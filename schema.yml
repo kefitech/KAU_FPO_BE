@@ -1,0 +1,542 @@
+openapi: 3.0.3
+info:
+  title: KAU-FPO Platform API
+  version: 1.0.0
+  description: AI-Based Digital Platform for KAU-FPO Linkage Programme
+  contact:
+    name: KEFI Tech
+    email: support@kefitech.com
+paths:
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: Authenticate user with username/email and password. Sets JWT tokens
+        as HTTP-only cookies for enhanced security.
+      summary: User Login (Cookie-based)
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: Login successful - JWT tokens set as HTTP-only cookies and
+            user info returned
+        '400':
+          description: Invalid credentials or validation error
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: Logout user by blacklisting the refresh token from cookie and clearing
+        all JWT cookies.
+      summary: User Logout (Cookie-based)
+      tags:
+      - Authentication
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '200':
+          description: Logout successful - cookies cleared and token blacklisted
+        '400':
+          description: Invalid or missing token
+  /api/auth/register/super-admin/:
+    post:
+      operationId: auth_register_super_admin_create
+      description: Create a new super admin account. First registration requires no
+        auth (bootstrap mode).
+      summary: Register Super Admin
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterSuperAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterSuperAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterSuperAdminRequest'
+        required: true
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: Super admin account created successfully
+        '400':
+          description: Validation error
+  /api/auth/roles/:
+    get:
+      operationId: auth_roles_list
+      description: |-
+        List all roles with pagination.
+
+        GET /api/auth/roles/
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - auth
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRoleList'
+          description: ''
+    post:
+      operationId: auth_roles_create
+      description: |-
+        Create a new role.
+
+        POST /api/auth/roles/
+        Body: {"name": "role_name"}
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+        required: true
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+  /api/auth/roles/{id}/:
+    get:
+      operationId: auth_roles_retrieve
+      description: |-
+        ViewSet for Role (Django Group) CRUD operations.
+
+        Permissions:
+        - Super Admin: Full access (GET, POST, PUT, PATCH, DELETE)
+        - Other authenticated users: Read-only access (GET)
+
+        Endpoints:
+        - POST   /api/auth/roles/          Create new role (super_admin only)
+        - GET    /api/auth/roles/          List all roles (all authenticated users)
+        - PUT    /api/auth/roles/{id}/     Update role (super_admin only)
+        - PATCH  /api/auth/roles/{id}/     Update role (super_admin only)
+        - DELETE /api/auth/roles/{id}/     Delete role (super_admin only)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - auth
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+    put:
+      operationId: auth_roles_update
+      description: |-
+        Full update of a role.
+
+        PUT /api/auth/roles/{id}/
+        Body: {"name": "new_role_name"}
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+        required: true
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+    patch:
+      operationId: auth_roles_partial_update
+      description: |-
+        Partial update of a role.
+
+        PATCH /api/auth/roles/{id}/
+        Body: {"name": "new_role_name"}
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+    delete:
+      operationId: auth_roles_destroy
+      description: |-
+        Delete a role (hard delete).
+
+        DELETE /api/auth/roles/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - auth
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /api/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: Generate new access and refresh tokens using the refresh token
+        from cookie. Old refresh token is blacklisted.
+      summary: Refresh JWT Tokens (Cookie-based)
+      tags:
+      - Authentication
+      security:
+      - jwtCookieAuth: []
+      - jwtAuth: []
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: Token refresh successful - new tokens set as cookies
+        '400':
+          description: Invalid or expired refresh token
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      description: |-
+        Serializer for user login.
+
+        Accepts username or email along with password.
+        Returns JWT tokens (access + refresh) on successful authentication.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Username or email address
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: User password
+      required:
+      - password
+      - username
+    PaginatedRoleList:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Success
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        meta:
+          type: object
+          properties:
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  example: 1
+                page_size:
+                  type: integer
+                  example: 20
+                total_count:
+                  type: integer
+                  example: 100
+                total_pages:
+                  type: integer
+                  example: 5
+                has_next:
+                  type: boolean
+                  example: true
+                has_previous:
+                  type: boolean
+                  example: false
+    PatchedRoleRequest:
+      type: object
+      description: |-
+        Serializer for Role (Django Group) management.
+
+        Wraps Django's built-in Group model to manage roles.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+    RegisterSuperAdminRequest:
+      type: object
+      description: |-
+        Serializer for Super Admin registration.
+
+        Validates input and creates new super_admin user.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Username for login (alphanumeric and @/./+/-/_ only)
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Valid email address
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Minimum 8 characters, 1 uppercase, 1 lowercase, 1 number
+        password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Must match password
+        first_name:
+          type: string
+          minLength: 1
+          description: User's first name
+          maxLength: 150
+        last_name:
+          type: string
+          minLength: 1
+          description: User's last name
+          maxLength: 150
+      required:
+      - email
+      - first_name
+      - last_name
+      - password
+      - password_confirm
+      - username
+    Role:
+      type: object
+      description: |-
+        Serializer for Role (Django Group) management.
+
+        Wraps Django's built-in Group model to manage roles.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+      required:
+      - id
+      - name
+    RoleRequest:
+      type: object
+      description: |-
+        Serializer for Role (Django Group) management.
+
+        Wraps Django's built-in Group model to manage roles.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+      required:
+      - name
+    User:
+      type: object
+      description: |-
+        Serializer for User model (read-only representation).
+
+        Used for returning user data in responses.
+        Does not include password field.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Email address
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        roles:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        last_login:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - date_joined
+      - email
+      - first_name
+      - id
+      - is_active
+      - last_login
+      - last_name
+      - roles
+      - username
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    jwtCookieAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |-
+        JWT authentication using either:
+        1. **Authorization header**: `Bearer <access_token>` (for API testing)
+        2. **HTTP-only cookie**: `access_token=<token>` (for browser clients)
+
+        The cookie-based approach is preferred for production as it provides better security against XSS attacks.
+servers:
+- url: http://localhost:8000
+  description: Development Server

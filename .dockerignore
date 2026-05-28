@@ -1,0 +1,26 @@
+venv/
+.env
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+media/
+logs/
+staticfiles/
+
+# Documentation — not needed in image
+CLAUDE.md
+IMPLEMENTATION_PLAN.md
+Documents/
+docs/
+context/
+*.md
+
+# IDE
+.idea/
+.vscode/
+
+# Test files
+.coverage
+htmlcov/

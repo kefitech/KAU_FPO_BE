@@ -1,0 +1,63 @@
+# =============================================================================
+# KAU-FPO Backend - Development Requirements
+# =============================================================================
+# Development-only dependencies
+# Install: pip install -r requirements/development.txt
+# =============================================================================
+
+# Include base requirements
+-r base.txt
+
+# -----------------------------------------------------------------------------
+# Debugging
+# -----------------------------------------------------------------------------
+django-debug-toolbar>=4.3,<5.0      # Debug toolbar
+django-extensions>=3.2,<4.0         # Management commands
+ipython>=8.0,<9.0                   # Enhanced shell
+ipdb>=0.13,<1.0                     # IPython debugger
+
+# -----------------------------------------------------------------------------
+# Code Quality
+# -----------------------------------------------------------------------------
+black>=24.0,<25.0                   # Code formatter
+isort>=5.13,<6.0                    # Import sorter
+flake8>=7.0,<8.0                    # Linter
+pylint>=3.0,<4.0                    # Static analysis
+pylint-django>=2.5,<3.0             # Django plugin for pylint
+mypy>=1.8,<2.0                      # Type checker
+django-stubs>=4.2,<5.0              # Django type stubs
+djangorestframework-stubs>=3.14,<4.0  # DRF type stubs
+
+# -----------------------------------------------------------------------------
+# Testing
+# -----------------------------------------------------------------------------
+pytest>=8.0,<9.0                    # Test framework
+pytest-django>=4.8,<5.0             # Django plugin
+pytest-cov>=4.1,<5.0                # Coverage
+pytest-xdist>=3.5,<4.0              # Parallel tests
+pytest-asyncio>=0.23,<1.0           # Async tests
+factory-boy>=3.3,<4.0               # Test factories
+faker>=24.0,<25.0                   # Fake data generation
+responses>=0.25,<1.0                # Mock HTTP responses
+freezegun>=1.4,<2.0                 # Mock datetime
+
+# -----------------------------------------------------------------------------
+# Documentation
+# -----------------------------------------------------------------------------
+mkdocs>=1.5,<2.0                    # Documentation generator
+mkdocs-material>=9.5,<10.0          # Material theme
+
+# -----------------------------------------------------------------------------
+# Development Server
+# -----------------------------------------------------------------------------
+watchfiles>=0.21,<1.0               # File watcher for auto-reload
+
+# -----------------------------------------------------------------------------
+# Database Tools
+# -----------------------------------------------------------------------------
+# Using factory-boy + faker for seeding (already included in Testing section)
+
+# -----------------------------------------------------------------------------
+# Pre-commit Hooks
+# -----------------------------------------------------------------------------
+pre-commit>=3.6,<4.0                # Git hooks

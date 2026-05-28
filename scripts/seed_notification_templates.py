@@ -1,0 +1,363 @@
+"""
+Seed notification template codes and templates.
+
+Run:
+    source venv/bin/activate && python manage.py shell -c "
+    exec(open('scripts/seed_notification_templates.py').read())
+    seed_notification_templates()
+    "
+
+Idempotent — skips existing entries.
+Add new template codes here as new features are built.
+"""
+
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
+
+from apps.database.models import NotificationTemplateCode, NotificationTemplate, Language
+
+
+TEMPLATE_CODES = [
+    # code                    | channel     | description                                    | variables
+    ('welcome',               'email',      'Welcome email with login credentials',          ['user_name', 'email', 'temp_password']),
+    ('welcome',               'sms',        'Welcome SMS with login credentials',            ['user_name', 'temp_password']),
+    ('welcome',               'whatsapp',   'Welcome WhatsApp with login credentials',       ['user_name', 'temp_password']),
+    ('email_verification',    'email',      'OTP for email verification at registration',    ['user_name', 'otp']),
+    ('mobile_verification',   'sms',        'OTP for phone verification and password reset', ['otp']),
+    ('application_submitted', 'email',      'FPO application submitted confirmation',        ['user_name', 'application_id']),
+    ('application_submitted', 'sms',        'FPO application submitted SMS confirmation',    ['user_name', 'application_id']),
+    ('application_approved',  'email',      'FPO application approved notification',         ['user_name', 'fpo_name', 'application_id']),
+    ('application_approved',  'sms',        'FPO application approved SMS',                  ['user_name', 'application_id']),
+    ('application_approved',  'whatsapp',   'FPO application approved WhatsApp',             ['user_name', 'application_id']),
+    ('application_rejected',  'email',      'FPO application rejected notification',         ['user_name', 'fpo_name', 'rejection_reason']),
+    ('application_rejected',  'whatsapp',   'FPO application rejected WhatsApp',             ['user_name', 'rejection_reason']),
+    ('info_requested',        'email',      'Additional information requested from FPO',     ['user_name', 'request_message']),
+    ('password_reset',        'email',      'Password reset link email',                     ['user_name', 'reset_link']),
+    ('password_changed',      'email',      'Password changed confirmation email',           ['user_name']),
+    ('two_factor_otp',              'email', 'OTP email for 2FA recovery (disable 2FA)',          ['user_name', 'otp']),
+    ('fpo_email_otp',               'email', 'OTP to verify FPO office email before submission',   ['user_name', 'otp']),
+    ('fpo_phone_otp',               'sms',   'OTP to verify FPO office phone before submission',   ['otp']),
+    ('admin_new_fpo_application',   'email', 'Notify admin when a new FPO application is submitted', ['fpo_name', 'application_id', 'district']),
+]
+
+
+# Templates: (code, channel, language_code, subject, body)
+TEMPLATES = [
+    (
+        'mobile_verification', 'sms', 'en', '',
+        'Your KAU-FPO OTP is {{otp}}. Valid for 10 minutes. Do not share with anyone.',
+    ),
+    (
+        'mobile_verification', 'sms', 'ml', '',
+        'നിങ്ങളുടെ KAU-FPO OTP ആണ് {{otp}}. 10 മിനിറ്റ് സാധുവാണ്. ആരുമായും പങ്കിടരുത്.',
+    ),
+    (
+        'password_reset', 'email', 'en',
+        'Reset Your KAU-FPO Password',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>We received a request to reset your KAU-FPO account password.</p>'
+            '<p>Click the button below to set a new password. This link is valid for <strong>15 minutes</strong>.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">If you did not request a password reset, you can safely ignore this email.</p>'
+        ),
+    ),
+    (
+        'password_reset', 'email', 'ml',
+        'നിങ്ങളുടെ KAU-FPO പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിന്റെ പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യാൻ ഒരു അഭ്യർത്ഥന ലഭിച്ചു.</p>'
+            '<p>പുതിയ പാസ്‌വേഡ് സജ്ജമാക്കാൻ ചുവടെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക. ഈ ലിങ്ക് <strong>15 മിനിറ്റ്</strong> സാധുവാണ്.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">നിങ്ങൾ ഇത് അഭ്യർത്ഥിച്ചില്ലെങ്കിൽ ഈ ഇമെയിൽ അവഗണിക്കുക.</p>'
+        ),
+    ),
+    (
+        'password_changed', 'email', 'en',
+        'Your KAU-FPO Password Has Been Changed',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Your KAU-FPO account password has been successfully changed.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">'
+            'If you did not make this change, please contact support immediately.'
+            '</p>'
+        ),
+    ),
+    (
+        'password_changed', 'email', 'ml',
+        'നിങ്ങളുടെ KAU-FPO പാസ്‌വേഡ് മാറ്റി',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിന്റെ പാസ്‌വേഡ് വിജയകരമായി മാറ്റി.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">'
+            'നിങ്ങൾ ഈ മാറ്റം വരുത്തിയില്ലെങ്കിൽ, ഉടൻ സപ്പോർട്ടിനെ ബന്ധപ്പെടുക.'
+            '</p>'
+        ),
+    ),
+    (
+        'welcome', 'email', 'en',
+        'Your KAU-FPO Platform Account is Ready',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Welcome to the <strong>KAU-FPO Digital Platform</strong>! Your account has been created.</p>'
+            '<p>Here are your login credentials:</p>'
+            '<table style="margin:12px 0;border-collapse:collapse;">'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Email</td>'
+            '<td style="padding:4px 0;font-weight:600;">{{email}}</td></tr>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Temporary Password</td>'
+            '<td style="padding:4px 0;font-weight:600;letter-spacing:1px;">{{temp_password}}</td></tr>'
+            '</table>'
+            '<p style="margin-top:4px;font-size:13px;color:#888888;">Please log in and change your password immediately.</p>'
+        ),
+    ),
+    (
+        'welcome', 'email', 'ml',
+        'നിങ്ങളുടെ KAU-FPO അക്കൗണ്ട് തയ്യാറാണ്',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>KAU-FPO ഡിജിറ്റൽ പ്ലാറ്റ്‌ഫോമിലേക്ക്</strong> സ്വാഗതം! നിങ്ങളുടെ അക്കൗണ്ട് തയ്യാറാക്കി.</p>'
+            '<p>നിങ്ങളുടെ ലോഗിൻ വിവരങ്ങൾ:</p>'
+            '<table style="margin:12px 0;border-collapse:collapse;">'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">ഇമെയിൽ</td>'
+            '<td style="padding:4px 0;font-weight:600;">{{email}}</td></tr>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">താൽക്കാലിക പാസ്‌വേഡ്</td>'
+            '<td style="padding:4px 0;font-weight:600;letter-spacing:1px;">{{temp_password}}</td></tr>'
+            '</table>'
+            '<p style="margin-top:4px;font-size:13px;color:#888888;">ദയവായി ലോഗിൻ ചെയ്ത് ഉടൻ പാസ്‌വേഡ് മാറ്റുക.</p>'
+        ),
+    ),
+    (
+        'welcome', 'sms', 'en', '',
+        'Welcome to KAU-FPO, {{user_name}}! Your temporary password is {{temp_password}}. Login and change it immediately.',
+    ),
+    (
+        'welcome', 'sms', 'ml', '',
+        'KAU-FPO-ലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
+    ),
+    (
+        'application_submitted', 'email', 'en',
+        'FPO Application Submitted — {{application_id}}',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Your FPO application has been submitted successfully.</p>'
+            '<p style="margin:12px 0;">'
+            '<span style="color:#666;font-size:13px;">Application ID</span><br>'
+            '<strong style="font-size:16px;letter-spacing:0.5px;">{{application_id}}</strong>'
+            '</p>'
+            '<p>Our team will review your application and get back to you shortly.</p>'
+        ),
+    ),
+    (
+        'application_approved', 'email', 'en',
+        'Congratulations! Your FPO Application is Approved',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>We are pleased to inform you that your FPO application for '
+            '<strong>{{fpo_name}}</strong> (ID: {{application_id}}) has been <strong style="color:#2e7d32;">approved</strong>.</p>'
+            '<p>You can now access all platform features. Log in to get started.</p>'
+        ),
+    ),
+    (
+        'application_rejected', 'email', 'en',
+        'FPO Application Update — Action Required',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>We regret to inform you that your FPO application for <strong>{{fpo_name}}</strong> '
+            'has not been approved at this time.</p>'
+            '<p><strong>Reason:</strong></p>'
+            '<p style="background:#fff8f8;border-left:3px solid #e53935;padding:10px 14px;color:#555;font-size:14px;">{{rejection_reason}}</p>'
+            '<p>You may correct the issues and resubmit your application.</p>'
+        ),
+    ),
+    (
+        'info_requested', 'email', 'en',
+        'Additional Information Required for Your FPO Application',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Our team requires additional information to process your application.</p>'
+            '<p style="background:#f5f5f5;border-left:3px solid #2e7d32;padding:10px 14px;color:#555;font-size:14px;">{{request_message}}</p>'
+            '<p>Please log in and update your application at the earliest.</p>'
+        ),
+    ),
+    (
+        'two_factor_otp', 'email', 'en',
+        'Your KAU-FPO 2FA Recovery OTP',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>You requested to disable Two-Factor Authentication on your KAU-FPO account.</p>'
+            '<p>Your recovery OTP is:</p>'
+            '<p style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;'
+            'padding:16px;background:#f5f5f5;border-radius:4px;color:#2e7d32;">{{otp}}</p>'
+            '<p>This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">'
+            'If you did not request this, your account may be at risk. '
+            'Please contact support immediately.'
+            '</p>'
+        ),
+    ),
+    (
+        'two_factor_otp', 'email', 'ml',
+        'നിങ്ങളുടെ KAU-FPO 2FA റിക്കവറി OTP',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിൽ Two-Factor Authentication നിർത്തലാക്കാൻ '
+            'ഒരു അഭ്യർത്ഥന ലഭിച്ചു.</p>'
+            '<p>നിങ്ങളുടെ റിക്കവറി OTP:</p>'
+            '<p style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;'
+            'padding:16px;background:#f5f5f5;border-radius:4px;color:#2e7d32;">{{otp}}</p>'
+            '<p>ഈ OTP <strong>10 മിനിറ്റ്</strong> സാധുവാണ്. ആരുമായും പങ്കിടരുത്.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">'
+            'നിങ്ങൾ ഇത് അഭ്യർത്ഥിച്ചില്ലെങ്കിൽ, ഉടൻ സപ്പോർട്ടിനെ ബന്ധപ്പെടുക.'
+            '</p>'
+        ),
+    ),
+    # ── FPO verification OTPs ────────────────────────────────────────────────────
+    (
+        'fpo_email_otp', 'email', 'en',
+        'Verify Your FPO Office Email — KAU-FPO',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Please use the OTP below to verify your FPO office email address.</p>'
+            '<p style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;'
+            'padding:16px;background:#f5f5f5;border-radius:4px;color:#2e7d32;">{{otp}}</p>'
+            '<p>This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.</p>'
+        ),
+    ),
+    (
+        'fpo_email_otp', 'email', 'ml',
+        'നിങ്ങളുടെ FPO ഓഫീസ് ഇമെയിൽ സ്ഥിരീകരിക്കുക — KAU-FPO',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>നിങ്ങളുടെ FPO ഓഫീസ് ഇമെയിൽ സ്ഥിരീകരിക്കാൻ ചുവടെയുള്ള OTP ഉപയോഗിക്കുക.</p>'
+            '<p style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;'
+            'padding:16px;background:#f5f5f5;border-radius:4px;color:#2e7d32;">{{otp}}</p>'
+            '<p>ഈ OTP <strong>10 മിനിറ്റ്</strong> സാധുവാണ്. ആരുമായും പങ്കിടരുത്.</p>'
+        ),
+    ),
+    (
+        'fpo_phone_otp', 'sms', 'en', '',
+        'Your KAU-FPO phone verification OTP is {{otp}}. Valid for 10 minutes. Do not share with anyone.',
+    ),
+    (
+        'fpo_phone_otp', 'sms', 'ml', '',
+        'നിങ്ങളുടെ KAU-FPO ഫോൺ സ്ഥിരീകരണ OTP ആണ് {{otp}}. 10 മിനിറ്റ് സാധുവാണ്. ആരുമായും പങ്കിടരുത്.',
+    ),
+    (
+        'admin_new_fpo_application', 'email', 'en',
+        'New FPO Application Submitted — {{application_id}}',
+        (
+            '<p>A new FPO application has been submitted and is awaiting review.</p>'
+            '<table style="margin:12px 0;border-collapse:collapse;">'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">FPO Name</td>'
+            '<td style="padding:4px 0;font-weight:600;">{{fpo_name}}</td></tr>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Application ID</td>'
+            '<td style="padding:4px 0;font-weight:600;letter-spacing:0.5px;">{{application_id}}</td></tr>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">District</td>'
+            '<td style="padding:4px 0;">{{district}}</td></tr>'
+            '</table>'
+            '<p>Please log in to the admin panel to review this application.</p>'
+        ),
+    ),
+    # ── WhatsApp templates ───────────────────────────────────────────────────────
+    # whatsapp_template_name must match the Meta-approved template name exactly.
+    # These are placeholder names — KAU updates them after Meta approval via the API.
+    (
+        'welcome', 'whatsapp', 'en', '',
+        'Welcome to KAU-FPO, {{user_name}}! Your temporary password is {{temp_password}}. Login and change it immediately.',
+        {'whatsapp_template_name': 'kau_fpo_welcome', 'whatsapp_template_language': 'en'},
+    ),
+    (
+        'welcome', 'whatsapp', 'ml', '',
+        'KAU-FPO-ലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
+        {'whatsapp_template_name': 'kau_fpo_welcome', 'whatsapp_template_language': 'ml'},
+    ),
+    (
+        'application_approved', 'whatsapp', 'en', '',
+        'Congratulations {{user_name}}! Your FPO application (ID: {{application_id}}) has been approved on the KAU-FPO platform.',
+        {'whatsapp_template_name': 'kau_fpo_application_approved', 'whatsapp_template_language': 'en'},
+    ),
+    (
+        'application_approved', 'whatsapp', 'ml', '',
+        'അഭിനന്ദനങ്ങൾ {{user_name}}! നിങ്ങളുടെ FPO അപ്ലിക്കേഷൻ (ID: {{application_id}}) KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ അംഗീകരിച്ചു.',
+        {'whatsapp_template_name': 'kau_fpo_application_approved', 'whatsapp_template_language': 'ml'},
+    ),
+    (
+        'application_rejected', 'whatsapp', 'en', '',
+        'Dear {{user_name}}, your FPO application was not approved. Reason: {{rejection_reason}}. Please log in for details.',
+        {'whatsapp_template_name': 'kau_fpo_application_rejected', 'whatsapp_template_language': 'en'},
+    ),
+    (
+        'application_rejected', 'whatsapp', 'ml', '',
+        'പ്രിയ {{user_name}}, നിങ്ങളുടെ FPO അപ്ലിക്കേഷൻ അംഗീകരിച്ചില്ല. കാരണം: {{rejection_reason}}. വിശദാംശങ്ങൾക്ക് ലോഗിൻ ചെയ്യുക.',
+        {'whatsapp_template_name': 'kau_fpo_application_rejected', 'whatsapp_template_language': 'ml'},
+    ),
+]
+
+
+def seed_notification_templates():
+    print("=" * 60)
+    print("SEEDING NOTIFICATION TEMPLATE CODES & TEMPLATES")
+    print("=" * 60)
+
+    created_codes = 0
+    skipped_codes = 0
+
+    code_map = {}  # (code, channel) -> NotificationTemplateCode instance
+
+    for code, channel, description, variables in TEMPLATE_CODES:
+        obj, created = NotificationTemplateCode.objects.get_or_create(
+            code=code,
+            channel=channel,
+            defaults={
+                'description': description,
+                'variables':   variables,
+                'is_active':   True,
+            }
+        )
+        code_map[(code, channel)] = obj
+        if created:
+            print(f"  [+] Template code: {code} ({channel})")
+            created_codes += 1
+        else:
+            skipped_codes += 1
+
+    print(f"\n  Template codes: {created_codes} created, {skipped_codes} skipped")
+
+    created_templates = 0
+    skipped_templates = 0
+
+    for row in TEMPLATES:
+        code, channel, lang_code, subject, body = row[:5]
+        extra = row[5] if len(row) > 5 else {}
+
+        template_code = code_map.get((code, channel))
+        if not template_code:
+            print(f"  [!] Template code not found for {code}/{channel} — skipping template")
+            continue
+
+        try:
+            language = Language.objects.get(code=lang_code)
+        except Language.DoesNotExist:
+            print(f"  [!] Language '{lang_code}' not found — skipping template for {code}/{channel}")
+            continue
+
+        defaults = {
+            'subject':   subject,
+            'body':      body,
+            'is_active': True,
+            **extra,
+        }
+
+        obj, created = NotificationTemplate.objects.update_or_create(
+            template_code=template_code,
+            language=language,
+            defaults=defaults,
+        )
+        if created:
+            print(f"  [+] Template: {code} ({channel}/{lang_code})")
+            created_templates += 1
+        else:
+            print(f"  [~] Updated : {code} ({channel}/{lang_code})")
+            skipped_templates += 1
+
+    print(f"  Templates      : {created_templates} created, {skipped_templates} skipped")
+    print("\nDone.")
