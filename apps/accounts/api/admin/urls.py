@@ -29,12 +29,54 @@ from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
 from .applications import (
     ApplicationListView,
     ApplicationDetailView,
-    ApplicationMarkUnderReviewView,
-    ApplicationApproveView,
     ApplicationRejectView,
     ApplicationRequestInfoView,
     ApplicationVerifyDocumentView,
     ApplicationSetUserLimitView,
+    ApplicationAssignTierView,
+)
+from .external_apis import (
+    ExternalAPISettingsListView,
+    ExternalAPISettingsDetailView,
+    ExternalAPISettingsActivateView,
+    ExternalAPISettingsDeactivateView,
+)
+from .page_access import RolePageAccessListView, RolePageAccessDetailView
+from .audit_logs import AuditLogListView
+from .dashboard import AdminDashboardStatsView
+from .ownership_claims import (
+    OwnershipClaimListView,
+    OwnershipClaimDetailView,
+    OwnershipClaimApproveView,
+    OwnershipClaimRejectView,
+)
+from .cms import (
+    SiteBlockListView,
+    SiteBlockDetailView,
+    AnnouncementListView,
+    AnnouncementDetailView,
+    FAQListView,
+    FAQDetailView,
+)
+from .schemes import (
+    SchemeListView,
+    SchemeDetailView,
+    SchemeActivateView,
+    SchemeDeactivateView,
+)
+from .experts import (
+    ExpertListView,
+    ExpertDetailView,
+    ExpertActivateView,
+    ExpertDeactivateView,
+    ExpertEnquiriesView,
+)
+from .fpo_users import (
+    FPOUserListView,
+    FPOUserDetailView,
+    FPOUserActivateView,
+    FPOUserDeactivateView,
+    FPOUserResetPasswordView,
 )
 from apps.accounts.api.menu import MenuItemViewSet
 from apps.accounts.api.sub_admins import SubAdminViewSet
@@ -57,12 +99,52 @@ urlpatterns = [
     path('fpo-permissions/',          FPOPermissionMatrixView.as_view(),      name='fpo-permission-matrix'),
     path('fpo-permissions/<int:role_id>/', FPORolePermissionsView.as_view(), name='fpo-role-permissions'),
     # FPO Applications workflow
-    path('applications/',                                                    ApplicationListView.as_view(),             name='admin-applications-list'),
-    path('applications/<int:fpo_id>/',                                       ApplicationDetailView.as_view(),           name='admin-applications-detail'),
-    path('applications/<int:fpo_id>/mark-under-review/',                     ApplicationMarkUnderReviewView.as_view(),  name='admin-applications-under-review'),
-    path('applications/<int:fpo_id>/approve/',                               ApplicationApproveView.as_view(),          name='admin-applications-approve'),
-    path('applications/<int:fpo_id>/reject/',                                ApplicationRejectView.as_view(),           name='admin-applications-reject'),
-    path('applications/<int:fpo_id>/request-info/',                          ApplicationRequestInfoView.as_view(),      name='admin-applications-request-info'),
-    path('applications/<int:fpo_id>/verify-document/<int:doc_id>/',          ApplicationVerifyDocumentView.as_view(),   name='admin-applications-verify-doc'),
-    path('applications/<int:fpo_id>/set-user-limit/',                        ApplicationSetUserLimitView.as_view(),     name='admin-applications-set-limit'),
+    path('applications/',                                                    ApplicationListView.as_view(),            name='admin-applications-list'),
+    path('applications/<int:fpo_id>/',                                       ApplicationDetailView.as_view(),          name='admin-applications-detail'),
+    path('applications/<int:fpo_id>/reject/',                                ApplicationRejectView.as_view(),          name='admin-applications-reject'),
+    path('applications/<int:fpo_id>/request-info/',                          ApplicationRequestInfoView.as_view(),     name='admin-applications-request-info'),
+    path('applications/<int:fpo_id>/verify-document/<int:doc_id>/',          ApplicationVerifyDocumentView.as_view(),  name='admin-applications-verify-doc'),
+    path('applications/<int:fpo_id>/set-user-limit/',                        ApplicationSetUserLimitView.as_view(),    name='admin-applications-set-limit'),
+    path('applications/<int:fpo_id>/assign-tier/',                           ApplicationAssignTierView.as_view(),      name='admin-applications-assign-tier'),
+    # Dashboard
+    path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
+    # Audit Logs
+    path('audit-logs/',                     AuditLogListView.as_view(),                  name='admin-audit-logs'),
+    # Ownership Claims
+    path('ownership-claims/',                           OwnershipClaimListView.as_view(),   name='admin-claims-list'),
+    path('ownership-claims/<int:claim_id>/',            OwnershipClaimDetailView.as_view(), name='admin-claims-detail'),
+    path('ownership-claims/<int:claim_id>/approve/',    OwnershipClaimApproveView.as_view(),name='admin-claims-approve'),
+    path('ownership-claims/<int:claim_id>/reject/',     OwnershipClaimRejectView.as_view(), name='admin-claims-reject'),
+    # Role Page Access
+    path('page-access/',                    RolePageAccessListView.as_view(),            name='admin-page-access-list'),
+    path('page-access/<int:role_id>/',      RolePageAccessDetailView.as_view(),          name='admin-page-access-detail'),
+    # External API Settings
+    path('external-apis/',                  ExternalAPISettingsListView.as_view(),       name='admin-external-apis-list'),
+    path('external-apis/<int:pk>/',        ExternalAPISettingsDetailView.as_view(),     name='admin-external-apis-detail'),
+    path('external-apis/<int:pk>/activate/',   ExternalAPISettingsActivateView.as_view(),   name='admin-external-apis-activate'),
+    path('external-apis/<int:pk>/deactivate/', ExternalAPISettingsDeactivateView.as_view(),  name='admin-external-apis-deactivate'),
+    # Site Content CMS
+    path('site-content/',             SiteBlockListView.as_view(),      name='admin-site-content-list'),
+    path('site-content/<str:key>/',   SiteBlockDetailView.as_view(),    name='admin-site-content-detail'),
+    path('announcements/',            AnnouncementListView.as_view(),   name='admin-announcements-list'),
+    path('announcements/<int:pk>/',   AnnouncementDetailView.as_view(), name='admin-announcements-detail'),
+    path('faqs/',                     FAQListView.as_view(),            name='admin-faqs-list'),
+    path('faqs/<int:pk>/',            FAQDetailView.as_view(),          name='admin-faqs-detail'),
+    # Schemes & Subsidies
+    path('schemes/',                       SchemeListView.as_view(),        name='admin-schemes-list'),
+    path('schemes/<int:pk>/',              SchemeDetailView.as_view(),      name='admin-schemes-detail'),
+    path('schemes/<int:pk>/activate/',     SchemeActivateView.as_view(),    name='admin-schemes-activate'),
+    path('schemes/<int:pk>/deactivate/',   SchemeDeactivateView.as_view(),  name='admin-schemes-deactivate'),
+    # FPO User Management
+    path('fpo-users/',                              FPOUserListView.as_view(),          name='admin-fpo-users-list'),
+    path('fpo-users/<int:user_id>/',                FPOUserDetailView.as_view(),        name='admin-fpo-users-detail'),
+    path('fpo-users/<int:user_id>/activate/',        FPOUserActivateView.as_view(),      name='admin-fpo-users-activate'),
+    path('fpo-users/<int:user_id>/deactivate/',      FPOUserDeactivateView.as_view(),    name='admin-fpo-users-deactivate'),
+    path('fpo-users/<int:user_id>/reset-password/',  FPOUserResetPasswordView.as_view(), name='admin-fpo-users-reset-password'),
+    # Expert Directory
+    path('experts/',                       ExpertListView.as_view(),        name='admin-experts-list'),
+    path('experts/<int:pk>/',              ExpertDetailView.as_view(),      name='admin-experts-detail'),
+    path('experts/<int:pk>/activate/',     ExpertActivateView.as_view(),    name='admin-experts-activate'),
+    path('experts/<int:pk>/deactivate/',   ExpertDeactivateView.as_view(),  name='admin-experts-deactivate'),
+    path('experts/<int:pk>/enquiries/',    ExpertEnquiriesView.as_view(),   name='admin-experts-enquiries'),
 ]

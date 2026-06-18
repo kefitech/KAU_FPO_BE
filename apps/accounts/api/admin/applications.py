@@ -1,22 +1,23 @@
 """
 Admin FPO Applications Workflow
 =================================
-KAU admin staff review, approve, reject, and manage FPO applications.
+KAU admin staff review and manage FPO applications.
+
+NOTE (KAU RCD June 2026): Approval is fully automated.
+FPOs go DRAFT → SUBMITTED → APPROVED in one transaction on submit.
+Admin can only reject or request info AFTER the FPO is already APPROVED.
 
 Endpoints:
     GET    /api/admin/applications/                                 — list with filters
     GET    /api/admin/applications/{id}/                            — full detail
-    POST   /api/admin/applications/{id}/mark-under-review/
-    POST   /api/admin/applications/{id}/approve/
     POST   /api/admin/applications/{id}/reject/                     — reason ≥ 20 chars (BR-103)
-    POST   /api/admin/applications/{id}/request-info/
+    POST   /api/admin/applications/{id}/request-info/               — APPROVED → INFO_REQUIRED
     POST   /api/admin/applications/{id}/verify-document/{doc_id}/
-    PATCH  /api/admin/applications/{id}/set-user-limit/
+    PATCH  /api/admin/applications/{id}/set-user-limit/             — deprecated (410)
 
 Permissions:
     list / detail / verify-document  → super_admin OR sub_admin with can_view_all_fpos
-    mark-under-review / approve / reject / request-info
-                                     → super_admin OR sub_admin with can_approve_fpo
+    reject / request-info            → super_admin OR sub_admin with can_approve_fpo
     set-user-limit                   → super_admin only
 """
 
@@ -31,7 +32,9 @@ from apps.core.utils.constants import FPOStatus, UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
-from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory
+from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory, FPOTierHistory
+from apps.core.models.generic import AuditLog
+from apps.core.services.audit import AuditService
 
 User = get_user_model()
 
@@ -113,8 +116,9 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
         model  = FPO
         fields = [
             'id', 'application_id', 'status', 'tier', 'current_step',
-            'name', 'name_ml', 'registration_number', 'cin_number',
-            'date_of_registration', 'registered_under', 'pan_number', 'gst_number',
+            'name', 'name_ml', 'legal_structure', 'legal_structure_detail',
+            'registration_number', 'cin_number',
+            'date_of_registration', 'pan_number', 'gst_number',
             'district', 'block_taluk', 'village_town',
             'address_line1', 'address_line2', 'pincode',
             'office_phone', 'office_email', 'website',
@@ -123,10 +127,13 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
             'signatory_name', 'signatory_designation',
             'signatory_phone', 'signatory_email', 'signatory_aadhaar_last4',
             'total_members', 'male_members', 'female_members', 'sc_st_members',
+            'promoting_agency', 'facilitating_agency_name',
+            'ceo_available', 'accountant_available',
+            'total_directors', 'women_directors', 'directors_under_35',
             'primary_commodities', 'secondary_commodities',
             'annual_turnover', 'bank_name', 'bank_branch',
             'account_number', 'ifsc_code', 'description',
-            'primary_user', 'max_secondary_users',
+            'primary_user',
             'documents', 'status_history',
             'created_at', 'updated_at',
         ]
@@ -165,12 +172,6 @@ class _RequestInfoSerializer(serializers.Serializer):
     )
 
 
-class _SetUserLimitSerializer(serializers.Serializer):
-    max_secondary_users = serializers.IntegerField(
-        min_value=1,
-        max_value=100,
-        help_text='New secondary user limit for this FPO (1–100)',
-    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -335,76 +336,16 @@ class ApplicationDetailView(APIView):
         )
 
 
-class ApplicationMarkUnderReviewView(APIView):
-
-    @extend_schema(
-        tags=['Admin - FPO Applications'],
-        summary='Mark application as Under Review',
-        description='Transitions SUBMITTED → UNDER_REVIEW. Call this when an admin starts reviewing the application.',
-        request=None,
-    )
-    def post(self, request, fpo_id):
-        if not _can_act(request.user):
-            return StandardResponse.error(
-                t('common.permission_denied', request.language),
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-
-        fpo = _get_fpo(fpo_id)
-        if not fpo:
-            return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
-
-        if fpo.status != FPOStatus.SUBMITTED:
-            return StandardResponse.error(
-                f'Cannot move to UNDER_REVIEW from "{fpo.status}". Application must be SUBMITTED.',
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        _transition(fpo, FPOStatus.UNDER_REVIEW, request.user)
-        return StandardResponse.success(
-            data={'status': fpo.status},
-            message=t('admin.fpo_under_review', request.language),
-        )
-
-
-class ApplicationApproveView(APIView):
-
-    @extend_schema(
-        tags=['Admin - FPO Applications'],
-        summary='Approve FPO application',
-        description='Transitions UNDER_REVIEW → APPROVED. FPO user receives email notification.',
-        request=None,
-    )
-    def post(self, request, fpo_id):
-        if not _can_act(request.user):
-            return StandardResponse.error(
-                t('common.permission_denied', request.language),
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-
-        fpo = _get_fpo(fpo_id)
-        if not fpo:
-            return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
-
-        if fpo.status != FPOStatus.UNDER_REVIEW:
-            return StandardResponse.error(
-                f'Cannot approve from "{fpo.status}". Application must be UNDER_REVIEW.',
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        _transition(fpo, FPOStatus.APPROVED, request.user)
-        return StandardResponse.success(
-            data={'status': fpo.status},
-            message=t('admin.fpo_approved', request.language),
-        )
-
-
 class ApplicationRejectView(APIView):
 
     @extend_schema(
         tags=['Admin - FPO Applications'],
         summary='Reject FPO application',
-        description='Transitions to REJECTED. Reason must be at least 20 characters (BR-103). FPO user receives email with reason.',
+        description=(
+            'Transitions APPROVED → REJECTED. Reason must be at least 20 characters (BR-103). '
+            'FPO user receives email with reason.\n\n'
+            '**Note:** Since approval is automated, admin can only reject an already-APPROVED FPO.'
+        ),
         request=_RejectSerializer,
         examples=[
             OpenApiExample('Reject', value={'reason': 'Submitted documents are incomplete and do not meet requirements.'}, request_only=True),
@@ -425,9 +366,9 @@ class ApplicationRejectView(APIView):
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
-        if fpo.status not in {FPOStatus.SUBMITTED, FPOStatus.UNDER_REVIEW}:
+        if fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error(
-                f'Cannot reject from "{fpo.status}". Must be SUBMITTED or UNDER_REVIEW.',
+                f'Cannot reject from "{fpo.status}". FPO must be APPROVED.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -443,7 +384,11 @@ class ApplicationRequestInfoView(APIView):
     @extend_schema(
         tags=['Admin - FPO Applications'],
         summary='Request additional information from FPO',
-        description='Transitions UNDER_REVIEW → INFO_REQUIRED. FPO user receives email with the notes.',
+        description=(
+            'Transitions APPROVED → INFO_REQUIRED. FPO user receives email with the notes '
+            'and can re-submit once they have addressed the request.\n\n'
+            '**Note:** Since approval is automated, admin raises info requests on an already-APPROVED FPO.'
+        ),
         request=_RequestInfoSerializer,
         examples=[
             OpenApiExample('Request info', value={'notes': 'Please upload a clearer copy of the bank statement.'}, request_only=True),
@@ -464,9 +409,9 @@ class ApplicationRequestInfoView(APIView):
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
-        if fpo.status != FPOStatus.UNDER_REVIEW:
+        if fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error(
-                f'Cannot request info from "{fpo.status}". Application must be UNDER_REVIEW.',
+                f'Cannot request info from "{fpo.status}". FPO must be APPROVED.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -526,35 +471,92 @@ class ApplicationVerifyDocumentView(APIView):
 
 
 class ApplicationSetUserLimitView(APIView):
+    """KAU confirmed: no secondary user limit. This endpoint is retained for future use."""
 
     @extend_schema(
         tags=['Admin - FPO Applications'],
-        summary='Set secondary user limit for an FPO',
-        description='Overrides the default limit of 15 secondary users for this FPO. Super admin only.',
-        request=_SetUserLimitSerializer,
-        examples=[
-            OpenApiExample('Set limit', value={'max_secondary_users': 25}, request_only=True),
-        ],
+        summary='Secondary user limit (disabled)',
+        description='KAU confirmed no secondary user limit is required. This endpoint is a no-op placeholder.',
+        deprecated=True,
     )
     def patch(self, request, fpo_id):
+        return StandardResponse.error(
+            'Secondary user limit has been removed by KAU. No limit applies.',
+            status_code=status.HTTP_410_GONE,
+        )
+
+
+class _AssignTierSerializer(serializers.Serializer):
+    tier           = serializers.ChoiceField(choices=['A', 'B', 'C', 'D'])
+    financial_year = serializers.RegexField(
+        r'^\d{4}-\d{2}$',
+        help_text='e.g. 2026-27',
+    )
+    notes = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+
+class ApplicationAssignTierView(APIView):
+
+    @extend_schema(
+        tags=['Admin - Tier Management'],
+        summary='Manually assign tier to an FPO',
+        description=(
+            'Admin override — manually assign a tier (A/B/C/D) to an FPO for a specific financial year.\n\n'
+            'Creates a new `FPOTierHistory` record and syncs `FPO.tier` immediately.\n\n'
+            'Use this when the auto-scored tier needs correction.\n\n'
+            '**Request body:**\n'
+            '```json\n'
+            '{ "tier": "A", "financial_year": "2026-27", "notes": "Manually verified — exceptional performance" }\n'
+            '```'
+        ),
+        request=_AssignTierSerializer,
+        responses={200: None},
+    )
+    def post(self, request, fpo_id):
         if not request.user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
             return StandardResponse.error(
-                t('common.permission_denied', request.language),
+                'Only super admin can manually assign a tier.',
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer = _SetUserLimitSerializer(data=request.data)
-        if not serializer.is_valid():
-            return StandardResponse.error(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
+        try:
+            fpo = FPO.objects.get(id=fpo_id)
+        except FPO.DoesNotExist:
+            return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        fpo = _get_fpo(fpo_id)
-        if not fpo:
-            return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
+        ser = _AssignTierSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
 
-        fpo.max_secondary_users = serializer.validated_data['max_secondary_users']
-        fpo.save(update_fields=['max_secondary_users', 'updated_at'])
+        tier           = ser.validated_data['tier']
+        financial_year = ser.validated_data['financial_year']
+        notes          = ser.validated_data.get('notes', '')
 
+        from django.db import transaction
+        with transaction.atomic():
+            FPOTierHistory.objects.create(
+                fpo            = fpo,
+                tier           = tier,
+                financial_year = financial_year,
+                assigned_by    = request.user,
+                notes          = notes or f'Manually assigned by admin ({request.user.get_full_name() or request.user.username})',
+            )
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.TIER_RECALCULATION,
+            instance=fpo,
+            request=request,
+            changes={
+                'tier':           tier,
+                'financial_year': financial_year,
+                'manual_override': True,
+                'notes':          notes,
+            },
+        )
+
+        fpo.refresh_from_db()
         return StandardResponse.success(
-            data={'max_secondary_users': fpo.max_secondary_users},
-            message=t('admin.user_limit_updated', request.language),
+            data={'tier': fpo.tier, 'financial_year': financial_year},
+            message=f'Tier {tier} manually assigned to {fpo.name} for {financial_year}.',
         )

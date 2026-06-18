@@ -31,8 +31,9 @@ from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
-from apps.database.models.fpo import FPOAction, FPOMemberPermission
-from apps.core.models.generic import MasterLookup
+from django.contrib.auth.models import Group
+from apps.database.models.fpo import FPOAction, RoleActionPermission
+from apps.accounts.api.admin.fpo_roles import SYSTEM_GROUPS
 
 TRANSLATION_CATEGORY = 'fpo_action'
 
@@ -132,10 +133,10 @@ class FPOActionSerializer(serializers.ModelSerializer):
         translations = validated_data.pop('translations', {})
         obj = super().create(validated_data)
         _save_translations(obj, translations)
-        # Seed default permission matrix rows (all denied) for every existing role
-        roles = MasterLookup.objects.filter(category='fpo_member_role', is_active=True)
-        FPOMemberPermission.objects.bulk_create([
-            FPOMemberPermission(role=role, action=obj, is_allowed=False)
+        # Seed default permission matrix rows (all denied) for every existing Group
+        roles = Group.objects.all()
+        RoleActionPermission.objects.bulk_create([
+            RoleActionPermission(role=role, action=obj, is_allowed=False)
             for role in roles
         ], ignore_conflicts=True)
         return obj

@@ -271,6 +271,10 @@ class FPOMessages:
         "Application submitted successfully. Your application ID is {application_id}.",
         "അപേക്ഷ വിജയകരമായി സമർപ്പിച്ചു. നിങ്ങളുടെ അപേക്ഷ ഐഡി: {application_id}."
     )
+    APPLICATION_APPROVED: Tuple[str, str] = (
+        "Your FPO registration has been approved. Your application ID is {application_id}.",
+        "നിങ്ങളുടെ FPO രജിസ്ട്രേഷൻ അംഗീകരിക്കപ്പെട്ടു. അപേക്ഷ ഐഡി: {application_id}."
+    )
 
 
 class DocumentMessages:

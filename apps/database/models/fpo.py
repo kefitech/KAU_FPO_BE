@@ -16,10 +16,10 @@ import uuid
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db import models
 
 from apps.core.models.base import BaseModel, TimeStampedModel
-from apps.core.models.generic import MasterLookup
 from apps.core.utils.constants import (
     District,
     DocumentType,
@@ -34,12 +34,11 @@ User = get_user_model()
 # CHOICES
 # =============================================================================
 
-class RegisteredUnder(models.TextChoices):
-    COMPANIES_ACT          = 'companies_act',          'Companies Act 2013'
-    COOPERATIVE_ACT        = 'cooperative_act',         'Kerala Co-operative Societies Act 1969'
-    PRODUCER_COMPANIES_ACT = 'producer_companies_act',  'Producer Companies Act'
-    SOCIETIES_ACT          = 'societies_act',           'Societies Registration Act 1860'
-    OTHER                  = 'other',                   'Other'
+# Legal structure values that require CIN format (21-char MCA21).
+# All others use Registration Number (alphanumeric).
+# Stored here as a set for serializer validation — legal_structure field itself
+# is a plain CharField; options come from MasterLookup category='legal_structure'.
+LEGAL_STRUCTURES_REQUIRING_CIN = {'companies_act', 'producer_companies'}
 
 
 class TierChoice(models.TextChoices):
@@ -74,14 +73,19 @@ class FPO(BaseModel):
     """
 
     # ── Step 1: Basic Info ────────────────────────────────────────────────────
-    name                 = models.CharField(max_length=255)
-    name_ml              = models.CharField(max_length=255, blank=True)
-    registration_number  = models.CharField(max_length=100, unique=True)
-    cin_number           = models.CharField(max_length=21, blank=True)
-    date_of_registration = models.DateField()
-    registered_under     = models.CharField(max_length=50, choices=RegisteredUnder.choices)
-    pan_number           = models.CharField(max_length=10)
-    gst_number           = models.CharField(max_length=15, blank=True)
+    name                   = models.CharField(max_length=255)
+    name_ml                = models.CharField(max_length=255, blank=True)
+    legal_structure        = models.CharField(max_length=50, blank=True,
+                                              help_text="MasterLookup category='legal_structure'")
+    legal_structure_detail = models.CharField(max_length=100, blank=True,
+                                              help_text="State CSA act name when legal_structure='state_specific_csa'")
+    registration_number    = models.CharField(max_length=100, blank=True,
+                                              help_text="For non-Companies Act FPOs. Unique when non-empty.")
+    cin_number             = models.CharField(max_length=21, blank=True,
+                                              help_text="Companies Act / Producer Companies only. MCA21 21-char format.")
+    date_of_registration   = models.DateField(null=True, blank=True)
+    pan_number             = models.CharField(max_length=10)
+    gst_number             = models.CharField(max_length=15, blank=True)
 
     # ── Step 2: Contact & Location ────────────────────────────────────────────
     district       = models.CharField(max_length=3, choices=District.choices, blank=True)
@@ -111,7 +115,8 @@ class FPO(BaseModel):
 
     # ── Step 3: Signatory & Members ───────────────────────────────────────────
     signatory_name          = models.CharField(max_length=255, blank=True)
-    signatory_designation   = models.CharField(max_length=100, blank=True)
+    signatory_designation   = models.CharField(max_length=100, blank=True,
+                                               help_text="MasterLookup category='signatory_designation'")
     signatory_phone         = models.CharField(max_length=10, blank=True)
     signatory_email         = models.EmailField(blank=True)
     signatory_aadhaar_last4 = models.CharField(max_length=4, blank=True)
@@ -119,6 +124,16 @@ class FPO(BaseModel):
     male_members            = models.PositiveIntegerField(null=True, blank=True)
     female_members          = models.PositiveIntegerField(null=True, blank=True)
     sc_st_members           = models.PositiveIntegerField(null=True, blank=True)
+
+    # New Step 3 fields (KAU RCD Reply, June 2026)
+    promoting_agency        = models.CharField(max_length=50, blank=True,
+                                               help_text="MasterLookup category='promoting_agency'")
+    facilitating_agency_name = models.CharField(max_length=255, blank=True)
+    ceo_available           = models.BooleanField(null=True, blank=True)
+    accountant_available    = models.BooleanField(null=True, blank=True)
+    total_directors         = models.PositiveIntegerField(null=True, blank=True)
+    women_directors         = models.PositiveIntegerField(null=True, blank=True)
+    directors_under_35      = models.PositiveIntegerField(null=True, blank=True)
 
     # ── Step 4: Business Details ──────────────────────────────────────────────
     primary_commodities   = models.JSONField(default=list, blank=True)
@@ -139,17 +154,13 @@ class FPO(BaseModel):
     )
 
     # ── Meta / System Fields ──────────────────────────────────────────────────
-    application_id      = models.CharField(max_length=30, unique=True, blank=True)
-    status              = models.CharField(
+    application_id = models.CharField(max_length=30, unique=True, blank=True)
+    status         = models.CharField(
         max_length=20, choices=FPOStatus.choices, default=FPOStatus.DRAFT
     )
-    tier                = models.CharField(
+    tier           = models.CharField(
         max_length=1, blank=True,
         help_text='Cached from FPOTierHistory — never set directly (BR-107)'
-    )
-    max_secondary_users = models.PositiveIntegerField(
-        default=15,
-        help_text='Max secondary users for this FPO. Configurable by KAU Admin.'
     )
     primary_user = models.OneToOneField(
         User, on_delete=models.PROTECT,
@@ -214,9 +225,11 @@ class FPO(BaseModel):
         if not self.phone_verified:
             errors.append('Office phone number must be verified before submission.')
         if not self.required_documents_uploaded:
-            errors.append('All required documents must be uploaded before submission.')
+            errors.append('All 3 required documents must be uploaded before submission.')
         if not self.total_members or self.total_members < 10:
             errors.append('FPO must have at least 10 members.')
+        if not self.latitude or not self.longitude:
+            errors.append('GPS coordinates are required. Please allow location access or enter coordinates manually.')
         return errors
 
 
@@ -326,12 +339,11 @@ class FPOUserMembership(BaseModel):
     fpo       = models.ForeignKey(FPO, on_delete=models.CASCADE, related_name='memberships')
     user      = models.OneToOneField(User, on_delete=models.CASCADE, related_name='fpo_membership')
     role      = models.ForeignKey(
-        MasterLookup,
+        Group,
         on_delete=models.PROTECT,
         related_name='fpo_memberships',
         null=True, blank=True,
-        limit_choices_to={'category': 'fpo_member_role'},
-        help_text='FPO-internal role — set from MasterLookup category fpo_member_role'
+        help_text='FPO-internal role — Django Group (primary, secondary, etc.)',
     )
     is_active = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -433,6 +445,158 @@ class FPOTierHistory(TimeStampedModel):
 
 
 # =============================================================================
+# TIER ASSESSMENT — FRAMEWORK MODELS
+# =============================================================================
+
+class TierDomain(models.Model):
+    """6 domains from KAU Tier Framework v1.0."""
+    code       = models.CharField(max_length=5, unique=True)   # I, II, III, IV, V, VI
+    name       = models.CharField(max_length=100)
+    max_marks  = models.PositiveSmallIntegerField()
+    order      = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Domain {self.code} — {self.name} ({self.max_marks} marks)"
+
+
+class TierCriterion(models.Model):
+    """16 criteria across 6 domains."""
+
+    class ScoringType(models.TextChoices):
+        COMPUTED        = 'computed',        'Computed automatically'
+        SINGLE_SELECT   = 'single_select',   'Single select'
+        BOOLEAN         = 'boolean',         'Yes / No'
+        NUMERIC_RANGE   = 'numeric_range',   'Numeric range'
+        ADDITIVE_BOOL   = 'additive_bool',   'Additive Yes/No'
+        PERCENTAGE      = 'percentage',      'System calculated percentage'
+        MULTI_SELECT    = 'multi_select',    'Multi select'
+        CONDITIONAL     = 'conditional',     'Conditional logic'
+
+    domain       = models.ForeignKey(TierDomain, on_delete=models.CASCADE, related_name='criteria')
+    code         = models.CharField(max_length=50, unique=True)
+    name         = models.CharField(max_length=200)
+    max_marks    = models.PositiveSmallIntegerField()
+    scoring_type = models.CharField(max_length=20, choices=ScoringType.choices)
+    order        = models.PositiveSmallIntegerField(default=0)
+    is_active    = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['domain__order', 'order']
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+
+class TierQuestion(models.Model):
+    """29 questions linked to criteria. answer_config stores options+scores as JSON."""
+
+    class InputType(models.TextChoices):
+        NUMBER        = 'number',        'Numeric input'
+        BOOLEAN       = 'boolean',       'Yes / No'
+        SINGLE_SELECT = 'single_select', 'Single select dropdown'
+        MULTI_SELECT  = 'multi_select',  'Multi select checkboxes'
+        COMPUTED      = 'computed',      'Auto-computed — no user input'
+
+    criterion    = models.ForeignKey(TierCriterion, on_delete=models.CASCADE, related_name='questions')
+    question_no  = models.PositiveSmallIntegerField(unique=True)   # Q1–Q29
+    text         = models.TextField()
+    input_type   = models.CharField(max_length=20, choices=InputType.choices)
+    answer_config = models.JSONField(
+        default=dict,
+        help_text=(
+            'For single_select/boolean: {"options": [{"value": "yes", "label": "Yes", "score": 5}]}\n'
+            'For number/multi_select: {"score_ranges": [...]} or {"options": [...]}\n'
+            'For computed: {"source": "date_of_registration"}'
+        )
+    )
+    is_conditional   = models.BooleanField(default=False)
+    condition_on     = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='dependent_questions',
+        help_text='Show this question only when condition_on question has condition_value'
+    )
+    condition_value  = models.CharField(max_length=50, blank=True)
+    is_required      = models.BooleanField(default=True)
+    has_upload       = models.BooleanField(default=False, help_text='Q6, Q17, Q27 require document upload')
+    upload_label     = models.CharField(max_length=200, blank=True)
+    order            = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['question_no']
+
+    def __str__(self):
+        return f"Q{self.question_no}: {self.text[:60]}"
+
+
+# =============================================================================
+# TIER ASSESSMENT — FPO RESPONSE MODELS
+# =============================================================================
+
+class FPOAssessment(BaseModel):
+    """One assessment per FPO per financial year. Editable until locked."""
+
+    class Status(models.TextChoices):
+        DRAFT     = 'draft',     'Draft'
+        SUBMITTED = 'submitted', 'Submitted'
+
+    fpo            = models.ForeignKey(FPO, on_delete=models.CASCADE, related_name='assessments')
+    financial_year = models.CharField(max_length=7, help_text='e.g. 2025-26')
+    status         = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    total_score    = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    tier_assigned  = models.CharField(max_length=1, blank=True)
+    domain_scores  = models.JSONField(default=dict, blank=True, help_text='{"I": 17.0, "II": 13.0, ...} — stored on submit')
+    submitted_at   = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('fpo', 'financial_year')]
+        ordering        = ['-financial_year']
+
+    def __str__(self):
+        return f"{self.fpo} — {self.financial_year} ({self.status})"
+
+
+class AssessmentAnswer(models.Model):
+    """One answer per question per assessment. answer stored as JSON for flexibility."""
+
+    assessment = models.ForeignKey(FPOAssessment, on_delete=models.CASCADE, related_name='answers')
+    question   = models.ForeignKey(TierQuestion, on_delete=models.CASCADE, related_name='answers')
+    answer     = models.JSONField(
+        help_text='Stored as JSON: "yes", 5000, ["local_market","trader"], etc.'
+    )
+    score      = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = [('assessment', 'question')]
+        ordering        = ['question__question_no']
+
+    def __str__(self):
+        return f"Assessment {self.assessment_id} — Q{self.question.question_no}"
+
+
+class AssessmentUpload(models.Model):
+    """Supporting document uploaded alongside a tier assessment question (Q6, Q17, Q27)."""
+
+    def _upload_path(self, filename):
+        ext = filename.rsplit('.', 1)[-1].lower()
+        return f'fpo/{self.assessment.fpo_id}/tier-assessment/{self.assessment_id}/q{self.question_no}/{uuid.uuid4()}.{ext}'
+
+    assessment        = models.ForeignKey(FPOAssessment, on_delete=models.CASCADE, related_name='uploads')
+    question_no       = models.PositiveSmallIntegerField()
+    file              = models.FileField(upload_to=_upload_path)
+    original_filename = models.CharField(max_length=255)
+    uploaded_at       = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['question_no', 'uploaded_at']
+
+    def __str__(self):
+        return f"Assessment {self.assessment_id} — Q{self.question_no} — {self.original_filename}"
+
+
+# =============================================================================
 # FPO OWNERSHIP CLAIM
 # =============================================================================
 
@@ -485,6 +649,13 @@ class FPOAction(BaseModel):
     code        = models.CharField(max_length=50, unique=True, help_text="Immutable action code used in permission checks")
     description = models.CharField(max_length=255, blank=True)
     is_active   = models.BooleanField(default=True)
+    menu_item   = models.ForeignKey(
+        'database.MenuItem',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='actions',
+        help_text='Page this action belongs to — used to group actions in the permission matrix',
+    )
 
     class Meta:
         ordering = ['code']
@@ -501,19 +672,19 @@ class FPOAction(BaseModel):
         return self.code
 
 
-class FPOMemberPermission(BaseModel):
+class RoleActionPermission(BaseModel):
     """
     System-wide permission matrix — role x action ceiling set by KAU Admin.
 
-    Primary user cannot grant their team more than what this matrix allows.
+    Covers all roles in the system (super_admin, sub_admin, fpo_manager,
+    government, cbbo, expert, viewer, primary, secondary, and any future roles).
     One row per (role, action) pair. Admin manages via /api/admin/fpo-permissions/.
     """
 
     role       = models.ForeignKey(
-        MasterLookup,
+        Group,
         on_delete=models.CASCADE,
-        related_name='fpo_permissions',
-        limit_choices_to={'category': 'fpo_member_role'},
+        related_name='role_action_permissions',
     )
     action     = models.ForeignKey(FPOAction, on_delete=models.CASCADE, related_name='role_permissions')
     is_allowed = models.BooleanField(default=False)
@@ -523,14 +694,14 @@ class FPOMemberPermission(BaseModel):
         ordering        = ['role', 'action']
 
     def __str__(self):
-        return f"{self.role.code} + {self.action.code} -> {'allowed' if self.is_allowed else 'denied'}"
+        return f"{self.role.name} + {self.action.code} -> {'allowed' if self.is_allowed else 'denied'}"
 
 
 class FPOMemberOverride(BaseModel):
     """
     Per-member permission override set by the FPO primary user.
 
-    Only actions where the role ceiling (FPOMemberPermission.is_allowed=True)
+    Only actions where the role ceiling (RoleActionPermission.is_allowed=True)
     can be overridden — primary cannot grant above the ceiling.
     """
 
@@ -548,3 +719,32 @@ class FPOMemberOverride(BaseModel):
 
     def __str__(self):
         return f"{self.membership.user} + {self.action.code} -> {'allowed' if self.is_allowed else 'denied'} (override)"
+
+
+class RolePageAccess(BaseModel):
+    """
+    Which pages each role can access — Step 2 of the permission matrix flow.
+
+    Role → Pages mapping. Admin sets this via the unified permission matrix UI:
+    Step 1: Select role → Step 2: Pages shown as rows, toggle access → Step 3: Save.
+    """
+
+    role      = models.ForeignKey(
+        Group,
+        on_delete=models.CASCADE,
+        related_name='page_access',
+    )
+    menu_item = models.ForeignKey(
+        'database.MenuItem',
+        on_delete=models.CASCADE,
+        related_name='role_access',
+    )
+    is_allowed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = [('role', 'menu_item')]
+        ordering        = ['role', 'menu_item']
+
+    def __str__(self):
+        status = 'allowed' if self.is_allowed else 'denied'
+        return f"{self.role.name} → {self.menu_item.path} ({status})"

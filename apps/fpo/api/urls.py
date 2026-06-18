@@ -22,6 +22,24 @@ from .email_verify import EmailOTPSendView, EmailOTPConfirmView
 from .phone_verify import PhoneOTPSendView, PhoneOTPConfirmView
 from .documents import DocumentUploadView, DocumentDeleteView
 from .submit import FPOSubmitView
+from .dashboard import FPODashboardView
+from .claim import FPOClaimView
+from .schemes import SchemeListPublicView, SchemeDetailPublicView
+from .team import (
+    TeamListView, TeamInviteView, TeamDeactivateView,
+    TeamBulkInviteView, TeamBulkInviteFileView,
+    TeamBulkActivateView, TeamBulkDeactivateView,
+    TeamResetPasswordView,
+)
+from .tier_assessment import (
+    TierAssessmentView,
+    TierAssessmentDetailView,
+    TierAssessmentSubmitView,
+    TierAssessmentHistoryView,
+    TierAssessmentReopenView,
+    TierAssessmentUploadView,
+    TierAssessmentUploadDeleteView,
+)
 
 # FPO-facing auth urls exposed to accounts/urls.py
 fpo_auth_urls = [
@@ -48,4 +66,28 @@ urlpatterns = [
     path('me/documents/<uuid:doc_id>/', DocumentDeleteView.as_view(),     name='fpo-document-delete'),
     # Submit
     path('me/submit/',                  FPOSubmitView.as_view(),           name='fpo-submit'),
+    # Dashboard
+    path('dashboard/',                  FPODashboardView.as_view(),        name='fpo-dashboard'),
+    # Ownership claim
+    path('claim/',                      FPOClaimView.as_view(),            name='fpo-claim'),
+    # Schemes & Subsidies (public browse)
+    path('schemes/',                    SchemeListPublicView.as_view(),    name='fpo-schemes-list'),
+    path('schemes/<int:pk>/',           SchemeDetailPublicView.as_view(),  name='fpo-schemes-detail'),
+    # Team management
+    path('me/team/',                            TeamListView.as_view(),           name='fpo-team-list'),
+    path('me/team/invite/',                     TeamInviteView.as_view(),         name='fpo-team-invite'),
+    path('me/team/bulk-invite/',                TeamBulkInviteView.as_view(),     name='fpo-team-bulk-invite'),
+    path('me/team/bulk-invite-file/',           TeamBulkInviteFileView.as_view(), name='fpo-team-bulk-invite-file'),
+    path('me/team/bulk-activate/',              TeamBulkActivateView.as_view(),   name='fpo-team-bulk-activate'),
+    path('me/team/bulk-deactivate/',            TeamBulkDeactivateView.as_view(), name='fpo-team-bulk-deactivate'),
+    path('me/team/<int:user_id>/deactivate/',     TeamDeactivateView.as_view(),     name='fpo-team-deactivate'),
+    path('me/team/<int:user_id>/reset-password/', TeamResetPasswordView.as_view(),  name='fpo-team-reset-password'),
+    # Tier Assessment
+    path('me/tier-assessment/',                         TierAssessmentView.as_view(),        name='fpo-tier-assessment'),
+    path('me/tier-assessment/history/',                 TierAssessmentHistoryView.as_view(), name='fpo-tier-assessment-history'),
+    path('me/tier-assessment/<int:assessment_id>/',     TierAssessmentDetailView.as_view(),  name='fpo-tier-assessment-detail'),
+    path('me/tier-assessment/<int:assessment_id>/submit/', TierAssessmentSubmitView.as_view(), name='fpo-tier-assessment-submit'),
+    path('me/tier-assessment/<int:assessment_id>/reopen/', TierAssessmentReopenView.as_view(), name='fpo-tier-assessment-reopen'),
+    path('me/tier-assessment/<int:assessment_id>/upload/', TierAssessmentUploadView.as_view(), name='fpo-tier-assessment-upload'),
+    path('me/tier-assessment/<int:assessment_id>/upload/<int:upload_id>/', TierAssessmentUploadDeleteView.as_view(), name='fpo-tier-assessment-upload-delete'),
 ]

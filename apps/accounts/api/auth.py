@@ -14,6 +14,8 @@ Created: 22-04-2026
 import secrets
 import logging
 
+from django.db import models
+
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -51,6 +53,52 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+# =============================================================================
+# LOGIN LOCKOUT HELPERS (KAU RCD Reply, June 2026)
+# =============================================================================
+# 5 consecutive failures → account locked for 30 minutes
+# Implemented via Redis keys — no migration needed.
+
+_LOGIN_FAIL_TTL  = 30 * 60   # 30-minute window
+_LOGIN_LOCK_TTL  = 30 * 60   # lock duration
+_MAX_FAIL_COUNT  = 5
+
+
+def _fail_key(identifier: str) -> str:
+    return f'auth:failed_logins:{identifier.lower()}'
+
+
+def _lock_key(user_id: int) -> str:
+    return f'auth:account_locked:{user_id}'
+
+
+def _increment_failed_login(identifier: str) -> None:
+    from django.core.cache import cache
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    key   = _fail_key(identifier)
+    count = cache.get(key, 0) + 1
+    cache.set(key, count, timeout=_LOGIN_FAIL_TTL)
+    # Lock the account if threshold reached
+    user = User.objects.filter(
+        models.Q(username=identifier) | models.Q(email=identifier)
+    ).first()
+    if user and count >= _MAX_FAIL_COUNT:
+        cache.set(_lock_key(user.pk), True, timeout=_LOGIN_LOCK_TTL)
+
+
+def _is_account_locked(user) -> bool:
+    from django.core.cache import cache
+    return bool(cache.get(_lock_key(user.pk)))
+
+
+def _clear_failed_login(user) -> None:
+    from django.core.cache import cache
+    cache.delete(_fail_key(user.username))
+    cache.delete(_fail_key(user.email))
+    cache.delete(_lock_key(user.pk))
 
 
 def _get_user_role(user):
@@ -178,15 +226,16 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
 
         if not serializer.is_valid():
-            # Log failed login attempt
-            username_or_email = request.data.get('username', 'Unknown')
+            username_or_email = request.data.get('username', '') or request.data.get('email', '')
+            # Increment failed login counter if we can identify the user
+            if username_or_email:
+                _increment_failed_login(username_or_email)
             AuditLog.log(
                 user=None,
                 action=AuditLog.Action.FAILED_LOGIN,
                 changes={'username': username_or_email, 'reason': 'Invalid credentials'},
                 request=request
             )
-
             return StandardResponse.validation_error(
                 errors=serializer.errors,
                 message=t("auth.invalid_credentials", language)
@@ -194,6 +243,16 @@ class LoginView(APIView):
 
         # Get authenticated user
         user = serializer.validated_data['user']
+
+        # Check if account is locked
+        if _is_account_locked(user):
+            return StandardResponse.error(
+                t('auth.account_locked', language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Clear failed login counter on success
+        _clear_failed_login(user)
 
         # Log successful login with IP address and location metadata
         AuditLog.log(

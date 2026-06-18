@@ -296,6 +296,9 @@ def seed_admin_translations(languages):
         # FPO permission matrix management
         ('fpo_permissions_retrieved',  'FPO permission matrix retrieved successfully', 'FPO അനുമതി മാട്രിക്സ് വിജയകരമായി ലഭിച്ചു'),
         ('fpo_permissions_updated',    'FPO permission matrix updated successfully',   'FPO അനുമതി മാട്രിക്സ് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        # Page access matrix
+        ('page_access_retrieved',      'Page access retrieved successfully',           'പേജ് ആക്സസ് വിജയകരമായി ലഭിച്ചു'),
+        ('page_access_updated',        'Page access updated successfully',             'പേജ് ആക്സസ് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
         # FPO application workflow
         ('fpo_under_review',           'Application marked as Under Review',           'അപേക്ഷ അവലോകനത്തിലേക്ക് മാറ്റി'),
         ('fpo_approved',               'FPO application approved successfully',        'FPO അപേക്ഷ വിജയകരമായി അംഗീകരിച്ചു'),
@@ -827,6 +830,33 @@ def seed_ui_translations(languages):
         ('applications_table.req_info_btn_submitting',      'Sending…',                                 'അയക്കുന്നു…'),
         ('applications_table.user_limit_dialog_title',      'Set Secondary User Limit',                 'ദ്വിതീയ ഉപയോക്തൃ പരിധി നിശ്ചയിക്കുക'),
         ('applications_table.user_limit_field_label',       'Max Secondary Users',                      'പരമാവധി ദ്വിതീയ ഉപയോക്താക്കൾ'),
+
+        # External APIs table
+        ('external_apis_table.page_title',          'External API Settings',                                'എക്സ്റ്റേണൽ API ക്രമീകരണങ്ങൾ'),
+        ('external_apis_table.page_description',    'Manage credentials for PAN / GSTIN / CIN verification', 'PAN / GSTIN / CIN പരിശോധനയ്ക്കുള്ള ക്രെഡൻഷ്യലുകൾ നിയന്ത്രിക്കുക'),
+        ('external_apis_table.col_service',         'Service',                                              'സേവനം'),
+        ('external_apis_table.col_api_url',         'API URL',                                              'API URL'),
+        ('external_apis_table.col_status',          'Status',                                               'നില'),
+        ('external_apis_table.col_actions',         'Actions',                                              'ആക്ഷനുകൾ'),
+        ('external_apis_table.add_button',          'Add External API',                                     'എക്സ്റ്റേണൽ API ചേർക്കുക'),
+        ('external_apis_table.view_title',          'External API Details',                                 'എക്സ്റ്റേണൽ API വിശദാംശങ്ങൾ'),
+        ('external_apis_table.toast_activated',     'External API activated',                               'എക്സ്റ്റേണൽ API സജീവമാക്കി'),
+        ('external_apis_table.toast_deactivated',   'External API deactivated',                             'എക്സ്റ്റേണൽ API നിഷ്ക്രിയമാക്കി'),
+        ('external_apis_table.deactivate_title',    'Deactivate API',                                       'API നിഷ്ക്രിയമാക്കുക'),
+        ('external_apis_table.deactivate_description', 'This will fall back to format-only validation.',    'ഇത് ഫോർമാറ്റ്-മാത്രം മൂല്യനിർണ്ണയത്തിലേക്ക് മടങ്ങും.'),
+        ('external_apis_table.empty_state',         'No external APIs configured yet',                      'ഇതുവരെ എക്സ്റ്റേണൽ API കോൺഫിഗർ ചെയ്തിട്ടില്ല'),
+        ('external_apis_table.field_service',       'Service',                                              'സേവനം'),
+        ('external_apis_table.field_api_url',       'API URL',                                              'API URL'),
+        ('external_apis_table.field_api_key',       'API Key',                                              'API കീ'),
+        ('external_apis_table.field_client_id',     'Client ID',                                            'ക്ലയന്റ് ID'),
+        ('external_apis_table.dialog_title_create', 'Configure API',                                        'API കോൺഫിഗർ ചെയ്യുക'),
+        ('external_apis_table.dialog_title_edit',   'Update API Settings',                                  'API ക്രമീകരണങ്ങൾ അപ്ഡേറ്റ് ചെയ്യുക'),
+        ('external_apis_table.btn_save',            'Save',                                                 'സംരക്ഷിക്കുക'),
+        ('external_apis_table.btn_saving',          'Saving…',                                              'സംരക്ഷിക്കുന്നു…'),
+        ('external_apis_table.btn_cancel',          'Cancel',                                               'റദ്ദാക്കുക'),
+        ('external_apis_table.service_pan',         'PAN Verification',                                     'PAN പരിശോധന'),
+        ('external_apis_table.service_gstin',       'GSTIN Verification',                                   'GSTIN പരിശോധന'),
+        ('external_apis_table.service_cin',         'CIN Verification',                                     'CIN പരിശോധന'),
     ]
 
     count = 0
@@ -861,6 +891,17 @@ def seed_menu_translations(languages):
         ('fpo_member_roles',       'Member Roles',             'അംഗ റോളുകൾ'),
         ('fpo_permissions',        'FPO Permissions',          'FPO അനുമതികൾ'),
         ('fpo_applications',       'FPO Applications',         'FPO അപേക്ഷകൾ'),
+        ('external_apis',          'External APIs',             'എക്സ്റ്റേണൽ APIs'),
+        # FPO portal pages
+        ('fpo_dashboard',          'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('fpo_register',           'Register FPO',             'FPO രജിസ്റ്റർ ചെയ്യുക'),
+        ('fpo_status',             'Application Status',       'അപേക്ഷ സ്ഥിതി'),
+        ('fpo_profile',            'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
+        ('fpo_applications',       'Applications',             'അപേക്ഷകൾ'),
+        ('fpo_recommendations',    'AI Recommendations',       'AI ശുപാർശകൾ'),
+        ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
+        ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),
+        ('fpo_settings',           'Settings',                 'ക്രമീകരണങ്ങൾ'),
     ]
 
     count = 0

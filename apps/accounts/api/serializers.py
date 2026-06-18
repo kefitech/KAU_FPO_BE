@@ -178,35 +178,24 @@ class RegisterSuperAdminSerializer(serializers.Serializer):
 
     def validate_password(self, value):
         """
-        Validate password strength.
-
-        Requirements:
+        KAU-confirmed password requirements (RCD Reply, June 2026):
         - Minimum 8 characters
         - At least 1 uppercase letter
         - At least 1 lowercase letter
         - At least 1 number
+        - At least 1 special character
         """
-        # Check minimum length
-        if len(value) < 8:
-            raise serializers.ValidationError(
-                t('auth.password_too_short')
-            )
+        from apps.core.utils.validators import validate_password_strength
+        try:
+            validate_password_strength(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
 
-        # Check complexity
-        has_upper = re.search(r'[A-Z]', value)
-        has_lower = re.search(r'[a-z]', value)
-        has_digit = re.search(r'\d', value)
-
-        if not (has_upper and has_lower and has_digit):
-            raise serializers.ValidationError(
-                t('auth.password_too_weak')
-            )
-
-        # Use Django's password validators (common passwords, etc.)
+        # Also run Django's built-in validators (common passwords, etc.)
         try:
             validate_password(value)
         except DjangoValidationError as e:
-            raise serializers.ValidationError(str(e))
+            raise serializers.ValidationError(list(e.messages))
 
         return value
 
@@ -498,15 +487,15 @@ class ChangeCurrentPasswordSerializer(serializers.Serializer):
     )
 
     def validate_new_password(self, value):
-        import re
-        if len(value) < 8:
-            raise serializers.ValidationError(t('auth.password_too_short'))
-        if not (re.search(r'[A-Z]', value) and re.search(r'[a-z]', value) and re.search(r'\d', value)):
-            raise serializers.ValidationError(t('auth.password_too_weak'))
+        from apps.core.utils.validators import validate_password_strength
+        try:
+            validate_password_strength(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
         try:
             validate_password(value)
         except DjangoValidationError as e:
-            raise serializers.ValidationError(str(e))
+            raise serializers.ValidationError(list(e.messages))
         return value
 
     def validate(self, attrs):

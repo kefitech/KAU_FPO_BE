@@ -174,6 +174,17 @@ class AuditLog(TimeStampedModel):
         PASSWORD_RESET = 'password_reset', 'Password Reset'
         EXPORT = 'export', 'Data Export'
         IMPORT = 'import', 'Data Import'
+        # FPO-specific events
+        DOCUMENT_UPLOAD   = 'document_upload',   'Document Upload'
+        DOCUMENT_DELETE   = 'document_delete',   'Document Delete'
+        FPO_PROFILE_CHANGE = 'fpo_profile_change', 'FPO Profile Change'
+        FPO_SUBMIT        = 'fpo_submit',        'FPO Application Submitted'
+        FPO_STATUS_CHANGE = 'fpo_status_change', 'FPO Status Change'
+        TIER_RECALCULATION = 'tier_recalculation', 'Tier Recalculation'
+        # Team management events (wired in when team management is built)
+        FPO_USER_INVITE    = 'fpo_user_invite',    'FPO User Invited'
+        FPO_USER_ACTIVATE  = 'fpo_user_activate',  'FPO User Activated'
+        FPO_USER_DEACTIVATE = 'fpo_user_deactivate', 'FPO User Deactivated'
 
     # Who performed the action
     user = models.ForeignKey(

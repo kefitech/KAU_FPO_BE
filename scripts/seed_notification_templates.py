@@ -37,7 +37,10 @@ TEMPLATE_CODES = [
     ('two_factor_otp',              'email', 'OTP email for 2FA recovery (disable 2FA)',          ['user_name', 'otp']),
     ('fpo_email_otp',               'email', 'OTP to verify FPO office email before submission',   ['user_name', 'otp']),
     ('fpo_phone_otp',               'sms',   'OTP to verify FPO office phone before submission',   ['otp']),
-    ('admin_new_fpo_application',   'email', 'Notify admin when a new FPO application is submitted', ['fpo_name', 'application_id', 'district']),
+    ('admin_new_fpo_application',   'email',  'Notify admin when a new FPO application is submitted', ['fpo_name', 'application_id', 'district']),
+    ('application_approved',        'in_app', 'In-app notification when FPO is approved',             ['user_name', 'application_id']),
+    ('application_rejected',        'in_app', 'In-app notification when FPO is rejected',             ['user_name', 'rejection_reason']),
+    ('info_requested',              'in_app', 'In-app notification when admin requests more info',     ['user_name', 'request_message']),
 ]
 
 
@@ -290,6 +293,37 @@ TEMPLATES = [
         'പ്രിയ {{user_name}}, നിങ്ങളുടെ FPO അപ്ലിക്കേഷൻ അംഗീകരിച്ചില്ല. കാരണം: {{rejection_reason}}. വിശദാംശങ്ങൾക്ക് ലോഗിൻ ചെയ്യുക.',
         {'whatsapp_template_name': 'kau_fpo_application_rejected', 'whatsapp_template_language': 'ml'},
     ),
+    # ── In-App Notifications ─────────────────────────────────────────────────────
+    (
+        'application_approved', 'in_app', 'en',
+        'Your FPO Application is Approved',
+        'Congratulations {{user_name}}! Your FPO application (ID: {{application_id}}) has been approved. You can now access all platform features.',
+    ),
+    (
+        'application_approved', 'in_app', 'ml',
+        'നിങ്ങളുടെ FPO അപേക്ഷ അംഗീകരിച്ചു',
+        'അഭിനന്ദനങ്ങൾ {{user_name}}! നിങ്ങളുടെ FPO അപേക്ഷ (ID: {{application_id}}) അംഗീകരിച്ചു. ഇനി പ്ലാറ്റ്‌ഫോമിന്റെ എല്ലാ സൗകര്യങ്ങളും ഉപയോഗിക്കാം.',
+    ),
+    (
+        'application_rejected', 'in_app', 'en',
+        'FPO Application Not Approved',
+        'Dear {{user_name}}, your FPO application was not approved. Reason: {{rejection_reason}}. Please log in to review and resubmit.',
+    ),
+    (
+        'application_rejected', 'in_app', 'ml',
+        'FPO അപേക്ഷ അംഗീകരിച്ചില്ല',
+        'പ്രിയ {{user_name}}, നിങ്ങളുടെ FPO അപേക്ഷ അംഗീകരിച്ചില്ല. കാരണം: {{rejection_reason}}. ദയവായി ലോഗിൻ ചെയ്ത് വിശദാംശങ്ങൾ പരിശോധിക്കുക.',
+    ),
+    (
+        'info_requested', 'in_app', 'en',
+        'Additional Information Required',
+        'Dear {{user_name}}, our team requires additional information to process your FPO application. Please log in and update your application.',
+    ),
+    (
+        'info_requested', 'in_app', 'ml',
+        'കൂടുതൽ വിവരങ്ങൾ ആവശ്യമാണ്',
+        'പ്രിയ {{user_name}}, നിങ്ങളുടെ FPO അപേക്ഷ പ്രോസസ്സ് ചെയ്യാൻ കൂടുതൽ വിവരങ്ങൾ ആവശ്യമാണ്. ദയവായി ലോഗിൻ ചെയ്ത് അപ്ഡേറ്റ് ചെയ്യുക.',
+    ),
 ]
 
 
@@ -360,4 +394,16 @@ def seed_notification_templates():
             skipped_templates += 1
 
     print(f"  Templates      : {created_templates} created, {skipped_templates} skipped")
+
+    # ── Seed in_app channel settings ─────────────────────────────────────────
+    from apps.database.models.notification import NotificationChannelSettings
+    ch, created = NotificationChannelSettings.objects.get_or_create(
+        channel='in_app',
+        defaults={'config': {}, 'is_active': True},
+    )
+    if created:
+        print("\n  [+] Channel settings: in_app (no config required)")
+    else:
+        print("\n  [~] Channel settings: in_app already exists")
+
     print("\nDone.")

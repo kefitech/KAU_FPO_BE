@@ -1,0 +1,100 @@
+http://localhost:8000/api/fpo/dashboard/
+Server response
+Code	Details
+200	
+Response body
+Download
+{
+  "status": "success",
+  "message": "Dashboard loaded.",
+  "data": {
+    "profile": {
+      "id": "3",
+      "name": "Kerala Farmers Producer Company Limited",
+      "application_id": "KAU-FPO-TVM-2026-0001",
+      "status": "approved",
+      "legal_structure": "state_specific_csa",
+      "primary_commodities": [
+        "rice_paddy",
+        "pearl_millet",
+        "arecanut",
+        "coriander",
+        "mango",
+        "banana_stem",
+        "honey_products",
+        "spice_processing"
+      ],
+      "current_step": 4,
+      "pan_number": "AABCK1234D",
+      "date_of_registration": "2024-03-15",
+      "total_members": 15
+    },
+    "tier": {
+      "tier": null,
+      "financial_year": null
+    },
+    "location": {
+      "district": "TVM",
+      "block_taluk": "nedumangad",
+      "address_line1": "KefiTech Solutions Pvt Ltd , Trivandrum periyar building module 1  Trivandrum",
+      "address_line2": "",
+      "pincode": "695581",
+      "latitude": 8.556583,
+      "longitude": 76.882118
+    },
+    "team": {
+      "total": 0,
+      "active": 0
+    },
+    "documents": {
+      "uploaded": 3,
+      "verified": 0,
+      "required_missing": [],
+      "ready_to_submit": true
+    },
+    "notifications": {
+      "unread_count": 0,
+      "recent": []
+    },
+    "quick_links": [
+      {
+        "label": "Complete Registration",
+        "path": "/fpo/register"
+      },
+      {
+        "label": "View Status",
+        "path": "/fpo/status"
+      },
+      {
+        "label": "Upload Documents",
+        "path": "/fpo/register"
+      },
+      {
+        "label": "Team Members",
+        "path": "/fpo/settings"
+      },
+      {
+        "label": "My Profile",
+        "path": "/fpo/profile"
+      }
+    ]
+  }
+}
+Response headers
+ allow: GET,HEAD,OPTIONS 
+ content-language: en 
+ content-length: 1161 
+ content-type: application/json 
+ cross-origin-opener-policy: same-origin 
+ date: Fri,12 Jun 2026 15:41:49 GMT 
+ djdt-store-id: f064efb929174c6b9404e296efd64027 
+ referrer-policy: same-origin 
+ server: WSGIServer/0.2 CPython/3.10.12 
+ server-timing: TimerPanel_utime;dur=118.3929999999691;desc="User CPU time",TimerPanel_stime;dur=4.717999999996891;desc="System CPU time",TimerPanel_total;dur=123.110999999966;desc="Total CPU time",TimerPanel_total_time;dur=129.4245410244912;desc="Elapsed time",SQLPanel_sql_time;dur=9.36046993592754;desc="SQL 13 queries",CachePanel_total_time;dur=0;desc="Cache 0 Calls" 
+ vary: Accept,Accept-Language,origin 
+ x-content-type-options: nosniff 
+ x-frame-options: DENY 
+Responses
+Code	Description	Links
+200	
+No response body

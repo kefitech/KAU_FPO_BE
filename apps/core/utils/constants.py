@@ -34,7 +34,7 @@ class District(models.TextChoices):
     KOTTAYAM = "KTM", "Kottayam"
     IDUKKI = "IDK", "Idukki"
     ERNAKULAM = "EKM", "Ernakulam"
-    THRISSUR = "TSR", "Thrissur"
+    THRISSUR = "TRS", "Thrissur"
     PALAKKAD = "PKD", "Palakkad"
     MALAPPURAM = "MLP", "Malappuram"
     KOZHIKODE = "KZD", "Kozhikode"
@@ -52,7 +52,7 @@ DISTRICTS_BILINGUAL = {
     "KTM": ("Kottayam", "കോട്ടയം"),
     "IDK": ("Idukki", "ഇടുക്കി"),
     "EKM": ("Ernakulam", "എറണാകുളം"),
-    "TSR": ("Thrissur", "തൃശ്ശൂർ"),
+    "TRS": ("Thrissur", "തൃശ്ശൂർ"),
     "PKD": ("Palakkad", "പാലക്കാട്"),
     "MLP": ("Malappuram", "മലപ്പുറം"),
     "KZD": ("Kozhikode", "കോഴിക്കോട്"),
@@ -150,13 +150,13 @@ class FPOStatus(models.TextChoices):
 
 # Valid status transitions (from_status -> [allowed_to_statuses])
 FPO_STATUS_TRANSITIONS = {
-    FPOStatus.DRAFT: [FPOStatus.SUBMITTED],
-    FPOStatus.SUBMITTED: [FPOStatus.UNDER_REVIEW, FPOStatus.REJECTED],
-    FPOStatus.UNDER_REVIEW: [FPOStatus.APPROVED, FPOStatus.REJECTED, FPOStatus.INFO_REQUIRED],
+    FPOStatus.DRAFT:         [FPOStatus.SUBMITTED],
+    FPOStatus.SUBMITTED:     [FPOStatus.APPROVED, FPOStatus.UNDER_REVIEW, FPOStatus.REJECTED],
+    FPOStatus.UNDER_REVIEW:  [FPOStatus.APPROVED, FPOStatus.REJECTED, FPOStatus.INFO_REQUIRED],
     FPOStatus.INFO_REQUIRED: [FPOStatus.SUBMITTED],
-    FPOStatus.APPROVED: [FPOStatus.SUSPENDED],
-    FPOStatus.REJECTED: [FPOStatus.DRAFT],
-    FPOStatus.SUSPENDED: [FPOStatus.APPROVED],
+    FPOStatus.APPROVED:      [FPOStatus.SUSPENDED, FPOStatus.REJECTED],
+    FPOStatus.REJECTED:      [FPOStatus.DRAFT],
+    FPOStatus.SUSPENDED:     [FPOStatus.APPROVED],
 }
 
 
@@ -196,11 +196,11 @@ class DocumentType(models.TextChoices):
     OTHER = "other", "Other Document"
 
 
-# Documents required for FPO registration
+# Documents required for FPO registration (KAU confirmed 3 docs, June 2026)
+# Signatory ID removed — Aadhaar last 4 digits captured as a form field
 REQUIRED_DOCUMENTS = [
     DocumentType.FPO_REGISTRATION_CERT,
     DocumentType.BANK_DETAILS,
-    DocumentType.SIGNATORY_ID,
     DocumentType.PAN_CARD,
 ]
 

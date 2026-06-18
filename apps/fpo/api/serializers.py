@@ -18,7 +18,7 @@ from apps.core.services.translation import t
 from apps.core.utils.constants import UserRole
 
 from apps.database.models.fpo import (
-    FPO, ApplicationStatusHistory, RegisteredUnder,
+    FPO, ApplicationStatusHistory, LEGAL_STRUCTURES_REQUIRING_CIN,
 )
 from apps.core.utils.constants import District, FPOStatus
 
@@ -186,16 +186,21 @@ class FPOStep1Serializer(serializers.Serializer):
     """
     Step 1 — Basic Info. Creates FPO in DRAFT status.
     Duplicate detection on pan_number, registration_number, cin_number, gst_number.
+
+    legal_structure options come from MasterLookup category='legal_structure'.
+    Companies Act / Producer Companies → supply cin_number (21-char MCA21).
+    All others → supply registration_number (alphanumeric + /).
     """
 
-    name                 = serializers.CharField(max_length=255, help_text='FPO name in English')
-    name_ml              = serializers.CharField(max_length=255, required=False, allow_blank=True, help_text='FPO name in Malayalam (optional)')
-    registration_number  = serializers.CharField(max_length=100, help_text='Unique FPO registration number (alphanumeric + /)')
-    cin_number           = serializers.CharField(max_length=21, required=False, allow_blank=True, help_text='MCA21 CIN number (optional)')
-    date_of_registration = serializers.DateField(help_text='Date of FPO registration (not future, not older than 20 years)')
-    registered_under     = serializers.ChoiceField(choices=RegisteredUnder.choices, help_text='Act under which FPO is registered')
-    pan_number           = serializers.CharField(max_length=10, help_text='PAN number — format: AAAAA9999A')
-    gst_number           = serializers.CharField(max_length=15, required=False, allow_blank=True, help_text='GST number (optional) — must start with 32 for Kerala')
+    name                   = serializers.CharField(max_length=255, help_text='FPO name in English')
+    name_ml                = serializers.CharField(max_length=255, required=False, allow_blank=True, help_text='FPO name in Malayalam (optional)')
+    legal_structure        = serializers.CharField(max_length=50, help_text="Legal structure code — from /api/public/master-data/?category=legal_structure")
+    legal_structure_detail = serializers.CharField(max_length=100, required=False, allow_blank=True, help_text="Required when legal_structure='state_specific_csa' — specify the state act")
+    registration_number    = serializers.CharField(max_length=100, required=False, allow_blank=True, help_text='Unique FPO registration number (alphanumeric + /) — required for non-Companies Act FPOs')
+    cin_number             = serializers.CharField(max_length=21, required=False, allow_blank=True, help_text='MCA21 21-char CIN — required for Companies Act / Producer Companies')
+    date_of_registration   = serializers.DateField(help_text='Date of FPO registration (not future, not before 2004)')
+    pan_number             = serializers.CharField(max_length=10, help_text='PAN number — format: AAAAA9999A')
+    gst_number             = serializers.CharField(max_length=15, required=False, allow_blank=True, help_text='GST number (optional) — must start with 32 for Kerala')
 
     def validate_pan_number(self, value):
         import re
@@ -222,34 +227,60 @@ class FPOStep1Serializer(serializers.Serializer):
                 raise serializers.ValidationError('Invalid CIN format.')
         return value
 
+    def validate_legal_structure(self, value):
+        from apps.core.models.generic import MasterLookup
+        if not MasterLookup.objects.filter(
+            category='legal_structure', code=value, is_active=True
+        ).exists():
+            raise serializers.ValidationError('Invalid legal structure. Choose from the provided list.')
+        return value
+
     def validate_date_of_registration(self, value):
         from datetime import date
-        from dateutil.relativedelta import relativedelta
         today = date.today()
         if value > today:
             raise serializers.ValidationError('Date of registration cannot be in the future.')
-        if value < today - relativedelta(years=20):
-            raise serializers.ValidationError('Date of registration cannot be older than 20 years.')
+        if value.year < 2004:
+            raise serializers.ValidationError('Date of registration cannot be before 2004.')
         return value
 
     def validate_registration_number(self, value):
-        import re
-        value = value.strip()
-        if not re.match(r'^[A-Za-z0-9/]+$', value):
-            raise serializers.ValidationError('Registration number can only contain alphanumeric characters and /.')
-        # Duplicate check (exclude current FPO if updating)
-        fpo_id = self.context.get('fpo_id')
-        qs = FPO.objects.filter(registration_number=value)
-        if fpo_id:
-            qs = qs.exclude(pk=fpo_id)
-        if qs.exists():
-            raise serializers.ValidationError('duplicate')
+        if value:
+            value = value.strip()
+            if not re.match(r'^[A-Za-z0-9/]+$', value):
+                raise serializers.ValidationError('Registration number can only contain alphanumeric characters and /.')
+            fpo_id = self.context.get('fpo_id')
+            qs = FPO.objects.filter(registration_number=value)
+            if fpo_id:
+                qs = qs.exclude(pk=fpo_id)
+            if qs.exists():
+                raise serializers.ValidationError('duplicate')
         return value
 
     def validate(self, attrs):
-        # Duplicate checks for pan, gst, cin
         fpo_id = self.context.get('fpo_id')
+        legal_structure = attrs.get('legal_structure', '')
 
+        # CIN required for Companies Act / Producer Companies
+        if legal_structure in LEGAL_STRUCTURES_REQUIRING_CIN:
+            if not attrs.get('cin_number'):
+                raise serializers.ValidationError({
+                    'cin_number': 'CIN number is required for Companies Act / Producer Companies.'
+                })
+        else:
+            # Registration number required for all other structures
+            if not attrs.get('registration_number'):
+                raise serializers.ValidationError({
+                    'registration_number': 'Registration number is required for this legal structure.'
+                })
+
+        # state_specific_csa requires the detail field
+        if legal_structure == 'state_specific_csa' and not attrs.get('legal_structure_detail'):
+            raise serializers.ValidationError({
+                'legal_structure_detail': 'Please specify the state cooperative societies act.'
+            })
+
+        # Duplicate checks
         pan = attrs.get('pan_number')
         if pan:
             qs = FPO.objects.filter(pan_number=pan)
@@ -285,16 +316,16 @@ class FPOStep2Serializer(serializers.Serializer):
     """Step 2 — Contact & Location."""
 
     district      = serializers.ChoiceField(choices=District.choices)
-    block_taluk   = serializers.CharField(max_length=100)
+    block_taluk   = serializers.CharField(max_length=100, help_text='Block name — from /api/public/master-data/?category=block&district=<code>')
     village_town  = serializers.CharField(max_length=100)
     address_line1 = serializers.CharField(max_length=255)
     address_line2 = serializers.CharField(max_length=255, required=False, allow_blank=True)
     pincode       = serializers.CharField(max_length=6, help_text='6 digits starting with 6')
-    office_phone  = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    office_phone  = serializers.CharField(max_length=10, help_text='Required — 10-digit Indian mobile number')
     office_email  = serializers.EmailField(help_text='Will require OTP verification before submission')
     website       = serializers.URLField(required=False, allow_blank=True)
-    latitude      = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
-    longitude     = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    latitude      = serializers.DecimalField(max_digits=9, decimal_places=6, help_text='GPS latitude — required (captured from browser or entered manually)')
+    longitude     = serializers.DecimalField(max_digits=9, decimal_places=6, help_text='GPS longitude — required')
 
     def validate_pincode(self, value):
         if not value.isdigit() or len(value) != 6 or not value.startswith('6'):
@@ -334,7 +365,7 @@ class FPOStep3Serializer(serializers.Serializer):
     """Step 3 — Signatory & Members."""
 
     signatory_name          = serializers.CharField(max_length=255)
-    signatory_designation   = serializers.CharField(max_length=100)
+    signatory_designation   = serializers.CharField(max_length=100, help_text="From /api/public/master-data/?category=signatory_designation")
     signatory_phone         = serializers.CharField(max_length=10)
     signatory_email         = serializers.EmailField()
     signatory_aadhaar_last4 = serializers.CharField(max_length=4, min_length=4, help_text='Last 4 digits of Aadhaar')
@@ -343,15 +374,31 @@ class FPOStep3Serializer(serializers.Serializer):
     female_members          = serializers.IntegerField(min_value=0)
     sc_st_members           = serializers.IntegerField(min_value=0, required=False, allow_null=True)
 
+    # New Step 3 fields (KAU RCD Reply, June 2026)
+    promoting_agency         = serializers.CharField(max_length=50, help_text="From /api/public/master-data/?category=promoting_agency")
+    facilitating_agency_name = serializers.CharField(max_length=255)
+    ceo_available            = serializers.BooleanField(help_text='Is a CEO available? Yes/No')
+    accountant_available     = serializers.BooleanField(help_text='Is an accountant available? Yes/No')
+    total_directors          = serializers.IntegerField(min_value=0)
+    women_directors          = serializers.IntegerField(min_value=0)
+    directors_under_35       = serializers.IntegerField(min_value=0)
+
     def validate_signatory_aadhaar_last4(self, value):
         if not value.isdigit():
             raise serializers.ValidationError('Must be exactly 4 digits.')
         return value
 
     def validate_signatory_phone(self, value):
-        import re
         if not re.match(r'^[6-9]\d{9}$', value):
             raise serializers.ValidationError('Enter a valid 10-digit Indian mobile number.')
+        return value
+
+    def validate_promoting_agency(self, value):
+        from apps.core.models.generic import MasterLookup
+        if not MasterLookup.objects.filter(
+            category='promoting_agency', code=value, is_active=True
+        ).exists():
+            raise serializers.ValidationError('Invalid promoting agency. Choose from the provided list.')
         return value
 
     def validate(self, attrs):
@@ -361,6 +408,13 @@ class FPOStep3Serializer(serializers.Serializer):
         if male + female > total:
             raise serializers.ValidationError(
                 'Sum of male and female members cannot exceed total members.'
+            )
+        women = attrs.get('women_directors', 0)
+        young = attrs.get('directors_under_35', 0)
+        total_dirs = attrs.get('total_directors', 0)
+        if women + young > total_dirs:
+            raise serializers.ValidationError(
+                'Women directors + directors under 35 cannot exceed total directors.'
             )
         return attrs
 
@@ -413,7 +467,6 @@ class FPODetailSerializer(serializers.ModelSerializer):
 
     status_display       = serializers.CharField(source='get_status_display', read_only=True)
     district_display     = serializers.CharField(source='get_district_display', read_only=True)
-    registered_under_display = serializers.CharField(source='get_registered_under_display', read_only=True)
     current_tier         = serializers.SerializerMethodField()
     required_docs_uploaded  = serializers.SerializerMethodField()
     required_docs_verified  = serializers.SerializerMethodField()
@@ -425,9 +478,9 @@ class FPODetailSerializer(serializers.ModelSerializer):
             'id', 'uuid', 'application_id', 'status', 'status_display',
             'current_step', 'current_tier',
             # Step 1
-            'name', 'name_ml', 'registration_number', 'cin_number',
-            'date_of_registration', 'registered_under', 'registered_under_display',
-            'pan_number', 'gst_number',
+            'name', 'name_ml', 'legal_structure', 'legal_structure_detail',
+            'registration_number', 'cin_number',
+            'date_of_registration', 'pan_number', 'gst_number',
             # Step 2
             'district', 'district_display', 'block_taluk', 'village_town',
             'address_line1', 'address_line2', 'pincode',
@@ -437,12 +490,14 @@ class FPODetailSerializer(serializers.ModelSerializer):
             'signatory_name', 'signatory_designation', 'signatory_phone',
             'signatory_email', 'signatory_aadhaar_last4',
             'total_members', 'male_members', 'female_members', 'sc_st_members',
+            'promoting_agency', 'facilitating_agency_name',
+            'ceo_available', 'accountant_available',
+            'total_directors', 'women_directors', 'directors_under_35',
             # Step 4
             'primary_commodities', 'secondary_commodities', 'annual_turnover',
             'bank_name', 'bank_branch', 'account_number', 'ifsc_code', 'description',
             # Meta
-            'max_secondary_users', 'required_docs_uploaded',
-            'required_docs_verified', 'submission_errors',
+            'required_docs_uploaded', 'required_docs_verified', 'submission_errors',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields

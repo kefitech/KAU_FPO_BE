@@ -137,7 +137,7 @@ class Language(TimeStampedModel):
 
         if languages is None:
             languages = list(cls.objects.filter(is_active=True).values(
-                'code', 'name', 'native_name', 'is_rtl', 'display_order'
+                'code', 'name', 'native_name', 'is_default', 'is_rtl', 'display_order'
             ))
             cache.set(cache_key, languages, 60 * 60 * 24)  # 24 hours
 

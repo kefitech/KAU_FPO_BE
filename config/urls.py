@@ -96,8 +96,9 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
-    # Public translations endpoint (no auth required — called by frontend on load)
+    # Public endpoints (no auth required)
     path('api/translations/', include('apps.core.urls', namespace='core')),
+    path('api/public/',       include('apps.core.public_urls')),
 
     # API v1 endpoints
     path('api/auth/', include('apps.accounts.urls', namespace='accounts')),

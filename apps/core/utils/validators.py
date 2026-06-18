@@ -458,3 +458,35 @@ def validate_kerala_district(value: str, language: str = 'en') -> str:
         raise ValidationError(_t('invalid_district', language))
 
     return cleaned
+
+
+# =============================================================================
+# PASSWORD STRENGTH VALIDATOR (KAU RCD Reply, June 2026)
+# =============================================================================
+
+def validate_password_strength(value: str) -> str:
+    """
+    Validate password meets KAU security requirements:
+    - Minimum 8 characters
+    - At least 1 uppercase letter
+    - At least 1 lowercase letter
+    - At least 1 digit
+    - At least 1 special character
+
+    Raises:
+        ValidationError: If any requirement is not met
+    """
+    errors = []
+    if len(value) < 8:
+        errors.append('Password must be at least 8 characters long.')
+    if not re.search(r'[A-Z]', value):
+        errors.append('Password must contain at least one uppercase letter.')
+    if not re.search(r'[a-z]', value):
+        errors.append('Password must contain at least one lowercase letter.')
+    if not re.search(r'[0-9]', value):
+        errors.append('Password must contain at least one number.')
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>\-_=+\[\];\'\\`~/]', value):
+        errors.append('Password must contain at least one special character (e.g. @, #, $).')
+    if errors:
+        raise ValidationError(errors)
+    return value

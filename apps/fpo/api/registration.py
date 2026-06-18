@@ -29,6 +29,8 @@ from apps.core.permissions.rbac import IsFPOManager
 from apps.core.utils.constants import FPOStatus, can_transition_fpo_status
 from apps.core.utils.validators import validate_indian_phone
 from apps.core.utils.responses import StandardResponse
+from apps.core.services.audit import AuditService
+from apps.core.models.generic import AuditLog
 from apps.database.models.fpo import FPO, ApplicationStatusHistory
 from apps.database.models import UserProfile
 from apps.notifications.services import send_notification
@@ -55,8 +57,9 @@ STEP_SERIALIZER_MAP = {
 
 STEP_FIELDS_MAP = {
     1: [
-        'name', 'name_ml', 'registration_number', 'cin_number',
-        'date_of_registration', 'registered_under', 'pan_number', 'gst_number',
+        'name', 'name_ml', 'legal_structure', 'legal_structure_detail',
+        'registration_number', 'cin_number',
+        'date_of_registration', 'pan_number', 'gst_number',
     ],
     2: [
         'district', 'block_taluk', 'village_town', 'address_line1',
@@ -67,6 +70,9 @@ STEP_FIELDS_MAP = {
         'signatory_name', 'signatory_designation', 'signatory_phone',
         'signatory_email', 'signatory_aadhaar_last4', 'total_members',
         'male_members', 'female_members', 'sc_st_members',
+        'promoting_agency', 'facilitating_agency_name',
+        'ceo_available', 'accountant_available',
+        'total_directors', 'women_directors', 'directors_under_35',
     ],
     4: [
         'primary_commodities', 'secondary_commodities', 'annual_turnover',
@@ -79,17 +85,18 @@ class _FPOWizardPatchSerializer(drf_serializers.Serializer):
     """Swagger-only: shows all possible fields for PATCH /api/fpo/me/ steps 1-4."""
     step = drf_serializers.IntegerField(help_text='Which step to save: 1, 2, 3, or 4')
     # Step 1
-    name                 = drf_serializers.CharField(required=False)
-    name_ml              = drf_serializers.CharField(required=False)
-    registration_number  = drf_serializers.CharField(required=False)
-    cin_number           = drf_serializers.CharField(required=False)
-    date_of_registration = drf_serializers.DateField(required=False)
-    registered_under     = drf_serializers.CharField(required=False)
-    pan_number           = drf_serializers.CharField(required=False)
-    gst_number           = drf_serializers.CharField(required=False)
+    name                   = drf_serializers.CharField(required=False)
+    name_ml                = drf_serializers.CharField(required=False)
+    legal_structure        = drf_serializers.CharField(required=False, help_text="From /api/public/master-data/?category=legal_structure")
+    legal_structure_detail = drf_serializers.CharField(required=False, help_text="State CSA act name when legal_structure='state_specific_csa'")
+    registration_number    = drf_serializers.CharField(required=False)
+    cin_number             = drf_serializers.CharField(required=False)
+    date_of_registration   = drf_serializers.DateField(required=False)
+    pan_number             = drf_serializers.CharField(required=False)
+    gst_number             = drf_serializers.CharField(required=False)
     # Step 2
-    district       = drf_serializers.CharField(required=False, help_text='3-letter district code e.g. TSR')
-    block_taluk    = drf_serializers.CharField(required=False)
+    district       = drf_serializers.CharField(required=False, help_text='3-letter district code e.g. TRS')
+    block_taluk    = drf_serializers.CharField(required=False, help_text='Block name from /api/public/master-data/?category=block&district=<code>')
     village_town   = drf_serializers.CharField(required=False)
     address_line1  = drf_serializers.CharField(required=False)
     address_line2  = drf_serializers.CharField(required=False)
@@ -100,20 +107,27 @@ class _FPOWizardPatchSerializer(drf_serializers.Serializer):
     latitude       = drf_serializers.DecimalField(max_digits=9, decimal_places=6, required=False)
     longitude      = drf_serializers.DecimalField(max_digits=9, decimal_places=6, required=False)
     # Step 3
-    signatory_name          = drf_serializers.CharField(required=False)
-    signatory_designation   = drf_serializers.CharField(required=False)
-    signatory_phone         = drf_serializers.CharField(required=False)
-    signatory_email         = drf_serializers.EmailField(required=False)
-    signatory_aadhaar_last4 = drf_serializers.CharField(required=False)
-    total_members           = drf_serializers.IntegerField(required=False)
-    male_members            = drf_serializers.IntegerField(required=False)
-    female_members          = drf_serializers.IntegerField(required=False)
-    sc_st_members           = drf_serializers.IntegerField(required=False)
+    signatory_name           = drf_serializers.CharField(required=False)
+    signatory_designation    = drf_serializers.CharField(required=False, help_text="From /api/public/master-data/?category=signatory_designation")
+    signatory_phone          = drf_serializers.CharField(required=False)
+    signatory_email          = drf_serializers.EmailField(required=False)
+    signatory_aadhaar_last4  = drf_serializers.CharField(required=False)
+    total_members            = drf_serializers.IntegerField(required=False)
+    male_members             = drf_serializers.IntegerField(required=False)
+    female_members           = drf_serializers.IntegerField(required=False)
+    sc_st_members            = drf_serializers.IntegerField(required=False)
+    promoting_agency         = drf_serializers.CharField(required=False, help_text="From /api/public/master-data/?category=promoting_agency")
+    facilitating_agency_name = drf_serializers.CharField(required=False)
+    ceo_available            = drf_serializers.BooleanField(required=False)
+    accountant_available     = drf_serializers.BooleanField(required=False)
+    total_directors          = drf_serializers.IntegerField(required=False)
+    women_directors          = drf_serializers.IntegerField(required=False)
+    directors_under_35       = drf_serializers.IntegerField(required=False)
     # Step 4
     primary_commodities   = drf_serializers.ListField(child=drf_serializers.CharField(), required=False)
     secondary_commodities = drf_serializers.ListField(child=drf_serializers.CharField(), required=False)
-    annual_turnover       = drf_serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
-    bank_name             = drf_serializers.CharField(required=False)
+    annual_turnover       = drf_serializers.DecimalField(max_digits=15, decimal_places=2, required=False, help_text='Annual turnover in Lakhs (INR)')
+    bank_name             = drf_serializers.CharField(required=False, help_text='From /api/public/master-data/?category=bank_name')
     bank_branch           = drf_serializers.CharField(required=False)
     account_number        = drf_serializers.CharField(required=False)
     ifsc_code             = drf_serializers.CharField(required=False)
@@ -380,27 +394,35 @@ class FPORegisterView(APIView):
         data = serializer.validated_data
 
         fpo = FPO.objects.create(
-            primary_user        = request.user,
-            created_by          = request.user,
-            name                = data['name'],
-            name_ml             = data.get('name_ml', ''),
-            registration_number = data['registration_number'],
-            cin_number          = data.get('cin_number', ''),
-            date_of_registration = data['date_of_registration'],
-            registered_under    = data['registered_under'],
-            pan_number          = data['pan_number'],
-            gst_number          = data.get('gst_number', ''),
-            current_step        = 1,
-            status              = FPOStatus.DRAFT,
+            primary_user           = request.user,
+            created_by             = request.user,
+            name                   = data['name'],
+            name_ml                = data.get('name_ml', ''),
+            legal_structure        = data['legal_structure'],
+            legal_structure_detail = data.get('legal_structure_detail', ''),
+            registration_number    = data.get('registration_number', ''),
+            cin_number             = data.get('cin_number', ''),
+            date_of_registration   = data['date_of_registration'],
+            pan_number             = data['pan_number'],
+            gst_number             = data.get('gst_number', ''),
+            current_step           = 1,
+            status                 = FPOStatus.DRAFT,
         )
 
-        # Log initial status
         ApplicationStatusHistory.objects.create(
             fpo        = fpo,
             from_status = '',
             to_status   = FPOStatus.DRAFT,
             changed_by  = request.user,
             notes       = 'FPO registration started.',
+        )
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.CREATE,
+            instance=fpo,
+            request=request,
+            changes={'name': fpo.name, 'legal_structure': fpo.legal_structure},
         )
 
         return StandardResponse.created(
@@ -500,10 +522,15 @@ class FPOMeView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        # Update only the fields for this step
+        # Capture old values for audit before overwriting
+        changes = {}
         for field in STEP_FIELDS_MAP[step]:
             if field in data:
-                setattr(fpo, field, data[field])
+                old_val = getattr(fpo, field, None)
+                new_val = data[field]
+                if old_val != new_val:
+                    changes[field] = {'old': str(old_val) if old_val else '', 'new': str(new_val)}
+                setattr(fpo, field, new_val)
 
         # Advance wizard step if moving forward
         if step > fpo.current_step:
@@ -511,6 +538,15 @@ class FPOMeView(APIView):
 
         fpo.updated_by = request.user
         fpo.save()
+
+        if changes:
+            AuditService.log(
+                user=request.user,
+                action=AuditLog.Action.FPO_PROFILE_CHANGE,
+                instance=fpo,
+                request=request,
+                changes=changes,
+            )
 
         return StandardResponse.success(
             data=FPODetailSerializer(fpo).data,

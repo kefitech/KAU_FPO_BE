@@ -29,6 +29,8 @@ from apps.core.permissions.rbac import IsFPOManager
 from apps.core.utils.constants import DocumentType, FPOStatus, REQUIRED_DOCUMENTS
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
+from apps.core.services.audit import AuditService
+from apps.core.models.generic import AuditLog
 from apps.database.models.fpo import FPO, FPODocument
 
 
@@ -180,6 +182,14 @@ class DocumentUploadView(APIView):
             updated_by    = request.user,
         )
 
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.DOCUMENT_UPLOAD,
+            instance=doc,
+            request=request,
+            changes={'document_type': document_type, 'file_size': file.size, 'mime_type': mime_type},
+        )
+
         serializer = FPODocumentSerializer(doc, context={'request': request})
         return StandardResponse.success(
             data=serializer.data,
@@ -251,5 +261,13 @@ class DocumentDeleteView(APIView):
         doc.is_deleted  = True
         doc.updated_by  = request.user
         doc.save(update_fields=['is_deleted', 'updated_by', 'updated_at'])
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.DOCUMENT_DELETE,
+            instance=doc,
+            request=request,
+            changes={'document_type': doc.document_type},
+        )
 
         return StandardResponse.success(message=t('fpo.document_deleted', lang))

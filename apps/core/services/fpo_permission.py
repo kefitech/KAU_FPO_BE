@@ -4,7 +4,7 @@ FPO Permission Service
 
 Two-tier permission check for FPO-internal actions:
 
-  Tier 1 (KAU Admin): FPOMemberPermission matrix — role x action ceiling
+  Tier 1 (KAU Admin): RoleActionPermission matrix — role x action ceiling
   Tier 2 (FPO Primary): FPOMemberOverride — per-member overrides within the ceiling
 
 Check order:
@@ -36,7 +36,7 @@ def get_user_membership(user, fpo):
 
 def get_role_permission(role, action_code):
     """
-    Return FPOMemberPermission.is_allowed for (role, action_code).
+    Return RoleActionPermission.is_allowed for (role, action_code).
     Cached per role+action for 5 minutes.
     """
     cache_key = f'fpo_perm:{role.id}:{action_code}'
@@ -44,8 +44,8 @@ def get_role_permission(role, action_code):
     if cached is not None:
         return cached
 
-    from apps.database.models.fpo import FPOMemberPermission
-    perm = FPOMemberPermission.objects.filter(
+    from apps.database.models.fpo import RoleActionPermission
+    perm = RoleActionPermission.objects.filter(
         role=role,
         action__code=action_code,
         action__is_active=True,
@@ -87,8 +87,8 @@ def has_fpo_permission(user, fpo, action_code):
     if not membership or not membership.role:
         return False
 
-    # Primary role bypasses the matrix — they own the FPO
-    if membership.role.code == 'primary':
+    # FPO owner bypasses the matrix — they own the FPO
+    if fpo.user == user:
         from apps.database.models.fpo import FPOAction
         return FPOAction.objects.filter(code=action_code, is_active=True).exists()
 
@@ -107,7 +107,7 @@ def has_fpo_permission(user, fpo, action_code):
 
 
 def invalidate_role_permission_cache(role_id, action_code):
-    """Call this after updating FPOMemberPermission rows."""
+    """Call this after updating RoleActionPermission rows."""
     cache.delete(f'fpo_perm:{role_id}:{action_code}')
 
 
@@ -116,7 +116,7 @@ def get_effective_permissions(membership):
     Return dict of {action_code: is_allowed} for a membership,
     applying ceiling + overrides. Used by team permission API.
     """
-    from apps.database.models.fpo import FPOMemberPermission, FPOMemberOverride, FPOAction
+    from apps.database.models.fpo import RoleActionPermission, FPOMemberOverride, FPOAction
 
     if not membership.role:
         return {}
@@ -127,7 +127,7 @@ def get_effective_permissions(membership):
     # Role ceiling
     ceiling_map = {
         p['action__code']: p['is_allowed']
-        for p in FPOMemberPermission.objects.filter(
+        for p in RoleActionPermission.objects.filter(
             role=membership.role
         ).select_related('action').values('action__code', 'is_allowed')
     }

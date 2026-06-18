@@ -4,10 +4,10 @@ Seed FPO Permission Matrix
 
 Seeds:
   1. TranslationCategory rows — fpo_member_role, fpo_action
-  2. FPO member roles into MasterLookup (category='fpo_member_role')
+  2. FPO member role Groups (primary, secondary) in auth.Group
   3. FPO actions into FPOAction
   4. Translation rows for roles and actions (EN + ML)
-  5. Default permission matrix (role x action)
+  5. Default permission matrix (role x action) into RoleActionPermission
 
 Run:
     source venv/bin/activate && python manage.py shell -c "
@@ -20,9 +20,9 @@ Idempotent — safe to re-run. Uses update_or_create throughout.
 
 
 def seed_fpo_permissions():
-    from apps.core.models.generic import MasterLookup
+    from django.contrib.auth.models import Group
     from apps.database.models import Language, TranslationCategory, Translation
-    from apps.database.models.fpo import FPOAction, FPOMemberPermission
+    from apps.database.models.fpo import FPOAction, RoleActionPermission
 
     lang_en = Language.objects.get(code='en')
     lang_ml = Language.objects.get(code='ml')
@@ -41,31 +41,27 @@ def seed_fpo_permissions():
     print("  TranslationCategories ready: fpo_member_role, fpo_action")
 
     # ------------------------------------------------------------------
-    # 2. FPO Member Roles + Translations
+    # 2. FPO Member Role Groups + Translations
     # ------------------------------------------------------------------
     ROLES = [
-        {'code': 'primary',   'en': 'Primary User',   'ml': 'പ്രാഥമിക ഉപയോക്താവ്'},
-        {'code': 'secondary', 'en': 'Secondary User', 'ml': 'ദ്വിതീയ ഉപയോക്താവ്'},
+        {'name': 'primary',   'en': 'Primary User',   'ml': 'പ്രാഥമിക ഉപയോക്താവ്'},
+        {'name': 'secondary', 'en': 'Secondary User', 'ml': 'ദ്വിതീയ ഉപയോക്താവ്'},
     ]
 
-    role_objects = {}
+    role_groups = {}
     for role in ROLES:
-        obj, created = MasterLookup.objects.update_or_create(
-            category='fpo_member_role',
-            code=role['code'],
-            defaults={'is_active': True},
-        )
-        role_objects[role['code']] = obj
+        group, created = Group.objects.get_or_create(name=role['name'])
+        role_groups[role['name']] = group
 
         Translation.objects.update_or_create(
-            category=cat_roles, key=role['code'], language=lang_en,
+            category=cat_roles, key=role['name'], language=lang_en,
             defaults={'value': role['en']},
         )
         Translation.objects.update_or_create(
-            category=cat_roles, key=role['code'], language=lang_ml,
+            category=cat_roles, key=role['name'], language=lang_ml,
             defaults={'value': role['ml']},
         )
-        print(f"  Role {'created' if created else 'updated'}: {role['code']}")
+        print(f"  Role Group {'created' if created else 'exists'}: {role['name']}")
 
     # ------------------------------------------------------------------
     # 3. FPO Actions + Translations
@@ -149,7 +145,7 @@ def seed_fpo_permissions():
         print(f"  Action {'created' if created else 'updated'}: {action['code']}")
 
     # ------------------------------------------------------------------
-    # 4. Default Permission Matrix
+    # 4. Default Permission Matrix (primary x secondary only)
     # ------------------------------------------------------------------
     MATRIX = {
         'primary': {
@@ -170,7 +166,7 @@ def seed_fpo_permissions():
             'can_invite_team':    False,
             'can_manage_team':    False,
             'can_view_docs':      True,
-            'can_edit_profile':   False,
+            'can_edit_profile':   True,   # RCD: secondary can do data entry
             'can_view_dashboard': True,
             'can_submit_claim':   False,
         },
@@ -178,12 +174,12 @@ def seed_fpo_permissions():
 
     created_count = 0
     updated_count = 0
-    for role_code, permissions in MATRIX.items():
-        role = role_objects[role_code]
+    for role_name, permissions in MATRIX.items():
+        group = role_groups[role_name]
         for action_code, is_allowed in permissions.items():
-            action = action_objects[action_code]
-            _, created = FPOMemberPermission.objects.update_or_create(
-                role=role, action=action,
+            action_obj = action_objects[action_code]
+            _, created = RoleActionPermission.objects.update_or_create(
+                role=group, action=action_obj,
                 defaults={'is_allowed': is_allowed},
             )
             if created:
@@ -192,4 +188,36 @@ def seed_fpo_permissions():
                 updated_count += 1
 
     print(f"\nPermission matrix: {created_count} created, {updated_count} updated")
+
+    # ------------------------------------------------------------------
+    # 5. Link FPOActions to their pages via menu_item FK
+    # ------------------------------------------------------------------
+    from apps.database.models import MenuItem
+
+    ACTION_PAGE_MAP = {
+        'can_view_dashboard': '/fpo/dashboard',
+        'can_submit':         '/fpo/register',
+        'can_upload_docs':    '/fpo/register',
+        'can_delete_docs':    '/fpo/register',
+        'can_view_docs':      '/fpo/register',
+        'can_edit_profile':   '/fpo/profile',
+        'can_invite_team':    '/fpo/settings',
+        'can_manage_team':    '/fpo/settings',
+        'can_submit_claim':   '/fpo/applications',
+    }
+
+    page_cache = {}
+    linked = 0
+    for action_code, page_path in ACTION_PAGE_MAP.items():
+        if page_path not in page_cache:
+            page_cache[page_path] = MenuItem.objects.filter(path=page_path, is_active=True).first()
+        page = page_cache[page_path]
+        if page:
+            FPOAction.objects.filter(code=action_code).update(menu_item=page)
+            print(f"  Linked: {action_code}  →  {page_path}")
+            linked += 1
+        else:
+            print(f"  ⚠️  Page not found for {action_code}: {page_path} — run seed_menu first")
+
+    print(f"\nActions linked to pages: {linked}/{len(ACTION_PAGE_MAP)}")
     print("Done. FPO permission matrix seeded successfully.")

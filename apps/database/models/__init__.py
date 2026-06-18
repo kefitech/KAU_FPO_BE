@@ -36,6 +36,24 @@ from .user import UserProfile
 # External API Settings
 from .external_api import ExternalAPISettings
 
+# Schemes & Expert Directory
+from .schemes import (
+    Scheme,
+    SchemeCategory,
+    Expert,
+    ExpertCategory,
+    ExpertEnquiry,
+)
+
+# Site Content CMS
+from .cms import (
+    SiteBlock,
+    Announcement,
+    AnnouncementCategory,
+    FAQ,
+    FAQCategory,
+)
+
 # FPO Module
 from .fpo import (
     FPO,
@@ -46,11 +64,18 @@ from .fpo import (
     FPOTierHistory,
     FPOOwnershipClaim,
     FPOAction,
-    FPOMemberPermission,
+    RoleActionPermission,
     FPOMemberOverride,
-    RegisteredUnder,
+    RolePageAccess,
     TierChoice,
     ClaimStatus,
+    LEGAL_STRUCTURES_REQUIRING_CIN,
+    TierDomain,
+    TierCriterion,
+    TierQuestion,
+    FPOAssessment,
+    AssessmentAnswer,
+    AssessmentUpload,
 )
 
 __all__ = [
@@ -80,11 +105,31 @@ __all__ = [
     'FPOTierHistory',
     'FPOOwnershipClaim',
     'FPOAction',
-    'FPOMemberPermission',
+    'RoleActionPermission',
     'FPOMemberOverride',
-    'RegisteredUnder',
+    'RolePageAccess',
     'TierChoice',
     'ClaimStatus',
+    'LEGAL_STRUCTURES_REQUIRING_CIN',
+    # Tier Assessment Framework
+    'TierDomain',
+    'TierCriterion',
+    'TierQuestion',
+    'FPOAssessment',
+    'AssessmentAnswer',
+    'AssessmentUpload',
     # External API Settings
     'ExternalAPISettings',
+    # Schemes & Expert Directory
+    'Scheme',
+    'SchemeCategory',
+    'Expert',
+    'ExpertCategory',
+    'ExpertEnquiry',
+    # Site Content CMS
+    'SiteBlock',
+    'Announcement',
+    'AnnouncementCategory',
+    'FAQ',
+    'FAQCategory',
 ]
