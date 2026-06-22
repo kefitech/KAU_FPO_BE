@@ -86,6 +86,44 @@ class TranslationViewSet(TranslatedViewSet):
             message=t('admin.translation_verified', self.get_language())
         )
 
+    @extend_schema(
+        tags=['Admin - Translations'],
+        request={'application/json': {'type': 'object', 'properties': {'ids': {'type': 'array', 'items': {'type': 'integer'}}}, 'required': ['ids']}},
+    )
+    @action(detail=False, methods=['post'], url_path='bulk-verify')
+    def bulk_verify(self, request):
+        """Mark multiple translations as verified. Body: { ids: [1, 2, 3] }"""
+        ids = request.data.get('ids', [])
+        if not ids or not isinstance(ids, list):
+            return StandardResponse.error('ids must be a non-empty list.', status_code=status.HTTP_400_BAD_REQUEST)
+
+        updated = Translation.objects.filter(pk__in=ids).update(
+            is_verified=True,
+            verified_by=request.user,
+            verified_at=timezone.now(),
+        )
+        return StandardResponse.success(
+            data={'verified': updated},
+            message=f'{updated} translation(s) marked as verified.',
+        )
+
+    @extend_schema(
+        tags=['Admin - Translations'],
+        request={'application/json': {'type': 'object', 'properties': {'ids': {'type': 'array', 'items': {'type': 'integer'}}}, 'required': ['ids']}},
+    )
+    @action(detail=False, methods=['post'], url_path='bulk-delete')
+    def bulk_delete(self, request):
+        """Delete multiple translations. Body: { ids: [1, 2, 3] }"""
+        ids = request.data.get('ids', [])
+        if not ids or not isinstance(ids, list):
+            return StandardResponse.error('ids must be a non-empty list.', status_code=status.HTTP_400_BAD_REQUEST)
+
+        deleted, _ = Translation.objects.filter(pk__in=ids).delete()
+        return StandardResponse.success(
+            data={'deleted': deleted},
+            message=f'{deleted} translation(s) deleted.',
+        )
+
     @extend_schema(tags=['Admin - Translations'])
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):
