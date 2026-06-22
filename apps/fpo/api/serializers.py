@@ -555,4 +555,7 @@ class FieldValidateSerializer(serializers.Serializer):
         choices=[(f, f) for f in SUPPORTED_FIELDS],
         help_text='Field name to validate'
     )
-    value = serializers.CharField(help_text='Current field value')
+    value = serializers.CharField(
+        allow_blank=True,
+        help_text='Current field value. Empty string returns valid=true (no format check on blank).',
+    )

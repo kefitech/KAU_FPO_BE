@@ -631,6 +631,13 @@ class FieldValidateView(APIView):
         field = serializer.validated_data['field']
         value = serializer.validated_data['value'].strip()
 
+        # Empty value — nothing to validate (required-field check is done at submit time)
+        if not value:
+            return StandardResponse.success(
+                data={'field': field, 'valid': True, 'error': None, 'duplicate': False},
+                message='Validation complete.',
+            )
+
         # Get current user's FPO id to exclude from duplicate check
         fpo = FPO.objects.filter(primary_user=request.user).first()
         fpo_id = fpo.pk if fpo else None

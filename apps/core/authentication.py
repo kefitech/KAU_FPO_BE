@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from rest_framework.request import Request
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import Token
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 from apps.core.utils.cookies import get_access_token_from_cookie
@@ -56,4 +57,7 @@ class JWTCookieAuthentication(JWTAuthentication):
                 pass
 
         # Fall back to Authorization header (used by Swagger / Postman)
-        return super().authenticate(request)
+        try:
+            return super().authenticate(request)
+        except (InvalidToken, TokenError, AuthenticationFailed):
+            return None

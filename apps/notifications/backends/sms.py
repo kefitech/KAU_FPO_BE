@@ -52,10 +52,7 @@ class SMSBackend(BaseNotificationBackend):
         try:
             otp_match = _OTP_RE.search(body)
             if otp_match:
-                print(f"\n{'='*50}")
-                print(f"[DEV] SMS OTP → {phone}")
-                print(f"[DEV] OTP: {otp_match.group(1)}")
-                print(f"{'='*50}\n")
+                logger.warning(f"\n{'='*50}\n[DEV] SMS OTP → {phone}\n[DEV] OTP CODE: {otp_match.group(1)}\n{'='*50}")
                 # MSG91 OTP API — params sent as query string (MSG91 requirement)
                 params = {'mobile': phone, 'otp': otp_match.group(1)}
                 if template_id:

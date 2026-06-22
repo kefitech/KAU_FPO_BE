@@ -199,6 +199,7 @@ class LoginView(APIView):
     Accepts username/email and password.
     Returns JWT access and refresh tokens on successful authentication.
     """
+    authentication_classes = []  # skip auth check — stale cookies must not block login
 
     permission_classes = [AllowAny]
     throttle_classes   = [LoginThrottle]
