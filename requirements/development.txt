@@ -27,6 +27,9 @@ pylint-django>=2.5,<3.0             # Django plugin for pylint
 mypy>=1.8,<2.0                      # Type checker
 django-stubs>=4.2,<5.0              # Django type stubs
 djangorestframework-stubs>=3.14,<4.0  # DRF type stubs
+types-requests>=2.31,<3.0           # Type stubs for requests
+types-pytz>=2024.1                  # Type stubs for pytz
+types-PyYAML>=6.0,<7.0             # Type stubs for PyYAML
 
 # -----------------------------------------------------------------------------
 # Testing
@@ -37,7 +40,7 @@ pytest-cov>=4.1,<5.0                # Coverage
 pytest-xdist>=3.5,<4.0              # Parallel tests
 pytest-asyncio>=0.23,<1.0           # Async tests
 factory-boy>=3.3,<4.0               # Test factories
-faker>=24.0,<25.0                   # Fake data generation
+faker>=24.0,<26.0                   # Fake data generation
 responses>=0.25,<1.0                # Mock HTTP responses
 freezegun>=1.4,<2.0                 # Mock datetime
 

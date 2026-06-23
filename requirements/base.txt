@@ -3,12 +3,15 @@
 # =============================================================================
 # Core dependencies required for all environments
 # Install: pip install -r requirements/base.txt
+#
+# NOTE: Dev uses Django 4.2.x for PostgreSQL compatibility.
+#       Upgrade to Django 5.x at production deployment (SRS requirement).
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # Django & Django REST Framework
 # -----------------------------------------------------------------------------
-Django>=5.0,<6.0
+Django>=4.2,<5.0                    # Upgrade to >=5.0 at deployment
 djangorestframework>=3.15,<4.0
 
 # -----------------------------------------------------------------------------
@@ -62,6 +65,7 @@ django-filter>=24.0,<25.0
 Pillow>=10.0,<11.0                  # Image processing
 python-magic>=0.4.27,<1.0           # MIME type detection for document uploads
 openpyxl>=3.1,<4.0                  # Excel export/import for translations
+lxml>=6.0,<7.0                      # XML/HTML processing (used by python-docx)
 
 # -----------------------------------------------------------------------------
 # Cloud Storage (S3)
@@ -84,8 +88,8 @@ python-dateutil>=2.8,<3.0           # Date utilities
 # -----------------------------------------------------------------------------
 # Security
 # -----------------------------------------------------------------------------
-argon2-cffi>=23.1,<24.0             # Password hashing (Argon2)
-cryptography>=42.0,<43.0            # AES-256 encryption (Fernet) for notification channel credentials
+argon2-cffi>=23.1,<25.0             # Password hashing (Argon2)
+cryptography>=42.0,<49.0            # AES-256 encryption (Fernet) for notification channel credentials
 pyotp>=2.9,<3.0                     # TOTP/HOTP for 2FA (Google Authenticator)
 qrcode[pil]>=8.0,<9.0               # QR code generation for 2FA setup
 
@@ -98,10 +102,15 @@ shortuuid>=1.0,<2.0                 # Short UUIDs
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
-structlog>=24.0,<25.0               # Structured logging (optional)
+structlog>=24.0,<25.0               # Structured logging
 
 # -----------------------------------------------------------------------------
-# HTTP Client (for external APIs)
+# HTTP Client (for external APIs — MSG91, WhatsApp, PAN/GSTIN/CIN verification)
 # -----------------------------------------------------------------------------
 requests>=2.31,<3.0
 httpx>=0.27,<1.0                    # Async HTTP client
+
+# -----------------------------------------------------------------------------
+# Document Generation
+# -----------------------------------------------------------------------------
+python-docx>=1.2,<2.0               # Word document generation (DPR reports)
