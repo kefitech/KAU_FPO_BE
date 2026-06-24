@@ -154,7 +154,7 @@ class FPO(BaseModel):
     )
 
     # ── Meta / System Fields ──────────────────────────────────────────────────
-    application_id = models.CharField(max_length=30, unique=True, blank=True)
+    application_id = models.CharField(max_length=30, unique=True, blank=True, null=True, default=None)
     status         = models.CharField(
         max_length=20, choices=FPOStatus.choices, default=FPOStatus.DRAFT
     )

@@ -80,17 +80,25 @@ class _StatusHistorySerializer(serializers.ModelSerializer):
 
 
 class _ApplicationListSerializer(serializers.ModelSerializer):
+    primary_user_id    = serializers.IntegerField(source='primary_user.id', default=None)
     primary_user_name  = serializers.SerializerMethodField()
     primary_user_email = serializers.SerializerMethodField()
     primary_user_phone = serializers.SerializerMethodField()
+    current_tier       = serializers.CharField(source='tier', default=None)
+    status_display     = serializers.CharField(source='get_status_display', read_only=True)
+    district_display   = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
         fields = [
-            'id', 'application_id', 'name', 'name_ml', 'district',
-            'status', 'tier', 'current_step',
+            'id', 'application_id', 'name', 'name_ml',
+            'district', 'district_display',
+            'status', 'status_display',
+            'tier', 'current_tier', 'current_step',
+            'total_members',
+            'office_email', 'office_phone',
             'email_verified', 'phone_verified',
-            'primary_user_name', 'primary_user_email', 'primary_user_phone',
+            'primary_user_id', 'primary_user_name', 'primary_user_email', 'primary_user_phone',
             'created_at', 'updated_at',
         ]
 
@@ -105,6 +113,10 @@ class _ApplicationListSerializer(serializers.ModelSerializer):
     def get_primary_user_phone(self, obj):
         profile = getattr(obj.primary_user, 'profile', None) if obj.primary_user else None
         return profile.phone if profile else None
+
+    def get_district_display(self, obj):
+        from apps.core.utils.constants import get_district_name
+        return get_district_name(obj.district) if obj.district else None
 
 
 class _ApplicationDetailSerializer(serializers.ModelSerializer):
@@ -559,4 +571,46 @@ class ApplicationAssignTierView(APIView):
         return StandardResponse.success(
             data={'tier': fpo.tier, 'financial_year': financial_year},
             message=f'Tier {tier} manually assigned to {fpo.name} for {financial_year}.',
+        )
+
+
+class ApplicationTierHistoryView(APIView):
+
+    @extend_schema(
+        tags=['Admin - Tier Management'],
+        summary='Tier history for an FPO',
+        description='Returns the full tier assignment history for an FPO — one row per financial year, oldest first.',
+        responses={200: None},
+    )
+    def get(self, request, fpo_id):
+        if not request.user.groups.filter(
+            name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]
+        ).exists():
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        try:
+            fpo = FPO.objects.get(id=fpo_id)
+        except FPO.DoesNotExist:
+            return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        history = fpo.tier_history.select_related('assigned_by').order_by('created_at')
+
+        data = [
+            {
+                'id':             row.id,
+                'tier':           row.tier,
+                'financial_year': row.financial_year,
+                'assigned_by':    (
+                    f"{row.assigned_by.first_name} {row.assigned_by.last_name}".strip()
+                    or row.assigned_by.username
+                ) if row.assigned_by else 'System',
+                'notes':          row.notes,
+                'assigned_at':    row.created_at,
+            }
+            for row in history
+        ]
+
+        return StandardResponse.success(
+            data={'fpo_id': fpo.id, 'current_tier': fpo.tier, 'history': data},
+            message='Tier history retrieved.',
         )

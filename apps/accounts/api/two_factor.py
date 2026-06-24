@@ -89,7 +89,9 @@ def _verify_partial_token(partial_token):
 
 def _verify_totp(two_factor, code):
     totp = pyotp.TOTP(two_factor.secret)
-    return totp.verify(code, valid_window=1)
+    # valid_window=0 → only the current 30s window accepted (strict).
+    # pyotp handles minor clock drift internally.
+    return totp.verify(code, valid_window=0)
 
 
 # ─── Request Serializers ──────────────────────────────────────────────────────

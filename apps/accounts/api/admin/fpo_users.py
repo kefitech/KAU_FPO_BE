@@ -18,6 +18,7 @@ import secrets
 import string
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import serializers, status
 from rest_framework.views import APIView
@@ -34,6 +35,28 @@ User = get_user_model()
 
 def _is_admin(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
+
+
+def _resolve_fpo_user(user_id):
+    """
+    Returns (django_user, membership_or_None) for either a primary or secondary FPO user.
+    Raises User.DoesNotExist if not found in either table.
+    """
+    try:
+        mem = FPOUserMembership.objects.select_related('user', 'user__profile').get(
+            user_id=user_id, is_deleted=False
+        )
+        return mem.user, mem
+    except FPOUserMembership.DoesNotExist:
+        pass
+
+    try:
+        fpo = FPO.objects.select_related('primary_user', 'primary_user__profile').get(
+            primary_user_id=user_id, is_deleted=False
+        )
+        return fpo.primary_user, None
+    except FPO.DoesNotExist:
+        raise User.DoesNotExist
 
 
 def _generate_temp_password():
@@ -86,55 +109,143 @@ class FPOUserListView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        qs = FPOUserMembership.objects.select_related(
-            'user', 'user__profile', 'fpo', 'role'
-        ).filter(is_deleted=False)
+        role_filter   = request.query_params.get('role', '').strip().lower()
+        fpo_id        = request.query_params.get('fpo_id', '').strip()
+        is_active_raw = request.query_params.get('is_active', '').strip().lower()
+        search        = request.query_params.get('search', '').strip()
 
-        role = request.query_params.get('role')
-        if role:
-            qs = qs.filter(role__name=role)
+        results = []
 
-        fpo_id = request.query_params.get('fpo_id')
-        if fpo_id:
-            qs = qs.filter(fpo_id=fpo_id)
+        # --- Primary users (from FPO.primary_user) ---
+        if not role_filter or role_filter == 'primary':
+            fpo_qs = FPO.objects.select_related(
+                'primary_user', 'primary_user__profile'
+            ).filter(is_deleted=False)
 
-        is_active = request.query_params.get('is_active')
-        if is_active is not None:
-            qs = qs.filter(is_active=is_active.lower() == 'true')
+            if fpo_id:
+                fpo_qs = fpo_qs.filter(id=fpo_id)
+            if is_active_raw:
+                fpo_qs = fpo_qs.filter(primary_user__is_active=(is_active_raw == 'true'))
+            if search:
+                fpo_qs = fpo_qs.filter(
+                    Q(primary_user__first_name__icontains=search) |
+                    Q(primary_user__last_name__icontains=search) |
+                    Q(primary_user__email__icontains=search)
+                )
 
-        search = request.query_params.get('search', '').strip()
-        if search:
-            qs = qs.filter(
-                user__first_name__icontains=search
-            ) | qs.filter(
-                user__last_name__icontains=search
-            ) | qs.filter(
-                user__email__icontains=search
-            )
+            for fpo in fpo_qs:
+                u = fpo.primary_user
+                profile = getattr(u, 'profile', None)
+                results.append({
+                    'id':         u.id,
+                    'first_name': u.first_name,
+                    'last_name':  u.last_name,
+                    'email':      u.email,
+                    'phone':      profile.phone if profile else None,
+                    'role':       'primary',
+                    'fpo_id':     fpo.id,
+                    'fpo_name':   fpo.name,
+                    'is_active':  u.is_active,
+                    'joined_at':  fpo.created_at,
+                    'last_login': u.last_login,
+                })
+
+        # --- Secondary users (from FPOUserMembership) ---
+        if not role_filter or role_filter == 'secondary':
+            mem_qs = FPOUserMembership.objects.select_related(
+                'user', 'user__profile', 'fpo', 'role'
+            ).filter(is_deleted=False)
+
+            if fpo_id:
+                mem_qs = mem_qs.filter(fpo_id=fpo_id)
+            if is_active_raw:
+                mem_qs = mem_qs.filter(is_active=(is_active_raw == 'true'))
+            if search:
+                mem_qs = mem_qs.filter(
+                    Q(user__first_name__icontains=search) |
+                    Q(user__last_name__icontains=search) |
+                    Q(user__email__icontains=search)
+                )
+
+            for mem in mem_qs:
+                u = mem.user
+                profile = getattr(u, 'profile', None)
+                results.append({
+                    'id':         u.id,
+                    'first_name': u.first_name,
+                    'last_name':  u.last_name,
+                    'email':      u.email,
+                    'phone':      profile.phone if profile else None,
+                    'role':       mem.role.name if mem.role else 'secondary',
+                    'fpo_id':     mem.fpo.id,
+                    'fpo_name':   mem.fpo.name,
+                    'is_active':  mem.is_active,
+                    'joined_at':  mem.created_at,
+                    'last_login': u.last_login,
+                })
 
         paginator = StandardPagination()
-        page = paginator.paginate_queryset(qs, request)
-        return paginator.get_paginated_response(FPOUserSerializer(page, many=True).data)
+        page = paginator.paginate_queryset(results, request)
+        return paginator.get_paginated_response(page)
 
 
 class FPOUserDetailView(APIView):
 
-    def _get(self, user_id):
+    def _build_data(self, user_id):
+        # Check secondary first
         try:
-            return FPOUserMembership.objects.select_related(
+            mem = FPOUserMembership.objects.select_related(
                 'user', 'user__profile', 'fpo', 'role'
             ).get(user_id=user_id, is_deleted=False)
+            u = mem.user
+            profile = getattr(u, 'profile', None)
+            return {
+                'id':         u.id,
+                'first_name': u.first_name,
+                'last_name':  u.last_name,
+                'email':      u.email,
+                'phone':      profile.phone if profile else None,
+                'role':       mem.role.name if mem.role else 'secondary',
+                'fpo_id':     mem.fpo.id,
+                'fpo_name':   mem.fpo.name,
+                'is_active':  mem.is_active,
+                'joined_at':  mem.created_at,
+                'last_login': u.last_login,
+            }
         except FPOUserMembership.DoesNotExist:
+            pass
+
+        # Fall back to primary user
+        try:
+            fpo = FPO.objects.select_related(
+                'primary_user', 'primary_user__profile'
+            ).get(primary_user_id=user_id, is_deleted=False)
+            u = fpo.primary_user
+            profile = getattr(u, 'profile', None)
+            return {
+                'id':         u.id,
+                'first_name': u.first_name,
+                'last_name':  u.last_name,
+                'email':      u.email,
+                'phone':      profile.phone if profile else None,
+                'role':       'primary',
+                'fpo_id':     fpo.id,
+                'fpo_name':   fpo.name,
+                'is_active':  u.is_active,
+                'joined_at':  fpo.created_at,
+                'last_login': u.last_login,
+            }
+        except FPO.DoesNotExist:
             return None
 
     @extend_schema(tags=['Admin - FPO Users'], summary='Retrieve an FPO user')
     def get(self, request, user_id):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-        membership = self._get(user_id)
-        if not membership:
+        data = self._build_data(user_id)
+        if not data:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
-        return StandardResponse.success(data=FPOUserSerializer(membership).data)
+        return StandardResponse.success(data=data)
 
 
 class FPOUserActivateView(APIView):
@@ -144,16 +255,15 @@ class FPOUserActivateView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            membership = FPOUserMembership.objects.select_related('user').get(
-                user_id=user_id, is_deleted=False
-            )
-        except FPOUserMembership.DoesNotExist:
+            user, membership = _resolve_fpo_user(user_id)
+        except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        membership.user.is_active = True
-        membership.user.save(update_fields=['is_active'])
-        membership.is_active = True
-        membership.save(update_fields=['is_active'])
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+        if membership:
+            membership.is_active = True
+            membership.save(update_fields=['is_active'])
         return StandardResponse.success(message='User activated.')
 
 
@@ -164,16 +274,15 @@ class FPOUserDeactivateView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            membership = FPOUserMembership.objects.select_related('user').get(
-                user_id=user_id, is_deleted=False
-            )
-        except FPOUserMembership.DoesNotExist:
+            user, membership = _resolve_fpo_user(user_id)
+        except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        membership.user.is_active = False
-        membership.user.save(update_fields=['is_active'])
-        membership.is_active = False
-        membership.save(update_fields=['is_active'])
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+        if membership:
+            membership.is_active = False
+            membership.save(update_fields=['is_active'])
         return StandardResponse.success(message='User deactivated.')
 
 
@@ -188,13 +297,10 @@ class FPOUserResetPasswordView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            membership = FPOUserMembership.objects.select_related(
-                'user', 'user__profile'
-            ).get(user_id=user_id, is_deleted=False)
-        except FPOUserMembership.DoesNotExist:
+            user, _ = _resolve_fpo_user(user_id)
+        except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        user = membership.user
         temp_password = _generate_temp_password()
         user.set_password(temp_password)
         user.save(update_fields=['password'])
@@ -205,10 +311,10 @@ class FPOUserResetPasswordView(APIView):
             profile.save(update_fields=['must_change_password'])
 
         context = {
-            'user_name':      f'{user.first_name} {user.last_name}'.strip() or user.email,
-            'temp_password':  temp_password,
-            'button_link':    '',
-            'button_text':    'Login',
+            'user_name':     f'{user.first_name} {user.last_name}'.strip() or user.email,
+            'temp_password': temp_password,
+            'button_link':   '',
+            'button_text':   'Login',
         }
         try:
             send_notification(user=user, code='password_reset_by_admin', channel='email', context=context)

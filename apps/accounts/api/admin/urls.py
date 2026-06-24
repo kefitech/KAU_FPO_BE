@@ -34,6 +34,7 @@ from .applications import (
     ApplicationVerifyDocumentView,
     ApplicationSetUserLimitView,
     ApplicationAssignTierView,
+    ApplicationTierHistoryView,
 )
 from .external_apis import (
     ExternalAPISettingsListView,
@@ -106,6 +107,7 @@ urlpatterns = [
     path('applications/<int:fpo_id>/verify-document/<int:doc_id>/',          ApplicationVerifyDocumentView.as_view(),  name='admin-applications-verify-doc'),
     path('applications/<int:fpo_id>/set-user-limit/',                        ApplicationSetUserLimitView.as_view(),    name='admin-applications-set-limit'),
     path('applications/<int:fpo_id>/assign-tier/',                           ApplicationAssignTierView.as_view(),      name='admin-applications-assign-tier'),
+    path('applications/<int:fpo_id>/tier-history/',                          ApplicationTierHistoryView.as_view(),     name='admin-applications-tier-history'),
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
     # Audit Logs
