@@ -323,7 +323,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     is_prefilled   = serializers.SerializerMethodField()
 
     # Questions auto-filled from FPO registration data — frontend shows these as read-only
-    PREFILLED_QNOS = {1, 2, 7, 8, 12, 15}
+    PREFILLED_QNOS = {1, 2, 8, 12, 15}
 
     class Meta:
         model  = TierQuestion
@@ -389,7 +389,7 @@ class TierAssessmentView(APIView):
         summary='Get current assessment + all questions',
         description=(
             'Returns the current financial year assessment (if started) and the full '
-            'list of 29 questions with their answer options and scoring config.\n\n'
+            'list of 28 questions with their answer options and scoring config.\n\n'
             'If no assessment exists for the current year, `assessment` is null.\n\n'
             'Questions are ordered by question_no. Conditional questions include '
             '`condition_on_question_no` and `condition_value` for frontend to show/hide.'
@@ -516,7 +516,7 @@ class TierAssessmentDetailView(APIView):
             return StandardResponse.error('answers must be a dict of {question_no: answer}.',
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        PREFILLED_QNOS = {1, 2, 7, 8, 12, 15}
+        PREFILLED_QNOS = {1, 2, 8, 12, 15}
         question_map = {q.question_no: q for q in TierQuestion.objects.all()}
         saved = []
 
