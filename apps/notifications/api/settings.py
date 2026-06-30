@@ -8,9 +8,11 @@ Sensitive fields are encrypted before saving to DB.
 """
 
 from rest_framework import serializers, status
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.decorators import action
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
+from django_filters.rest_framework import DjangoFilterBackend
 from apps.core.views import TranslatedViewSet
 from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.responses import StandardResponse
@@ -101,6 +103,10 @@ class NotificationChannelSettingsViewSet(TranslatedViewSet):
     queryset           = NotificationChannelSettings.objects.all().order_by('channel')
     serializer_class   = NotificationChannelSettingsSerializer
     permission_classes = [IsSuperAdmin]
+    filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields   = ['channel', 'is_active']
+    search_fields      = ['channel']
+
 
     list_message    = 'admin.channel_settings_retrieved'
     create_message  = 'admin.channel_settings_created'
