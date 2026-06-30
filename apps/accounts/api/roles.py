@@ -5,7 +5,7 @@ Author: Athul Gopan
 Created: 22-04-2026
 """
 
-from rest_framework import status
+from rest_framework import status,filters
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.models import Group
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -32,6 +32,9 @@ class RoleViewSet(TranslatedViewSet):
     serializer_class = RoleSerializer
     permission_classes = [IsAuthenticated, IsSuperAdminOrReadOnly]
     pagination_class = StandardPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter] 
+    search_fields   = ['name']                                    
+    ordering_fields = ['name']  
     http_method_names = ['get', 'post', 'put', 'patch', 'delete']
 
     # Translation keys
