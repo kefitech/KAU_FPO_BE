@@ -68,7 +68,7 @@ class FPODocumentSerializer(serializers.ModelSerializer):
             'id', 'document_type', 'document_type_display',
             'file_url', 'file_size', 'mime_type',
             'is_required', 'is_verified', 'verified_at',
-            'created_at',
+            'created_at','uuid'
         ]
 
     def get_file_url(self, obj):
@@ -251,7 +251,8 @@ class DocumentDeleteView(APIView):
             )
 
         try:
-            doc = FPODocument.objects.get(id=doc_id, fpo=fpo, is_deleted=False)
+            print(doc_id,"doccccc")
+            doc = FPODocument.objects.get(uuid=doc_id, fpo=fpo, is_deleted=False)
         except FPODocument.DoesNotExist:
             return StandardResponse.error(
                 t('fpo.document_not_found', lang),
