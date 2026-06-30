@@ -219,6 +219,9 @@ class AnnouncementListView(APIView):
         category = request.query_params.get('category')
         if category:
             qs = qs.filter(category=category)
+        search = request.query_params.get('search', '').strip()  # ← add here
+        if search:
+            qs = qs.filter(title__en__icontains=search) | qs.filter(title__ml__icontains=search)
         lang = request.query_params.get('lang')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
@@ -363,6 +366,9 @@ class FAQListView(APIView):
         category = request.query_params.get('category')
         if category:
             qs = qs.filter(category=category)
+        search = request.query_params.get('search', '').strip()  # ← add here
+        if search:
+            qs = qs.filter(question__en__icontains=search) | qs.filter(question__ml__icontains=search)
         lang = request.query_params.get('lang')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)

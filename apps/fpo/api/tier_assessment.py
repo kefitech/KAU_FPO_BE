@@ -36,7 +36,6 @@ from apps.database.models.fpo import (
     TierDomain, TierCriterion, TierQuestion, FPOTierHistory,
 )
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -214,7 +213,9 @@ def _score_criterion(criterion, answers_by_qno, fpo):
     # ── Share Capital Mobilised (Q16 numeric range) ───────────────────────────
     if code == 'share_capital_mobilised':
         try:
-            v = float(answers_by_qno.get(16, 0) or 0)
+            raw = answers_by_qno.get(16, 0) or 0
+            print(f"Debug share_capital raw= {raw!r} type{type(raw)}")
+            v = Decimal(str(raw)) 
             if v > 1000000:   return Decimal('5')
             if v >= 500000:   return Decimal('4')
             if v >= 200000:   return Decimal('2')
@@ -367,6 +368,7 @@ class AssessmentUploadSerializer(serializers.ModelSerializer):
 class AssessmentSerializer(serializers.ModelSerializer):
     answers = AssessmentAnswerSerializer(many=True, read_only=True)
     uploads = AssessmentUploadSerializer(many=True, read_only=True)
+    domain_scores = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPOAssessment
@@ -374,6 +376,20 @@ class AssessmentSerializer(serializers.ModelSerializer):
             'id', 'financial_year', 'status',
             'total_score', 'tier_assigned', 'domain_scores', 'submitted_at',
             'created_at', 'updated_at', 'answers', 'uploads',
+        ]
+    def get_domain_scores(self, obj):
+        stored_scores = obj.domain_scores or {}
+
+        domains = TierDomain.objects.all()
+
+        return [
+            {
+                "domain_code": domain.code,
+                "domain_name": domain.name,
+                "score": float(stored_scores.get(domain.code, 0)),
+                "max_score": domain.max_marks,
+            }
+            for domain in TierDomain.objects.all()
         ]
 
 

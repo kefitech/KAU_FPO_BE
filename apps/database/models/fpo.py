@@ -491,7 +491,7 @@ class TierCriterion(models.Model):
 
 
 class TierQuestion(models.Model):
-    """29 questions linked to criteria. answer_config stores options+scores as JSON."""
+    """28 questions linked to criteria. answer_config stores options+scores as JSON."""
 
     class InputType(models.TextChoices):
         NUMBER        = 'number',        'Numeric input'

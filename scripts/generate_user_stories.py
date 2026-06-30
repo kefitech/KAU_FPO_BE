@@ -498,8 +498,8 @@ story_table(
     action='complete the annual tier assessment for my FPO',
     benefit='My FPO gets a tier classification (A/B/C/D) for the financial year',
     acceptance=[
-        '29 questions across 6 domains presented',
-        'Pre-filled questions (Q1, Q2, Q7, Q8, Q12, Q15) shown as read-only/grayed out',
+        '28 questions across 6 domains presented',
+        'Pre-filled questions (Q1, Q2, Q8, Q12, Q15) shown as read-only/grayed out',
         'upload_label shown on upload questions (Q6, Q17, Q27) as upload button label',
         'Conditional questions: Q19, Q20 hidden unless Q18 = Yes',
         'Answers auto-saved on each PATCH call',
@@ -727,7 +727,7 @@ story_table(
     benefit='I can review how the FPO scored in each domain',
     acceptance=[
         'Assessment visible on application detail page',
-        'All 29 questions with given answers shown',
+        'All 28 questions with given answers shown',
         'Domain scores and total score visible',
         'Uploaded files (Q6, Q17, Q27) accessible',
         'Shows "Not Assessed" if no assessment submitted',
