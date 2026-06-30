@@ -642,20 +642,21 @@ class FieldValidateView(APIView):
         fpo = FPO.objects.filter(primary_user=request.user).first()
         fpo_id = fpo.pk if fpo else None
 
-        valid, error, duplicate = self._validate(field, value, fpo_id)
+        valid, error, duplicate, existing_fpo_id = self._validate(field, value, fpo_id)
 
         return StandardResponse.success(
             data={
-                'field':     field,
-                'valid':     valid,
-                'error':     error,
-                'duplicate': duplicate,
+                'field':           field,
+                'valid':           valid,
+                'error':           error,
+                'duplicate':       duplicate,
+                'existing_fpo_id': existing_fpo_id,
             },
             message='Validation complete.',
         )
 
     def _validate(self, field, value, fpo_id):
-        """Returns (valid, error_message, is_duplicate)"""
+        """Returns (valid, error_message, is_duplicate, existing_fpo_id)"""
 
         validators = {
             'pan_number':          self._validate_pan,
@@ -679,74 +680,75 @@ class FieldValidateView(APIView):
         qs = FPO.objects.filter(**{field: value})
         if fpo_id:
             qs = qs.exclude(pk=fpo_id)
-        return qs.exists()
+        existing = qs.first()
+        return (True, existing.id) if existing else (False, None)
 
     def _validate_pan(self, value, fpo_id):
         value = value.upper()
         if not re.match(r'^[A-Z]{5}[0-9]{4}[A-Z]$', value):
-            return False, 'Invalid PAN format. Expected: AAAAA9999A', False
-        dup = self._check_duplicate('pan_number', value, fpo_id)
+            return False, 'Invalid PAN format. Expected: AAAAA9999A', False, None
+        dup, dup_fpo_id = self._check_duplicate('pan_number', value, fpo_id)
         if dup:
-            return False, 'An FPO with this PAN already exists.', True
-        return True, None, False
+            return False, 'An FPO with this PAN already exists.', True, dup_fpo_id
+        return True, None, False, None
 
     def _validate_gst(self, value, fpo_id):
         value = value.upper()
         if not value.startswith('32'):
-            return False, 'GST number must start with 32 for Kerala.', False
+            return False, 'GST number must start with 32 for Kerala.', False, None
         if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$', value):
-            return False, 'Invalid GST number format.', False
-        dup = self._check_duplicate('gst_number', value, fpo_id)
+            return False, 'Invalid GST number format.', False, None
+        dup, dup_fpo_id = self._check_duplicate('gst_number', value, fpo_id)
         if dup:
-            return False, 'An FPO with this GST number already exists.', True
-        return True, None, False
+            return False, 'An FPO with this GST number already exists.', True, dup_fpo_id
+        return True, None, False, None
 
     def _validate_cin(self, value, fpo_id):
         value = value.upper()
         if not re.match(r'^[A-Z]{1}[0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$', value):
-            return False, 'Invalid CIN format.', False
-        dup = self._check_duplicate('cin_number', value, fpo_id)
+            return False, 'Invalid CIN format.', False, None
+        dup, dup_fpo_id = self._check_duplicate('cin_number', value, fpo_id)
         if dup:
-            return False, 'An FPO with this CIN already exists.', True
-        return True, None, False
+            return False, 'An FPO with this CIN already exists.', True, dup_fpo_id
+        return True, None, False, None
 
     def _validate_reg_number(self, value, fpo_id):
         if not re.match(r'^[A-Za-z0-9/]+$', value):
-            return False, 'Only alphanumeric characters and / are allowed.', False
-        dup = self._check_duplicate('registration_number', value, fpo_id)
+            return False, 'Only alphanumeric characters and / are allowed.', False, None
+        dup, dup_fpo_id = self._check_duplicate('registration_number', value, fpo_id)
         if dup:
-            return False, 'An FPO with this registration number already exists.', True
-        return True, None, False
+            return False, 'An FPO with this registration number already exists.', True, dup_fpo_id
+        return True, None, False, None
 
     def _validate_email(self, value, fpo_id):
         value = value.lower()
         if not re.match(r'^[^@]+@[^@]+\.[^@]+$', value):
-            return False, 'Enter a valid email address.', False
-        dup = self._check_duplicate('office_email', value, fpo_id)
+            return False, 'Enter a valid email address.', False, None
+        dup, dup_fpo_id = self._check_duplicate('office_email', value, fpo_id)
         if dup:
-            return False, 'An FPO with this email already exists.', True
-        return True, None, False
+            return False, 'An FPO with this email already exists.', True, dup_fpo_id
+        return True, None, False, None
 
     def _validate_phone(self, value, fpo_id):
         if not re.match(r'^[6-9]\d{9}$', value):
-            return False, 'Enter a valid 10-digit Indian mobile number.', False
-        dup = self._check_duplicate('office_phone', value, fpo_id)
+            return False, 'Enter a valid 10-digit Indian mobile number.', False, None
+        dup, dup_fpo_id = self._check_duplicate('office_phone', value, fpo_id)
         if dup:
-            return False, 'An FPO with this phone number already exists.', True
-        return True, None, False
+            return False, 'An FPO with this phone number already exists.', True, dup_fpo_id
+        return True, None, False, None
 
     def _validate_ifsc(self, value, fpo_id):
         value = value.upper()
         if not re.match(r'^[A-Z]{4}0[A-Z0-9]{6}$', value):
-            return False, 'Invalid IFSC code. Expected format: AAAA0AAAAAA', False
-        return True, None, False
+            return False, 'Invalid IFSC code. Expected format: AAAA0AAAAAA', False, None
+        return True, None, False, None
 
     def _validate_account(self, value, fpo_id):
         if not value.isdigit() or not (9 <= len(value) <= 18):
-            return False, 'Account number must be 9-18 digits.', False
-        return True, None, False
+            return False, 'Account number must be 9-18 digits.', False, None
+        return True, None, False, None
 
     def _validate_pincode(self, value, fpo_id):
         if not value.isdigit() or len(value) != 6 or not value.startswith('6'):
-            return False, 'Pincode must be 6 digits starting with 6.', False
-        return True, None, False
+            return False, 'Pincode must be 6 digits starting with 6.', False, None
+        return True, None, False, None

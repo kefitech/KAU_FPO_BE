@@ -48,6 +48,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from django.shortcuts import redirect
 
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -84,6 +85,13 @@ def api_root(request):
 # =============================================================================
 
 urlpatterns = [
+    # Root — Swagger in dev, API info in production
+    path('', lambda request: redirect('/api/docs/') if settings.DEBUG else JsonResponse({
+        'name': 'KAU-FPO Platform API',
+        'version': '1.1.1',
+        'status': 'running',
+    })),
+
     # Admin
     path('admin/', admin.site.urls),
 

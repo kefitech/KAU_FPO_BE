@@ -18,6 +18,8 @@ Language keys in content JSON are validated against the active Language table.
 Pass ?lang=ml to GET endpoints to receive resolved text + available_languages instead of raw JSON.
 """
 
+from django.core.cache import cache
+
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiTypes, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
@@ -165,6 +167,8 @@ class SiteBlockDetailView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+        cache.delete_pattern('public:site_content:*')
+        cache.delete_pattern(f'public:site_content_detail:*:{key}')
         return StandardResponse.success(data=SiteBlockSerializer(block).data, message='Block updated.')
 
 
@@ -249,6 +253,7 @@ class AnnouncementListView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save()
+        cache.delete_pattern('public:announcements:*')
         return StandardResponse.success(data=AnnouncementSerializer(obj).data,
                                         message='Announcement created.',
                                         status_code=status.HTTP_201_CREATED)
@@ -300,6 +305,7 @@ class AnnouncementDetailView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+        cache.delete_pattern('public:announcements:*')
         return StandardResponse.success(data=AnnouncementSerializer(obj).data, message='Updated.')
 
     @extend_schema(tags=['Admin - CMS'], summary='Delete an announcement')
@@ -310,6 +316,7 @@ class AnnouncementDetailView(APIView):
         if not obj:
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.delete()
+        cache.delete_pattern('public:announcements:*')
         return StandardResponse.success(message='Deleted.')
 
 
@@ -388,6 +395,7 @@ class FAQListView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save()
+        cache.delete_pattern('public:faqs:*')
         return StandardResponse.success(data=FAQSerializer(obj).data,
                                         message='FAQ created.',
                                         status_code=status.HTTP_201_CREATED)
@@ -428,6 +436,7 @@ class FAQDetailView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+        cache.delete_pattern('public:faqs:*')
         return StandardResponse.success(data=FAQSerializer(obj).data, message='Updated.')
 
     @extend_schema(tags=['Admin - CMS'], summary='Delete a FAQ')
@@ -438,4 +447,5 @@ class FAQDetailView(APIView):
         if not obj:
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.delete()
+        cache.delete_pattern('public:faqs:*')
         return StandardResponse.success(message='Deleted.')
