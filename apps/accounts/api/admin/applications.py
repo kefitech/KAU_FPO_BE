@@ -27,6 +27,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from rest_framework import serializers, status
 from rest_framework.views import APIView
+from rest_framework.filters import OrderingFilter
 
 from apps.core.utils.constants import FPOStatus, UserRole
 from apps.core.utils.pagination import StandardPagination
@@ -274,6 +275,11 @@ def _transition(fpo, to_status, changed_by, notes=''):
 # ──────────────────────────────────────────────────────────────────────────────
 
 class ApplicationListView(APIView):
+    ordering_fields = [
+        'application_id', 'name', 'district', 'status',
+        'total_members', 'updated_at', 'created_at',
+    ]
+    ordering = ['-updated_at']  # default ordering if no `ordering` param sent
 
     @extend_schema(
         tags=['Admin - FPO Applications'],
@@ -284,6 +290,7 @@ class ApplicationListView(APIView):
             OpenApiParameter('district', description='Filter by district code (e.g. TSR, KLM)', required=False),
             OpenApiParameter('tier',     description='Filter by tier (A/B/C/D)', required=False),
             OpenApiParameter('search',   description='Search by FPO name or application_id', required=False),
+            OpenApiParameter('ordering', description='Order by field (prefix with "-" for descending), e.g. application_id or -updated_at', required=False),
         ],
     )
     def get(self, request):
@@ -295,7 +302,7 @@ class ApplicationListView(APIView):
 
         qs = FPO.objects.filter(is_deleted=False).select_related(
             'primary_user', 'primary_user__profile',
-        ).order_by('-created_at')
+        )
 
         s      = request.query_params.get('status')
         d      = request.query_params.get('district')
@@ -310,6 +317,8 @@ class ApplicationListView(APIView):
             qs = qs.filter(tier=tier)
         if search:
             qs = qs.filter(name__icontains=search) | qs.filter(application_id__icontains=search)
+
+        qs = OrderingFilter().filter_queryset(request, qs, self)
 
         paginator = StandardPagination()
         page      = paginator.paginate_queryset(qs, request)
