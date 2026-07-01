@@ -128,6 +128,41 @@ def seed_menu():
         roles     = [super_admin_group, sub_admin_group],
         order     = 12,
     )
+    seed_item(
+        label_key = 'menu.dashboard',
+        path      = '/admin/dashboard',
+        icon      = 'bar-chart-2',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 13,
+    )
+    seed_item(
+        label_key = 'menu.ownership_claims',
+        path      = '/admin/ownership-claims',
+        icon      = 'briefcase',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 14,
+    )
+    seed_item(
+        label_key = 'menu.audit_logs',
+        path      = '/admin/audit-logs',
+        icon      = 'clipboard-list',
+        roles     = [super_admin_group],
+        order     = 15,
+    )
+    seed_item(
+        label_key = 'menu.experts',
+        path      = '/admin/experts',
+        icon      = 'user-check',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 16,
+    )
+    seed_item(
+        label_key = 'menu.schemes',
+        path      = '/admin/schemes',
+        icon      = 'book-open',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 17,
+    )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 

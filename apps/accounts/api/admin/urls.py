@@ -58,6 +58,31 @@ from .cms import (
     AnnouncementDetailView,
     FAQListView,
     FAQDetailView,
+    QuickLinkListView,
+    QuickLinkDetailView,
+    QuickLinkLogoDeleteView,
+    QuickLinkActivateView,
+    QuickLinkDeactivateView,
+    NewsSourceListView,
+    NewsSourceDetailView,
+    NewsSourceLogoDeleteView,
+    NewsSourceActivateView,
+    NewsSourceDeactivateView,
+    TeamMemberListView,
+    TeamMemberDetailView,
+    TeamMemberPhotoDeleteView,
+    TeamMemberActivateView,
+    TeamMemberDeactivateView,
+    GalleryListView,
+    GalleryDetailView,
+    GalleryActivateView,
+    GalleryDeactivateView,
+    DocumentLibraryListView,
+    DocumentLibraryDetailView,
+    DocumentLibraryActivateView,
+    DocumentLibraryDeactivateView,
+    FeedbackListView,
+    FeedbackDetailView,
 )
 from .schemes import (
     SchemeListView,
@@ -79,6 +104,7 @@ from .fpo_users import (
     FPOUserDeactivateView,
     FPOUserResetPasswordView,
 )
+from .reports import FPOSummaryReportView
 from apps.accounts.api.menu import MenuItemViewSet
 from apps.accounts.api.sub_admins import SubAdminViewSet
 
@@ -132,6 +158,39 @@ urlpatterns = [
     path('announcements/<int:pk>/',   AnnouncementDetailView.as_view(), name='admin-announcements-detail'),
     path('faqs/',                     FAQListView.as_view(),            name='admin-faqs-list'),
     path('faqs/<int:pk>/',            FAQDetailView.as_view(),          name='admin-faqs-detail'),
+
+    path('quick-links/',                          QuickLinkListView.as_view(),       name='admin-quick-links-list'),
+    path('quick-links/<int:pk>/',                 QuickLinkDetailView.as_view(),     name='admin-quick-links-detail'),
+    path('quick-links/<int:pk>/logo/',            QuickLinkLogoDeleteView.as_view(), name='admin-quick-links-logo-delete'),
+    path('quick-links/<int:pk>/activate/',        QuickLinkActivateView.as_view(),   name='admin-quick-links-activate'),
+    path('quick-links/<int:pk>/deactivate/',      QuickLinkDeactivateView.as_view(), name='admin-quick-links-deactivate'),
+
+    path('news-sources/',                          NewsSourceListView.as_view(),       name='admin-news-sources-list'),
+    path('news-sources/<int:pk>/',                 NewsSourceDetailView.as_view(),     name='admin-news-sources-detail'),
+    path('news-sources/<int:pk>/logo/',            NewsSourceLogoDeleteView.as_view(), name='admin-news-sources-logo-delete'),
+    path('news-sources/<int:pk>/activate/',        NewsSourceActivateView.as_view(),   name='admin-news-sources-activate'),
+    path('news-sources/<int:pk>/deactivate/',      NewsSourceDeactivateView.as_view(), name='admin-news-sources-deactivate'),
+
+    path('team/',                          TeamMemberListView.as_view(),        name='admin-team-list'),
+    path('team/<int:pk>/',                 TeamMemberDetailView.as_view(),      name='admin-team-detail'),
+    path('team/<int:pk>/photo/',           TeamMemberPhotoDeleteView.as_view(), name='admin-team-photo-delete'),
+    path('team/<int:pk>/activate/',        TeamMemberActivateView.as_view(),    name='admin-team-activate'),
+    path('team/<int:pk>/deactivate/',      TeamMemberDeactivateView.as_view(),  name='admin-team-deactivate'),
+
+    path('reports/fpo-summary/',             FPOSummaryReportView.as_view(),   name='admin-reports-fpo-summary'),
+
+    path('feedback/',                        FeedbackListView.as_view(),       name='admin-feedback-list'),
+    path('feedback/<int:pk>/',               FeedbackDetailView.as_view(),     name='admin-feedback-detail'),
+
+    path('gallery/',                         GalleryListView.as_view(),        name='admin-gallery-list'),
+    path('gallery/<int:pk>/',                GalleryDetailView.as_view(),      name='admin-gallery-detail'),
+    path('gallery/<int:pk>/activate/',       GalleryActivateView.as_view(),    name='admin-gallery-activate'),
+    path('gallery/<int:pk>/deactivate/',     GalleryDeactivateView.as_view(),  name='admin-gallery-deactivate'),
+
+    path('documents/',                         DocumentLibraryListView.as_view(),       name='admin-documents-list'),
+    path('documents/<int:pk>/',                DocumentLibraryDetailView.as_view(),     name='admin-documents-detail'),
+    path('documents/<int:pk>/activate/',       DocumentLibraryActivateView.as_view(),   name='admin-documents-activate'),
+    path('documents/<int:pk>/deactivate/',     DocumentLibraryDeactivateView.as_view(), name='admin-documents-deactivate'),
     # Schemes & Subsidies
     path('schemes/',                       SchemeListView.as_view(),        name='admin-schemes-list'),
     path('schemes/<int:pk>/',              SchemeDetailView.as_view(),      name='admin-schemes-detail'),

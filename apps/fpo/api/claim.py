@@ -25,6 +25,7 @@ from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, FPODocument, FPOOwnershipClaim, ClaimStatus
+from apps.notifications.services import send_notification
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -137,6 +138,20 @@ class FPOClaimView(APIView):
             request=request,
             changes={'fpo_id': fpo_id, 'reason': reason[:100]},
         )
+
+        # Notify claimant that claim is received
+        user_name = request.user.get_full_name() or request.user.username
+        fpo_name  = fpo.name or f'FPO #{fpo.id}'
+        for channel in ('email', 'in_app'):
+            try:
+                send_notification(
+                    user=request.user,
+                    code='claim_submitted',
+                    channel=channel,
+                    context={'user_name': user_name, 'fpo_name': fpo_name},
+                )
+            except Exception:
+                pass
 
         return StandardResponse.created(
             data=ClaimResponseSerializer(claim).data,

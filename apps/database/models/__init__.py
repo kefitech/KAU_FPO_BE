@@ -52,6 +52,15 @@ from .cms import (
     AnnouncementCategory,
     FAQ,
     FAQCategory,
+    QuickLink,
+    NewsSource,
+    NewsSourceCategory,
+    TeamMember,
+    GalleryPhoto,
+    DocumentLibrary,
+    Feedback,
+    FeedbackStatus,
+    VisitorCount,
 )
 
 # FPO Module

@@ -29,6 +29,7 @@ from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, FPOOwnershipClaim, FPOUserMembership, ClaimStatus
+from apps.notifications.services import send_notification
 
 User = get_user_model()
 
@@ -145,7 +146,11 @@ class OwnershipClaimApproveView(APIView):
             '1. Sets claim status = approved\n'
             '2. Transfers `FPO.primary_user` to claimant\n'
             '3. Assigns `fpo_manager` + `primary` groups to claimant\n'
-            '4. Auto-rejects all other pending claims on the same FPO\n\n'
+            '4. **Deactivates old primary user** account + removes their groups\n'
+            '5. **Deactivates ALL secondary users** of the FPO\n'
+            '6. Auto-rejects all other pending claims on the same FPO\n'
+            '7. Sends `claim_ownership_revoked` email + in-app to old primary and all secondaries\n'
+            '8. Sends `claim_approved` email + in-app to the claimant\n\n'
             '**Only super admin can approve.**'
         ),
         request=_ReviewSerializer,
@@ -177,6 +182,13 @@ class OwnershipClaimApproveView(APIView):
         claimant  = claim.claimant
 
         with transaction.atomic():
+            # Collect secondary users before deactivating (for notifications)
+            secondary_memberships = list(
+                FPOUserMembership.objects.filter(fpo=fpo, is_active=True)
+                .exclude(user=fpo.primary_user)
+                .select_related('user', 'user__profile')
+            )
+
             # Transfer FPO ownership
             old_primary = fpo.primary_user
             fpo.primary_user = claimant
@@ -187,11 +199,24 @@ class OwnershipClaimApproveView(APIView):
             primary_group     = Group.objects.get(name='primary')
             claimant.groups.add(fpo_manager_group, primary_group)
 
-            # Deactivate old primary's membership if exists
-            FPOUserMembership.objects.filter(fpo=fpo, user=old_primary).update(is_active=False)
+            # Deactivate old primary — revoke account + remove fpo_manager group
+            if old_primary and old_primary != claimant:
+                old_primary.is_active = False
+                old_primary.save(update_fields=['is_active'])
+                old_primary.groups.remove(fpo_manager_group, primary_group)
+                FPOUserMembership.objects.filter(fpo=fpo, user=old_primary).update(is_active=False)
+
+            # Deactivate ALL secondary users
+            for membership in secondary_memberships:
+                membership.is_active = False
+                membership.user.is_active = False
+                membership.user.save(update_fields=['is_active'])
+            if secondary_memberships:
+                FPOUserMembership.objects.filter(
+                    id__in=[m.id for m in secondary_memberships]
+                ).update(is_active=False)
 
             # Create membership record for new primary
-            secondary_group = Group.objects.get(name='secondary')
             FPOUserMembership.objects.get_or_create(
                 fpo=fpo,
                 user=claimant,
@@ -219,6 +244,51 @@ class OwnershipClaimApproveView(APIView):
                 reviewed_at  = timezone.now(),
                 review_notes = 'Auto-rejected: another claim was approved for this FPO.',
             )
+
+        # Send notifications (outside transaction — failures must not roll back ownership transfer)
+        fpo_name = fpo.name or f'FPO #{fpo.id}'
+
+        # Notify old primary
+        if old_primary and old_primary != claimant:
+            old_name = old_primary.get_full_name() or old_primary.username
+            for channel in ('email', 'in_app'):
+                try:
+                    send_notification(
+                        user=old_primary,
+                        code='claim_ownership_revoked',
+                        channel=channel,
+                        context={'user_name': old_name, 'fpo_name': fpo_name},
+                    )
+                except Exception:
+                    pass
+
+        # Notify secondary users
+        for membership in secondary_memberships:
+            sec_user = membership.user
+            sec_name = sec_user.get_full_name() or sec_user.username
+            for channel in ('email', 'in_app'):
+                try:
+                    send_notification(
+                        user=sec_user,
+                        code='claim_ownership_revoked',
+                        channel=channel,
+                        context={'user_name': sec_name, 'fpo_name': fpo_name},
+                    )
+                except Exception:
+                    pass
+
+        # Notify claimant (new primary)
+        claimant_name = claimant.get_full_name() or claimant.username
+        for channel in ('email', 'in_app'):
+            try:
+                send_notification(
+                    user=claimant,
+                    code='claim_approved',
+                    channel=channel,
+                    context={'user_name': claimant_name, 'fpo_name': fpo_name},
+                )
+            except Exception:
+                pass
 
         AuditService.log(
             user=request.user,
@@ -266,23 +336,44 @@ class OwnershipClaimRejectView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
 
+        claimant = claim.claimant
+        fpo      = claim.fpo
+        notes    = ser.validated_data['notes']
+
         claim.status       = ClaimStatus.REJECTED
         claim.reviewed_by  = request.user
         claim.reviewed_at  = timezone.now()
-        claim.review_notes = ser.validated_data['notes']
+        claim.review_notes = notes
         claim.save()
 
         AuditService.log(
             user=request.user,
             action=AuditLog.Action.UPDATE,
-            instance=claim.fpo,
+            instance=fpo,
             request=request,
             changes={
                 'claim_id': claim_id,
                 'action':   'claim_rejected',
-                'notes':    ser.validated_data['notes'],
+                'notes':    notes,
             },
         )
+
+        fpo_name      = fpo.name or f'FPO #{fpo.id}'
+        claimant_name = claimant.get_full_name() or claimant.username
+        for channel in ('email', 'in_app'):
+            try:
+                send_notification(
+                    user=claimant,
+                    code='claim_rejected',
+                    channel=channel,
+                    context={
+                        'user_name':        claimant_name,
+                        'fpo_name':         fpo_name,
+                        'rejection_reason': notes,
+                    },
+                )
+            except Exception:
+                pass
 
         return StandardResponse.success(
             data=None,

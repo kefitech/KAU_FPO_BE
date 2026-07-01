@@ -41,6 +41,15 @@ TEMPLATE_CODES = [
     ('application_approved',        'in_app', 'In-app notification when FPO is approved',             ['user_name', 'application_id']),
     ('application_rejected',        'in_app', 'In-app notification when FPO is rejected',             ['user_name', 'rejection_reason']),
     ('info_requested',              'in_app', 'In-app notification when admin requests more info',     ['user_name', 'request_message']),
+    # Ownership claim workflow
+    ('claim_submitted',             'email',  'Notify claimant that claim is received and under review', ['user_name', 'fpo_name']),
+    ('claim_submitted',             'in_app', 'In-app: claim received confirmation',                     ['user_name', 'fpo_name']),
+    ('claim_approved',              'email',  'Notify claimant that their ownership claim was approved',  ['user_name', 'fpo_name']),
+    ('claim_approved',              'in_app', 'In-app: claim approved confirmation',                      ['user_name', 'fpo_name']),
+    ('claim_rejected',              'email',  'Notify claimant that their ownership claim was rejected',  ['user_name', 'fpo_name', 'rejection_reason']),
+    ('claim_rejected',              'in_app', 'In-app: claim rejected notification',                      ['user_name', 'fpo_name', 'rejection_reason']),
+    ('claim_ownership_revoked',     'email',  'Notify old primary/secondary users that FPO access was revoked after claim approval', ['user_name', 'fpo_name']),
+    ('claim_ownership_revoked',     'in_app', 'In-app: FPO access revoked due to ownership transfer',    ['user_name', 'fpo_name']),
 ]
 
 
@@ -323,6 +332,125 @@ TEMPLATES = [
         'info_requested', 'in_app', 'ml',
         'കൂടുതൽ വിവരങ്ങൾ ആവശ്യമാണ്',
         'പ്രിയ {{user_name}}, നിങ്ങളുടെ FPO അപേക്ഷ പ്രോസസ്സ് ചെയ്യാൻ കൂടുതൽ വിവരങ്ങൾ ആവശ്യമാണ്. ദയവായി ലോഗിൻ ചെയ്ത് അപ്ഡേറ്റ് ചെയ്യുക.',
+    ),
+
+    # ── Ownership Claim Notifications ────────────────────────────────────────
+    (
+        'claim_submitted', 'email', 'en',
+        'Your Ownership Claim Has Been Received',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>We have received your ownership claim for <strong>{{fpo_name}}</strong>.</p>'
+            '<p>Our team will review your claim and supporting documents. You will be notified once a decision is made.</p>'
+            '<p>This process typically takes 3–5 business days.</p>'
+        ),
+    ),
+    (
+        'claim_submitted', 'email', 'ml',
+        'നിങ്ങളുടെ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{fpo_name}}</strong>-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു.</p>'
+            '<p>ഞങ്ങളുടെ ടീം നിങ്ങളുടെ അവകാശവാദം അവലോകനം ചെയ്യും. തീരുമാനം ആകുമ്പോൾ അറിയിക്കും.</p>'
+        ),
+    ),
+    (
+        'claim_submitted', 'in_app', 'en',
+        'Ownership Claim Submitted',
+        'Dear {{user_name}}, your ownership claim for {{fpo_name}} has been received and is under review.',
+    ),
+    (
+        'claim_submitted', 'in_app', 'ml',
+        'ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിച്ചു',
+        'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു. അവലോകനം ചെയ്തുകൊണ്ടിരിക്കുന്നു.',
+    ),
+    (
+        'claim_approved', 'email', 'en',
+        'Your Ownership Claim Has Been Approved',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Congratulations! Your ownership claim for <strong>{{fpo_name}}</strong> has been <strong>approved</strong>.</p>'
+            '<p>You are now the primary user of this FPO. Please log in to complete your profile and access all platform features.</p>'
+        ),
+    ),
+    (
+        'claim_approved', 'email', 'ml',
+        'നിങ്ങളുടെ ഉടമസ്ഥാവകാശ അവകാശവാദം അംഗീകരിച്ചു',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>അഭിനന്ദനങ്ങൾ! <strong>{{fpo_name}}</strong>-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം <strong>അംഗീകരിച്ചു</strong>.</p>'
+            '<p>ഇപ്പോൾ നിങ്ങൾ ഈ FPO-യുടെ പ്രാഥമിക ഉപയോക്താവാണ്. ദയവായി ലോഗിൻ ചെയ്ത് പ്രൊഫൈൽ പൂർത്തിയാക്കുക.</p>'
+        ),
+    ),
+    (
+        'claim_approved', 'in_app', 'en',
+        'Ownership Claim Approved',
+        'Congratulations {{user_name}}! Your ownership claim for {{fpo_name}} has been approved. You are now the primary user.',
+    ),
+    (
+        'claim_approved', 'in_app', 'ml',
+        'ഉടമസ്ഥാവകാശ അവകാശവാദം അംഗീകരിച്ചു',
+        'അഭിനന്ദനങ്ങൾ {{user_name}}! {{fpo_name}}-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം അംഗീകരിച്ചു. നിങ്ങൾ ഇപ്പോൾ പ്രാഥമിക ഉപയോക്താവാണ്.',
+    ),
+    (
+        'claim_rejected', 'email', 'en',
+        'Your Ownership Claim Was Not Approved',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>We regret to inform you that your ownership claim for <strong>{{fpo_name}}</strong> has been <strong>rejected</strong>.</p>'
+            '<p><strong>Reason:</strong> {{rejection_reason}}</p>'
+            '<p>If you believe this is an error, please contact KAU support for further assistance.</p>'
+        ),
+    ),
+    (
+        'claim_rejected', 'email', 'ml',
+        'നിങ്ങളുടെ ഉടമസ്ഥാവകാശ അവകാശവാദം അംഗീകരിച്ചില്ല',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{fpo_name}}</strong>-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം <strong>നിരസിച്ചു</strong>.</p>'
+            '<p><strong>കാരണം:</strong> {{rejection_reason}}</p>'
+            '<p>ഇത് തെറ്റാണെന്ന് കരുതുന്നെങ്കിൽ KAU സഹായ കേന്ദ്രവുമായി ബന്ധപ്പെടുക.</p>'
+        ),
+    ),
+    (
+        'claim_rejected', 'in_app', 'en',
+        'Ownership Claim Rejected',
+        'Dear {{user_name}}, your ownership claim for {{fpo_name}} was not approved. Reason: {{rejection_reason}}.',
+    ),
+    (
+        'claim_rejected', 'in_app', 'ml',
+        'ഉടമസ്ഥാവകാശ അവകാശവാദം നിരസിച്ചു',
+        'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം അംഗീകരിച്ചില്ല. കാരണം: {{rejection_reason}}.',
+    ),
+    (
+        'claim_ownership_revoked', 'email', 'en',
+        'Your FPO Access Has Been Revoked',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>This is to inform you that your access to <strong>{{fpo_name}}</strong> on the KAU-FPO platform has been revoked.</p>'
+            '<p>This action was taken following the approval of an ownership claim by the rightful owner of this FPO.</p>'
+            '<p>If you believe this is an error, please contact KAU support immediately.</p>'
+        ),
+    ),
+    (
+        'claim_ownership_revoked', 'email', 'ml',
+        'നിങ്ങളുടെ FPO ആക്‌സസ് റദ്ദാക്കി',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ <strong>{{fpo_name}}</strong>-ലേക്കുള്ള നിങ്ങളുടെ ആക്‌സസ് റദ്ദാക്കിയിരിക്കുന്നു.</p>'
+            '<p>ഈ FPO-യുടെ ഉടമസ്ഥാവകാശ അവകാശവാദം അംഗീകരിച്ചതിനാൽ ഈ നടപടി സ്വീകരിച്ചു.</p>'
+            '<p>ഇത് തെറ്റാണെന്ന് കരുതുന്നെങ്കിൽ ഉടൻ KAU സഹായ കേന്ദ്രവുമായി ബന്ധപ്പെടുക.</p>'
+        ),
+    ),
+    (
+        'claim_ownership_revoked', 'in_app', 'en',
+        'FPO Access Revoked',
+        'Dear {{user_name}}, your access to {{fpo_name}} has been revoked following an ownership transfer approved by KAU Admin.',
+    ),
+    (
+        'claim_ownership_revoked', 'in_app', 'ml',
+        'FPO ആക്‌സസ് റദ്ദാക്കി',
+        'പ്രിയ {{user_name}}, KAU അഡ്‌മിൻ അംഗീകരിച്ച ഉടമസ്ഥ കൈമാറ്റത്തെ തുടർന്ന് {{fpo_name}}-ലേക്കുള്ള നിങ്ങളുടെ ആക്‌സസ് റദ്ദാക്കി.',
     ),
 ]
 
