@@ -1919,6 +1919,38 @@ def seed_menu_translations(languages):
     return count
 
 
+def seed_fixes(languages):
+    """
+    Apply known fixes to existing translations.
+
+    Uses update_or_create so these always overwrite the DB value.
+    Add any future broken-placeholder fixes here.
+    """
+    category_common = TranslationCategory.objects.get(code='common')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    fixes = [
+        # rate_limited was seeded with {seconds} (single brace) — must be {{seconds}}
+        (category_common, 'rate_limited', lang_en,
+         'Too many requests. Please try again after {{seconds}} seconds.'),
+        (category_common, 'rate_limited', lang_ml,
+         'നിരവധി അഭ്യർത്ഥനകൾ. {{seconds}} സെക്കൻഡിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.'),
+    ]
+
+    count = 0
+    for category, key, language, value in fixes:
+        obj, created = Translation.objects.update_or_create(
+            category=category, key=key, language=language,
+            defaults={'value': value, 'context': 'Fixed placeholder format', 'is_verified': True}
+        )
+        status = '✅ Fixed' if not created else '✅ Created'
+        print(f"  {status}  common.{key} [{language.code}]")
+        count += 1
+
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -1972,6 +2004,11 @@ def seed_translations():
     frontend_count = seed_frontend_ui_translations(languages)
     print(f"✅ Seeded {frontend_count} frontend UI translations")
     total_count += frontend_count
+
+    # Step 8: Apply known fixes (broken placeholders, wrong values)
+    print("\nApplying translation fixes...")
+    seed_fixes(languages)
+    print(f"✅ Fixes applied")
 
     print("\n" + "=" * 60)
     print(f"✅ SUCCESS! Migrated {total_count} translations")

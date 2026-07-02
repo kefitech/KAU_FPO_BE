@@ -419,8 +419,8 @@ class CommonMessages:
         "അസാധുവായ അഭ്യർത്ഥന. നിങ്ങളുടെ ഇൻപുട്ട് പരിശോധിക്കുക."
     )
     RATE_LIMITED: Tuple[str, str] = (
-        "Too many requests. Please try again after {seconds} seconds.",
-        "നിരവധി അഭ്യർത്ഥനകൾ. {seconds} സെക്കൻഡിന് ശേഷം വീണ്ടും ശ്രമിക്കുക."
+        "Too many requests. Please try again after {{seconds}} seconds.",
+        "നിരവധി അഭ്യർത്ഥനകൾ. {{seconds}} സെക്കൻഡിന് ശേഷം വീണ്ടും ശ്രമിക്കുക."
     )
     OPERATION_NOT_ALLOWED: Tuple[str, str] = (
         "This operation is not allowed",

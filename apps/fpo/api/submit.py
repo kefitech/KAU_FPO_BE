@@ -115,6 +115,7 @@ class FPOSubmitView(APIView):
         # Notify FPO user — email + SMS (approved, not just submitted)
         ctx = {
             'user_name':      request.user.get_full_name() or request.user.username,
+            'fpo_name':       fpo.name or f'FPO #{fpo.id}',
             'application_id': application_id,
         }
         send_notification(user=request.user, code='application_approved', channel='email',  context=ctx, lang=lang)
