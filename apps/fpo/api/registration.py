@@ -532,6 +532,15 @@ class FPOMeView(APIView):
                     changes[field] = {'old': str(old_val) if old_val else '', 'new': str(new_val)}
                 setattr(fpo, field, new_val)
 
+        # BR-008: changing office_email/office_phone invalidates prior OTP verification
+        if 'office_email' in changes and fpo.email_verified:
+            fpo.email_verified = False
+            changes['email_verified'] = {'old': 'True', 'new': 'False'}
+
+        if 'office_phone' in changes and fpo.phone_verified:
+            fpo.phone_verified = False
+            changes['phone_verified'] = {'old': 'True', 'new': 'False'}
+
         # Advance wizard step if moving forward
         if step > fpo.current_step:
             fpo.current_step = step
