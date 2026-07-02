@@ -34,7 +34,7 @@ class District(models.TextChoices):
     KOTTAYAM = "KTM", "Kottayam"
     IDUKKI = "IDK", "Idukki"
     ERNAKULAM = "EKM", "Ernakulam"
-    THRISSUR = "TRS", "Thrissur"
+    THRISSUR = "TSR", "Thrissur"
     PALAKKAD = "PKD", "Palakkad"
     MALAPPURAM = "MLP", "Malappuram"
     KOZHIKODE = "KZD", "Kozhikode"
@@ -52,7 +52,7 @@ DISTRICTS_BILINGUAL = {
     "KTM": ("Kottayam", "കോട്ടയം"),
     "IDK": ("Idukki", "ഇടുക്കി"),
     "EKM": ("Ernakulam", "എറണാകുളം"),
-    "TRS": ("Thrissur", "തൃശ്ശൂർ"),
+    "TSR": ("Thrissur", "തൃശ്ശൂർ"),
     "PKD": ("Palakkad", "പാലക്കാട്"),
     "MLP": ("Malappuram", "മലപ്പുറം"),
     "KZD": ("Kozhikode", "കോഴിക്കോട്"),
