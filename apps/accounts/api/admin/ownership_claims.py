@@ -181,6 +181,15 @@ class OwnershipClaimApproveView(APIView):
         fpo       = claim.fpo
         claimant  = claim.claimant
 
+        # Guard: claimant must not already be primary_user of a different FPO
+        existing_fpo = FPO.objects.filter(primary_user=claimant).exclude(id=fpo.id).first()
+        if existing_fpo:
+            return StandardResponse.error(
+                f'Claimant is already the primary owner of another FPO ({existing_fpo.name or existing_fpo.id}). '
+                f'Transfer cannot proceed.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
             # Collect secondary users before deactivating (for notifications)
             secondary_memberships = list(
