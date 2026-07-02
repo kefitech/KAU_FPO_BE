@@ -223,7 +223,7 @@ class OwnershipClaimApproveView(APIView):
                 defaults={
                     'role': primary_group,
                     'is_active': True,
-                    'invited_by': request.user,
+                    'created_by': request.user,
                 },
             )
 

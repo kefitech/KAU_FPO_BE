@@ -71,7 +71,7 @@ class TeamInviteSerializer(serializers.Serializer):
         return value.lower()
 
 
-class TeamMemberSerializer(serializers.ModelSerializer):
+class FPOTeamMemberSerializer(serializers.ModelSerializer):
     id         = serializers.IntegerField(source='user.id', read_only=True)
     first_name = serializers.CharField(source='user.first_name', read_only=True)
     last_name  = serializers.CharField(source='user.last_name', read_only=True)
@@ -100,7 +100,7 @@ class TeamListView(APIView):
         tags=['FPO - Team'],
         summary='List team members',
         description='Returns all secondary users in this FPO. Only accessible by the primary user.',
-        responses={200: TeamMemberSerializer(many=True)},
+        responses={200: FPOTeamMemberSerializer(many=True)},
     )
     def get(self, request):
         fpo = _get_primary_fpo(request.user)
@@ -115,7 +115,7 @@ class TeamListView(APIView):
         ).select_related('user', 'user__profile', 'role').exclude(
             user=request.user
         )
-        serializer = TeamMemberSerializer(memberships, many=True)
+        serializer = FPOTeamMemberSerializer(memberships, many=True)
         return StandardResponse.success(serializer.data, 'Team members retrieved.')
 
 

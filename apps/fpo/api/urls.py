@@ -23,6 +23,7 @@ from .phone_verify import PhoneOTPSendView, PhoneOTPConfirmView
 from .documents import DocumentUploadView, DocumentDeleteView
 from .submit import FPOSubmitView
 from .dashboard import FPODashboardView
+from .profile import FPOProfileView
 from .claim import FPOClaimView
 from .schemes import SchemeListPublicView, SchemeDetailPublicView
 from .team import (
@@ -68,6 +69,8 @@ urlpatterns = [
     path('me/submit/',                  FPOSubmitView.as_view(),           name='fpo-submit'),
     # Dashboard
     path('dashboard/',                  FPODashboardView.as_view(),        name='fpo-dashboard'),
+    # Personal profile
+    path('me/profile/',                 FPOProfileView.as_view(),          name='fpo-profile'),
     # Ownership claim
     path('claim/',                      FPOClaimView.as_view(),            name='fpo-claim'),
     # Schemes & Subsidies (public browse)
