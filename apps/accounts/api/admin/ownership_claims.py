@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
-from apps.core.utils.constants import UserRole
+from apps.core.utils.constants import UserRole, FPOStatus
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, FPOOwnershipClaim, FPOUserMembership, ClaimStatus
@@ -184,11 +184,36 @@ class OwnershipClaimApproveView(APIView):
         # Guard: claimant must not already be primary_user of a different FPO
         existing_fpo = FPO.objects.filter(primary_user=claimant).exclude(id=fpo.id).first()
         if existing_fpo:
-            return StandardResponse.error(
-                f'Claimant is already the primary owner of another FPO ({existing_fpo.name or existing_fpo.id}). '
-                f'Transfer cannot proceed.',
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+            if existing_fpo.status == FPOStatus.DRAFT:
+                # Draft is incomplete — delete it so transfer can proceed
+                existing_fpo.delete()
+                try:
+                    send_notification(
+                        user=claimant,
+                        code='claim_draft_removed',
+                        channel='email',
+                        context={
+                            'user_name': claimant.get_full_name() or claimant.username,
+                            'fpo_name':  fpo.name or f'FPO #{fpo.id}',
+                        },
+                    )
+                    send_notification(
+                        user=claimant,
+                        code='claim_draft_removed',
+                        channel='in_app',
+                        context={
+                            'user_name': claimant.get_full_name() or claimant.username,
+                            'fpo_name':  fpo.name or f'FPO #{fpo.id}',
+                        },
+                    )
+                except Exception:
+                    pass
+            else:
+                return StandardResponse.error(
+                    f'Claimant is already the primary owner of another active FPO ({existing_fpo.name or existing_fpo.id}). '
+                    f'Transfer cannot proceed.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
         with transaction.atomic():
             # Collect secondary users before deactivating (for notifications)

@@ -50,6 +50,8 @@ TEMPLATE_CODES = [
     ('claim_rejected',              'in_app', 'In-app: claim rejected notification',                      ['user_name', 'fpo_name', 'rejection_reason']),
     ('claim_ownership_revoked',     'email',  'Notify old primary/secondary users that FPO access was revoked after claim approval', ['user_name', 'fpo_name']),
     ('claim_ownership_revoked',     'in_app', 'In-app: FPO access revoked due to ownership transfer',    ['user_name', 'fpo_name']),
+    ('claim_draft_removed',         'email',  'Notify claimant that their incomplete draft FPO was removed during ownership transfer', ['user_name', 'fpo_name']),
+    ('claim_draft_removed',         'in_app', 'In-app: draft FPO removed during ownership transfer',     ['user_name', 'fpo_name']),
 ]
 
 
@@ -451,6 +453,33 @@ TEMPLATES = [
         'claim_ownership_revoked', 'in_app', 'ml',
         'FPO ആക്‌സസ് റദ്ദാക്കി',
         'പ്രിയ {{user_name}}, KAU അഡ്‌മിൻ അംഗീകരിച്ച ഉടമസ്ഥ കൈമാറ്റത്തെ തുടർന്ന് {{fpo_name}}-ലേക്കുള്ള നിങ്ങളുടെ ആക്‌സസ് റദ്ദാക്കി.',
+    ),
+    (
+        'claim_draft_removed', 'email', 'en',
+        'Your Draft FPO Registration Has Been Removed',
+        '<p>Dear <strong>{{user_name}}</strong>,</p>'
+        '<p>As part of approving your ownership claim for <strong>{{fpo_name}}</strong>, '
+        'your incomplete draft FPO registration has been automatically removed.</p>'
+        '<p>You are now the primary owner of <strong>{{fpo_name}}</strong>. '
+        'Please log in to access your FPO dashboard.</p>',
+    ),
+    (
+        'claim_draft_removed', 'email', 'ml',
+        'നിങ്ങളുടെ ഡ്രാഫ്റ്റ് FPO രജിസ്ട്രേഷൻ നീക്കം ചെയ്തു',
+        '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+        '<p><strong>{{fpo_name}}</strong>-ന്റെ ഉടമസ്ഥ അവകാശം അംഗീകരിക്കുന്നതിന്റെ ഭാഗമായി, '
+        'നിങ്ങളുടെ അപൂർണ്ണ ഡ്രാഫ്റ്റ് FPO രജിസ്ട്രേഷൻ സ്വയമേവ നീക്കം ചെയ്തിരിക്കുന്നു.</p>'
+        '<p>നിങ്ങൾ ഇപ്പോൾ <strong>{{fpo_name}}</strong>-ന്റെ പ്രാഥമിക ഉടമസ്ഥനാണ്.</p>',
+    ),
+    (
+        'claim_draft_removed', 'in_app', 'en',
+        'Draft FPO Registration Removed',
+        'Dear {{user_name}}, your incomplete draft FPO registration was removed as part of the ownership transfer approval for {{fpo_name}}. You are now the primary owner.',
+    ),
+    (
+        'claim_draft_removed', 'in_app', 'ml',
+        'ഡ്രാഫ്റ്റ് FPO രജിസ്ട്രേഷൻ നീക്കം ചെയ്തു',
+        'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ഉടമസ്ഥ കൈമാറ്റ അംഗീകാരത്തിന്റെ ഭാഗമായി നിങ്ങളുടെ ഡ്രാഫ്റ്റ് FPO രജിസ്ട്രേഷൻ നീക്കം ചെയ്തു. നിങ്ങൾ ഇപ്പോൾ പ്രാഥമിക ഉടമസ്ഥനാണ്.',
     ),
 ]
 
