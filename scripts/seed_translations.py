@@ -1927,6 +1927,7 @@ def seed_fixes(languages):
     Add any future broken-placeholder fixes here.
     """
     category_common = TranslationCategory.objects.get(code='common')
+    category_auth   = TranslationCategory.objects.get(code='auth')
     lang_en = languages['en']
     lang_ml = languages['ml']
 
@@ -1936,6 +1937,11 @@ def seed_fixes(languages):
          'Too many requests. Please try again after {{seconds}} seconds.'),
         (category_common, 'rate_limited', lang_ml,
          'നിരവധി അഭ്യർത്ഥനകൾ. {{seconds}} സെക്കൻഡിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.'),
+        # account_locked was seeded with {minutes} (single brace) — must be {{minutes}}
+        (category_auth, 'account_locked', lang_en,
+         'Account locked due to too many failed attempts. Try after {{minutes}} minutes.'),
+        (category_auth, 'account_locked', lang_ml,
+         'നിരവധി പരാജയപ്പെട്ട ശ്രമങ്ങൾ കാരണം അക്കൗണ്ട് ലോക്ക് ചെയ്തു. {{minutes}} മിനിറ്റിന് ശേഷം ശ്രമിക്കുക.'),
     ]
 
     count = 0

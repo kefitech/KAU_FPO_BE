@@ -99,8 +99,8 @@ class AuthMessages:
         "നിലവിലെ പാസ്‌വേഡ് തെറ്റാണ്"
     )
     ACCOUNT_LOCKED: Tuple[str, str] = (
-        "Account locked due to too many failed attempts. Try after {minutes} minutes.",
-        "നിരവധി പരാജയപ്പെട്ട ശ്രമങ്ങൾ കാരണം അക്കൗണ്ട് ലോക്ക് ചെയ്തു. {minutes} മിനിറ്റിന് ശേഷം ശ്രമിക്കുക."
+        "Account locked due to too many failed attempts. Try after {{minutes}} minutes.",
+        "നിരവധി പരാജയപ്പെട്ട ശ്രമങ്ങൾ കാരണം അക്കൗണ്ട് ലോക്ക് ചെയ്തു. {{minutes}} മിനിറ്റിന് ശേഷം ശ്രമിക്കുക."
     )
     USERNAME_ALREADY_EXISTS: Tuple[str, str] = (
         "An account with this username already exists",
