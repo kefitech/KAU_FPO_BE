@@ -22,6 +22,8 @@ TEMPLATE_CODES = [
     ('welcome',               'email',      'Welcome email with login credentials',          ['user_name', 'email', 'temp_password']),
     ('welcome',               'sms',        'Welcome SMS with login credentials',            ['user_name', 'temp_password']),
     ('welcome',               'whatsapp',   'Welcome WhatsApp with login credentials',       ['user_name', 'temp_password']),
+    ('welcome_fpo',           'email',      'Welcome email for self-registered FPO users (no credentials block)', ['user_name']),
+    ('welcome_fpo',           'sms',        'Welcome SMS for self-registered FPO users',     ['user_name']),
     ('email_verification',    'email',      'OTP for email verification at registration',    ['user_name', 'otp']),
     ('mobile_verification',   'sms',        'OTP for phone verification and password reset', ['otp']),
     ('application_submitted', 'email',      'FPO application submitted confirmation',        ['user_name', 'application_id']),
@@ -146,6 +148,33 @@ TEMPLATES = [
     (
         'welcome', 'sms', 'ml', '',
         'KAU-FPO-ലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
+    ),
+    (
+        'welcome_fpo', 'email', 'en',
+        'Welcome to KAU-FPO Digital Platform',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Welcome to the <strong>KAU-FPO Digital Platform</strong>! Your account has been created successfully.</p>'
+            '<p>You can now log in and begin your FPO registration. Our platform will guide you through each step of the process.</p>'
+            '<p style="margin-top:8px;font-size:13px;color:#888888;">If you have any questions, please contact our support team.</p>'
+        ),
+    ),
+    (
+        'welcome_fpo', 'email', 'ml',
+        'KAU-FPO ഡിജിറ്റൽ പ്ലാറ്റ്‌ഫോമിലേക്ക് സ്വാഗതം',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>KAU-FPO ഡിജിറ്റൽ പ്ലാറ്റ്‌ഫോമിലേക്ക്</strong> സ്വാഗതം! നിങ്ങളുടെ അക്കൗണ്ട് വിജയകരമായി സൃഷ്ടിച്ചു.</p>'
+            '<p>ഇപ്പോൾ ലോഗിൻ ചെയ്ത് നിങ്ങളുടെ FPO രജിസ്‌ട്രേഷൻ ആരംഭിക്കാം. ഓരോ ഘട്ടത്തിലും പ്ലാറ്റ്‌ഫോം നിങ്ങളെ നയിക്കും.</p>'
+        ),
+    ),
+    (
+        'welcome_fpo', 'sms', 'en', '',
+        'Welcome to KAU-FPO Platform, {{user_name}}! Your account is ready. Log in to start your FPO registration.',
+    ),
+    (
+        'welcome_fpo', 'sms', 'ml', '',
+        'KAU-FPO പ്ലാറ്റ്‌ഫോമിലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ അക്കൗണ്ട് തയ്യാറാണ്. FPO രജിസ്‌ട്രേഷൻ ആരംഭിക്കാൻ ലോഗിൻ ചെയ്യുക.',
     ),
     (
         'application_submitted', 'email', 'en',

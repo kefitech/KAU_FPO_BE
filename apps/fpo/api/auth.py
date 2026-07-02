@@ -55,7 +55,7 @@ class RegisterFPOUserView(APIView):
         try:
             send_notification(
                 user=user,
-                code='welcome',
+                code='welcome_fpo',
                 channel='email',
                 context={
                     'user_name': user.get_full_name() or user.email,
@@ -67,7 +67,7 @@ class RegisterFPOUserView(APIView):
         try:
             send_notification(
                 user=user,
-                code='welcome',
+                code='welcome_fpo',
                 channel='sms',
                 context={
                     'user_name': user.get_full_name() or user.email,
