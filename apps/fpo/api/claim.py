@@ -106,13 +106,26 @@ class FPOClaimView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        # One pending claim per user per FPO
-        if FPOOwnershipClaim.objects.filter(
-            fpo=fpo, claimant=request.user, status=ClaimStatus.PENDING
-        ).exists():
+        # Block if user already has a pending claim on ANY FPO
+        existing_pending = FPOOwnershipClaim.objects.filter(
+            claimant=request.user, status=ClaimStatus.PENDING
+        ).select_related('fpo').first()
+        if existing_pending:
             return StandardResponse.error(
-                'You already have a pending claim on this FPO. Please wait for admin review.',
+                f'You already have a pending claim on '
+                f'"{existing_pending.fpo.name or f"FPO #{existing_pending.fpo.id}"}". '
+                f'Please wait for admin review before submitting another claim.',
                 status_code=status.HTTP_409_CONFLICT,
+            )
+
+        # Max 3 attempts per user per FPO (including rejected claims)
+        attempt_count = FPOOwnershipClaim.objects.filter(
+            fpo=fpo, claimant=request.user
+        ).count()
+        if attempt_count >= 3:
+            return StandardResponse.error(
+                'You have reached the maximum number of claim attempts (3) for this FPO.',
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
         # Validate supporting doc IDs belong to this user
