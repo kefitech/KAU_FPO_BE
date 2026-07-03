@@ -12,6 +12,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
+from django.db.models import Q
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -68,6 +69,15 @@ class SchemeListView(APIView):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
         qs = Scheme.objects.filter(is_deleted=False).order_by('order', 'name_en')
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(name_en__icontains=search) |
+                Q(name_ml__icontains=search) |
+                Q(administering_body__icontains=search) |
+                Q(objective__icontains=search)
+            )
 
         category = request.query_params.get('category')
         if category:
