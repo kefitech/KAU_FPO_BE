@@ -14,6 +14,7 @@ Rules:
 - Supporting doc IDs must belong to the claimant's own uploaded documents
 """
 
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema
@@ -23,9 +24,12 @@ from rest_framework.views import APIView
 from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService
+from apps.core.utils.constants import UserRole
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, FPODocument, FPOOwnershipClaim, ClaimStatus
 from apps.notifications.services import send_notification
+
+User = get_user_model()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,9 +143,10 @@ class FPOClaimView(APIView):
             changes={'fpo_id': fpo_id, 'reason': reason[:100]},
         )
 
-        # Notify claimant that claim is received
         user_name = request.user.get_full_name() or request.user.username
         fpo_name  = fpo.name or f'FPO #{fpo.id}'
+
+        # Notify claimant that claim is received
         for channel in ('email', 'in_app'):
             try:
                 send_notification(
@@ -149,6 +154,25 @@ class FPOClaimView(APIView):
                     code='claim_submitted',
                     channel=channel,
                     context={'user_name': user_name, 'fpo_name': fpo_name},
+                )
+            except Exception:
+                pass
+
+        # Notify all super admins in their inbox
+        admin_users = User.objects.filter(
+            groups__name=UserRole.SUPER_ADMIN,
+            is_active=True,
+        )
+        for admin in admin_users:
+            try:
+                send_notification(
+                    user=admin,
+                    code='claim_new_admin',
+                    channel='in_app',
+                    context={
+                        'fpo_name':      fpo_name,
+                        'claimant_name': user_name,
+                    },
                 )
             except Exception:
                 pass

@@ -7,10 +7,11 @@ POST /api/admin/ownership-claims/{id}/approve/  — approve → transfer FPO own
 POST /api/admin/ownership-claims/{id}/reject/   — reject with reason
 
 Approve flow:
-- Sets claim status = approved
-- Transfers FPO.primary_user to claimant
-- Old primary user's FPOUserMembership (if any) is deactivated
-- New primary user gets fpo_manager + primary groups
+- Old FPO: status → CLAIMED (all data + application_id preserved for audit)
+- New FPO record created for claimant (status=DRAFT, current_step=1)
+- Claimant gets fpo_manager + primary groups + FPOUserMembership on NEW FPO
+- Old primary user deactivated (groups removed, account disabled)
+- All secondary users of old FPO deactivated
 - All other pending claims on same FPO are auto-rejected
 """
 
@@ -28,7 +29,7 @@ from apps.core.services.audit import AuditService
 from apps.core.utils.constants import UserRole, FPOStatus
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.fpo import FPO, FPOOwnershipClaim, FPOUserMembership, ClaimStatus
+from apps.database.models.fpo import FPO, FPODocument, FPOOwnershipClaim, FPOUserMembership, ClaimStatus, ApplicationStatusHistory
 from apps.notifications.services import send_notification
 
 User = get_user_model()
@@ -39,18 +40,19 @@ User = get_user_model()
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _ClaimListSerializer(serializers.ModelSerializer):
-    fpo_name      = serializers.CharField(source='fpo.name', read_only=True)
-    fpo_id        = serializers.IntegerField(source='fpo.id', read_only=True)
-    claimant_name = serializers.SerializerMethodField()
+    fpo_name       = serializers.CharField(source='fpo.name', read_only=True)
+    fpo_id         = serializers.IntegerField(source='fpo.id', read_only=True)
+    claimant_name  = serializers.SerializerMethodField()
     claimant_email = serializers.CharField(source='claimant.email', read_only=True)
     claimant_phone = serializers.SerializerMethodField()
+    supporting_docs = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPOOwnershipClaim
         fields = [
             'id', 'fpo_id', 'fpo_name',
             'claimant_name', 'claimant_email', 'claimant_phone',
-            'reason', 'supporting_doc_ids',
+            'reason', 'supporting_docs',
             'status', 'reviewed_at', 'review_notes',
             'created_at',
         ]
@@ -61,6 +63,27 @@ class _ClaimListSerializer(serializers.ModelSerializer):
     def get_claimant_phone(self, obj):
         profile = getattr(obj.claimant, 'profile', None)
         return profile.phone if profile else None
+
+    def get_supporting_docs(self, obj):
+        if not obj.supporting_doc_ids:
+            return []
+        docs = FPODocument.objects.filter(
+            id__in=obj.supporting_doc_ids,
+            is_deleted=False,
+        ).only('id', 'document_type', 'file', 'created_at')
+        request = self.context.get('request')
+        result = []
+        for doc in docs:
+            file_url = doc.file.url if doc.file else None
+            if file_url and request:
+                file_url = request.build_absolute_uri(file_url)
+            result.append({
+                'id':            str(doc.id),
+                'document_type': doc.document_type,
+                'file_url':      file_url,
+                'uploaded_at':   doc.created_at,
+            })
+        return result
 
 
 class _ReviewSerializer(serializers.Serializer):
@@ -111,7 +134,7 @@ class OwnershipClaimListView(APIView):
 
         paginator  = StandardPagination()
         page       = paginator.paginate_queryset(qs, request)
-        serializer = _ClaimListSerializer(page, many=True)
+        serializer = _ClaimListSerializer(page, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data)
 
 
@@ -133,7 +156,10 @@ class OwnershipClaimDetailView(APIView):
         except FPOOwnershipClaim.DoesNotExist:
             return StandardResponse.error('Claim not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        return StandardResponse.success(_ClaimListSerializer(claim).data, 'Claim retrieved.')
+        return StandardResponse.success(
+            _ClaimListSerializer(claim, context={'request': request}).data,
+            'Claim retrieved.',
+        )
 
 
 class OwnershipClaimApproveView(APIView):
@@ -144,13 +170,14 @@ class OwnershipClaimApproveView(APIView):
         description=(
             'Approves the claim and transfers FPO ownership to the claimant:\n\n'
             '1. Sets claim status = approved\n'
-            '2. Transfers `FPO.primary_user` to claimant\n'
-            '3. Assigns `fpo_manager` + `primary` groups to claimant\n'
-            '4. **Deactivates old primary user** account + removes their groups\n'
-            '5. **Deactivates ALL secondary users** of the FPO\n'
-            '6. Auto-rejects all other pending claims on the same FPO\n'
-            '7. Sends `claim_ownership_revoked` email + in-app to old primary and all secondaries\n'
-            '8. Sends `claim_approved` email + in-app to the claimant\n\n'
+            '2. Old FPO status → **CLAIMED** (all data + application_id preserved)\n'
+            '3. Creates a **new FPO record** for the claimant (status=DRAFT, step=1)\n'
+            '4. Assigns `fpo_manager` + `primary` groups to claimant on new FPO\n'
+            '5. **Deactivates old primary user** account + removes their groups\n'
+            '6. **Deactivates ALL secondary users** of the old FPO\n'
+            '7. Auto-rejects all other pending claims on the same FPO\n'
+            '8. Sends `claim_ownership_revoked` email + in-app to old primary and secondaries\n'
+            '9. Sends `claim_approved` email + in-app to the claimant\n\n'
             '**Only super admin can approve.**'
         ),
         request=_ReviewSerializer,
@@ -210,65 +237,118 @@ class OwnershipClaimApproveView(APIView):
                     pass
             else:
                 return StandardResponse.error(
-                    f'Claimant is already the primary owner of another active FPO ({existing_fpo.name or existing_fpo.id}). '
-                    f'Transfer cannot proceed.',
+                    f'Claimant is already the primary owner of another active FPO '
+                    f'({existing_fpo.name or existing_fpo.id}). Transfer cannot proceed.',
                     status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
         with transaction.atomic():
+            old_primary = fpo.primary_user
+            old_fpo_status = fpo.status
+
             # Collect secondary users before deactivating (for notifications)
             secondary_memberships = list(
                 FPOUserMembership.objects.filter(fpo=fpo, is_active=True)
-                .exclude(user=fpo.primary_user)
+                .exclude(user=old_primary)
                 .select_related('user', 'user__profile')
             )
 
-            # Transfer FPO ownership
-            old_primary = fpo.primary_user
-            fpo.primary_user = claimant
-            fpo.save(update_fields=['primary_user'])
-
-            # Assign correct groups to new primary user
             fpo_manager_group = Group.objects.get(name=UserRole.FPO_MANAGER)
             primary_group     = Group.objects.get(name='primary')
-            claimant.groups.add(fpo_manager_group, primary_group)
 
-            # Deactivate old primary — revoke account + remove fpo_manager group
+            # ── Mark old FPO as CLAIMED — preserves all data + application_id ──
+            fpo.status = FPOStatus.CLAIMED
+            fpo.save(update_fields=['status'])
+
+            ApplicationStatusHistory.objects.create(
+                fpo         = fpo,
+                from_status = old_fpo_status,
+                to_status   = FPOStatus.CLAIMED,
+                changed_by  = request.user,
+                notes       = f'Ownership transferred to claimant (claim #{claim_id})',
+            )
+
+            # ── Deactivate old primary ─────────────────────────────────────────
             if old_primary and old_primary != claimant:
                 old_primary.is_active = False
                 old_primary.save(update_fields=['is_active'])
                 old_primary.groups.remove(fpo_manager_group, primary_group)
                 FPOUserMembership.objects.filter(fpo=fpo, user=old_primary).update(is_active=False)
 
-            # Deactivate ALL secondary users
+                AuditService.log(
+                    user=request.user,
+                    action=AuditLog.Action.UPDATE,
+                    instance=old_primary,
+                    request=request,
+                    changes={
+                        'action':   'account_deactivated',
+                        'reason':   'ownership_transfer',
+                        'claim_id': claim_id,
+                        'fpo_id':   fpo.id,
+                        'fpo_name': fpo.name or f'FPO #{fpo.id}',
+                    },
+                )
+
+            # ── Deactivate ALL secondary users of old FPO ─────────────────────
             for membership in secondary_memberships:
-                membership.is_active = False
+                membership.is_active      = False
                 membership.user.is_active = False
                 membership.user.save(update_fields=['is_active'])
+                AuditService.log(
+                    user=request.user,
+                    action=AuditLog.Action.UPDATE,
+                    instance=membership.user,
+                    request=request,
+                    changes={
+                        'action':   'account_deactivated',
+                        'reason':   'ownership_transfer',
+                        'claim_id': claim_id,
+                        'fpo_id':   fpo.id,
+                    },
+                )
             if secondary_memberships:
                 FPOUserMembership.objects.filter(
                     id__in=[m.id for m in secondary_memberships]
                 ).update(is_active=False)
 
-            # Create membership record for new primary
+            # ── Create fresh FPO record for claimant ──────────────────────────
+            new_fpo = FPO.objects.create(
+                primary_user  = claimant,
+                status        = FPOStatus.DRAFT,
+                current_step  = 1,
+            )
+
+            ApplicationStatusHistory.objects.create(
+                fpo         = new_fpo,
+                from_status = '',
+                to_status   = FPOStatus.DRAFT,
+                changed_by  = request.user,
+                notes       = f'New FPO created on ownership claim approval (claim #{claim_id}, old FPO #{fpo.id})',
+            )
+
+            # ── Assign groups + membership to claimant on new FPO ────────────
+            claimant.groups.add(fpo_manager_group, primary_group)
+            claimant.is_active = True
+            claimant.save(update_fields=['is_active'])
+
             FPOUserMembership.objects.get_or_create(
-                fpo=fpo,
+                fpo=new_fpo,
                 user=claimant,
                 defaults={
-                    'role': primary_group,
-                    'is_active': True,
+                    'role':       primary_group,
+                    'is_active':  True,
                     'created_by': request.user,
                 },
             )
 
-            # Approve this claim
+            # ── Approve this claim ────────────────────────────────────────────
             claim.status       = ClaimStatus.APPROVED
             claim.reviewed_by  = request.user
             claim.reviewed_at  = timezone.now()
             claim.review_notes = ser.validated_data['notes']
             claim.save()
 
-            # Auto-reject all other pending claims on same FPO
+            # ── Auto-reject all other pending claims on same FPO ──────────────
             FPOOwnershipClaim.objects.filter(
                 fpo=fpo,
                 status=ClaimStatus.PENDING,
@@ -319,7 +399,11 @@ class OwnershipClaimApproveView(APIView):
                     user=claimant,
                     code='claim_approved',
                     channel=channel,
-                    context={'user_name': claimant_name, 'fpo_name': fpo_name},
+                    context={
+                        'user_name': claimant_name,
+                        'fpo_name':  fpo_name,
+                        'new_fpo_id': new_fpo.id,
+                    },
                 )
             except Exception:
                 pass
@@ -332,14 +416,22 @@ class OwnershipClaimApproveView(APIView):
             changes={
                 'claim_id':    claim_id,
                 'action':      'ownership_transferred',
+                'old_primary': old_primary.email if old_primary else None,
                 'new_primary': claimant.email,
+                'old_fpo_id':  fpo.id,
+                'old_fpo_status_set_to': 'CLAIMED',
+                'new_fpo_id':  new_fpo.id,
                 'notes':       ser.validated_data['notes'],
             },
         )
 
         return StandardResponse.success(
-            data={'fpo_id': fpo.id, 'new_primary': claimant.email},
-            message=f'Claim approved. FPO ownership transferred to {claimant.get_full_name() or claimant.email}.',
+            data={
+                'old_fpo_id': fpo.id,
+                'new_fpo_id': new_fpo.id,
+                'new_primary': claimant.email,
+            },
+            message=f'Claim approved. New FPO #{new_fpo.id} created for {claimant.get_full_name() or claimant.email}.',
         )
 
 

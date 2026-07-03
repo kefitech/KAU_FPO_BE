@@ -54,6 +54,7 @@ TEMPLATE_CODES = [
     ('claim_ownership_revoked',     'in_app', 'In-app: FPO access revoked due to ownership transfer',    ['user_name', 'fpo_name']),
     ('claim_draft_removed',         'email',  'Notify claimant that their incomplete draft FPO was removed during ownership transfer', ['user_name', 'fpo_name']),
     ('claim_draft_removed',         'in_app', 'In-app: draft FPO removed during ownership transfer',     ['user_name', 'fpo_name']),
+    ('claim_new_admin',             'in_app', 'Notify admin inbox when a new ownership claim is submitted', ['fpo_name', 'claimant_name']),
 ]
 
 
@@ -509,6 +510,16 @@ TEMPLATES = [
         'claim_draft_removed', 'in_app', 'ml',
         'ഡ്രാഫ്റ്റ് FPO രജിസ്ട്രേഷൻ നീക്കം ചെയ്തു',
         'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ഉടമസ്ഥ കൈമാറ്റ അംഗീകാരത്തിന്റെ ഭാഗമായി നിങ്ങളുടെ ഡ്രാഫ്റ്റ് FPO രജിസ്ട്രേഷൻ നീക്കം ചെയ്തു. നിങ്ങൾ ഇപ്പോൾ പ്രാഥമിക ഉടമസ്ഥനാണ്.',
+    ),
+    (
+        'claim_new_admin', 'in_app', 'en',
+        'New Ownership Claim Received',
+        'A new ownership claim has been submitted for <strong>{{fpo_name}}</strong> by {{claimant_name}}. Please review and take action.',
+    ),
+    (
+        'claim_new_admin', 'in_app', 'ml',
+        'പുതിയ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു',
+        '{{claimant_name}} {{fpo_name}}-നായി ഒരു ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിച്ചിരിക്കുന്നു. ദയവായി അവലോകനം ചെയ്ത് നടപടി സ്വീകരിക്കുക.',
     ),
 ]
 

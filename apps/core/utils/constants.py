@@ -146,6 +146,7 @@ class FPOStatus(models.TextChoices):
     APPROVED = "approved", "Approved"
     REJECTED = "rejected", "Rejected"
     SUSPENDED = "suspended", "Suspended"
+    CLAIMED = "claimed", "Claimed (Ownership Transferred)"
 
 
 # Valid status transitions (from_status -> [allowed_to_statuses])
@@ -154,7 +155,7 @@ FPO_STATUS_TRANSITIONS = {
     FPOStatus.SUBMITTED:     [FPOStatus.APPROVED, FPOStatus.UNDER_REVIEW, FPOStatus.REJECTED],
     FPOStatus.UNDER_REVIEW:  [FPOStatus.APPROVED, FPOStatus.REJECTED, FPOStatus.INFO_REQUIRED],
     FPOStatus.INFO_REQUIRED: [FPOStatus.SUBMITTED],
-    FPOStatus.APPROVED:      [FPOStatus.SUSPENDED, FPOStatus.REJECTED],
+    FPOStatus.APPROVED:      [FPOStatus.SUSPENDED, FPOStatus.REJECTED, FPOStatus.CLAIMED],
     FPOStatus.REJECTED:      [FPOStatus.DRAFT],
     FPOStatus.SUSPENDED:     [FPOStatus.APPROVED],
 }

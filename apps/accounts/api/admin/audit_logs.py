@@ -25,7 +25,7 @@ from apps.core.models.generic import AuditLog
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.fpo import FPO
+from apps.database.models.fpo import FPO, FPODocument
 
 User = get_user_model()
 
@@ -133,25 +133,27 @@ class AuditLogListView(APIView):
         if action:
             qs = qs.filter(action=action)
 
-        # Filter: by FPO — find all AuditLog rows whose object is the FPO or its documents
+        # Filter: by FPO — find all AuditLog rows related to a specific FPO
         fpo_id = request.query_params.get('fpo_id', '').strip()
         if fpo_id:
             try:
-                fpo = FPO.objects.get(id=fpo_id)
+                fpo     = FPO.objects.get(id=fpo_id)
                 fpo_ct  = ContentType.objects.get_for_model(FPO)
-                # Also pull in document events linked to this FPO
-                from apps.database.models.fpo import FPODocument
                 doc_ct  = ContentType.objects.get_for_model(FPODocument)
-                doc_ids = list(
+                doc_ids_str = [
+                    str(d) for d in
                     FPODocument.objects.filter(fpo=fpo).values_list('id', flat=True)
-                )
-                doc_ids_str = [str(d) for d in doc_ids]
-                qs = qs.filter(
-                    content_type=fpo_ct, object_id=str(fpo.id)
-                ) | qs.filter(
-                    content_type=doc_ct, object_id__in=doc_ids_str
-                )
-                qs = qs.order_by('-created_at')
+                ]
+
+                # Direct FPO object logs
+                qs_fpo  = qs.filter(content_type=fpo_ct, object_id=str(fpo.id))
+                # Document logs for this FPO
+                qs_docs = qs.filter(content_type=doc_ct, object_id__in=doc_ids_str)
+                # User/other logs that carry fpo_id in their changes JSON
+                # (e.g. account_deactivated on ownership transfer, team invites)
+                qs_refs = qs.filter(changes__fpo_id=fpo.id)
+
+                qs = (qs_fpo | qs_docs | qs_refs).distinct().order_by('-created_at')
             except (FPO.DoesNotExist, ValueError):
                 return StandardResponse.error(
                     'FPO not found.',
