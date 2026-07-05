@@ -349,7 +349,7 @@ class PublicDocumentLibraryView(APIView):
             }
             for d in qs
         ]
-        cache.set(cache_key, data, timeout=60 * 60 * 24)
+        cache.set(cache_key, data, timeout=6)
         return StandardResponse.success(data=data)
 
 

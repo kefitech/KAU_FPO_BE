@@ -1144,7 +1144,7 @@ class DocumentLibraryListView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(created_by=request.user)
-        cache.delete('public:document_library')
+        cache.delete_pattern('public:document_library:*')
         return StandardResponse.created(
             data=DocumentLibrarySerializer(obj, context={'request': request}).data,
             message='Document uploaded.',
@@ -1186,7 +1186,7 @@ class DocumentLibraryDetailView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(updated_by=request.user)
-        cache.delete('public:document_library')
+        cache.delete_pattern('public:document_library:*')
         return StandardResponse.success(
             data=DocumentLibrarySerializer(obj, context={'request': request}).data,
             message='Updated.',
@@ -1218,7 +1218,7 @@ class DocumentLibraryActivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = True
         obj.save(update_fields=['is_active'])
-        cache.delete('public:document_library')
+        cache.delete_pattern('public:document_library:*')
         return StandardResponse.success(message='Activated.')
 
 
@@ -1234,7 +1234,7 @@ class DocumentLibraryDeactivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = False
         obj.save(update_fields=['is_active'])
-        cache.delete('public:document_library')
+        cache.delete_pattern('public:document_library:*')
         return StandardResponse.success(message='Deactivated.')
 
 
