@@ -144,7 +144,8 @@ class OwnershipClaimListView(APIView):
                 Q(fpo__name__icontains=search) |
                 Q(claimant__first_name__icontains=search) |
                 Q(claimant__last_name__icontains=search) |
-                Q(claimant__email__icontains=search)
+                Q(claimant__email__icontains=search) |
+                Q(claimant__profile__phone__icontains=search)
                 )
 
 
