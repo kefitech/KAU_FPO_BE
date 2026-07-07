@@ -114,7 +114,7 @@ class OwnershipClaimListView(APIView):
         tags=['Admin - Ownership Claims'],
         summary='List all ownership claims',
         parameters=[
-            OpenApiParameter('search', str, description='Search by FPO name, claimant first name, last name, or email'),
+            OpenApiParameter('search', str, description='Search by FPO name, claimant first name, last name, email, phone number'),
             OpenApiParameter('status',  str, description='Filter: pending / approved / rejected'),
             OpenApiParameter('fpo_id',  int, description='Filter by FPO ID'),
         ],
@@ -129,11 +129,11 @@ class OwnershipClaimListView(APIView):
 
         qs = (
             FPOOwnershipClaim.objects.select_related(
-    'fpo',
-    'claimant',
-    'claimant__profile',
-    'reviewed_by'
-)
+        'fpo',
+        'claimant',
+        'claimant__profile',
+        'reviewed_by',
+        )
             .order_by('-created_at')
         )
 
@@ -156,6 +156,31 @@ class OwnershipClaimListView(APIView):
         fpo_id = request.query_params.get('fpo_id', '').strip()
         if fpo_id:
             qs = qs.filter(fpo_id=fpo_id)
+
+
+        ORDERING_FIELD_MAP = {
+            'created_at':      'created_at',
+            '-created_at':     '-created_at',
+
+            'status':          'status',
+            '-status':         '-status',
+
+            'fpo_name':        'fpo__name',
+            '-fpo_name':       '-fpo__name',
+
+            'claimant_name':   'claimant__first_name',
+            '-claimant_name':  '-claimant__first_name',
+
+            'claimant_email':  'claimant__email',
+            '-claimant_email': '-claimant__email',
+        }
+
+        ordering_param = request.query_params.get('ordering', '-created_at').strip()
+        ordering = ORDERING_FIELD_MAP.get(ordering_param, '-created_at')  # translates here
+
+        qs = qs.order_by(ordering)  # always gets the real ORM path, never the raw client string
+        
+
 
         print("COUNT =", qs.count())
         paginator  = StandardPagination()
