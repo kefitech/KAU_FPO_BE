@@ -124,6 +124,7 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
     documents      = serializers.SerializerMethodField()
     status_history = serializers.SerializerMethodField()
     primary_user   = serializers.SerializerMethodField()
+    claim_origin   = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
@@ -148,6 +149,7 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
             'account_number', 'ifsc_code', 'description',
             'primary_user',
             'documents', 'status_history',
+            'claim_origin',
             'created_at', 'updated_at',
         ]
 
@@ -170,6 +172,15 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
         history = obj.status_history.select_related('changed_by').order_by('created_at')
         return _StatusHistorySerializer(history, many=True).data
 
+    def get_claim_origin(self, obj):
+        if not obj.claimed_from_fpo_id:
+            return None
+        return {
+            'original_fpo_id':   obj.claimed_from_fpo_id,
+            'original_fpo_name': obj.claimed_from_fpo.name if obj.claimed_from_fpo else None,
+            'claim_id':          obj.origin_claim_id,
+        }
+
 
 class _RejectSerializer(serializers.Serializer):
     reason = serializers.CharField(
@@ -185,6 +196,28 @@ class _RequestInfoSerializer(serializers.Serializer):
     )
 
 
+class _ActivateDeactivateSerializer(serializers.Serializer):
+    notes = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text='Optional notes for this status change',
+    )
+
+
+class _AdminEditFPOSerializer(serializers.Serializer):
+    name                   = serializers.CharField(max_length=200, required=False)
+    name_ml                = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    district               = serializers.CharField(max_length=10, required=False)
+    pan_number             = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    gst_number             = serializers.CharField(max_length=15, required=False, allow_blank=True)
+    cin_number             = serializers.CharField(max_length=21, required=False, allow_blank=True)
+    registration_number    = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    office_email           = serializers.EmailField(required=False, allow_blank=True)
+    office_phone           = serializers.CharField(max_length=15, required=False, allow_blank=True)
+    total_members          = serializers.IntegerField(required=False, min_value=0)
+    male_members           = serializers.IntegerField(required=False, min_value=0)
+    female_members         = serializers.IntegerField(required=False, min_value=0)
+    legal_structure        = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    legal_structure_detail = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -341,7 +374,7 @@ class ApplicationDetailView(APIView):
             )
 
         fpo = FPO.objects.select_related(
-            'primary_user', 'primary_user__profile',
+            'primary_user', 'primary_user__profile', 'claimed_from_fpo',
         ).prefetch_related(
             'documents', 'status_history__changed_by',
         ).filter(id=fpo_id, is_deleted=False).first()
@@ -354,6 +387,97 @@ class ApplicationDetailView(APIView):
 
         return StandardResponse.success(
             data=_ApplicationDetailSerializer(fpo, context={'request': request}).data,
+        )
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Edit FPO details (admin)',
+        description=(
+            'Allows admin to edit key FPO fields on any status.\n\n'
+            'Unique fields (`pan_number`, `gst_number`, `cin_number`, `registration_number`, '
+            '`office_email`, `office_phone`) are checked for duplicates across other FPOs '
+            '(excluding CLAIMED FPOs). Returns 400 with field-level error if a duplicate is found.\n\n'
+            'All fields are optional — only include what needs to change.'
+        ),
+        request=_AdminEditFPOSerializer,
+        responses={200: None},
+    )
+    def patch(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        ser = _AdminEditFPOSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        data = ser.validated_data
+        if not data:
+            return StandardResponse.error(
+                'No fields provided to update.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Duplicate check for unique fields
+        UNIQUE_FIELDS = [
+            'pan_number', 'gst_number', 'cin_number',
+            'registration_number', 'office_email', 'office_phone',
+        ]
+        for field in UNIQUE_FIELDS:
+            if field not in data:
+                continue
+            new_val = data[field]
+            if not new_val:
+                continue
+            conflict = FPO.objects.filter(
+                **{field: new_val},
+                is_deleted=False,
+            ).exclude(id=fpo.id).exclude(status=FPOStatus.CLAIMED).first()
+            if conflict:
+                return StandardResponse.error(
+                    {field: f"'{new_val}' is already registered to another FPO (#{conflict.id} — {conflict.name})."},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Build changes dict (old → new) for audit log
+        changes = {}
+        update_fields = []
+        for field, new_val in data.items():
+            old_val = getattr(fpo, field, None)
+            if old_val != new_val:
+                changes[field] = {'old': old_val, 'new': new_val}
+                setattr(fpo, field, new_val)
+                update_fields.append(field)
+
+        if not update_fields:
+            return StandardResponse.success(
+                data={'fpo_id': fpo.id},
+                message='No changes detected.',
+            )
+
+        update_fields.append('updated_at')
+        fpo.save(update_fields=update_fields)
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=fpo,
+            request=request,
+            changes=changes,
+        )
+
+        return StandardResponse.success(
+            data={'fpo_id': fpo.id, 'updated_fields': list(changes.keys())},
+            message='FPO details updated.',
         )
 
 
@@ -440,6 +564,137 @@ class ApplicationRequestInfoView(APIView):
         return StandardResponse.success(
             data={'status': fpo.status},
             message=t('admin.fpo_info_requested', request.language),
+        )
+
+
+class ApplicationActivateView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Activate a suspended or rejected FPO',
+        description=(
+            'Transitions SUSPENDED or REJECTED → APPROVED.\n\n'
+            'Before activating, checks for duplicate `pan_number`, `gst_number`, `cin_number`, '
+            '`registration_number` against other APPROVED FPOs. If a conflict is found, returns 400.\n\n'
+            'Optional `notes` field is recorded in the status history.'
+        ),
+        request=_ActivateDeactivateSerializer,
+        responses={200: None},
+    )
+    def post(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        ser = _ActivateDeactivateSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        ALLOWED_FROM = [FPOStatus.SUSPENDED, FPOStatus.REJECTED]
+        if fpo.status not in ALLOWED_FROM:
+            return StandardResponse.error(
+                f'Cannot activate from "{fpo.status}". FPO must be SUSPENDED or REJECTED.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Duplicate check against other ACTIVE (approved) FPOs, excluding claimed FPOs
+        UNIQUE_FIELDS = [
+            ('pan_number', fpo.pan_number),
+            ('gst_number', fpo.gst_number),
+            ('cin_number', fpo.cin_number),
+            ('registration_number', fpo.registration_number),
+        ]
+        for field, value in UNIQUE_FIELDS:
+            if not value:
+                continue
+            conflict = FPO.objects.filter(
+                **{field: value},
+                status=FPOStatus.APPROVED,
+                is_deleted=False,
+            ).exclude(id=fpo.id).exclude(status=FPOStatus.CLAIMED).first()
+            if conflict:
+                return StandardResponse.error(
+                    f'Cannot activate: {field} \'{value}\' is already registered to another active FPO '
+                    f'(#{conflict.id} — {conflict.name}).',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+        notes = ser.validated_data.get('notes', '')
+        _transition(fpo, FPOStatus.APPROVED, request.user, notes=notes)
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_STATUS_CHANGE,
+            instance=fpo,
+            request=request,
+            changes={'action': 'fpo_activated', 'new_status': FPOStatus.APPROVED, 'notes': notes},
+        )
+
+        return StandardResponse.success(
+            data={'status': fpo.status, 'fpo_id': fpo.id},
+            message='FPO activated successfully.',
+        )
+
+
+class ApplicationDeactivateView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Deactivate (suspend) an approved FPO',
+        description=(
+            'Transitions APPROVED → SUSPENDED.\n\n'
+            'Optional `notes` field is recorded in the status history.'
+        ),
+        request=_ActivateDeactivateSerializer,
+        responses={200: None},
+    )
+    def post(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        ser = _ActivateDeactivateSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if fpo.status != FPOStatus.APPROVED:
+            return StandardResponse.error(
+                f'Cannot deactivate from "{fpo.status}". FPO must be APPROVED.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        notes = ser.validated_data.get('notes', '')
+        _transition(fpo, FPOStatus.SUSPENDED, request.user, notes=notes)
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_STATUS_CHANGE,
+            instance=fpo,
+            request=request,
+            changes={'action': 'fpo_deactivated', 'new_status': FPOStatus.SUSPENDED, 'notes': notes},
+        )
+
+        return StandardResponse.success(
+            data={'status': fpo.status, 'fpo_id': fpo.id},
+            message='FPO deactivated (suspended) successfully.',
         )
 
 

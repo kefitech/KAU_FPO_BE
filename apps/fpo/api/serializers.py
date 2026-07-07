@@ -499,6 +499,7 @@ class FPODetailSerializer(serializers.ModelSerializer):
             # Meta
             'required_docs_uploaded', 'required_docs_verified', 'submission_errors',
             'created_at', 'updated_at',
+            'origin_claim_id',
         ]
         read_only_fields = fields
 

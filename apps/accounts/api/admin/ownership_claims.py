@@ -1,14 +1,15 @@
 """
 Admin Ownership Claims API
 ===========================
-GET  /api/admin/ownership-claims/           — list all claims (filter: status, fpo_id)
-GET  /api/admin/ownership-claims/{id}/      — claim detail
-POST /api/admin/ownership-claims/{id}/approve/  — approve → transfer FPO ownership
-POST /api/admin/ownership-claims/{id}/reject/   — reject with reason
+GET  /api/admin/ownership-claims/                         — list all claims (filter: status, fpo_id)
+GET  /api/admin/ownership-claims/{id}/                    — claim detail
+POST /api/admin/ownership-claims/{id}/approve/            — approve → transfer FPO ownership
+POST /api/admin/ownership-claims/{id}/reject/             — reject with reason
+POST /api/admin/ownership-claims/{id}/request-documents/  — request additional docs from claimant
 
 Approve flow:
 - Old FPO: status → CLAIMED (all data + application_id preserved for audit)
-- New FPO record created for claimant (status=DRAFT, current_step=1)
+- New FPO record created for claimant (status=DRAFT, current_step=0 — forces step 1 on first login only)
 - Claimant gets fpo_manager + primary groups + FPOUserMembership on NEW FPO
 - Old primary user deactivated (groups removed, account disabled)
 - All secondary users of old FPO deactivated
@@ -195,15 +196,14 @@ class OwnershipClaimApproveView(APIView):
         except FPOOwnershipClaim.DoesNotExist:
             return StandardResponse.error('Claim not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        if claim.status != ClaimStatus.PENDING:
+        if claim.status not in (ClaimStatus.PENDING, ClaimStatus.DOCS_SUBMITTED):
             return StandardResponse.error(
-                f'Claim is already {claim.status}.',
+                f'Cannot approve a claim with status: {claim.status}.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         ser = _ReviewSerializer(data=request.data)
-        if not ser.is_valid():
-            return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
+        ser.is_valid(raise_exception=True)
 
         fpo       = claim.fpo
         claimant  = claim.claimant
@@ -311,12 +311,67 @@ class OwnershipClaimApproveView(APIView):
                     id__in=[m.id for m in secondary_memberships]
                 ).update(is_active=False)
 
-            # ── Create fresh FPO record for claimant ──────────────────────────
+            # ── Create new FPO record for claimant — copy all data from old FPO ─
+            # All 4 wizard steps pre-filled so claimant just verifies, not re-enters.
+            # email_verified/phone_verified reset — claimant must verify their own contacts.
             new_fpo = FPO.objects.create(
-                primary_user  = claimant,
-                status        = FPOStatus.DRAFT,
-                current_step  = 1,
+                primary_user             = claimant,
+                status                   = FPOStatus.DRAFT,
+                current_step             = 0,
+                # Step 1
+                name                     = fpo.name or '',
+                name_ml                  = fpo.name_ml or '',
+                legal_structure          = fpo.legal_structure or '',
+                legal_structure_detail   = fpo.legal_structure_detail or '',
+                registration_number      = fpo.registration_number or '',
+                cin_number               = fpo.cin_number or '',
+                date_of_registration     = fpo.date_of_registration,
+                pan_number               = fpo.pan_number or '',
+                gst_number               = fpo.gst_number or '',
+                # Step 2
+                district                 = fpo.district or '',
+                block_taluk              = fpo.block_taluk or '',
+                village_town             = fpo.village_town or '',
+                address_line1            = fpo.address_line1 or '',
+                address_line2            = fpo.address_line2 or '',
+                pincode                  = fpo.pincode or '',
+                office_phone             = fpo.office_phone or '',
+                office_email             = fpo.office_email or '',
+                website                  = fpo.website or '',
+                email_verified           = False,
+                phone_verified           = False,
+                latitude                 = fpo.latitude,
+                longitude                = fpo.longitude,
+                # Step 3
+                signatory_name           = fpo.signatory_name or '',
+                signatory_designation    = fpo.signatory_designation or '',
+                signatory_phone          = fpo.signatory_phone or '',
+                signatory_email          = fpo.signatory_email or '',
+                signatory_aadhaar_last4  = fpo.signatory_aadhaar_last4 or '',
+                total_members            = fpo.total_members,
+                male_members             = fpo.male_members,
+                female_members           = fpo.female_members,
+                sc_st_members            = fpo.sc_st_members,
+                promoting_agency         = fpo.promoting_agency or '',
+                facilitating_agency_name = fpo.facilitating_agency_name or '',
+                ceo_available            = fpo.ceo_available,
+                accountant_available     = fpo.accountant_available,
+                total_directors          = fpo.total_directors,
+                women_directors          = fpo.women_directors,
+                directors_under_35       = fpo.directors_under_35,
+                # Step 4
+                primary_commodities      = fpo.primary_commodities or [],
+                secondary_commodities    = fpo.secondary_commodities or [],
+                annual_turnover          = fpo.annual_turnover,
+                bank_name                = fpo.bank_name or '',
+                bank_branch              = fpo.bank_branch or '',
+                account_number           = fpo.account_number or '',
+                ifsc_code                = fpo.ifsc_code or '',
+                description              = fpo.description or '',
             )
+            new_fpo.claimed_from_fpo = fpo
+            new_fpo.origin_claim_id  = claim.id
+            new_fpo.save(update_fields=['claimed_from_fpo', 'origin_claim_id'])
 
             ApplicationStatusHistory.objects.create(
                 fpo         = new_fpo,
@@ -452,15 +507,14 @@ class OwnershipClaimRejectView(APIView):
         except FPOOwnershipClaim.DoesNotExist:
             return StandardResponse.error('Claim not found.', status_code=status.HTTP_404_NOT_FOUND)
 
-        if claim.status != ClaimStatus.PENDING:
+        if claim.status not in (ClaimStatus.PENDING, ClaimStatus.DOCS_REQUESTED, ClaimStatus.DOCS_SUBMITTED):
             return StandardResponse.error(
-                f'Claim is already {claim.status}.',
+                f'Cannot reject a claim with status: {claim.status}.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         ser = _ReviewSerializer(data=request.data)
-        if not ser.is_valid():
-            return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
+        ser.is_valid(raise_exception=True)
 
         claimant = claim.claimant
         fpo      = claim.fpo
@@ -504,4 +558,80 @@ class OwnershipClaimRejectView(APIView):
         return StandardResponse.success(
             data=None,
             message='Claim rejected.',
+        )
+
+
+class OwnershipClaimRequestDocsView(APIView):
+
+    @extend_schema(
+        tags=['Admin - Ownership Claims'],
+        summary='Request additional documents from claimant',
+        description=(
+            'Sets claim status to `docs_requested` and sends email + SMS + in-app '
+            'notification to the claimant describing what documents are needed. '
+            'Can be called on a `pending` or `docs_requested` claim.'
+        ),
+        request=_ReviewSerializer,
+        responses={200: None},
+    )
+    def post(self, request, claim_id):
+        if not _can_manage(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        try:
+            claim = FPOOwnershipClaim.objects.select_related('fpo', 'claimant').get(id=claim_id)
+        except FPOOwnershipClaim.DoesNotExist:
+            return StandardResponse.error('Claim not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if claim.status in (ClaimStatus.APPROVED, ClaimStatus.REJECTED):
+            return StandardResponse.error(
+                f'Cannot request documents on a {claim.status} claim.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ser = _ReviewSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        claimant = claim.claimant
+        fpo      = claim.fpo
+        message  = ser.validated_data['notes']
+
+        claim.status       = ClaimStatus.DOCS_REQUESTED
+        claim.reviewed_by  = request.user
+        claim.reviewed_at  = timezone.now()
+        claim.review_notes = message
+        claim.save()
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=fpo,
+            request=request,
+            changes={
+                'claim_id': claim_id,
+                'action':   'docs_requested',
+                'message':  message,
+            },
+        )
+
+        fpo_name      = fpo.name or f'FPO #{fpo.id}'
+        claimant_name = claimant.get_full_name() or claimant.username
+        for channel in ('email', 'sms', 'in_app'):
+            try:
+                send_notification(
+                    user=claimant,
+                    code='claim_docs_requested',
+                    channel=channel,
+                    context={
+                        'user_name':  claimant_name,
+                        'fpo_name':   fpo_name,
+                        'admin_message': message,
+                    },
+                )
+            except Exception:
+                pass
+
+        return StandardResponse.success(
+            data=None,
+            message='Document request sent to claimant.',
         )

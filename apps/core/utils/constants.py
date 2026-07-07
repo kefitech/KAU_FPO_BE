@@ -195,6 +195,7 @@ class DocumentType(models.TextChoices):
     BOARD_RESOLUTION = "board_resolution", "Board Resolution"
     MOA_AOA = "moa_aoa", "MOA/AOA"
     OTHER = "other", "Other Document"
+    CLAIM_SUPPORT = "claim_support", "Ownership Claim Supporting Document"
 
 
 # Documents required for FPO registration (KAU confirmed 3 docs, June 2026)

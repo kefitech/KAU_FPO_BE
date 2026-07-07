@@ -110,18 +110,29 @@ def _notifications_summary(user):
     return {'unread_count': unread_count, 'recent': previews}
 
 
-PRIMARY_QUICK_LINKS = [
-    {'label': 'View Status',      'path': '/fpo/status'},
-    {'label': 'Upload Documents', 'path': '/fpo/documents'},
-    {'label': 'Team Members',     'path': '/fpo/team'},
-    {'label': 'My Profile',       'path': '/fpo/profile'},
-]
+def _quick_links(fpo, is_primary):
+    status = fpo.status
 
-SECONDARY_QUICK_LINKS = [
-    {'label': 'View Status',      'path': '/fpo/status'},
-    {'label': 'Upload Documents', 'path': '/fpo/documents'},
-    {'label': 'My Profile',       'path': '/fpo/profile'},
-]
+    if status == 'draft':
+        links = [{'label': 'Continue Registration', 'path': '/fpo/register'}]
+    elif status == 'info_required':
+        links = [
+            {'label': 'Update Application', 'path': '/fpo/register'},
+            {'label': 'My Application',     'path': '/fpo/applications'},
+        ]
+    elif status in ('submitted', 'under_review'):
+        links = [{'label': 'View Application Status', 'path': '/fpo/applications'}]
+    else:
+        # approved / rejected / suspended
+        links = [
+            {'label': 'My Application', 'path': '/fpo/applications'},
+            {'label': 'My Profile',     'path': '/fpo/settings/profile'},
+        ]
+        if is_primary:
+            links.append({'label': 'Team Members', 'path': '/fpo/team'})
+        links.append({'label': 'Schemes & Subsidies', 'path': '/fpo/schemes'})
+
+    return links
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -152,7 +163,7 @@ class FPODashboardView(APIView):
             )
 
         is_primary   = fpo.primary_user == request.user
-        quick_links  = PRIMARY_QUICK_LINKS if is_primary else SECONDARY_QUICK_LINKS
+        quick_links  = _quick_links(fpo, is_primary)
 
         data = {
             'profile':       _profile_summary(fpo),

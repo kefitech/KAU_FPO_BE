@@ -49,9 +49,11 @@ class TierChoice(models.TextChoices):
 
 
 class ClaimStatus(models.TextChoices):
-    PENDING  = 'pending',  'Pending'
-    APPROVED = 'approved', 'Approved'
-    REJECTED = 'rejected', 'Rejected'
+    PENDING         = 'pending',         'Pending'
+    DOCS_REQUESTED  = 'docs_requested',  'Documents Requested'
+    DOCS_SUBMITTED  = 'docs_submitted',  'Documents Submitted'
+    APPROVED        = 'approved',        'Approved'
+    REJECTED        = 'rejected',        'Rejected'
 
 
 # =============================================================================
@@ -170,6 +172,15 @@ class FPO(BaseModel):
         User, on_delete=models.SET_NULL,
         related_name='assigned_fpos', null=True, blank=True,
         help_text='Phase 2: sub-admin row-level security anchor'
+    )
+    claimed_from_fpo = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='resulted_claims',
+        help_text='If this FPO was created via an ownership claim, points to the original FPO'
+    )
+    origin_claim_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='FPOOwnershipClaim ID that created this FPO'
     )
 
     class Meta:
@@ -617,7 +628,7 @@ class FPOOwnershipClaim(TimeStampedModel):
         help_text='List of FPODocument IDs submitted as supporting evidence'
     )
     status      = models.CharField(
-        max_length=10, choices=ClaimStatus.choices, default=ClaimStatus.PENDING
+        max_length=15, choices=ClaimStatus.choices, default=ClaimStatus.PENDING
     )
     reviewed_by = models.ForeignKey(
         User, on_delete=models.SET_NULL,

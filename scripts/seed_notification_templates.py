@@ -55,6 +55,9 @@ TEMPLATE_CODES = [
     ('claim_draft_removed',         'email',  'Notify claimant that their incomplete draft FPO was removed during ownership transfer', ['user_name', 'fpo_name']),
     ('claim_draft_removed',         'in_app', 'In-app: draft FPO removed during ownership transfer',     ['user_name', 'fpo_name']),
     ('claim_new_admin',             'in_app', 'Notify admin inbox when a new ownership claim is submitted', ['fpo_name', 'claimant_name']),
+    ('claim_docs_requested',        'email',  'Notify claimant that admin is requesting additional documents', ['user_name', 'fpo_name', 'admin_message']),
+    ('claim_docs_requested',        'sms',    'SMS to claimant: admin requesting additional documents',        ['user_name', 'fpo_name']),
+    ('claim_docs_requested',        'in_app', 'In-app: admin requesting additional documents for claim',       ['user_name', 'fpo_name', 'admin_message']),
 ]
 
 
@@ -520,6 +523,48 @@ TEMPLATES = [
         'claim_new_admin', 'in_app', 'ml',
         'പുതിയ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു',
         '{{claimant_name}} {{fpo_name}}-നായി ഒരു ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിച്ചിരിക്കുന്നു. ദയവായി അവലോകനം ചെയ്ത് നടപടി സ്വീകരിക്കുക.',
+    ),
+    # Documents requested from claimant
+    (
+        'claim_docs_requested', 'email', 'en',
+        'Additional Documents Required for Your Ownership Claim',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>We have reviewed your ownership claim for <strong>{{fpo_name}}</strong> and require additional documents before we can proceed.</p>'
+            '<p><strong>Message from KAU Admin:</strong></p>'
+            '<blockquote style="border-left:3px solid #2e7d32;padding-left:12px;margin:12px 0;color:#444;">{{admin_message}}</blockquote>'
+            '<p>Please log in to the KAU-FPO platform and upload the requested documents at the earliest.</p>'
+            '<p style="margin-top:16px;font-size:13px;color:#888888;">If you have any questions, please contact KAU support.</p>'
+        ),
+    ),
+    (
+        'claim_docs_requested', 'email', 'ml',
+        'നിങ്ങളുടെ ഉടമസ്ഥാവകാശ അവകാശവാദത്തിന് അധിക രേഖകൾ ആവശ്യമാണ്',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{fpo_name}}</strong>-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദം അവലോകനം ചെയ്തു. തുടർനടപടിക്ക് അധിക രേഖകൾ ആവശ്യമാണ്.</p>'
+            '<p><strong>KAU അഡ്‌മിൻ സന്ദേശം:</strong></p>'
+            '<blockquote style="border-left:3px solid #2e7d32;padding-left:12px;margin:12px 0;color:#444;">{{admin_message}}</blockquote>'
+            '<p>ദയവായി KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ ലോഗിൻ ചെയ്ത് ആവശ്യമായ രേഖകൾ അപ്‌ലോഡ് ചെയ്യുക.</p>'
+        ),
+    ),
+    (
+        'claim_docs_requested', 'sms', 'en', '',
+        'KAU-FPO: Additional documents required for your ownership claim of {{fpo_name}}. Please log in to upload them.',
+    ),
+    (
+        'claim_docs_requested', 'sms', 'ml', '',
+        'KAU-FPO: {{fpo_name}}-ന്റെ ഉടമസ്ഥ അവകാശവാദത്തിന് അധിക രേഖകൾ ആവശ്യമാണ്. ദയവായി ലോഗിൻ ചെയ്ത് അപ്‌ലോഡ് ചെയ്യുക.',
+    ),
+    (
+        'claim_docs_requested', 'in_app', 'en',
+        'Documents Requested for Your Ownership Claim',
+        'Dear {{user_name}}, KAU Admin has requested additional documents for your ownership claim on {{fpo_name}}. Message: {{admin_message}}',
+    ),
+    (
+        'claim_docs_requested', 'in_app', 'ml',
+        'ഉടമസ്ഥ അവകാശവാദത്തിന് രേഖകൾ ആവശ്യപ്പെട്ടു',
+        'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ഉടമസ്ഥ അവകാശവാദത്തിന് KAU അഡ്‌മിൻ അധിക രേഖകൾ ആവശ്യപ്പെട്ടിരിക്കുന്നു. സന്ദേശം: {{admin_message}}',
     ),
 ]
 

@@ -24,7 +24,7 @@ from .documents import DocumentUploadView, DocumentDeleteView
 from .submit import FPOSubmitView
 from .dashboard import FPODashboardView
 from .profile import FPOProfileView
-from .claim import FPOClaimView
+from .claim import FPOClaimView, FPOClaimRespondView, FPOClaimDocumentUploadView, FPOClaimDocumentDeleteView
 from .schemes import SchemeListPublicView, SchemeDetailPublicView
 from .team import (
     TeamListView, TeamInviteView, TeamDeactivateView,
@@ -73,6 +73,9 @@ urlpatterns = [
     path('me/profile/',                 FPOProfileView.as_view(),          name='fpo-profile'),
     # Ownership claim
     path('claim/',                      FPOClaimView.as_view(),            name='fpo-claim'),
+    path('claim/<int:claim_id>/respond/',   FPOClaimRespondView.as_view(),        name='fpo-claim-respond'),
+    path('claim/<int:claim_id>/documents/',            FPOClaimDocumentUploadView.as_view(),  name='fpo-claim-documents'),
+    path('claim/<int:claim_id>/documents/<int:doc_id>/', FPOClaimDocumentDeleteView.as_view(), name='fpo-claim-document-delete'),
     # Schemes & Subsidies (public browse)
     path('schemes/',                    SchemeListPublicView.as_view(),    name='fpo-schemes-list'),
     path('schemes/<int:pk>/',           SchemeDetailPublicView.as_view(),  name='fpo-schemes-detail'),

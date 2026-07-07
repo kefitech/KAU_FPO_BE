@@ -4,14 +4,13 @@
 # Core dependencies required for all environments
 # Install: pip install -r requirements/base.txt
 #
-# NOTE: Dev uses Django 4.2.x for PostgreSQL compatibility.
-#       Upgrade to Django 5.x at production deployment (SRS requirement).
+# NOTE: Django 5.x as required by SRS. PostgreSQL 17 in docker-compose.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # Django & Django REST Framework
 # -----------------------------------------------------------------------------
-Django>=4.2,<5.0                    # Upgrade to >=5.0 at deployment
+Django>=5.0,<6.0                    # SRS requirement: Django 5
 djangorestframework>=3.15,<4.0
 
 # -----------------------------------------------------------------------------

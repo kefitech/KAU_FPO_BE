@@ -438,7 +438,7 @@ class FPORegisterView(APIView):
             'registration_number': data.get('registration_number'),
         }
         for field, value in fields.items():
-            if value and FPO.objects.filter(**{field: value}).exists():
+            if value and FPO.objects.filter(**{field: value}).exclude(status='claimed').exists():
                 return field
         return None
 
@@ -686,7 +686,7 @@ class FieldValidateView(APIView):
         return fn(value, fpo_id)
 
     def _check_duplicate(self, field, value, fpo_id):
-        qs = FPO.objects.filter(**{field: value})
+        qs = FPO.objects.filter(**{field: value}).exclude(status='claimed')
         if fpo_id:
             qs = qs.exclude(pk=fpo_id)
         existing = qs.first()

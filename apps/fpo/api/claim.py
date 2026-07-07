@@ -14,17 +14,20 @@ Rules:
 - Supporting doc IDs must belong to the claimant's own uploaded documents
 """
 
+import magic
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.views import APIView
 
 from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService
-from apps.core.utils.constants import UserRole
+from apps.core.utils.constants import DocumentType, UserRole
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, FPODocument, FPOOwnershipClaim, ClaimStatus
 from apps.notifications.services import send_notification
@@ -59,7 +62,8 @@ class ClaimResponseSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'fpo_id', 'fpo_name',
             'reason', 'supporting_doc_ids',
-            'status', 'created_at',
+            'status', 'review_notes', 'reviewed_at',
+            'created_at',
         ]
 
 
@@ -86,18 +90,23 @@ class FPOClaimView(APIView):
     )
     def post(self, request):
         ser = ClaimSerializer(data=request.data)
-        if not ser.is_valid():
-            return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
+        ser.is_valid(raise_exception=True)
 
         fpo_id             = ser.validated_data['fpo_id']
         reason             = ser.validated_data['reason']
         supporting_doc_ids = ser.validated_data.get('supporting_doc_ids', [])
 
-        # Validate FPO exists
+        # Validate FPO exists and is claimable
         try:
             fpo = FPO.objects.get(id=fpo_id, is_deleted=False)
         except FPO.DoesNotExist:
             return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if fpo.status == 'claimed':
+            return StandardResponse.error(
+                'This FPO has already been transferred to its legitimate owner and cannot be claimed.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Block if claimant is already the primary user
         if fpo.primary_user == request.user:
@@ -210,3 +219,221 @@ class FPOClaimView(APIView):
             ClaimResponseSerializer(claims, many=True).data,
             'Claims retrieved.',
         )
+
+
+class FPOClaimRespondView(APIView):
+    """
+    POST /api/fpo/claim/{claim_id}/respond/
+
+    Claimant uploads supporting documents in response to a docs_requested claim.
+    Status transitions: docs_requested → docs_submitted.
+    Admin is notified in their inbox.
+    """
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Registration'],
+        summary='Respond to a document request on an ownership claim',
+        description=(
+            'Called after admin sets claim to `docs_requested`. '
+            'Claimant submits uploaded document IDs. '
+            'Status changes to `docs_submitted` and admin is notified.'
+        ),
+    )
+    def post(self, request, claim_id):
+        try:
+            claim = FPOOwnershipClaim.objects.select_related('fpo').get(
+                id=claim_id,
+                claimant=request.user,
+                status=ClaimStatus.DOCS_REQUESTED,
+            )
+        except FPOOwnershipClaim.DoesNotExist:
+            return StandardResponse.error(
+                'Claim not found or not awaiting documents.',
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        supporting_doc_ids = request.data.get('supporting_doc_ids', [])
+        if not supporting_doc_ids:
+            return StandardResponse.error(
+                'Please upload at least one supporting document.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Filter by created_by + claim_support type — works regardless of which FPO the doc is on
+        valid_docs = FPODocument.objects.filter(
+            document_type=DocumentType.CLAIM_SUPPORT,
+            id__in=supporting_doc_ids,
+            is_deleted=False,
+            created_by=request.user,
+        ).values_list('id', flat=True)
+        valid_doc_ids = [str(d) for d in valid_docs]
+
+        if not valid_doc_ids:
+            return StandardResponse.error(
+                'No valid documents found. Please upload your documents first.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing = claim.supporting_doc_ids or []
+        claim.supporting_doc_ids = list(set(existing + valid_doc_ids))
+        claim.status = ClaimStatus.DOCS_SUBMITTED
+        claim.save(update_fields=['supporting_doc_ids', 'status'])
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=claim,
+            request=request,
+            changes={'docs_submitted': len(valid_doc_ids), 'status': ClaimStatus.DOCS_SUBMITTED},
+        )
+
+        user_name = request.user.get_full_name() or request.user.username
+        fpo_name  = claim.fpo.name or f'FPO #{claim.fpo.id}'
+
+        admin_users = User.objects.filter(groups__name=UserRole.SUPER_ADMIN, is_active=True)
+        for admin in admin_users:
+            try:
+                send_notification(
+                    user=admin,
+                    code='claim_new_admin',
+                    channel='in_app',
+                    context={'fpo_name': fpo_name, 'claimant_name': user_name},
+                )
+            except Exception:
+                pass
+
+        return StandardResponse.success(
+            data=ClaimResponseSerializer(claim).data,
+            message='Documents submitted. KAU Admin has been notified and will review your claim shortly.',
+        )
+
+
+class FPOClaimDocumentUploadView(APIView):
+    """
+    POST /api/fpo/claim/{claim_id}/documents/
+
+    Upload a supporting document for an ownership claim.
+    Unlike the main document upload API, this does NOT require FPO to be in DRAFT status.
+    Accepts: PDF, JPG, PNG — max 5 MB.
+    Stores as document_type='signatory_id' on the claimant's FPO (or creates a standalone record).
+    Returns the document ID to use in respond/.
+    """
+    permission_classes = [IsFPOManager]
+    parser_classes     = [MultiPartParser, FormParser]
+
+    @extend_schema(
+        tags=['FPO - Registration'],
+        summary='Upload a supporting document for an ownership claim',
+        description='Upload evidence to support your ownership claim. No FPO status restriction.',
+    )
+    def post(self, request, claim_id):
+        try:
+            claim = FPOOwnershipClaim.objects.select_related('fpo').get(
+                id=claim_id,
+                claimant=request.user,
+                status=ClaimStatus.DOCS_REQUESTED,
+            )
+        except FPOOwnershipClaim.DoesNotExist:
+            return StandardResponse.error(
+                'Claim not found or not awaiting documents.',
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        file = request.FILES.get('file')
+        if not file:
+            return StandardResponse.error(
+                'No file provided.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        max_size = 5 * 1024 * 1024  # 5 MB
+        if file.size > max_size:
+            return StandardResponse.error(
+                'File too large. Maximum allowed size is 5 MB.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        mime_type = magic.from_buffer(file.read(2048), mime=True)
+        file.seek(0)
+        if mime_type not in {'application/pdf', 'image/jpeg', 'image/png'}:
+            return StandardResponse.error(
+                'Invalid file format. Only PDF, JPG, and PNG are allowed.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Use the claimant's FPO if they have one; otherwise use the claimed FPO
+        user_fpo = getattr(request.user, 'fpo', None) or claim.fpo
+
+        # No soft-delete of previous docs — claims can have multiple supporting files
+        doc = FPODocument.objects.create(
+            fpo           = user_fpo,
+            document_type = DocumentType.CLAIM_SUPPORT,
+            file          = file,
+            file_size     = file.size,
+            mime_type     = mime_type,
+            created_by    = request.user,
+            updated_by    = request.user,
+        )
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.DOCUMENT_UPLOAD,
+            instance=doc,
+            request=request,
+            changes={'claim_id': claim_id, 'file_size': file.size, 'mime_type': mime_type},
+        )
+
+        return StandardResponse.success(
+            data={'id': str(doc.id), 'file_size': doc.file_size, 'mime_type': mime_type},
+            message='Document uploaded successfully.',
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class FPOClaimDocumentDeleteView(APIView):
+    """
+    DELETE /api/fpo/claim/{claim_id}/documents/{doc_id}/
+
+    Remove an uploaded supporting document from a docs_requested claim.
+    Only works while claim is in docs_requested state.
+    """
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Registration'],
+        summary='Delete a supporting document from an ownership claim',
+    )
+    def delete(self, request, claim_id, doc_id):
+        try:
+            claim = FPOOwnershipClaim.objects.get(
+                id=claim_id,
+                claimant=request.user,
+                status=ClaimStatus.DOCS_REQUESTED,
+            )
+        except FPOOwnershipClaim.DoesNotExist:
+            return StandardResponse.error(
+                'Claim not found or not awaiting documents.',
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        user_fpo = getattr(request.user, 'fpo', None) or claim.fpo
+
+        try:
+            doc = FPODocument.objects.get(
+                id=doc_id,
+                fpo=user_fpo,
+                document_type=DocumentType.CLAIM_SUPPORT,
+                is_deleted=False,
+                created_by=request.user,
+            )
+        except FPODocument.DoesNotExist:
+            return StandardResponse.error(
+                'Document not found.',
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        doc.is_deleted = True
+        doc.save(update_fields=['is_deleted'])
+
+        return StandardResponse.success(message='Document removed.')
