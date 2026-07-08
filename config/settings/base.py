@@ -390,9 +390,12 @@ CORS_EXPOSE_HEADERS = ['Set-Cookie']
 # CSRF PROTECTION (Cookie-based authentication)
 # =============================================================================
 
+# Set to False on testing servers that run HTTP (no TLS). Default: True in production, False in dev.
+COOKIE_SECURE = config('COOKIE_SECURE', default=not DEBUG, cast=bool)
+
 # CSRF settings for cookie-based JWT authentication
 CSRF_COOKIE_HTTPONLY = False  # Frontend needs to read CSRF token
-CSRF_COOKIE_SECURE = not DEBUG  # HTTPS only in production
+CSRF_COOKIE_SECURE = COOKIE_SECURE
 CSRF_COOKIE_SAMESITE = 'Lax'  # CSRF protection
 CSRF_COOKIE_NAME = 'csrftoken'
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
@@ -410,7 +413,7 @@ CSRF_TRUSTED_ORIGINS = config(
 
 # Session cookie settings
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG  # HTTPS only in production
+SESSION_COOKIE_SECURE = COOKIE_SECURE
 SESSION_COOKIE_SAMESITE = 'Lax'
 
 # =============================================================================
