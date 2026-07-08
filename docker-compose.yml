@@ -54,6 +54,15 @@ services:
       - db
       - redis
 
+  frontend:
+    build:
+      context: ../kau-fpo-frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://35.169.38.1/api
+    restart: always
+    depends_on:
+      - web
+
   nginx:
     image: nginx:alpine
     restart: always
@@ -65,6 +74,7 @@ services:
       - media_files:/app/media
     depends_on:
       - web
+      - frontend
 
 volumes:
   postgres_data:
