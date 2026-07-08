@@ -92,8 +92,8 @@ urlpatterns = [
         'status': 'running',
     })),
 
-    # Admin
-    path('admin/', admin.site.urls),
+    # Django admin (moved to /django-admin/ so /admin/ is free for the Next.js frontend)
+    path('django-admin/', admin.site.urls),
 
     # API Root & Health
     path('api/', api_root, name='api-root'),
