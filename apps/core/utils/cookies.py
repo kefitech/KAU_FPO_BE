@@ -43,7 +43,7 @@ def get_cookie_settings(is_access_token: bool = True) -> dict:
     return {
         'max_age': max_age,
         'httponly': True,  # Prevents JavaScript access (XSS protection)
-        'secure': not settings.DEBUG,  # HTTPS only in production
+        'secure': getattr(settings, 'COOKIE_SECURE', not settings.DEBUG),
         'samesite': 'Lax',  # CSRF protection (Lax allows top-level navigation)
         'path': '/',
     }
