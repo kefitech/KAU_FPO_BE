@@ -55,10 +55,7 @@ services:
       - redis
 
   frontend:
-    build:
-      context: ../kau-fpo-frontend
-      args:
-        NEXT_PUBLIC_API_BASE_URL: http://35.169.38.1/api
+    image: athulkefitech1123/kau-fpo-frontend:testing
     restart: always
     depends_on:
       - web
