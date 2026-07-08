@@ -35,10 +35,6 @@ django-prometheus>=2.3,<3.0         # Prometheus metrics (optional)
 django-csp>=3.8,<4.0                # Content Security Policy (optional)
 
 # -----------------------------------------------------------------------------
-# Database Connection Pooling
-# -----------------------------------------------------------------------------
-django-db-connection-pool>=1.2,<2.0  # Connection pooling (optional)
-
 # -----------------------------------------------------------------------------
 # Health Checks
 # -----------------------------------------------------------------------------

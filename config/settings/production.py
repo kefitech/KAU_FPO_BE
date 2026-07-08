@@ -92,8 +92,6 @@ X_FRAME_OPTIONS = 'DENY'
 # DATABASE (Production PostgreSQL)
 # =============================================================================
 
-# Enable connection pooling for better performance
-DATABASES['default']['CONN_MAX_AGE'] = config('DB_CONN_MAX_AGE', default=300, cast=int)
 DATABASES['default']['OPTIONS'] = {
     'connect_timeout': 10,
     'options': '-c statement_timeout=30000',  # 30 second query timeout
@@ -256,8 +254,3 @@ except ImportError:
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 
-# Connection pooling (if using Django 4.2+)
-DATABASES['default']['OPTIONS']['pool'] = {
-    'min_size': 2,
-    'max_size': 10,
-}
