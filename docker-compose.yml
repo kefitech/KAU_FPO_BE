@@ -19,7 +19,7 @@ services:
   web:
     build: .
     restart: always
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
     volumes:
       - media_files:/app/media
       - static_files:/app/staticfiles
@@ -33,7 +33,7 @@ services:
   celery:
     build: .
     restart: always
-    command: celery -A config worker --loglevel=info
+    command: celery -A config worker --loglevel=info --concurrency=1
     volumes:
       - logs:/app/logs
     env_file:
