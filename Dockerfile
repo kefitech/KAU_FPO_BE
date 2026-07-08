@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
     libmagic1 \
+    binutils \
+    libproj-dev \
+    gdal-bin \
+    libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/ requirements/
