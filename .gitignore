@@ -56,4 +56,6 @@ IMPLEMENTATION_PLAN.md
 context/
 Documents/
 docs/
+# PEM keys — never commit private keys
+*.pem
 Server/kau.pem

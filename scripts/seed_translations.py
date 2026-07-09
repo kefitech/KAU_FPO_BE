@@ -1892,6 +1892,13 @@ def seed_menu_translations(languages):
         ('fpo_permissions',        'FPO Permissions',          'FPO അനുമതികൾ'),
         ('fpo_applications',       'FPO Applications',         'FPO അപേക്ഷകൾ'),
         ('external_apis',          'External APIs',             'എക്സ്റ്റേണൽ APIs'),
+        ('site_content',           'Site Content',              'സൈറ്റ് ഉള്ളടക്കം'),
+        ('announcements',          'Announcements',             'പ്രഖ്യാപനങ്ങൾ'),
+        ('faqs',                   'FAQs',                      'പതിവ് ചോദ്യങ്ങൾ'),
+        ('ownership_claims',       'Ownership Claims',          'ഉടമസ്ഥാവകാശ അഭ്യർത്ഥനകൾ'),
+        ('audit_logs',             'Audit Logs',                'ഓഡിറ്റ് ലോഗുകൾ'),
+        ('experts',                'Experts',                   'വിദഗ്ധർ'),
+        ('schemes',                'Schemes & Subsidies',       'പദ്ധതികളും സബ്‌സിഡികളും'),
         # FPO portal pages
         ('fpo_dashboard',          'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
         ('fpo_register',           'Register FPO',             'FPO രജിസ്റ്റർ ചെയ്യുക'),
