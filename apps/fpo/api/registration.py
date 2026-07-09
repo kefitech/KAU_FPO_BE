@@ -308,16 +308,37 @@ class PreRegisterVerifyOTPView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        otp_key = f'fpo:prereg_otp:{phone}'
-        stored  = cache.get(otp_key)
+        _MAX_ATTEMPTS = 3
+        _OTP_TTL      = 600  # 10 min
 
-        if not stored or stored != otp:
+        otp_key      = f'fpo:prereg_otp:{phone}'
+        attempts_key = f'fpo:prereg_otp_attempts:{phone}'
+        stored       = cache.get(otp_key)
+
+        if not stored:
             return StandardResponse.error(
-                'Invalid or expired OTP.',
+                'OTP has expired. Please request a new one.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if stored != otp:
+            attempts = cache.get(attempts_key, 0) + 1
+            remaining = max(0, _MAX_ATTEMPTS - attempts)
+            if remaining == 0:
+                cache.delete(otp_key)
+                cache.delete(attempts_key)
+                return StandardResponse.error(
+                    'Maximum attempts reached. Please request a new OTP.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            cache.set(attempts_key, attempts, _OTP_TTL)
+            return StandardResponse.error(
+                f'Incorrect OTP. {remaining} attempt(s) remaining. OTP is valid for 10 minutes.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         cache.delete(otp_key)
+        cache.delete(attempts_key)
         cache.delete(f'fpo:prereg_otp_count:{phone}')
 
         phone_token = secrets.token_urlsafe(32)
