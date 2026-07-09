@@ -154,9 +154,15 @@ REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
 
 # Stricter throttling for production
 REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
-    'anon': '50/hour',
-    'user': '500/hour',
-    'login': '5/minute',  # Prevent brute force
+    'anon':              '50/hour',
+    'user':              '500/hour',
+    'login':             '5/minute',
+    'forgot_password':   '3/minute',
+    'otp_verify':        '5/minute',
+    'register':          '3/minute',
+    'two_factor_login':  '5/minute',
+    'two_factor_setup':  '10/minute',
+    'disable_2fa_otp':   '3/minute',
 }
 
 # =============================================================================
