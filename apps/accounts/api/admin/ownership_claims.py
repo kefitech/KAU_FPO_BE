@@ -16,6 +16,8 @@ Approve flow:
 - All other pending claims on same FPO are auto-rejected
 """
 
+from re import search
+from django.db.models import Q
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import transaction
@@ -112,6 +114,7 @@ class OwnershipClaimListView(APIView):
         tags=['Admin - Ownership Claims'],
         summary='List all ownership claims',
         parameters=[
+            OpenApiParameter('search', str, description='Search by FPO name, claimant first name, last name, email, phone number'),
             OpenApiParameter('status',  str, description='Filter: pending / approved / rejected'),
             OpenApiParameter('fpo_id',  int, description='Filter by FPO ID'),
         ],
@@ -119,11 +122,32 @@ class OwnershipClaimListView(APIView):
     )
     def get(self, request):
         if not _can_manage(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+            return StandardResponse.error(
+                'Permission denied.',
+                status_code=status.HTTP_403_FORBIDDEN
+            )
 
-        qs = FPOOwnershipClaim.objects.select_related(
-            'fpo', 'claimant', 'claimant__profile', 'reviewed_by'
-        ).order_by('-created_at')
+        qs = (
+            FPOOwnershipClaim.objects.select_related(
+        'fpo',
+        'claimant',
+        'claimant__profile',
+        'reviewed_by',
+        )
+            .order_by('-created_at')
+        )
+
+        search = request.query_params.get('search', '').strip()
+        print("SEARCH =", repr(search))
+        if search:
+            qs = qs.filter(
+                Q(fpo__name__icontains=search) |
+                Q(claimant__first_name__icontains=search) |
+                Q(claimant__last_name__icontains=search) |
+                Q(claimant__email__icontains=search) |
+                Q(claimant__profile__phone__icontains=search)
+                )
+
 
         status_filter = request.query_params.get('status', '').strip()
         if status_filter:
@@ -133,6 +157,32 @@ class OwnershipClaimListView(APIView):
         if fpo_id:
             qs = qs.filter(fpo_id=fpo_id)
 
+
+        ORDERING_FIELD_MAP = {
+            'created_at':      'created_at',
+            '-created_at':     '-created_at',
+
+            'status':          'status',
+            '-status':         '-status',
+
+            'fpo_name':        'fpo__name',
+            '-fpo_name':       '-fpo__name',
+
+            'claimant_name':   'claimant__first_name',
+            '-claimant_name':  '-claimant__first_name',
+
+            'claimant_email':  'claimant__email',
+            '-claimant_email': '-claimant__email',
+        }
+
+        ordering_param = request.query_params.get('ordering', '-created_at').strip()
+        ordering = ORDERING_FIELD_MAP.get(ordering_param, '-created_at')  # translates here
+
+        qs = qs.order_by(ordering)  # always gets the real ORM path, never the raw client string
+        
+
+
+        print("COUNT =", qs.count())
         paginator  = StandardPagination()
         page       = paginator.paginate_queryset(qs, request)
         serializer = _ClaimListSerializer(page, many=True, context={'request': request})
