@@ -179,13 +179,15 @@ class SiteBlockDetailView(APIView):
 # ─── Announcements ────────────────────────────────────────────────────────────
 
 class AnnouncementSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
     class Meta:
         model  = Announcement
         fields = [
-            'id', 'title', 'body', 'category', 'published_date',
+            'id', 'title', 'body', 'category', 'category_display', 'published_date',
             'is_active', 'order', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'category_display', 'created_at', 'updated_at']
 
     def validate_title(self, value):
         return _validate_multilingual_field(value, 'title')
