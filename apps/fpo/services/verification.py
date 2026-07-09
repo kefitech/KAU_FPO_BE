@@ -22,11 +22,16 @@ from django.core.cache import cache
 
 from apps.notifications.services import send_notification
 
-_OTP_TTL   = 600  # 10 minutes
-_MAX_SENDS = 3    # max OTP sends per 10 min window
+_OTP_TTL      = 600  # 10 minutes
+_MAX_SENDS    = 3    # max OTP sends per 10 min window
+_MAX_ATTEMPTS = 3    # max wrong guesses before OTP is invalidated
 
 
 class OTPRateLimitExceeded(Exception):
+    pass
+
+
+class OTPAttemptsExhausted(Exception):
     pass
 
 
@@ -47,6 +52,21 @@ def _check_and_increment(count_key: str) -> None:
         cache.set(count_key, 1, _OTP_TTL)
     else:
         cache.incr(count_key)
+
+
+def _check_attempts(attempts_key: str, otp_key: str, otp_ttl: int) -> int:
+    """
+    Increment the failed-attempt counter.
+    Returns remaining attempts. Raises OTPAttemptsExhausted (and deletes OTP) when 0 remain.
+    """
+    attempts = cache.get(attempts_key, 0) + 1
+    remaining = max(0, _MAX_ATTEMPTS - attempts)
+    if remaining == 0:
+        cache.delete(otp_key)
+        cache.delete(attempts_key)
+        raise OTPAttemptsExhausted()
+    cache.set(attempts_key, attempts, otp_ttl)
+    return remaining
 
 
 class VerificationService:
@@ -75,17 +95,24 @@ class VerificationService:
         )
 
     @staticmethod
-    def verify_email_otp(fpo, otp: str) -> bool:
-        """Return True and mark email verified if OTP matches. Consumes the OTP."""
-        key = f'fpo:email_otp:{fpo.id}'
-        stored = cache.get(key)
+    def verify_email_otp(fpo, otp: str) -> int:
+        """
+        Verify email OTP. Returns 0 on success.
+        Returns remaining attempts (1 or 2) on wrong OTP.
+        Raises OTPAttemptsExhausted when all attempts used (OTP deleted).
+        """
+        otp_key      = f'fpo:email_otp:{fpo.id}'
+        attempts_key = f'fpo:email_otp_attempts:{fpo.id}'
+        stored = cache.get(otp_key)
         if stored and stored == otp:
-            cache.delete(key)
+            cache.delete(otp_key)
             cache.delete(f'fpo:email_otp_count:{fpo.id}')
+            cache.delete(attempts_key)
             fpo.email_verified = True
             fpo.save(update_fields=['email_verified'])
-            return True
-        return False
+            return 0
+        # Wrong OTP — track attempts (raises OTPAttemptsExhausted when exhausted)
+        return _check_attempts(attempts_key, otp_key, _OTP_TTL)
 
     # ── Phone OTP ─────────────────────────────────────────────────────────────
 
@@ -108,14 +135,20 @@ class VerificationService:
         )
 
     @staticmethod
-    def verify_phone_otp(fpo, otp: str) -> bool:
-        """Return True and mark phone verified if OTP matches. Consumes the OTP."""
-        key = f'fpo:phone_otp:{fpo.id}'
-        stored = cache.get(key)
+    def verify_phone_otp(fpo, otp: str) -> int:
+        """
+        Verify phone OTP. Returns 0 on success.
+        Returns remaining attempts (1 or 2) on wrong OTP.
+        Raises OTPAttemptsExhausted when all attempts used (OTP deleted).
+        """
+        otp_key      = f'fpo:phone_otp:{fpo.id}'
+        attempts_key = f'fpo:phone_otp_attempts:{fpo.id}'
+        stored = cache.get(otp_key)
         if stored and stored == otp:
-            cache.delete(key)
+            cache.delete(otp_key)
             cache.delete(f'fpo:phone_otp_count:{fpo.id}')
+            cache.delete(attempts_key)
             fpo.phone_verified = True
             fpo.save(update_fields=['phone_verified'])
-            return True
-        return False
+            return 0
+        return _check_attempts(attempts_key, otp_key, _OTP_TTL)
