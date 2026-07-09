@@ -94,6 +94,20 @@ def _is_account_locked(user) -> bool:
     return bool(cache.get(_lock_key(user.pk)))
 
 
+def _lock_remaining_minutes(user) -> int:
+    """Return whole minutes remaining on the account lock (minimum 1)."""
+    from django.core.cache import cache
+    try:
+        client = cache.client.get_client()
+        versioned_key = cache.client.make_key(_lock_key(user.pk))
+        ttl_seconds = client.ttl(versioned_key)
+        if ttl_seconds and ttl_seconds > 0:
+            return max(1, -(-ttl_seconds // 60))  # ceiling division
+    except Exception:
+        pass
+    return _LOGIN_LOCK_TTL // 60  # fallback to full duration
+
+
 def _clear_failed_login(user) -> None:
     from django.core.cache import cache
     cache.delete(_fail_key(user.username))
@@ -248,7 +262,7 @@ class LoginView(APIView):
         # Check if account is locked
         if _is_account_locked(user):
             return StandardResponse.error(
-                t('auth.account_locked', language),
+                t('auth.account_locked', language, minutes=_lock_remaining_minutes(user)),
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
