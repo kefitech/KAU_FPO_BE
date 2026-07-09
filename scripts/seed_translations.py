@@ -1951,6 +1951,20 @@ def seed_fixes(languages):
          'നിരവധി പരാജയപ്പെട്ട ശ്രമങ്ങൾ കാരണം അക്കൗണ്ട് ലോക്ക് ചെയ്തു. {{minutes}} മിനിറ്റിന് ശേഷം ശ്രമിക്കുക.'),
     ]
 
+    # New OTP attempt tracking keys (seeded via messages.py with double-brace placeholders)
+    category_fpo = TranslationCategory.objects.get(code='fpo')
+    fpo_otp_fixes = [
+        (category_fpo, 'invalid_otp_with_attempts', lang_en,
+         'Incorrect OTP. {{attempts_remaining}} attempt(s) remaining. OTP is valid for {{validity_minutes}} minutes.'),
+        (category_fpo, 'invalid_otp_with_attempts', lang_ml,
+         'തെറ്റായ OTP. {{attempts_remaining}} ശ്രമം(ങ്ങൾ) ശേഷിക്കുന്നു. OTP {{validity_minutes}} മിനിറ്റ് സാധുവാണ്.'),
+        (category_fpo, 'otp_attempts_exhausted', lang_en,
+         'Maximum attempts reached. Please request a new OTP.'),
+        (category_fpo, 'otp_attempts_exhausted', lang_ml,
+         'പരമാവധി ശ്രമങ്ങൾ കഴിഞ്ഞു. ദയവായി ഒരു പുതിയ OTP അഭ്യർത്ഥിക്കുക.'),
+    ]
+    fixes.extend(fpo_otp_fixes)
+
     count = 0
     for category, key, language, value in fixes:
         obj, created = Translation.objects.update_or_create(
