@@ -199,7 +199,7 @@ def seed_fpo_master_data():
                 'Parakode', 'Pulikeezhu', 'Ranni'],
         'TVM': ['Athiyannur', 'Chirayinkeezhu', 'Kilimanoor', 'Nedumangad', 'Nemom',
                 'Parassala', 'Perumkadavila', 'Pothencode', 'Vamanapuram', 'Varkala', 'Vellanad'],
-        'TRS': ['Anthikkad', 'Chalakudy', 'Chavakkad', 'Cherpu', 'Chowannur',
+        'TSR': ['Anthikkad', 'Chalakudy', 'Chavakkad', 'Cherpu', 'Chowannur',
                 'Irinjalakkuda', 'Kodakara', 'Mala', 'Mathilakam', 'Mullassery',
                 'Ollukkara', 'Pazhayannur', 'Puzhakkal', 'Thalikkulam',
                 'Vellangallur', 'Wadakkanchery'],
