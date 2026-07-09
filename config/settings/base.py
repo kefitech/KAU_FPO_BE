@@ -380,8 +380,8 @@ CORS_ALLOW_HEADERS = [
     'x-language',  # Custom header for language
 ]
 
-# Expose cookies to frontend
-CORS_EXPOSE_HEADERS = ['Set-Cookie']
+# Expose cookies + download headers to frontend
+CORS_EXPOSE_HEADERS = ['Set-Cookie', 'Content-Disposition']
 
 # =============================================================================
 # CSRF PROTECTION (Cookie-based authentication)
