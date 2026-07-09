@@ -230,8 +230,8 @@ class FPOMessages:
         "അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട OTP. ദയവായി പുതിയ ഒന്ന് അഭ്യർത്ഥിക്കുക."
     )
     INVALID_OTP_WITH_ATTEMPTS: Tuple[str, str] = (
-        "Incorrect OTP. {attempts_remaining} attempt(s) remaining. OTP is valid for {validity_minutes} minutes.",
-        "തെറ്റായ OTP. {attempts_remaining} ശ്രമം(ങ്ങൾ) ശേഷിക്കുന്നു. OTP {validity_minutes} മിനിറ്റ് സാധുവാണ്."
+        "Incorrect OTP. {{attempts_remaining}} attempt(s) remaining. OTP is valid for {{validity_minutes}} minutes.",
+        "തെറ്റായ OTP. {{attempts_remaining}} ശ്രമം(ങ്ങൾ) ശേഷിക്കുന്നു. OTP {{validity_minutes}} മിനിറ്റ് സാധുവാണ്."
     )
     OTP_ATTEMPTS_EXHAUSTED: Tuple[str, str] = (
         "Maximum attempts reached. Please request a new OTP.",
