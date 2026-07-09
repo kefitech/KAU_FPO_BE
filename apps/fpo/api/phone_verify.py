@@ -16,7 +16,7 @@ from apps.core.permissions.rbac import IsFPOManager
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
 from apps.database.models.fpo import FPO
-from apps.fpo.services.verification import VerificationService, OTPRateLimitExceeded
+from apps.fpo.services.verification import VerificationService, OTPRateLimitExceeded, OTPAttemptsExhausted
 
 
 class PhoneOTPSendView(APIView):
@@ -109,9 +109,17 @@ class PhoneOTPConfirmView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not VerificationService.verify_phone_otp(fpo, serializer.validated_data['otp']):
+        try:
+            remaining = VerificationService.verify_phone_otp(fpo, serializer.validated_data['otp'])
+        except OTPAttemptsExhausted:
             return StandardResponse.error(
-                t('fpo.invalid_or_expired_otp', lang),
+                t('fpo.otp_attempts_exhausted', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if remaining > 0:
+            return StandardResponse.error(
+                t('fpo.invalid_otp_with_attempts', lang, attempts_remaining=remaining, validity_minutes=10),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
