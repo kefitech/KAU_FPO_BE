@@ -29,7 +29,7 @@ from django.contrib.auth.password_validation import validate_password
 
 from apps.core.permissions.rbac import IsSuperAdminOrFirstUser, IsSuperAdmin, get_user_permissions
 from apps.core.utils.throttles import (
-    LoginThrottle, ForgotPasswordThrottle, OTPVerifyThrottle, RegisterThrottle,
+    ForgotPasswordThrottle, OTPVerifyThrottle, RegisterThrottle,
 )
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
@@ -216,7 +216,7 @@ class LoginView(APIView):
     authentication_classes = []  # skip auth check — stale cookies must not block login
 
     permission_classes = [AllowAny]
-    throttle_classes   = [LoginThrottle]
+    throttle_classes   = []
     serializer_class   = LoginSerializer  # For drf-spectacular
 
     @extend_schema(
