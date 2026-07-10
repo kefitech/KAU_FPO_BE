@@ -259,14 +259,7 @@ class LoginView(APIView):
         # Get authenticated user
         user = serializer.validated_data['user']
 
-        # Check if account is locked
-        if _is_account_locked(user):
-            return StandardResponse.error(
-                t('auth.account_locked', language, minutes=_lock_remaining_minutes(user)),
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-
-        # Clear failed login counter on success
+        # Correct password — clear lock and allow login regardless of lock status
         _clear_failed_login(user)
 
         # Log successful login with IP address and location metadata
