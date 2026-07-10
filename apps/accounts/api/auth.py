@@ -242,9 +242,17 @@ class LoginView(APIView):
 
         if not serializer.is_valid():
             username_or_email = request.data.get('username', '') or request.data.get('email', '')
-            # Increment failed login counter if we can identify the user
             if username_or_email:
                 _increment_failed_login(username_or_email)
+                # If this attempt triggered or account is already locked, show locked message
+                locked_user = User.objects.filter(
+                    models.Q(username=username_or_email) | models.Q(email__iexact=username_or_email)
+                ).first()
+                if locked_user and _is_account_locked(locked_user):
+                    return StandardResponse.error(
+                        t('auth.account_locked', language, minutes=_lock_remaining_minutes(locked_user)),
+                        status_code=status.HTTP_403_FORBIDDEN,
+                    )
             AuditLog.log(
                 user=None,
                 action=AuditLog.Action.FAILED_LOGIN,
