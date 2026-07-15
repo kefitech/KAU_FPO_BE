@@ -9,7 +9,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
-
+from django.db.models import Q
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.schemes import Scheme
@@ -59,7 +59,12 @@ class SchemeListPublicView(APIView):
 
         search = request.query_params.get('search')
         if search:
-            qs = qs.filter(name_en__icontains=search) | qs.filter(name_ml__icontains=search)
+            qs = qs.filter(
+                Q(name_en__icontains=search) |
+                Q(name_ml__icontains=search) |
+                Q(administering_body__icontains=search) |
+                Q(objective__icontains=search)
+            )    
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)

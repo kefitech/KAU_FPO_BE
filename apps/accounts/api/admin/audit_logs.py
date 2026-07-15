@@ -13,7 +13,7 @@ Filters:
     from_date   — start date (YYYY-MM-DD)
     to_date     — end date (YYYY-MM-DD)
 """
-
+from django.db.models import Q
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 
@@ -173,6 +173,15 @@ class AuditLogListView(APIView):
         if to_date:
             qs = qs.filter(created_at__date__lte=to_date)
 
+
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(action__icontains=search) |
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(user__email__icontains=search)
+            )
         # Paginate
         paginator   = StandardPagination()
         page        = paginator.paginate_queryset(qs, request)

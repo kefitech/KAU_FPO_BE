@@ -467,7 +467,7 @@ class NotificationTemplate(TimeStampedModel):
             placeholder = f"{{{{{key}}}}}"
             result['body'] = result['body'].replace(placeholder, str(value))
 
-        if self.template_code.channel == NotificationTemplateCode.Channel.EMAIL and self.subject:
+        if self.subject:
             result['subject'] = self.subject
             for key, value in context.items():
                 placeholder = f"{{{{{key}}}}}"
