@@ -155,15 +155,53 @@ class NotificationChannelSettingsViewSet(TranslatedViewSet):
 
         from apps.database.models import NotificationLog
         from apps.notifications.tasks import deliver_notification
+        from django.contrib.auth import get_user_model
 
-        log = NotificationLog(
+        log_kwargs = dict(
             channel          = obj.channel,
             status           = NotificationLog.Status.PENDING,
             rendered_subject = 'Test Notification — KAU-FPO',
             rendered_body    = message,
             recipient        = recipient,
         )
+        
+        # log = NotificationLog(
+        #     channel          = obj.channel,
+        #     status           = NotificationLog.Status.PENDING,
+        #     rendered_subject = 'Test Notification — KAU-FPO',
+        #     rendered_body    = message,
+        #     recipient        = recipient,
+        # )
+        # log.save()
+        if obj.channel == NotificationChannelSettings.Channel.IN_APP:
+            User = get_user_model()
+            user = None
+
+
+            if recipient.isdigit():
+               user = User.objects.filter(pk=int(recipient)).first()
+            if not user:
+               user = User.objects.filter(username=recipient).first()
+            if not user:
+               user = User.objects.filter(email=recipient).first()
+
+            if not user:
+               return StandardResponse.error(
+                  message=f'No user found matching "{recipient}" (tried user ID, username, and email)',
+                   status_code=status.HTTP_400_BAD_REQUEST
+               )
+            log_kwargs['user'] = user
+
+        #    log_kwargs['user'] = user
+        #    log = NotificationLog(**log_kwargs)
+        #    log.save()
+
+        
+            
+
+        log = NotificationLog(**log_kwargs)
         log.save()
+
 
         deliver_notification.delay(log.id, obj.id)
 
