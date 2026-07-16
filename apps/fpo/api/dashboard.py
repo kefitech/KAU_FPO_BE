@@ -103,7 +103,7 @@ def _notifications_summary(user):
         previews.append({
             'id':         notif.id,
             'title':      notif.title,
-            'body':       notif.body[:100] if notif.body else '',
+            'body':       notif.body,
             'is_read':    notif.is_read,
             'created_at': notif.created_at.isoformat(),
         })

@@ -63,7 +63,9 @@ class SchemeListPublicView(APIView):
                 Q(name_en__icontains=search) |
                 Q(name_ml__icontains=search) |
                 Q(administering_body__icontains=search) |
-                Q(objective__icontains=search)
+                Q(objective__icontains=search) |
+                Q(eligibility__icontains=search) |
+                Q(benefit_details__icontains=search)
             )    
 
         paginator = StandardPagination()
