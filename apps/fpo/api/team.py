@@ -22,6 +22,7 @@ Rules:
 import csv
 import io
 import secrets
+import re
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -45,6 +46,8 @@ from apps.notifications.services import send_notification
 
 User = get_user_model()
 
+
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -379,6 +382,12 @@ def _create_member(fpo, row, inviter, lang):
             raise ValueError(f'{missing[0]} and {missing[1]} are required.')  # NEW
         else:                                                        # NEW
             raise ValueError(f'{", ".join(missing[:-1])}, and {missing[-1]} are required.')  # NEW
+        
+    if not EMAIL_REGEX.match(email):  
+        raise ValueError('Invalid Email')                                # NEW
+
+    if User.objects.filter(email__iexact=email).exists():
+        raise ValueError(f'{email} is already registered.')
 
     if User.objects.filter(email__iexact=email).exists():
         raise ValueError(f'{email} is already registered.')
