@@ -17,7 +17,8 @@ from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db import models
+from django.db import models, transaction
+from django.db.models import Max
 
 from apps.core.models.base import BaseModel, TimeStampedModel
 from apps.core.utils.constants import (
@@ -201,11 +202,18 @@ class FPO(BaseModel):
         """Format: KAU-FPO-{DISTRICT}-{YEAR}-{4-digit sequence}"""
         year     = date.today().year
         district = self.district
-        count    = FPO.objects.filter(
-            district=district,
-            application_id__startswith=f'KAU-FPO-{district}-{year}-',
-        ).count()
-        return f'KAU-FPO-{district}-{year}-{str(count + 1).zfill(4)}'
+        prefix   = f'KAU-FPO-{district}-{year}-'
+        with transaction.atomic():
+            # Lock rows for this district+year so concurrent submissions
+            # cannot read the same MAX and generate a duplicate ID
+            last = (
+                FPO.objects
+                .select_for_update()
+                .filter(application_id__startswith=prefix)
+                .aggregate(max_id=Max('application_id'))
+            )['max_id']
+            last_seq = int(last.split('-')[-1]) if last else 0
+            return f'{prefix}{str(last_seq + 1).zfill(4)}'
 
     @property
     def current_tier(self):
