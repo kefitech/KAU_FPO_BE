@@ -359,13 +359,26 @@ def _create_member(fpo, row, inviter, lang):
     Returns (user, temp_password) on success.
     Raises ValueError with a human-readable message on failure.
     """
-    email = row.get('email', '').strip().lower()
-    first_name = row.get('first_name', '').strip()
-    last_name  = row.get('last_name', '').strip()
-    phone      = row.get('phone', '').strip()
+    email      = (row.get('email') or '').strip().lower()      # CHANGED: handles None value, not just missing key
+    first_name = (row.get('first_name') or '').strip()          # CHANGED
+    last_name  = (row.get('last_name') or '').strip()           # CHANGED
+    phone      = (row.get('phone') or '').strip()                # CHANGED
 
-    if not email or not first_name or not last_name:
-        raise ValueError('first_name, last_name and email are required.')
+    missing = []                                                  # NEW
+    if not first_name:                                             # NEW
+        missing.append('first_name')                              # NEW
+    if not last_name:                                              # NEW
+        missing.append('last_name')                                # NEW
+    if not email:                                                  # NEW
+        missing.append('email')                                    # NEW
+
+    if missing:                                                    # NEW (replaces old if/raise below)
+        if len(missing) == 1:                                       # NEW
+            raise ValueError(f'{missing[0]} is required.')          # NEW
+        elif len(missing) == 2:                                     # NEW
+            raise ValueError(f'{missing[0]} and {missing[1]} are required.')  # NEW
+        else:                                                        # NEW
+            raise ValueError(f'{", ".join(missing[:-1])}, and {missing[-1]} are required.')  # NEW
 
     if User.objects.filter(email__iexact=email).exists():
         raise ValueError(f'{email} is already registered.')
@@ -474,7 +487,13 @@ class TeamBulkInviteView(APIView):
                 user, _ = _create_member(fpo, row, request.user, lang)
                 success.append({'row': i, 'email': user.email, 'name': user.get_full_name()})
             except Exception as e:
-                failed.append({'row': i, 'email': row.get('email', ''), 'reason': str(e)})
+                failed.append({
+                    'row': i,
+                    'email': row.get('email', ''),
+                    'first_name': row.get('first_name', ''),   # NEW
+                    'last_name': row.get('last_name', ''),     # NEW
+                    'reason': str(e),
+                })
 
         if success:
             AuditLogService.log(
@@ -562,7 +581,13 @@ class TeamBulkInviteFileView(APIView):
                 user, _ = _create_member(fpo, row, request.user, lang)
                 success.append({'row': i, 'email': user.email, 'name': user.get_full_name()})
             except Exception as e:
-                failed.append({'row': i, 'email': row.get('email', ''), 'reason': str(e)})
+                failed.append({
+                    'row': i,
+                    'email': row.get('email', ''),
+                    'first_name': row.get('first_name', ''),   # NEW
+                    'last_name': row.get('last_name', ''),     # NEW
+                    'reason': str(e),
+                })
 
         if success:
             AuditLogService.log(
