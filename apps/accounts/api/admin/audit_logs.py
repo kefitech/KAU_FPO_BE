@@ -16,7 +16,7 @@ Filters:
 from django.db.models import Q
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-
+from rest_framework.filters import OrderingFilter
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import serializers, status
 from rest_framework.views import APIView
@@ -94,6 +94,9 @@ def _can_view(user):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AuditLogListView(APIView):
+    ordering_fields = ['action', 'created_at']
+    ordering = ['-created_at']  # default sort when no `ordering` param is sent
+ 
 
     @extend_schema(
         tags=['Admin - Audit Logs'],
@@ -126,7 +129,7 @@ class AuditLogListView(APIView):
 
         qs = AuditLog.objects.select_related(
             'user', 'content_type'
-        ).order_by('-created_at')
+        )
 
         # Filter: action type
         action = request.query_params.get('action', '').strip()
@@ -176,12 +179,18 @@ class AuditLogListView(APIView):
 
         search = request.query_params.get('search', '').strip()
         if search:
-            qs = qs.filter(
-                Q(action__icontains=search) |
-                Q(user__first_name__icontains=search) |
-                Q(user__last_name__icontains=search) |
-                Q(user__email__icontains=search)
-            )
+            search_terms = search.split()
+            search_query = Q()
+            for term in search_terms:
+                search_query &= (
+                    Q(action__icontains=term) |
+                    Q(user__first_name__icontains=term) |
+                    Q(user__last_name__icontains=term) |
+                    Q(user__email__icontains=term) |
+                    Q(object_repr__icontains=term)
+                )
+            qs = qs.filter(search_query)
+        qs = OrderingFilter().filter_queryset(request, qs, self)
         # Paginate
         paginator   = StandardPagination()
         page        = paginator.paginate_queryset(qs, request)
