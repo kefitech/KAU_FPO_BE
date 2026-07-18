@@ -53,9 +53,11 @@ logs/
 # Claude / internal docs — not for repo
 CLAUDE.md
 IMPLEMENTATION_PLAN.md
+.claude/
 context/
 Documents/
 docs/
+Server/
+nginx/
 # PEM keys — never commit private keys
 *.pem
-Server/kau.pem
