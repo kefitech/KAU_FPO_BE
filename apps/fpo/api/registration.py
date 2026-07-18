@@ -778,6 +778,14 @@ class FieldValidateView(APIView):
     def _validate_account(self, value, fpo_id):
         if not value.isdigit() or not (9 <= len(value) <= 18):
             return False, 'Account number must be 9-18 digits.', False, None
+        qs = FPO.objects.filter(account_number=value).exclude(
+            status__in=[FPOStatus.DRAFT, FPOStatus.REJECTED, FPOStatus.CLAIMED]
+        )
+        if fpo_id:
+            qs = qs.exclude(pk=fpo_id)
+        if qs.exists():
+            dup = qs.first()
+            return False, 'This bank account number is already registered with another FPO.', True, dup.pk
         return True, None, False, None
 
     def _validate_pincode(self, value, fpo_id):

@@ -448,6 +448,16 @@ class FPOStep4Serializer(serializers.Serializer):
     def validate_account_number(self, value):
         if not value.isdigit() or not (9 <= len(value) <= 18):
             raise serializers.ValidationError('Account number must be 9-18 digits.')
+        fpo_id = self.context.get('fpo_id')
+        qs = FPO.objects.filter(account_number=value).exclude(
+            status__in=[FPOStatus.DRAFT, FPOStatus.REJECTED, FPOStatus.CLAIMED]
+        )
+        if fpo_id:
+            qs = qs.exclude(pk=fpo_id)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'This bank account number is already registered with another FPO.'
+            )
         return value
 
     def validate_ifsc_code(self, value):
