@@ -45,14 +45,16 @@ User = get_user_model()
 # ──────────────────────────────────────────────────────────────────────────────
 
 class _DocumentSerializer(serializers.ModelSerializer):
-    verified_by_name = serializers.SerializerMethodField()
-    file_url         = serializers.SerializerMethodField()
+    verified_by_name    = serializers.SerializerMethodField()
+    file_url            = serializers.SerializerMethodField()
+    is_info_response_doc = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPODocument
         fields = [
             'id', 'document_type', 'file_url', 'file_size', 'mime_type',
             'is_verified', 'verified_by_name', 'verified_at', 'created_at',
+            'is_info_response_doc',
         ]
 
     def get_verified_by_name(self, obj):
@@ -65,6 +67,16 @@ class _DocumentSerializer(serializers.ModelSerializer):
         if obj.file and request:
             return request.build_absolute_uri(obj.file.url)
         return str(obj.file) if obj.file else None
+
+    def get_is_info_response_doc(self, obj):
+        # timestamps are pre-computed in get_documents() and passed via context
+        info_start = self.context.get('info_required_start')
+        info_end   = self.context.get('info_required_end')
+        if not info_start:
+            return False
+        after_start = obj.created_at >= info_start
+        before_end  = (info_end is None) or (obj.created_at <= info_end)
+        return after_start and before_end
 
 
 class _StatusHistorySerializer(serializers.ModelSerializer):
@@ -166,7 +178,20 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
 
     def get_documents(self, obj):
         docs = obj.documents.filter(is_deleted=False).order_by('document_type')
-        return _DocumentSerializer(docs, many=True, context=self.context).data
+        history = list(obj.status_history.order_by('created_at'))
+        # Find the most recent time FPO entered info_required
+        info_entry = next((h for h in reversed(history) if h.to_status == 'info_required'), None)
+        # Find the exit from that specific info_required period (must come after the entry)
+        info_exit = next(
+            (h for h in history if h.from_status == 'info_required' and info_entry and h.created_at > info_entry.created_at),
+            None,
+        )
+        ctx = {
+            **self.context,
+            'info_required_start': info_entry.created_at if info_entry else None,
+            'info_required_end':   info_exit.created_at  if info_exit  else None,
+        }
+        return _DocumentSerializer(docs, many=True, context=ctx).data
 
     def get_status_history(self, obj):
         history = obj.status_history.select_related('changed_by').order_by('created_at')
@@ -565,6 +590,83 @@ class ApplicationRequestInfoView(APIView):
             data={'status': fpo.status},
             message=t('admin.fpo_info_requested', request.language),
         )
+
+
+class ApplicationApproveView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Approve a re-submitted FPO application',
+        description=(
+            'Approves an FPO application that was re-submitted after an information request. '
+            'Only valid for FPOs in `SUBMITTED` status (i.e. those that went through INFO_REQUIRED → re-submit).\n\n'
+            'Optional `notes` field is recorded in the status history.\n\n'
+            'On approval: notifies the FPO user via email, SMS, and in-app notification.'
+        ),
+        request=_ActivateDeactivateSerializer,
+        responses={200: None, 400: None},
+    )
+    def post(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if fpo.status != FPOStatus.SUBMITTED:
+            return StandardResponse.error(
+                'FPO must be in SUBMITTED status to approve.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ser = _ActivateDeactivateSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        notes = ser.validated_data.get('notes', '').strip() or 'Approved after review.'
+
+        from django.db import transaction
+        with transaction.atomic():
+            fpo.status = FPOStatus.APPROVED
+            fpo.save(update_fields=['status', 'updated_at'])
+            ApplicationStatusHistory.objects.create(
+                fpo=fpo,
+                from_status=FPOStatus.SUBMITTED,
+                to_status=FPOStatus.APPROVED,
+                changed_by=request.user,
+                notes=notes,
+            )
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_STATUS_CHANGE,
+            instance=fpo,
+            request=request,
+            changes={'from': FPOStatus.SUBMITTED, 'to': FPOStatus.APPROVED},
+        )
+
+        if fpo.primary_user:
+            ctx = {
+                'user_name':      fpo.primary_user.get_full_name() or fpo.primary_user.username,
+                'fpo_name':       fpo.name or f'FPO #{fpo.id}',
+                'application_id': fpo.application_id or '',
+            }
+            from apps.notifications.services import send_notification
+            try:
+                send_notification(user=fpo.primary_user, code='application_approved', channel='email',  context=ctx)
+                send_notification(user=fpo.primary_user, code='application_approved', channel='sms',    context=ctx)
+                send_notification(user=fpo.primary_user, code='application_approved', channel='in_app', context=ctx)
+            except Exception:
+                pass
+
+        return StandardResponse.success(message='FPO application approved.')
 
 
 class ApplicationActivateView(APIView):

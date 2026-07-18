@@ -82,8 +82,34 @@ class FPOSubmitView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        from_status = fpo.status
+
         with transaction.atomic():
-            from_status    = fpo.status
+            if from_status == FPOStatus.INFO_REQUIRED:
+                fpo.status = FPOStatus.SUBMITTED
+                fpo.save(update_fields=['status', 'updated_at'])
+                ApplicationStatusHistory.objects.create(
+                    fpo=fpo,
+                    from_status=from_status,
+                    to_status=FPOStatus.SUBMITTED,
+                    changed_by=request.user,
+                    notes='Re-submitted after information request.',
+                )
+
+                AuditService.log(
+                    user=request.user,
+                    action=AuditLog.Action.FPO_SUBMIT,
+                    instance=fpo,
+                    request=request,
+                    changes={'from_status': from_status, 'status': FPOStatus.SUBMITTED},
+                )
+
+                return StandardResponse.success(
+                    message='Application re-submitted. The admin will review your updated information.',
+                    data={'status': FPOStatus.SUBMITTED},
+                )
+
+            # DRAFT flow: DRAFT → SUBMITTED → APPROVED
             application_id = fpo.application_id or fpo.generate_application_id()
             fpo.application_id = application_id
             fpo.status         = FPOStatus.APPROVED

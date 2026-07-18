@@ -12,7 +12,7 @@ Stages:
     verify_phone     → /fpo/register  (step 5 — phone OTP)
     upload_documents → /fpo/register  (step 6)
     submit           → /fpo/register  (step 7)
-    status           → /fpo/status
+    status           → /fpo/status  (submitted, under_review, suspended, info_required)
     dashboard        → /fpo/dashboard
     None             → no redirect (admin/other roles use menu)
 """
@@ -35,13 +35,13 @@ def get_fpo_redirect(user):
     if not fpo:
         return {'stage': 'wizard_step', 'step': 1}
 
-    if fpo.status in (FPOStatus.SUBMITTED, FPOStatus.UNDER_REVIEW, FPOStatus.SUSPENDED):
+    if fpo.status in (FPOStatus.SUBMITTED, FPOStatus.UNDER_REVIEW, FPOStatus.SUSPENDED, FPOStatus.INFO_REQUIRED):
         return {'stage': 'status', 'step': None}
 
     if fpo.status == FPOStatus.APPROVED:
         return {'stage': 'dashboard', 'step': None}
 
-    # DRAFT, INFO_REQUIRED, REJECTED — determine wizard stage
+    # DRAFT, REJECTED — determine wizard stage
     if fpo.current_step < 4:
         return {'stage': 'wizard_step', 'step': fpo.current_step + 1}
 

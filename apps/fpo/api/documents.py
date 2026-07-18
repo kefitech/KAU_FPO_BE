@@ -114,7 +114,7 @@ class DocumentUploadView(APIView):
         if err:
             return err
 
-        if fpo.status != FPOStatus.DRAFT:
+        if fpo.status not in (FPOStatus.DRAFT, FPOStatus.INFO_REQUIRED):
             return StandardResponse.error(
                 t('fpo.cannot_edit_status', lang).format(status=fpo.status),
                 status_code=status.HTTP_400_BAD_REQUEST,

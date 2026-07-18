@@ -22,6 +22,7 @@ from .email_verify import EmailOTPSendView, EmailOTPConfirmView
 from .phone_verify import PhoneOTPSendView, PhoneOTPConfirmView
 from .documents import DocumentUploadView, DocumentDeleteView
 from .submit import FPOSubmitView
+from .info_response import FPOInfoResponseView
 from .dashboard import FPODashboardView
 from .profile import FPOProfileView
 from .claim import FPOClaimView, FPOClaimRespondView, FPOClaimDocumentUploadView, FPOClaimDocumentDeleteView
@@ -67,6 +68,7 @@ urlpatterns = [
     path('me/documents/<uuid:doc_id>/', DocumentDeleteView.as_view(),     name='fpo-document-delete'),
     # Submit
     path('me/submit/',                  FPOSubmitView.as_view(),           name='fpo-submit'),
+    path('me/info-response/',           FPOInfoResponseView.as_view(),     name='fpo-info-response'),
     # Dashboard
     path('dashboard/',                  FPODashboardView.as_view(),        name='fpo-dashboard'),
     # Personal profile
