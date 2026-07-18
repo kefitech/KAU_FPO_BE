@@ -35,6 +35,7 @@ from .applications import (
     ApplicationSetUserLimitView,
     ApplicationAssignTierView,
     ApplicationTierHistoryView,
+    ApplicationTierAssessmentView,
     ApplicationActivateView,
     ApplicationDeactivateView,
 )
@@ -137,6 +138,7 @@ urlpatterns = [
     path('applications/<int:fpo_id>/set-user-limit/',                        ApplicationSetUserLimitView.as_view(),    name='admin-applications-set-limit'),
     path('applications/<int:fpo_id>/assign-tier/',                           ApplicationAssignTierView.as_view(),      name='admin-applications-assign-tier'),
     path('applications/<int:fpo_id>/tier-history/',                          ApplicationTierHistoryView.as_view(),     name='admin-applications-tier-history'),
+    path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),
     path('applications/<int:fpo_id>/activate/',                              ApplicationActivateView.as_view(),        name='admin-applications-activate'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
     # Dashboard

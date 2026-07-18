@@ -33,7 +33,7 @@ from apps.core.utils.constants import FPOStatus, UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
-from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory, FPOTierHistory
+from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory, FPOTierHistory, FPOAssessment, AssessmentAnswer, AssessmentUpload
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
@@ -877,4 +877,73 @@ class ApplicationTierHistoryView(APIView):
         return StandardResponse.success(
             data={'fpo_id': fpo.id, 'current_tier': fpo.tier, 'history': data},
             message='Tier history retrieved.',
+        )
+
+
+class ApplicationTierAssessmentView(APIView):
+    """Read-only view of an FPO's tier assessment for admin."""
+
+    @extend_schema(
+        tags=['Admin - Tier Management'],
+        summary='View tier assessment for an FPO',
+        description='Returns all assessment submissions for an FPO across financial years, with all answers, domain scores, total score, and uploaded files.',
+    )
+    def get(self, request, fpo_id):
+        if not _can_view(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
+
+        assessments = FPOAssessment.objects.filter(fpo=fpo).prefetch_related(
+            'answers__question__criterion__domain',
+            'uploads',
+        ).order_by('-financial_year')
+
+        data = []
+        for assessment in assessments:
+            answers = []
+            for ans in assessment.answers.all():
+                q = ans.question
+                answers.append({
+                    'question_no':    q.question_no,
+                    'question_text':  q.text,
+                    'domain_code':    q.criterion.domain.code,
+                    'domain_name':    q.criterion.domain.name,
+                    'criterion_name': q.criterion.name,
+                    'input_type':     q.input_type,
+                    'answer':         ans.answer,
+                    'score':          float(ans.score),
+                })
+
+            uploads = [
+                {
+                    'id':                str(u.id),
+                    'question_no':       u.question_no,
+                    'original_filename': u.original_filename,
+                    'file_url':          request.build_absolute_uri(u.file.url) if u.file else None,
+                    'uploaded_at':       u.uploaded_at,
+                }
+                for u in assessment.uploads.all()
+            ]
+
+            data.append({
+                'id':             str(assessment.id),
+                'financial_year': assessment.financial_year,
+                'status':         assessment.status,
+                'total_score':    float(assessment.total_score) if assessment.total_score is not None else None,
+                'tier_assigned':  assessment.tier_assigned,
+                'domain_scores':  assessment.domain_scores,
+                'submitted_at':   assessment.submitted_at,
+                'answers':        answers,
+                'uploads':        uploads,
+            })
+
+        return StandardResponse.success(
+            data={'fpo_id': fpo_id, 'assessments': data},
+            message='Tier assessments retrieved.',
         )
