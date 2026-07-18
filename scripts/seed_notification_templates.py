@@ -34,8 +34,10 @@ TEMPLATE_CODES = [
     ('application_rejected',  'email',      'FPO application rejected notification',         ['user_name', 'fpo_name', 'rejection_reason']),
     ('application_rejected',  'whatsapp',   'FPO application rejected WhatsApp',             ['user_name', 'rejection_reason']),
     ('info_requested',        'email',      'Additional information requested from FPO',     ['user_name', 'request_message']),
-    ('password_reset',        'email',      'Password reset link email',                     ['user_name', 'reset_link']),
-    ('password_changed',      'email',      'Password changed confirmation email',           ['user_name']),
+    ('password_reset',            'email', 'Password reset link email',                              ['user_name', 'reset_link']),
+    ('password_reset_by_admin',   'email', 'Admin-initiated password reset with temp credentials', ['user_name', 'temp_password']),
+    ('password_reset_by_admin',   'sms',   'Admin-initiated password reset SMS',                   ['user_name', 'temp_password']),
+    ('password_changed',          'email', 'Password changed confirmation email',                  ['user_name']),
     ('two_factor_otp',              'email', 'OTP email for 2FA recovery (disable 2FA)',          ['user_name', 'otp']),
     ('fpo_email_otp',               'email', 'OTP to verify FPO office email before submission',   ['user_name', 'otp']),
     ('fpo_phone_otp',               'sms',   'OTP to verify FPO office phone before submission',   ['otp']),
@@ -90,6 +92,42 @@ TEMPLATES = [
             '<p>പുതിയ പാസ്‌വേഡ് സജ്ജമാക്കാൻ ചുവടെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക. ഈ ലിങ്ക് <strong>15 മിനിറ്റ്</strong> സാധുവാണ്.</p>'
             '<p style="margin-top:16px;font-size:13px;color:#888888;">നിങ്ങൾ ഇത് അഭ്യർത്ഥിച്ചില്ലെങ്കിൽ ഈ ഇമെയിൽ അവഗണിക്കുക.</p>'
         ),
+    ),
+    (
+        'password_reset_by_admin', 'email', 'en',
+        'Your KAU-FPO Password Has Been Reset',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>An administrator has reset your KAU-FPO account password.</p>'
+            '<p>Your new temporary password is:</p>'
+            '<table style="margin:12px 0;border-collapse:collapse;">'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Temporary Password</td>'
+            '<td style="padding:4px 0;font-weight:600;letter-spacing:1px;">{{temp_password}}</td></tr>'
+            '</table>'
+            '<p style="margin-top:4px;font-size:13px;color:#888888;">Please log in and change your password immediately.</p>'
+        ),
+    ),
+    (
+        'password_reset_by_admin', 'email', 'ml',
+        'നിങ്ങളുടെ KAU-FPO പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>ഒരു അഡ്മിനിസ്ട്രേറ്റർ നിങ്ങളുടെ KAU-FPO അക്കൗണ്ട് പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു.</p>'
+            '<p>നിങ്ങളുടെ പുതിയ താൽക്കാലിക പാസ്‌വേഡ്:</p>'
+            '<table style="margin:12px 0;border-collapse:collapse;">'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">താൽക്കാലിക പാസ്‌വേഡ്</td>'
+            '<td style="padding:4px 0;font-weight:600;letter-spacing:1px;">{{temp_password}}</td></tr>'
+            '</table>'
+            '<p style="margin-top:4px;font-size:13px;color:#888888;">ദയവായി ലോഗിൻ ചെയ്ത് ഉടൻ പാസ്‌വേഡ് മാറ്റുക.</p>'
+        ),
+    ),
+    (
+        'password_reset_by_admin', 'sms', 'en', '',
+        'KAU-FPO: Your password has been reset by admin. Temporary password: {{temp_password}}. Login and change it immediately.',
+    ),
+    (
+        'password_reset_by_admin', 'sms', 'ml', '',
+        'KAU-FPO: അഡ്മിൻ നിങ്ങളുടെ പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു. താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
     ),
     (
         'password_changed', 'email', 'en',
