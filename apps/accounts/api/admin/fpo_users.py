@@ -17,12 +17,13 @@ Filters (list):
 import secrets
 import string
 
+from apps.core.models.generic import AuditLog
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import serializers, status
 from rest_framework.views import APIView
-
+from apps.core.services.audit import AuditService as AuditLogService
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -264,6 +265,14 @@ class FPOUserActivateView(APIView):
         if membership:
             membership.is_active = True
             membership.save(update_fields=['is_active'])
+
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_USER_ACTIVATE,
+            instance=membership if membership else user,
+            request=request,
+            changes={'activated_user': user.email},
+         )
         return StandardResponse.success(message='User activated.')
 
 
@@ -283,6 +292,14 @@ class FPOUserDeactivateView(APIView):
         if membership:
             membership.is_active = False
             membership.save(update_fields=['is_active'])
+
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_USER_DEACTIVATE,
+            instance=membership if membership else user,
+            request=request,
+            changes={'deactivated_user': user.email},
+        )
         return StandardResponse.success(message='User deactivated.')
 
 
