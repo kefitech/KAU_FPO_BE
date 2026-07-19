@@ -250,7 +250,7 @@ class FPOStep1Serializer(serializers.Serializer):
             if not re.match(r'^[A-Za-z0-9/]+$', value):
                 raise serializers.ValidationError('Registration number can only contain alphanumeric characters and /.')
             fpo_id = self.context.get('fpo_id')
-            qs = FPO.objects.filter(registration_number=value)
+            qs = FPO.objects.filter(registration_number=value).exclude(status=FPOStatus.CLAIMED)
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
@@ -280,10 +280,10 @@ class FPOStep1Serializer(serializers.Serializer):
                 'legal_structure_detail': 'Please specify the state cooperative societies act.'
             })
 
-        # Duplicate checks
+        # Duplicate checks — CLAIMED FPOs excluded (data legitimately transferred to claimant)
         pan = attrs.get('pan_number')
         if pan:
-            qs = FPO.objects.filter(pan_number=pan)
+            qs = FPO.objects.filter(pan_number=pan).exclude(status=FPOStatus.CLAIMED)
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
@@ -291,7 +291,7 @@ class FPOStep1Serializer(serializers.Serializer):
 
         gst = attrs.get('gst_number')
         if gst:
-            qs = FPO.objects.filter(gst_number=gst)
+            qs = FPO.objects.filter(gst_number=gst).exclude(status=FPOStatus.CLAIMED)
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
@@ -299,7 +299,7 @@ class FPOStep1Serializer(serializers.Serializer):
 
         cin = attrs.get('cin_number')
         if cin:
-            qs = FPO.objects.filter(cin_number=cin)
+            qs = FPO.objects.filter(cin_number=cin).exclude(status=FPOStatus.CLAIMED)
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
