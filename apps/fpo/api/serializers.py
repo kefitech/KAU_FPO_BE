@@ -254,7 +254,7 @@ class FPOStep1Serializer(serializers.Serializer):
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
-                raise serializers.ValidationError('duplicate')
+                raise serializers.ValidationError('This registration number is already registered with another FPO.')
         return value
 
     def validate(self, attrs):
@@ -287,7 +287,7 @@ class FPOStep1Serializer(serializers.Serializer):
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
-                raise serializers.ValidationError({'pan_number': 'duplicate'})
+                raise serializers.ValidationError({'pan_number': 'This PAN number is already registered with another FPO.'})
 
         gst = attrs.get('gst_number')
         if gst:
@@ -295,7 +295,7 @@ class FPOStep1Serializer(serializers.Serializer):
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
-                raise serializers.ValidationError({'gst_number': 'duplicate'})
+                raise serializers.ValidationError({'gst_number': 'This GST number is already registered with another FPO.'})
 
         cin = attrs.get('cin_number')
         if cin:
@@ -303,7 +303,7 @@ class FPOStep1Serializer(serializers.Serializer):
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
-                raise serializers.ValidationError({'cin_number': 'duplicate'})
+                raise serializers.ValidationError({'cin_number': 'This CIN number is already registered with another FPO.'})
 
         return attrs
 
