@@ -237,14 +237,25 @@ class LoginView(APIView):
         """
         language = getattr(request, 'language', 'en')
 
+        # Check lockout BEFORE attempting authentication
+        username_or_email = (request.data.get('username', '') or request.data.get('email', '')).strip()
+        if username_or_email:
+            early_user = User.objects.filter(
+                models.Q(username=username_or_email) | models.Q(email__iexact=username_or_email)
+            ).first()
+            if early_user and _is_account_locked(early_user):
+                return StandardResponse.error(
+                    t('auth.account_locked', language, minutes=_lock_remaining_minutes(early_user)),
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         # Validate input
         serializer = LoginSerializer(data=request.data)
 
         if not serializer.is_valid():
-            username_or_email = request.data.get('username', '') or request.data.get('email', '')
             if username_or_email:
                 _increment_failed_login(username_or_email)
-                # If this attempt triggered or account is already locked, show locked message
+                # Re-check: this attempt may have just triggered the lock
                 locked_user = User.objects.filter(
                     models.Q(username=username_or_email) | models.Q(email__iexact=username_or_email)
                 ).first()
@@ -267,7 +278,7 @@ class LoginView(APIView):
         # Get authenticated user
         user = serializer.validated_data['user']
 
-        # Correct password — clear lock and allow login regardless of lock status
+        # Clear failed login counter on successful authentication (lock already expired or never hit)
         _clear_failed_login(user)
 
         # Log successful login with IP address and location metadata
