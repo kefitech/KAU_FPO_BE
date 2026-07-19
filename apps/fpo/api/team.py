@@ -41,6 +41,7 @@ from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService as AuditLogService
 from apps.core.utils.constants import FPOStatus, UserRole
 from apps.core.utils.responses import StandardResponse
+from django.contrib.contenttypes.models import ContentType
 from apps.database.models.fpo import FPO, FPOUserMembership
 from apps.notifications.services import send_notification
 
@@ -57,7 +58,23 @@ def _get_primary_fpo(user):
     """Return FPO only if this user is the primary user."""
     return FPO.objects.filter(primary_user=user, is_deleted=False).first()
 
+def _last_deactivated_by_admin(membership):
+    """
+    Check if the most recent activate/deactivate AuditLog entry for this
+    membership was a deactivation performed by an admin.
+    """
+    ct = ContentType.objects.get_for_model(membership)
+    last = AuditLog.objects.filter(
+        content_type=ct,
+        object_id=str(membership.pk),
+        action__in=[AuditLog.Action.FPO_USER_ACTIVATE, AuditLog.Action.FPO_USER_DEACTIVATE],
+    ).order_by('-created_at').first()
 
+    if last and last.action == AuditLog.Action.FPO_USER_DEACTIVATE and last.user:
+        return last.user.groups.filter(
+            name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]
+        ).exists()
+    return False
 # ─────────────────────────────────────────────────────────────────────────────
 # Serializers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -676,24 +693,50 @@ def _bulk_toggle(request, activate: bool):
             membership = FPOUserMembership.objects.select_related('user').get(
                 fpo=fpo, user_id=uid, is_deleted=False,
             )
+            if not activate and not membership.is_active:
+                failed.append({
+                    'user_id': uid,
+                    'name' : membership.user.get_full_name(),
+                    'reason': 'Already inactive.'})
+                continue
+
+            if activate and _last_deactivated_by_admin(membership):
+                failed.append({
+                    'user_id': uid,
+                    'name' : membership.user.get_full_name(),
+                    'reason': 'This member was deactivated by an admin. Contact admin to reactivate.',
+                })
+                continue
+
             membership.is_active      = activate
             membership.updated_by     = request.user
             membership.user.is_active = activate
             membership.save(update_fields=['is_active', 'updated_by'])
             membership.user.save(update_fields=['is_active'])
             success.append({'user_id': uid, 'name': membership.user.get_full_name()})
+
+            AuditLogService.log(
+                user=request.user,
+                action=AuditLog.Action.FPO_USER_ACTIVATE if activate else AuditLog.Action.FPO_USER_DEACTIVATE,
+                instance=membership,
+                request=request,
+                changes={'activated_user' if activate else 'deactivated_user': membership.user.email},
+            )
+
+
+
         except FPOUserMembership.DoesNotExist:
             failed.append({'user_id': uid, 'reason': 'Team member not found.'})
 
-    if success:
-        action = AuditLog.Action.FPO_USER_ACTIVATE if activate else AuditLog.Action.FPO_USER_DEACTIVATE
-        AuditLogService.log(
-            user=request.user,
-            action=action,
-            instance=fpo,
-            request=request,
-            changes={'user_ids': [r['user_id'] for r in success]},
-        )
+    # if success:
+    #     action = AuditLog.Action.FPO_USER_ACTIVATE if activate else AuditLog.Action.FPO_USER_DEACTIVATE
+    #     AuditLogService.log(
+    #         user=request.user,
+    #         action=action,
+    #         instance=fpo,
+    #         request=request,
+    #         changes={'user_ids': [r['user_id'] for r in success]},
+    #     )
 
     verb = 'activated' if activate else 'deactivated'
     return StandardResponse.success(
