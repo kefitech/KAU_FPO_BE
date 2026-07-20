@@ -69,6 +69,12 @@ class SoapSMSBackend(BaseNotificationBackend):
             template_id=dlt_template_id,
         )
 
+        logger.warning(
+            "\n" + "=" * 50 +
+            f"\n[DEV] SMS OTP → {mobile}"
+            f"\n[DEV] MESSAGE: {body}"
+            "\n" + "=" * 50
+        )
         logger.debug(f"[SMS] Sending to {mobile} via KAU SOAP gateway")
 
         try:
