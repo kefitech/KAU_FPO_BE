@@ -15,10 +15,13 @@ Both OTPs are one-time use — deleted after successful verification.
 Rate limit resets automatically when the 10 min TTL expires.
 """
 
+import logging
 import random
 import string
 
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
 
 from apps.notifications.services import send_notification
 
@@ -81,6 +84,7 @@ class VerificationService:
         """
         _check_and_increment(f'fpo:email_otp_count:{fpo.id}')
         otp = _generate_otp()
+        logger.warning(f"[DEV] Email OTP for FPO {fpo.id} ({fpo.office_email}): {otp}")
         cache.set(f'fpo:email_otp:{fpo.id}', otp, _OTP_TTL)
         send_notification(
             user=fpo.primary_user,
@@ -124,6 +128,7 @@ class VerificationService:
         """
         _check_and_increment(f'fpo:phone_otp_count:{fpo.id}')
         otp = _generate_otp()
+        logger.warning(f"[DEV] Phone OTP for FPO {fpo.id} ({fpo.office_phone}): {otp}")
         cache.set(f'fpo:phone_otp:{fpo.id}', otp, _OTP_TTL)
         send_notification(
             user=fpo.primary_user,
