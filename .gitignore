@@ -61,3 +61,6 @@ Server/
 nginx/
 # PEM keys — never commit private keys
 *.pem
+
+# SMS credentials and setup docs — contains tokens, never commit
+sms/

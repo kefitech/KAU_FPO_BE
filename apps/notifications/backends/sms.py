@@ -8,18 +8,12 @@ Credentials are read from NotificationChannelSettings (decrypted config).
 Config shape expected:
     {
         "api_key": "<auth_key>",
-        "sender_id": "KAUFPO",
-        "otp_template_id": "<template_id>",   # required for OTP messages
+        "sender_id": "KAUINF",
         "base_url": "https://api.msg91.com/api/v5/"
     }
 
-# DEV NOTE (2026-05-11):
-# Currently using MSG91 OTP API for development/testing purposes.
-# Before going live:
-#   1. Complete DLT registration (TRAI requirement for Indian SMS)
-#   2. Get approved transactional template from MSG91
-#   3. Switch OTP delivery to use the approved DLT template_id
-#   4. Update otp_template_id in NotificationChannelSettings via API
+DLT template IDs are stored per NotificationTemplate row (sms_dlt_template_id field).
+Every SMS template must have a TRAI-approved DLT template ID for delivery in India.
 """
 
 import re
@@ -31,18 +25,20 @@ from .base import BaseNotificationBackend
 
 logger = logging.getLogger(__name__)
 
-_OTP_RE = re.compile(r'\b(\d{6})\b')
+_OTP_RE = re.compile(r'\b(\d{4,8})\b')
 
 
 class SMSBackend(BaseNotificationBackend):
 
     def send(self, recipient: str, subject: str, body: str, log) -> bool:
-        api_key     = self.settings.get('api_key', '')
-        sender_id   = self.settings.get('sender_id', 'KAUFPO')
-        template_id = self.settings.get('otp_template_id', '')
-        base_url    = self.settings.get('base_url', 'https://api.msg91.com/api/v5/')
+        api_key   = self.settings.get('api_key', '')
+        sender_id = self.settings.get('sender_id', 'KAUINF')
+        base_url  = self.settings.get('base_url', 'https://api.msg91.com/api/v5/')
 
-        # Normalize phone — ensure 91 prefix (no + for MSG91 OTP API)
+        # Resolve DLT template ID from the per-template field
+        dlt_template_id = self._get_dlt_template_id(log)
+
+        # Normalize phone — ensure 91 prefix (no + for MSG91 API)
         phone = recipient.strip().lstrip('+').lstrip('0')
         if not phone.startswith('91'):
             phone = f"91{phone}"
@@ -53,10 +49,9 @@ class SMSBackend(BaseNotificationBackend):
             otp_match = _OTP_RE.search(body)
             if otp_match:
                 logger.warning(f"\n{'='*50}\n[DEV] SMS OTP → {phone}\n[DEV] OTP CODE: {otp_match.group(1)}\n{'='*50}")
-                # MSG91 OTP API — params sent as query string (MSG91 requirement)
                 params = {'mobile': phone, 'otp': otp_match.group(1)}
-                if template_id:
-                    params['template_id'] = template_id
+                if dlt_template_id:
+                    params['template_id'] = dlt_template_id
                 response = requests.post(
                     f"{base_url}otp",
                     params=params,
@@ -64,14 +59,17 @@ class SMSBackend(BaseNotificationBackend):
                     timeout=10,
                 )
             else:
-                # MSG91 flow/transactional API — for non-OTP messages
+                # MSG91 flow API — DLT template ID passed in sms body object
+                sms_payload = {'message': body, 'to': [phone]}
+                if dlt_template_id:
+                    sms_payload['dlt_te_id'] = dlt_template_id
                 response = requests.post(
                     f"{base_url}flow/",
                     json={
                         'sender':  sender_id,
                         'route':   '4',
                         'country': '91',
-                        'sms': [{'message': body, 'to': [phone]}],
+                        'sms':     [sms_payload],
                     },
                     headers=headers,
                     timeout=10,
@@ -96,3 +94,16 @@ class SMSBackend(BaseNotificationBackend):
             log.save(update_fields=['status', 'failure_reason', 'retry_count'])
             logger.error(f"SMS failed to {phone}: {exc}")
             return False
+
+    def _get_dlt_template_id(self, log) -> str:
+        """Look up DLT template ID from the NotificationTemplate row for this log."""
+        try:
+            if log.template_code and log.language:
+                tmpl = log.template_code.templates.filter(
+                    language=log.language, is_active=True
+                ).first()
+                if tmpl and tmpl.sms_dlt_template_id:
+                    return tmpl.sms_dlt_template_id
+        except Exception:
+            pass
+        return ''

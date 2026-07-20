@@ -159,6 +159,11 @@ def _get_recipient(user_id: int, channel: str) -> str:
 def _get_backend(channel: str, config: dict):
     """Return the correct backend instance for the channel."""
     from .backends import EmailBackend, SMSBackend, InAppBackend, WhatsAppBackend
+    from .backends.soap_sms import SoapSMSBackend
+
+    # Use SOAP SMS backend when a SOAP URL is configured, else fall back to MSG91
+    if channel == 'sms' and config.get('url'):
+        return SoapSMSBackend(config)
 
     backends = {
         'email':    EmailBackend,

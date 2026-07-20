@@ -67,11 +67,13 @@ TEMPLATE_CODES = [
 TEMPLATES = [
     (
         'mobile_verification', 'sms', 'en', '',
-        'Your KAU-FPO OTP is {{otp}}. Valid for 10 minutes. Do not share with anyone.',
+        '{{otp}} is your OTP for verification on the KAU-FPO Platform. Valid for 10 minutes only. Do not share this with anyone. - Kerala Agricultural University',
+        {'sms_dlt_template_id': '1477178419229543273'},
     ),
     (
         'mobile_verification', 'sms', 'ml', '',
-        'നിങ്ങളുടെ KAU-FPO OTP ആണ് {{otp}}. 10 മിനിറ്റ് സാധുവാണ്. ആരുമായും പങ്കിടരുത്.',
+        '{{otp}} is your OTP for verification on the KAU-FPO Platform. Valid for 10 minutes only. Do not share this with anyone. - Kerala Agricultural University',
+        {'sms_dlt_template_id': '1477178419229543273'},
     ),
     (
         'password_reset', 'email', 'en',
@@ -185,11 +187,13 @@ TEMPLATES = [
     ),
     (
         'welcome', 'sms', 'en', '',
-        'Welcome to KAU-FPO, {{user_name}}! Your temporary password is {{temp_password}}. Login and change it immediately.',
+        'Kerala Agricultural University: Welcome to the KAU-FPO Platform, {{user_name}}. Your temporary password is {{temp_password}}. Please log in and change your password immediately.',
+        {'sms_dlt_template_id': '1477178418732105903'},
     ),
     (
         'welcome', 'sms', 'ml', '',
-        'KAU-FPO-ലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
+        'Kerala Agricultural University: Welcome to the KAU-FPO Platform, {{user_name}}. Your temporary password is {{temp_password}}. Please log in and change your password immediately.',
+        {'sms_dlt_template_id': '1477178418732105903'},
     ),
     (
         'welcome_fpo', 'email', 'en',
@@ -212,11 +216,33 @@ TEMPLATES = [
     ),
     (
         'welcome_fpo', 'sms', 'en', '',
-        'Welcome to KAU-FPO Platform, {{user_name}}! Your account is ready. Log in to start your FPO registration.',
+        'Kerala Agricultural University: Welcome to the KAU-FPO Platform, {{user_name}} . You can log in and begin your FPO registration now.',
+        {'sms_dlt_template_id': '1477178419242517917'},
     ),
     (
         'welcome_fpo', 'sms', 'ml', '',
-        'KAU-FPO പ്ലാറ്റ്‌ഫോമിലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ അക്കൗണ്ട് തയ്യാറാണ്. FPO രജിസ്‌ട്രേഷൻ ആരംഭിക്കാൻ ലോഗിൻ ചെയ്യുക.',
+        'Kerala Agricultural University: Welcome to the KAU-FPO Platform, {{user_name}} . You can log in and begin your FPO registration now.',
+        {'sms_dlt_template_id': '1477178419242517917'},
+    ),
+    (
+        'application_submitted', 'sms', 'en', '',
+        'Kerala Agricultural University: Dear {{user_name}}, your FPO application has been submitted successfully. Your Application ID is {{application_id}}. We will notify you once it is reviewed.',
+        {'sms_dlt_template_id': '1477178418877262299'},
+    ),
+    (
+        'application_submitted', 'sms', 'ml', '',
+        'Kerala Agricultural University: Dear {{user_name}}, your FPO application has been submitted successfully. Your Application ID is {{application_id}}. We will notify you once it is reviewed.',
+        {'sms_dlt_template_id': '1477178418877262299'},
+    ),
+    (
+        'application_approved', 'sms', 'en', '',
+        'Kerala Agricultural University: Congratulations {{user_name}}, your FPO application ({{application_id}}) has been approved. Log in to the KAU-FPO Platform to view your dashboard.',
+        {'sms_dlt_template_id': '1477178418886266129'},
+    ),
+    (
+        'application_approved', 'sms', 'ml', '',
+        'Kerala Agricultural University: Congratulations {{user_name}}, your FPO application ({{application_id}}) has been approved. Log in to the KAU-FPO Platform to view your dashboard.',
+        {'sms_dlt_template_id': '1477178418886266129'},
     ),
     (
         'application_submitted', 'email', 'en',
@@ -320,11 +346,13 @@ TEMPLATES = [
     ),
     (
         'fpo_phone_otp', 'sms', 'en', '',
-        'Your KAU-FPO phone verification OTP is {{otp}}. Valid for 10 minutes. Do not share with anyone.',
+        '{{otp}} is your OTP to verify your FPO office phone number on the KAU-FPO Platform. Valid for 10 minutes. - Kerala Agricultural University',
+        {'sms_dlt_template_id': '1477178418651404094'},
     ),
     (
         'fpo_phone_otp', 'sms', 'ml', '',
-        'നിങ്ങളുടെ KAU-FPO ഫോൺ സ്ഥിരീകരണ OTP ആണ് {{otp}}. 10 മിനിറ്റ് സാധുവാണ്. ആരുമായും പങ്കിടരുത്.',
+        '{{otp}} is your OTP to verify your FPO office phone number on the KAU-FPO Platform. Valid for 10 minutes. - Kerala Agricultural University',
+        {'sms_dlt_template_id': '1477178418651404094'},
     ),
     (
         'admin_new_fpo_application', 'email', 'en',
@@ -588,11 +616,13 @@ TEMPLATES = [
     ),
     (
         'claim_docs_requested', 'sms', 'en', '',
-        'KAU-FPO: Additional documents required for your ownership claim of {{fpo_name}}. Please log in to upload them.',
+        'Kerala Agricultural University: Dear {{user_name}}, additional documents have been requested for the ownership claim of {{fpo_name}} FPO. Please log in to the platform to upload them.',
+        {'sms_dlt_template_id': '1477178418893537158'},
     ),
     (
         'claim_docs_requested', 'sms', 'ml', '',
-        'KAU-FPO: {{fpo_name}}-ന്റെ ഉടമസ്ഥ അവകാശവാദത്തിന് അധിക രേഖകൾ ആവശ്യമാണ്. ദയവായി ലോഗിൻ ചെയ്ത് അപ്‌ലോഡ് ചെയ്യുക.',
+        'Kerala Agricultural University: Dear {{user_name}}, additional documents have been requested for the ownership claim of {{fpo_name}} FPO. Please log in to the platform to upload them.',
+        {'sms_dlt_template_id': '1477178418893537158'},
     ),
     (
         'claim_docs_requested', 'in_app', 'en',

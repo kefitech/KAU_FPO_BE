@@ -44,11 +44,11 @@ class NotificationChannelSettings(TimeStampedModel):
             "use_tls": true
         }
 
-    SMS (MSG91) config shape:
+    SMS (KAU SOAP Gateway) config shape:
         {
-            "api_key": "<encrypted>",
-            "sender_id": "KAUFPO",
-            "base_url": "https://api.msg91.com/api/v5/"
+            "url":         "http://finance.kau.in/services/Utility.asmx",
+            "application": "KAUINF",
+            "token":       "<encrypted>"
         }
 
     In-App config shape:

@@ -430,6 +430,13 @@ class NotificationTemplate(TimeStampedModel):
         help_text="WhatsApp template language code (e.g. en, ml). Must match Meta-approved language."
     )
 
+    # SMS — TRAI DLT registered template ID (required for transactional SMS in India)
+    sms_dlt_template_id = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="DLT-registered template ID from TRAI portal. Required for SMS delivery in India. SMS channel only."
+    )
+
     class Meta:
         db_table = 'notification_templates'
         unique_together = [['template_code', 'language']]
