@@ -31,7 +31,7 @@ class _ProfileSerializer(serializers.Serializer):
 
     def validate_preferred_language(self, value):
         from apps.database.models.language import Language
-        active_codes = [lang.code for lang in Language.get_active_languages()]
+        active_codes = [lang["code"] for lang in Language.get_active_languages()]
         if value not in active_codes:
             raise serializers.ValidationError(f'Language "{value}" is not supported.')
         return value
