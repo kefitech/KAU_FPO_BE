@@ -307,7 +307,7 @@ def _transition(fpo, to_status, changed_by, notes=''):
     notification_map = {
         FPOStatus.APPROVED:      'fpo_approved',
         FPOStatus.REJECTED:      'fpo_rejected',
-        FPOStatus.INFO_REQUIRED: 'fpo_info_required',
+        FPOStatus.INFO_REQUIRED: 'info_requested',
     }
 
     code = notification_map.get(to_status)
@@ -318,10 +318,10 @@ def _transition(fpo, to_status, changed_by, notes=''):
                 code   =code,
                 channel='email',
                 context={
-                    'user_name':      fpo.primary_user.first_name or fpo.primary_user.username,
-                    'fpo_name':       fpo.name,
-                    'application_id': fpo.application_id,
-                    'notes':          notes,
+                    'user_name':       fpo.primary_user.first_name or fpo.primary_user.username,
+                    'fpo_name':        fpo.name,
+                    'application_id':  fpo.application_id,
+                    'request_message': notes,
                 },
             )
         except Exception:
