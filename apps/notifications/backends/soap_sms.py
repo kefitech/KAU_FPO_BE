@@ -1,8 +1,8 @@
 """
-SMS Notification Backend — KAU SOAP Gateway
-============================================
+SMS Notification Backend — KAU Gateway (HTTP GET)
+==================================================
 
-Sends SMS via KAU SMS Gateway (SOAP/ASMX service at finance.kau.in).
+Sends SMS via KAU SMS Gateway using HTTP GET.
 Credentials are read from NotificationChannelSettings (decrypted config).
 
 Config shape expected:
@@ -24,28 +24,11 @@ from .base import BaseNotificationBackend
 
 logger = logging.getLogger(__name__)
 
-_SOAP_NAMESPACE = 'http://tempuri.org/'
-
-_SOAP_ENVELOPE = """<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <SendSms xmlns="http://tempuri.org/">
-      <Application>{application}</Application>
-      <Token>{token}</Token>
-      <Mobile>{mobile}</Mobile>
-      <Message>{message}</Message>
-      <TemplateID>{template_id}</TemplateID>
-    </SendSms>
-  </soap:Body>
-</soap:Envelope>"""
-
 
 class SoapSMSBackend(BaseNotificationBackend):
 
     def send(self, recipient: str, subject: str, body: str, log) -> bool:
-        url         = self.settings.get('url', 'http://finance.kau.in/services/Utility.asmx')
+        base_url    = self.settings.get('url', 'http://finance.kau.in/services/Utility.asmx')
         application = self.settings.get('application', 'KAUINF')
         token       = self.settings.get('token', '')
 
@@ -56,31 +39,28 @@ class SoapSMSBackend(BaseNotificationBackend):
         if mobile.startswith('91') and len(mobile) == 12:
             mobile = mobile[2:]
 
-        headers = {
-            'Content-Type': 'text/xml; charset=utf-8',
-            'SOAPAction':   f'"{_SOAP_NAMESPACE}SendSms"',
+        url = f"{base_url.rstrip('/')}/SendSms"
+        params = {
+            'Application': application,
+            'Token':       token,
+            'MobileNo':    mobile,
+            'Message':     body,
+            'TemplateID':  dlt_template_id,
         }
 
-        payload = _SOAP_ENVELOPE.format(
-            application=application,
-            token=token,
-            mobile=mobile,
-            message=self._xml_escape(body),
-            template_id=dlt_template_id,
-        )
-
-        with open('/tmp/sms_debug.log', 'a') as _f:
-            _f.write(f"[DEV] SOAP SMS → {mobile} | MESSAGE: {body}\n")
-        logger.debug(f"[SMS] Sending to {mobile} via KAU SOAP gateway")
+        logger.debug(f"[SMS] Sending to {mobile} via KAU gateway")
 
         try:
-            response = requests.post(url, data=payload.encode('utf-8'), headers=headers, timeout=15)
+            response = requests.get(url, params=params, timeout=15)
             response.raise_for_status()
 
-            # ASMX services return XML — check for failure indicators in response
-            resp_text = response.text.lower()
-            if 'false' in resp_text or 'error' in resp_text or 'invalid' in resp_text:
-                raise ValueError(f"Gateway returned failure: {response.text[:200]}")
+            resp_text = response.text
+            logger.debug(f"[SMS] Gateway response: {resp_text[:200]}")
+
+            # Gateway returns XML like: <string>402,MsgID = ...</string> on success
+            # or error text on failure
+            if 'error' in resp_text.lower() or 'invalid' in resp_text.lower() or 'fail' in resp_text.lower():
+                raise ValueError(f"Gateway returned failure: {resp_text[:200]}")
 
             log.status  = log.__class__.Status.SENT
             log.sent_at = timezone.now()
@@ -97,7 +77,6 @@ class SoapSMSBackend(BaseNotificationBackend):
             return False
 
     def _get_dlt_template_id(self, log) -> str:
-        """Look up DLT template ID from the NotificationTemplate row for this log."""
         try:
             if log.template_code and log.language:
                 tmpl = log.template_code.templates.filter(
@@ -108,15 +87,3 @@ class SoapSMSBackend(BaseNotificationBackend):
         except Exception:
             pass
         return ''
-
-    @staticmethod
-    def _xml_escape(text: str) -> str:
-        """Escape special XML characters in the SMS message body."""
-        return (
-            text
-            .replace('&', '&amp;')
-            .replace('<', '&lt;')
-            .replace('>', '&gt;')
-            .replace('"', '&quot;')
-            .replace("'", '&apos;')
-        )
