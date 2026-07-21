@@ -108,6 +108,24 @@ class FPOClaimView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        if fpo.status not in ('approved', 'submitted', 'draft'):
+            return StandardResponse.error(
+                'This FPO cannot be claimed at this time.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Block claiming a DRAFT FPO that was itself created via an approved claim transfer.
+        # When admin approves a claim, the original FPO is marked 'claimed' and a new DRAFT FPO
+        # is created for the successful claimant. That new DRAFT should not be claimable again —
+        # it already went through the claim process and belongs to its current primary user.
+        if fpo.status == 'draft' and FPOOwnershipClaim.objects.filter(
+            fpo=fpo, status=ClaimStatus.APPROVED
+        ).exists():
+            return StandardResponse.error(
+                'This FPO has already been transferred to its verified owner and cannot be claimed again.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Block if claimant is already the primary user
         if fpo.primary_user == request.user:
             return StandardResponse.error(
