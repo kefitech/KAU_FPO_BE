@@ -180,9 +180,21 @@ _PDF_HTML = """
   body {{ font-family: Arial, sans-serif; font-size: 9pt; color: #333; }}
   h1 {{ color: #2e7d32; font-size: 16pt; margin-bottom: 2px; }}
   .meta {{ color: #757575; font-size: 8pt; margin-bottom: 12px; }}
-  table {{ width: 100%; border-collapse: collapse; }}
-  th {{ background: #2e7d32; color: #fff; padding: 6px 8px; text-align: left; font-size: 8pt; }}
-  td {{ padding: 5px 8px; border-bottom: 1px solid #e0e0e0; font-size: 8pt; }}
+  table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+  th, td {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  th {{ background: #2e7d32; color: #fff; padding: 5px 6px; text-align: left; font-size: 8pt; }}
+  td {{ padding: 4px 6px; border-bottom: 1px solid #e0e0e0; font-size: 8pt; }}
+  th:nth-child(1)  {{ width: 9%;  }}
+  th:nth-child(2)  {{ width: 15%; }}
+  th:nth-child(3)  {{ width: 8%;  }}
+  th:nth-child(4)  {{ width: 9%;  }}
+  th:nth-child(5)  {{ width: 7%;  }}
+  th:nth-child(6)  {{ width: 4%;  }}
+  th:nth-child(7)  {{ width: 5%;  }}
+  th:nth-child(8)  {{ width: 10%; }}
+  th:nth-child(9)  {{ width: 14%; }}
+  th:nth-child(10) {{ width: 8%;  }}
+  th:nth-child(11) {{ width: 11%; }}
   tr:nth-child(even) td {{ background: #f1f8e9; }}
   .badge-approved {{ color: #2e7d32; font-weight: bold; }}
   .badge-rejected {{ color: #c62828; font-weight: bold; }}

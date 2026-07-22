@@ -43,20 +43,24 @@ User = get_user_model()
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _ClaimListSerializer(serializers.ModelSerializer):
-    fpo_name       = serializers.CharField(source='fpo.name', read_only=True)
-    fpo_id         = serializers.IntegerField(source='fpo.id', read_only=True)
-    claimant_name  = serializers.SerializerMethodField()
-    claimant_email = serializers.CharField(source='claimant.email', read_only=True)
-    claimant_phone = serializers.SerializerMethodField()
+    fpo_name        = serializers.CharField(source='fpo.name', read_only=True)
+    fpo_id          = serializers.IntegerField(source='fpo.id', read_only=True)
+    fpo_identity    = serializers.SerializerMethodField()
+    claimant_name   = serializers.SerializerMethodField()
+    claimant_email  = serializers.CharField(source='claimant.email', read_only=True)
+    claimant_phone  = serializers.SerializerMethodField()
     supporting_docs = serializers.SerializerMethodField()
+    conflict_count  = serializers.SerializerMethodField()
+    has_conflict    = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPOOwnershipClaim
         fields = [
-            'id', 'fpo_id', 'fpo_name',
+            'id', 'fpo_id', 'fpo_name', 'fpo_identity',
             'claimant_name', 'claimant_email', 'claimant_phone',
             'reason', 'supporting_docs',
             'status', 'reviewed_at', 'review_notes',
+            'conflict_count', 'has_conflict',
             'created_at',
         ]
 
@@ -66,6 +70,28 @@ class _ClaimListSerializer(serializers.ModelSerializer):
     def get_claimant_phone(self, obj):
         profile = getattr(obj.claimant, 'profile', None)
         return profile.phone if profile else None
+
+    def get_fpo_identity(self, obj):
+        fpo = obj.fpo
+        return {
+            'pan_number':          fpo.pan_number or '',
+            'gst_number':          fpo.gst_number or '',
+            'cin_number':          fpo.cin_number or '',
+            'registration_number': fpo.registration_number or '',
+        }
+
+    def get_conflict_count(self, obj):
+        return FPOOwnershipClaim.objects.filter(
+            fpo=obj.fpo,
+            status__in=[
+                ClaimStatus.PENDING,
+                ClaimStatus.DOCS_REQUESTED,
+                ClaimStatus.DOCS_SUBMITTED,
+            ],
+        ).exclude(id=obj.id).count()
+
+    def get_has_conflict(self, obj):
+        return self.get_conflict_count(obj) > 0
 
     def get_supporting_docs(self, obj):
         if not obj.supporting_doc_ids:

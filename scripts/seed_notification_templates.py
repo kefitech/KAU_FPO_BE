@@ -56,7 +56,7 @@ TEMPLATE_CODES = [
     ('claim_ownership_revoked',     'in_app', 'In-app: FPO access revoked due to ownership transfer',    ['user_name', 'fpo_name']),
     ('claim_draft_removed',         'email',  'Notify claimant that their incomplete draft FPO was removed during ownership transfer', ['user_name', 'fpo_name']),
     ('claim_draft_removed',         'in_app', 'In-app: draft FPO removed during ownership transfer',     ['user_name', 'fpo_name']),
-    ('claim_new_admin',             'in_app', 'Notify admin inbox when a new ownership claim is submitted', ['fpo_name', 'claimant_name']),
+    ('claim_new_admin',             'in_app', 'Notify admin inbox when a new ownership claim is submitted', ['fpo_name', 'claimant_name', 'identity_info']),
     ('claim_docs_requested',        'email',  'Notify claimant that admin is requesting additional documents', ['user_name', 'fpo_name', 'admin_message']),
     ('claim_docs_requested',        'sms',    'SMS to claimant: admin requesting additional documents',        ['user_name', 'fpo_name']),
     ('claim_docs_requested',        'in_app', 'In-app: admin requesting additional documents for claim',       ['user_name', 'fpo_name', 'admin_message']),
@@ -583,12 +583,12 @@ TEMPLATES = [
     (
         'claim_new_admin', 'in_app', 'en',
         'New Ownership Claim Received',
-        'A new ownership claim has been submitted for <strong>{{fpo_name}}</strong> by {{claimant_name}}. Please review and take action.',
+        'A new ownership claim has been submitted for <strong>{{fpo_name}}</strong> by {{claimant_name}} ({{identity_info}}). Please review and take action.',
     ),
     (
         'claim_new_admin', 'in_app', 'ml',
         'പുതിയ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു',
-        '{{claimant_name}} {{fpo_name}}-നായി ഒരു ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിച്ചിരിക്കുന്നു. ദയവായി അവലോകനം ചെയ്ത് നടപടി സ്വീകരിക്കുക.',
+        '{{claimant_name}}, {{fpo_name}}-നായി ഒരു ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിച്ചിരിക്കുന്നു ({{identity_info}}). ദയവായി അവലോകനം ചെയ്ത് നടപടി സ്വീകരിക്കുക.',
     ),
     # Documents requested from claimant
     (

@@ -89,7 +89,13 @@ class RegisterFPOUserSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         value = value.lower().strip()
-        if User.objects.filter(email=value).exists():
+        existing = User.objects.filter(email=value).first()
+        if existing:
+            if not existing.is_active:
+                raise serializers.ValidationError(
+                    'This email is associated with a deactivated account. '
+                    'Please contact support to reactivate your account.'
+                )
             raise serializers.ValidationError(t('auth.email_already_exists'))
         return value
 
@@ -100,7 +106,13 @@ class RegisterFPOUserSerializer(serializers.Serializer):
             validate_indian_phone(value)
         except DjangoValidationError as e:
             raise serializers.ValidationError(str(e))
-        if UserProfile.objects.filter(phone=value).exists():
+        profile = UserProfile.objects.filter(phone=value).select_related('user').first()
+        if profile:
+            if not profile.user.is_active:
+                raise serializers.ValidationError(
+                    'This phone number is associated with a deactivated account. '
+                    'Please contact support to reactivate your account.'
+                )
             raise serializers.ValidationError("An account with this phone number already exists.")
         return value
 

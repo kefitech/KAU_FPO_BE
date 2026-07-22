@@ -133,6 +133,19 @@ class FPOClaimView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Block if claimant already has an approved claim on any FPO (Issue 3)
+        existing_approved = FPOOwnershipClaim.objects.filter(
+            claimant=request.user, status=ClaimStatus.APPROVED
+        ).select_related('fpo').first()
+        if existing_approved:
+            approved_fpo_name = existing_approved.fpo.name or f'FPO #{existing_approved.fpo.id}'
+            return StandardResponse.error(
+                f'You already have an approved ownership claim on '
+                f'"{approved_fpo_name}". '
+                f'Please contact support to claim additional businesses.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Block if user already has a pending claim on ANY FPO
         existing_pending = FPOOwnershipClaim.objects.filter(
             claimant=request.user, status=ClaimStatus.PENDING
@@ -186,6 +199,18 @@ class FPOClaimView(APIView):
         user_name = request.user.get_full_name() or request.user.username
         fpo_name  = fpo.name or f'FPO #{fpo.id}'
 
+        # Build identity summary for admin notification (Issue 1)
+        identity_parts = []
+        if fpo.pan_number:
+            identity_parts.append(f'PAN: {fpo.pan_number}')
+        if fpo.gst_number:
+            identity_parts.append(f'GST: {fpo.gst_number}')
+        if fpo.cin_number:
+            identity_parts.append(f'CIN: {fpo.cin_number}')
+        elif fpo.registration_number:
+            identity_parts.append(f'Reg No: {fpo.registration_number}')
+        identity_info = ' | '.join(identity_parts) if identity_parts else 'N/A'
+
         # Notify claimant that claim is received
         for channel in ('email', 'in_app'):
             try:
@@ -212,6 +237,7 @@ class FPOClaimView(APIView):
                     context={
                         'fpo_name':      fpo_name,
                         'claimant_name': user_name,
+                        'identity_info': identity_info,
                     },
                 )
             except Exception:
@@ -307,7 +333,19 @@ class FPOClaimRespondView(APIView):
         )
 
         user_name = request.user.get_full_name() or request.user.username
-        fpo_name  = claim.fpo.name or f'FPO #{claim.fpo.id}'
+        fpo       = claim.fpo
+        fpo_name  = fpo.name or f'FPO #{fpo.id}'
+
+        identity_parts = []
+        if fpo.pan_number:
+            identity_parts.append(f'PAN: {fpo.pan_number}')
+        if fpo.gst_number:
+            identity_parts.append(f'GST: {fpo.gst_number}')
+        if fpo.cin_number:
+            identity_parts.append(f'CIN: {fpo.cin_number}')
+        elif fpo.registration_number:
+            identity_parts.append(f'Reg No: {fpo.registration_number}')
+        identity_info = ' | '.join(identity_parts) if identity_parts else 'N/A'
 
         admin_users = User.objects.filter(groups__name=UserRole.SUPER_ADMIN, is_active=True)
         for admin in admin_users:
@@ -316,7 +354,11 @@ class FPOClaimRespondView(APIView):
                     user=admin,
                     code='claim_new_admin',
                     channel='in_app',
-                    context={'fpo_name': fpo_name, 'claimant_name': user_name},
+                    context={
+                        'fpo_name':      fpo_name,
+                        'claimant_name': user_name,
+                        'identity_info': identity_info,
+                    },
                 )
             except Exception:
                 pass
