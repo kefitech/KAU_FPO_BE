@@ -2798,7 +2798,7 @@ def seed_contact_translations(languages):
 
     count = 0
     for full_key, en_val, ml_val in KEYS:
-        key = full_key.split('.', 1)[1]
+        key = full_key
         for lang, val in [(en, en_val), (ml, ml_val)]:
             _, created = Translation.objects.update_or_create(
                 category=category,
@@ -2838,7 +2838,7 @@ def seed_banner_translations(languages):
 
     count = 0
     for full_key, en_val, ml_val in KEYS:
-        key = full_key.split('.', 1)[1]
+        key = full_key
         for lang, val in [(en, en_val), (ml, ml_val)]:
             _, created = Translation.objects.update_or_create(
                 category=category,
@@ -2892,7 +2892,7 @@ def seed_nav_translations(languages):
 
     count = 0
     for full_key, en_val, ml_val in NAV_KEYS:
-        key = full_key.split('.', 1)[1]
+        key = full_key
         for lang, val in [(en, en_val), (ml, ml_val)]:
             _, created = Translation.objects.update_or_create(
                 category=category,
