@@ -2756,6 +2756,155 @@ def seed_fixes(languages):
     return count
 
 
+def seed_contact_translations(languages):
+    """Seed contact page UI strings."""
+    en = languages.get('en')
+    ml = languages.get('ml')
+    if not en or not ml:
+        return 0
+    try:
+        category = TranslationCategory.objects.get(code='ui')
+    except TranslationCategory.DoesNotExist:
+        return 0
+
+    KEYS = [
+        ('contact.page_title',        'Contact Us',                                   'ഞങ്ങളെ ബന്ധപ്പെടുക'),
+        ('contact.breadcrumb',         'Contact',                                      'ബന്ധപ്പെടുക'),
+        ('contact.have_questions',     'Have Questions?',                              'ചോദ്യങ്ങളുണ്ടോ?'),
+        ('contact.send_message',       'Send us a Message',                            'ഞങ്ങൾക്ക് ഒരു സന്ദേശം അയക്കൂ'),
+        ('contact.message_sent',       'Message Sent!',                                'സന്ദേശം അയച്ചു!'),
+        ('contact.message_thanks',     "Thank you for reaching out. We'll get back to you shortly.", 'ബന്ധപ്പെട്ടതിന് നന്ദി. ഞങ്ങൾ ഉടൻ മറുപടി നൽകും.'),
+        ('contact.send_another',       'Send another message',                         'മറ്റൊരു സന്ദേശം അയക്കുക'),
+        ('contact.name_placeholder',   'Name *',                                       'പേര് *'),
+        ('contact.email_placeholder',  'Email *',                                      'ഇമെയിൽ *'),
+        ('contact.phone_placeholder',  'Phone (optional)',                             'ഫോൺ (ഐച്ഛികം)'),
+        ('contact.subject_placeholder','Subject *',                                    'വിഷയം *'),
+        ('contact.message_placeholder','Your Message *',                               'നിങ്ങളുടെ സന്ദേശം *'),
+        ('contact.sending',            'Sending…',                                     'അയക്കുന്നു…'),
+        ('contact.get_in_touch',       'Get in Touch',                                 'ബന്ധപ്പെടൂ'),
+        ('contact.contact_information','Contact Information',                          'ബന്ധപ്പെടൽ വിവരങ്ങൾ'),
+        ('contact.contact_desc',       'Strengthening Farmer Producer Organizations through knowledge, technology, and institutional support.', 'അറിവ്, സാങ്കേതികവിദ്യ, സ്ഥാപന പിന്തുണ എന്നിവ വഴി കർഷക ഉൽപ്പാദക സംഘടനകളെ ശക്തിപ്പെടുത്തുന്നു.'),
+        ('contact.hotline',            'Hotline',                                      'ഹോട്ട്ലൈൻ'),
+        ('contact.our_location',       'Our Location',                                 'ഞങ്ങളുടെ സ്ഥാനം'),
+        ('contact.official_email',     'Official Email',                               'ഔദ്യോഗിക ഇമെയിൽ'),
+        ('contact.error_name',         'Name is required.',                            'പേര് ആവശ്യമാണ്.'),
+        ('contact.error_email_req',    'Email is required.',                           'ഇമെയിൽ ആവശ്യമാണ്.'),
+        ('contact.error_email_inv',    'Enter a valid email address.',                 'സാധുവായ ഇമെയിൽ വിലാസം നൽകുക.'),
+        ('contact.error_phone',        'Phone number must be exactly 10 digits.',      'ഫോൺ നമ്പർ കൃത്യം 10 അക്കമായിരിക്കണം.'),
+        ('contact.error_subject',      'Subject is required.',                         'വിഷയം ആവശ്യമാണ്.'),
+        ('contact.error_message',      'Message is required.',                         'സന്ദേശം ആവശ്യമാണ്.'),
+        ('contact.error_generic',      'Something went wrong. Please try again.',      'എന്തോ പ്രശ്‌നം സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.'),
+    ]
+
+    count = 0
+    for full_key, en_val, ml_val in KEYS:
+        key = full_key.split('.', 1)[1]
+        for lang, val in [(en, en_val), (ml, ml_val)]:
+            _, created = Translation.objects.update_or_create(
+                category=category,
+                key=key,
+                language=lang,
+                defaults={'value': val, 'is_verified': True},
+            )
+            if created:
+                count += 1
+    return count
+
+
+def seed_banner_translations(languages):
+    """Seed homepage carousel/banner UI strings."""
+    en = languages.get('en')
+    ml = languages.get('ml')
+    if not en or not ml:
+        return 0
+    try:
+        category = TranslationCategory.objects.get(code='ui')
+    except TranslationCategory.DoesNotExist:
+        return 0
+
+    KEYS = [
+        ('banner.slide1_subtitle', 'Kerala Agricultural University',          'കേരള കാർഷിക സർവ്വകലാശാല'),
+        ('banner.slide1_title',    'Empowering Farmers through FPO Linkage',  'FPO ലിങ്കേജ് വഴി കർഷകരെ ശക്തിപ്പെടുത്തുക'),
+        ('banner.slide1_desc',     'A digital platform connecting Farmer Producer Organizations across Kerala with markets, experts, and government support under the KAU-FPO Linkage Programme.',
+                                   'KAU-FPO ലിങ്കേജ് പ്രോഗ്രാമിന് കീഴിൽ കേരളത്തിലെ ഫാർമർ പ്രൊഡ്യൂസർ ഓർഗനൈസേഷനുകളെ വിപണികൾ, വിദഗ്ദ്ധർ, സർക്കാർ പിന്തുണ എന്നിവയുമായി ബന്ധിപ്പിക്കുന്ന ഒരു ഡിജിറ്റൽ പ്ലാറ്റ്ഫോം.'),
+        ('banner.slide1_btn',      'Get Started',                              'ആരംഭിക്കുക'),
+        ('banner.slide2_subtitle', 'KAU-FPO Platform',                        'KAU-FPO പ്ലാറ്റ്ഫോം'),
+        ('banner.slide2_title',    'Smart Agriculture for a Better Tomorrow',  'മികച്ച നാളേക്കായി സ്മാർട്ട് കൃഷി'),
+        ('banner.slide2_desc',     'AI-powered crop recommendations, market linkage via ONDC, expert consultancy, and GIS mapping — all in one platform for Kerala\'s farming community.',
+                                   'AI-ശക്തിപ്പെടുത്തിയ വിള ശുപാർശകൾ, ONDC വഴി മാർക്കറ്റ് ലിങ്കേജ്, വിദഗ്ദ്ധ കൺസൾട്ടൻസി, GIS മാപ്പിംഗ് — കേരളത്തിലെ കർഷക സമൂഹത്തിനായി ഒരൊറ്റ പ്ലാറ്റ്ഫോമിൽ.'),
+        ('banner.slide2_btn',      'Learn More',                               'കൂടുതൽ അറിയൂ'),
+        ('banner.login_btn',       'Login',                                    'ലോഗിൻ'),
+    ]
+
+    count = 0
+    for full_key, en_val, ml_val in KEYS:
+        key = full_key.split('.', 1)[1]
+        for lang, val in [(en, en_val), (ml, ml_val)]:
+            _, created = Translation.objects.update_or_create(
+                category=category,
+                key=key,
+                language=lang,
+                defaults={'value': val, 'is_verified': True},
+            )
+            if created:
+                count += 1
+    return count
+
+
+def seed_nav_translations(languages):
+    """Seed public website nav, header-top, and footer UI strings."""
+    en = languages.get('en')
+    ml = languages.get('ml')
+    if not en or not ml:
+        print("  ⚠ EN or ML language missing — skipping nav translations")
+        return 0
+
+    try:
+        category = TranslationCategory.objects.get(code='ui')
+    except TranslationCategory.DoesNotExist:
+        print("  ⚠ 'ui' category not found — skipping nav translations")
+        return 0
+
+    NAV_KEYS = [
+        # key,                    EN value,                   ML value
+        ('nav.get_started',       'Get Started',              'ആരംഭിക്കുക'),
+        ('nav.sign_in',           'Sign In',                  'സൈൻ ഇൻ'),
+        ('nav.register',          'Register',                 'രജിസ്റ്റർ ചെയ്യുക'),
+        ('nav.pages',             'Pages',                    'പേജുകൾ'),
+        ('nav.about_us',          'About Us',                 'ഞങ്ങളെക്കുറിച്ച്'),
+        ('nav.team',              'Team',                     'ടീം'),
+        ('nav.how_to_register',   'How To Register',          'എങ്ങനെ രജിസ്റ്റർ ചെയ്യാം'),
+        ('nav.in_the_news',       'In the News',              'വാർത്തകൾ'),
+        ('nav.faqs',              'FAQs',                     'പതിവ് ചോദ്യങ്ങൾ'),
+        ('nav.contact_us',        'Contact Us',               'ഞങ്ങളെ ബന്ധപ്പെടുക'),
+        ('nav.events_updates',    'Events & Updates',         'ഇവന്റുകളും അദ്ധ്യതനങ്ങളും'),
+        ('nav.tagline',           'Smart & Empowered Farmers','സ്മാർട്ടും ശക്തരുമായ കർഷകർ'),
+        ('nav.explore',           'Explore',                  'പര്യവേക്ഷണം'),
+        ('nav.meet_our_team',     'Meet Our Team',            'ഞങ്ങളുടെ ടീമിനെ കാണുക'),
+        ('nav.news_media',        'News & Media',             'വാർത്തകളും മീഡിയയും'),
+        ('nav.contact_info',      'Contact Info',             'ബന്ധപ്പെടൽ വിവരങ്ങൾ'),
+        ('nav.address',           'Address',                  'വിലാസം'),
+        ('nav.support',           'Support',                  'സഹായം'),
+        ('nav.home',              'HOME',                     'ഹോം'),
+        ('nav.our_partners',      'Our Partners',             'ഞങ്ങളുടെ പങ്കാളികൾ'),
+        ('nav.subscribe_thanks',  'Thanks For Subscribing!',  'സബ്‌സ്ക്രൈബ് ചെയ്തതിന് നന്ദി!'),
+    ]
+
+    count = 0
+    for full_key, en_val, ml_val in NAV_KEYS:
+        key = full_key.split('.', 1)[1]
+        for lang, val in [(en, en_val), (ml, ml_val)]:
+            _, created = Translation.objects.update_or_create(
+                category=category,
+                key=key,
+                language=lang,
+                defaults={'value': val, 'is_verified': True},
+            )
+            if created:
+                count += 1
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -2815,7 +2964,25 @@ def seed_translations():
     ml_count = seed_fpo_portal_ml_translations(languages)
     total_count += ml_count
 
-    # Step 9: Apply known fixes (broken placeholders, wrong values)
+    # Step 9: Seed public nav / header / footer translations
+    print("\nSeeding public nav/header/footer translations...")
+    nav_count = seed_nav_translations(languages)
+    print(f"✅ Seeded {nav_count} nav translations")
+    total_count += nav_count
+
+    # Step 9b: Seed contact page translations
+    print("\nSeeding contact page translations...")
+    contact_count = seed_contact_translations(languages)
+    print(f"✅ Seeded {contact_count} contact translations")
+    total_count += contact_count
+
+    # Step 9c: Seed homepage banner/carousel translations
+    print("\nSeeding banner/carousel translations...")
+    banner_count = seed_banner_translations(languages)
+    print(f"✅ Seeded {banner_count} banner translations")
+    total_count += banner_count
+
+    # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
     seed_fixes(languages)
     print(f"✅ Fixes applied")
