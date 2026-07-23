@@ -349,9 +349,10 @@ class FPOStep2Serializer(serializers.Serializer):
             import re
             if not re.match(r'^[6-9]\d{9}$', value):
                 raise serializers.ValidationError('Enter a valid 10-digit Indian mobile number.')
-            # Duplicate check
             fpo_id = self.context.get('fpo_id')
-            qs = FPO.objects.filter(office_phone=value)
+            qs = FPO.objects.filter(office_phone=value).exclude(
+                status__in=[FPOStatus.CLAIMED, FPOStatus.REJECTED]
+            )
             if fpo_id:
                 qs = qs.exclude(pk=fpo_id)
             if qs.exists():
@@ -361,7 +362,9 @@ class FPOStep2Serializer(serializers.Serializer):
     def validate_office_email(self, value):
         value = value.lower().strip()
         fpo_id = self.context.get('fpo_id')
-        qs = FPO.objects.filter(office_email=value)
+        qs = FPO.objects.filter(office_email=value).exclude(
+            status__in=[FPOStatus.CLAIMED, FPOStatus.REJECTED]
+        )
         if fpo_id:
             qs = qs.exclude(pk=fpo_id)
         if qs.exists():

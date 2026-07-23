@@ -709,7 +709,9 @@ class FieldValidateView(APIView):
         return fn(value, fpo_id)
 
     def _check_duplicate(self, field, value, fpo_id):
-        qs = FPO.objects.filter(**{field: value}).exclude(status__in=[FPOStatus.CLAIMED, FPOStatus.REJECTED])
+        qs = FPO.objects.filter(**{field: value}).exclude(
+            status__in=[FPOStatus.CLAIMED, FPOStatus.REJECTED]
+        )
         if fpo_id:
             qs = qs.exclude(pk=fpo_id)
         existing = qs.first()
