@@ -56,11 +56,12 @@ class ClaimSerializer(serializers.Serializer):
 class ClaimResponseSerializer(serializers.ModelSerializer):
     fpo_name   = serializers.CharField(source='fpo.name', read_only=True)
     fpo_id     = serializers.IntegerField(source='fpo.id', read_only=True)
-
+    fpo_email  = serializers.EmailField(source='fpo.office_email', read_only=True)
     class Meta:
         model  = FPOOwnershipClaim
         fields = [
             'id', 'fpo_id', 'fpo_name',
+            'fpo_email',
             'reason', 'supporting_doc_ids',
             'status', 'review_notes', 'reviewed_at',
             'created_at',
@@ -117,7 +118,7 @@ class FPOClaimView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        if fpo.status not in ('approved', 'submitted', 'draft'):
+        if fpo.status not in ('approved', 'submitted', 'draft', 'info_required'):
             return StandardResponse.error(
                 'This FPO cannot be claimed at this time.',
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -46,9 +46,10 @@ class _ClaimListSerializer(serializers.ModelSerializer):
     fpo_name        = serializers.CharField(source='fpo.name', read_only=True)
     fpo_id          = serializers.IntegerField(source='fpo.id', read_only=True)
     fpo_identity    = serializers.SerializerMethodField()
-    claimant_name   = serializers.SerializerMethodField()
-    claimant_email  = serializers.CharField(source='claimant.email', read_only=True)
-    claimant_phone  = serializers.SerializerMethodField()
+    fpo_email      = serializers.EmailField(source='fpo.office_email', read_only=True)
+    claimant_name  = serializers.SerializerMethodField()
+    claimant_email = serializers.CharField(source='claimant.email', read_only=True)
+    claimant_phone = serializers.SerializerMethodField()
     supporting_docs = serializers.SerializerMethodField()
     conflict_count  = serializers.SerializerMethodField()
     has_conflict    = serializers.SerializerMethodField()
@@ -57,6 +58,7 @@ class _ClaimListSerializer(serializers.ModelSerializer):
         model  = FPOOwnershipClaim
         fields = [
             'id', 'fpo_id', 'fpo_name', 'fpo_identity',
+            'fpo_email',
             'claimant_name', 'claimant_email', 'claimant_phone',
             'reason', 'supporting_docs',
             'status', 'reviewed_at', 'review_notes',
@@ -462,13 +464,12 @@ class OwnershipClaimApproveView(APIView):
             claimant.is_active = True
             claimant.save(update_fields=['is_active'])
 
-            FPOUserMembership.objects.get_or_create(
-                fpo=new_fpo,
+            FPOUserMembership.objects.update_or_create(
                 user=claimant,
                 defaults={
-                    'role':       primary_group,
-                    'is_active':  True,
-                    'created_by': request.user,
+                    'fpo':       new_fpo,
+                    'role':      primary_group,
+                    'is_active': True,
                 },
             )
 

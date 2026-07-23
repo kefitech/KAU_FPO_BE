@@ -183,7 +183,11 @@ class FPO(BaseModel):
         null=True, blank=True,
         help_text='FPOOwnershipClaim ID that created this FPO'
     )
-
+    origin_claim_email = models.EmailField(
+    blank=True,
+    help_text='Email used to submit the ownership claim that created this FPO'
+    )
+    
     class Meta:
         verbose_name        = 'FPO'
         verbose_name_plural = 'FPOs'
