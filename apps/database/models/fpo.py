@@ -646,8 +646,12 @@ class FPOOwnershipClaim(TimeStampedModel):
         User, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='reviewed_claims',
     )
-    reviewed_at  = models.DateTimeField(null=True, blank=True)
-    review_notes = models.TextField(blank=True)
+    reviewed_at   = models.DateTimeField(null=True, blank=True)
+    review_notes  = models.TextField(blank=True)
+    matched_field = models.CharField(
+        max_length=50, blank=True,
+        help_text='The identity field that triggered duplicate detection (e.g. pan_number, gst_number)',
+    )
 
     class Meta:
         ordering = ['-created_at']

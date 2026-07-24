@@ -304,6 +304,17 @@ def _transition(fpo, to_status, changed_by, notes=''):
         notes      =notes,
     )
 
+    AuditService.log(
+        user=changed_by,
+        action=AuditLog.Action.FPO_STATUS_CHANGE,
+        instance=fpo,
+        changes={
+            'from_status': from_status,
+            'to_status':   to_status,
+            'notes':       notes or '',
+        },
+    )
+
     notification_map = {
         FPOStatus.APPROVED:      'fpo_approved',
         FPOStatus.REJECTED:      'fpo_rejected',

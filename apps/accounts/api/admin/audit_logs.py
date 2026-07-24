@@ -34,10 +34,23 @@ User = get_user_model()
 # Serializer
 # ─────────────────────────────────────────────────────────────────────────────
 
+STATUS_LABELS = {
+    'draft':         'Draft',
+    'submitted':     'Submitted',
+    'approved':      'Approved',
+    'rejected':      'Rejected',
+    'info_required': 'Info Required',
+    'claimed':       'Claimed',
+    'suspended':     'Suspended',
+    'under_review':  'Under Review',
+}
+
+
 class AuditLogSerializer(serializers.ModelSerializer):
     performed_by      = serializers.SerializerMethodField()
     action_display    = serializers.CharField(source='get_action_display', read_only=True)
     object_info       = serializers.SerializerMethodField()
+    description       = serializers.SerializerMethodField()
 
     class Meta:
         model  = AuditLog
@@ -45,6 +58,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
             'id',
             'action',
             'action_display',
+            'description',
             'performed_by',
             'object_info',
             'changes',
@@ -55,6 +69,32 @@ class AuditLogSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = fields
+
+    def get_description(self, obj):
+        changes = obj.changes or {}
+        action  = obj.action
+
+        if action == AuditLog.Action.FPO_STATUS_CHANGE:
+            from_s = STATUS_LABELS.get(changes.get('from_status', ''), changes.get('from_status', ''))
+            to_s   = STATUS_LABELS.get(changes.get('to_status', ''),   changes.get('to_status', ''))
+            notes  = changes.get('notes', '')
+            if from_s and to_s:
+                base = f'Status changed from "{from_s}" to "{to_s}"'
+                return f'{base} — {notes}' if notes else base
+
+        if action == AuditLog.Action.DOCUMENT_UPLOAD:
+            doc_type = changes.get('document_type', '')
+            return f'Document uploaded: {doc_type}' if doc_type else 'Document uploaded'
+
+        if action == AuditLog.Action.DOCUMENT_DELETE:
+            doc_type = changes.get('document_type', '')
+            return f'Document deleted: {doc_type}' if doc_type else 'Document deleted'
+
+        if action == AuditLog.Action.FPO_PROFILE_CHANGE:
+            fields = list(changes.keys())
+            return f'Profile updated: {", ".join(fields)}' if fields else 'Profile updated'
+
+        return None
 
     def get_performed_by(self, obj):
         if not obj.user:

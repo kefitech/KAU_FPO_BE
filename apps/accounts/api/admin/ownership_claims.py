@@ -75,11 +75,24 @@ class _ClaimListSerializer(serializers.ModelSerializer):
 
     def get_fpo_identity(self, obj):
         fpo = obj.fpo
+        _FIELD_LABELS = {
+            'pan_number':          'PAN',
+            'gst_number':          'GST',
+            'cin_number':          'CIN',
+            'registration_number': 'Reg No',
+            'office_email':        'Email',
+            'office_phone':        'Phone',
+        }
+        matched_field = obj.matched_field or ''
+        matched_value = getattr(fpo, matched_field, '') if matched_field else ''
         return {
             'pan_number':          fpo.pan_number or '',
             'gst_number':          fpo.gst_number or '',
             'cin_number':          fpo.cin_number or '',
             'registration_number': fpo.registration_number or '',
+            'matched_field':       matched_field,
+            'matched_label':       _FIELD_LABELS.get(matched_field, ''),
+            'matched_value':       matched_value or '',
         }
 
     def get_conflict_count(self, obj):

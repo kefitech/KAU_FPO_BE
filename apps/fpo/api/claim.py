@@ -51,6 +51,12 @@ class ClaimSerializer(serializers.Serializer):
         default=list,
         help_text='List of your uploaded FPODocument UUIDs as supporting evidence',
     )
+    matched_field = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default='',
+        help_text='The identity field that triggered duplicate detection (e.g. pan_number)',
+    )
 
 
 class ClaimResponseSerializer(serializers.ModelSerializer):
@@ -96,6 +102,7 @@ class FPOClaimView(APIView):
         fpo_id             = ser.validated_data['fpo_id']
         reason             = ser.validated_data['reason']
         supporting_doc_ids = ser.validated_data.get('supporting_doc_ids', [])
+        matched_field      = ser.validated_data.get('matched_field', '')
 
         # Validate FPO exists and is claimable
         try:
@@ -184,6 +191,7 @@ class FPOClaimView(APIView):
             reason             = reason,
             supporting_doc_ids = valid_doc_ids,
             status             = ClaimStatus.PENDING,
+            matched_field      = matched_field,
         )
 
         AuditService.log(
@@ -191,23 +199,31 @@ class FPOClaimView(APIView):
             action=AuditLog.Action.CREATE,
             instance=claim,
             request=request,
-            changes={'fpo_id': fpo_id, 'reason': reason[:100]},
+            changes={'fpo_id': fpo_id, 'reason': reason[:100], 'matched_field': matched_field},
         )
 
         user_name = request.user.get_full_name() or request.user.username
         fpo_name  = fpo.name or f'FPO #{fpo.id}'
 
-        # Build identity summary for admin notification (Issue 1)
-        identity_parts = []
-        if fpo.pan_number:
-            identity_parts.append(f'PAN: {fpo.pan_number}')
-        if fpo.gst_number:
-            identity_parts.append(f'GST: {fpo.gst_number}')
-        if fpo.cin_number:
-            identity_parts.append(f'CIN: {fpo.cin_number}')
-        elif fpo.registration_number:
-            identity_parts.append(f'Reg No: {fpo.registration_number}')
-        identity_info = ' | '.join(identity_parts) if identity_parts else 'N/A'
+        # Build identity_info: if we know the matched field, highlight it; otherwise list all
+        _FIELD_LABELS = {
+            'pan_number':          'PAN',
+            'gst_number':          'GST',
+            'cin_number':          'CIN',
+            'registration_number': 'Reg No',
+            'office_email':        'Email',
+            'office_phone':        'Phone',
+        }
+        if matched_field and matched_field in _FIELD_LABELS:
+            matched_value = getattr(fpo, matched_field, '') or ''
+            identity_info = f'{_FIELD_LABELS[matched_field]}: {matched_value}' if matched_value else 'N/A'
+        else:
+            parts = []
+            if fpo.pan_number:          parts.append(f'PAN: {fpo.pan_number}')
+            if fpo.gst_number:          parts.append(f'GST: {fpo.gst_number}')
+            if fpo.cin_number:          parts.append(f'CIN: {fpo.cin_number}')
+            elif fpo.registration_number: parts.append(f'Reg No: {fpo.registration_number}')
+            identity_info = ' | '.join(parts) if parts else 'N/A'
 
         # Notify claimant that claim is received
         for channel in ('email', 'in_app'):
