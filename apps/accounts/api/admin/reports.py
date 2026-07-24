@@ -78,7 +78,7 @@ def _rows(qs):
             'district':        district_name,
             'legal_structure': fpo.legal_structure or '',
             'status':          fpo.status or '',
-            'tier':            fpo.tier or 'Not Assessed',
+            'tier':            fpo.tier or 'N/A',
             'total_members':   fpo.total_members or 0,
             'contact_name':    f'{u.first_name} {u.last_name}'.strip() if u else '',
             'contact_email':   u.email if u else '',
@@ -176,24 +176,24 @@ _PDF_HTML = """
 <head>
 <meta charset="utf-8">
 <style>
-  @page {{ size: A4 landscape; margin: 1.5cm; }}
+  @page {{ size: A4 landscape; margin: 1cm; margin-left: 0.8cm; }}
   body {{ font-family: Arial, sans-serif; font-size: 9pt; color: #333; }}
   h1 {{ color: #2e7d32; font-size: 16pt; margin-bottom: 2px; }}
   .meta {{ color: #757575; font-size: 8pt; margin-bottom: 12px; }}
   table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
-  th {{ background: #2e7d32; color: #fff; padding: 5px 6px; text-align: left; font-size: 8pt;
+  th {{ background: #2e7d32; color: #fff; padding: 5px 6px; text-align: left; font-size: 8pt; box-sizing: border-box;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  td {{ padding: 4px 6px; border-bottom: 1px solid #e0e0e0; font-size: 8pt;
+  td {{ padding: 4px 6px; border-bottom: 1px solid #e0e0e0; font-size: 8pt; box-sizing: border-box;
         word-break: break-word; overflow-wrap: break-word; }}
   th:nth-child(1)  {{ width: 10%; }}
-  th:nth-child(2)  {{ width: 15%; }}
+  th:nth-child(2)  {{ width: 14%; }}
   th:nth-child(3)  {{ width: 8%;  }}
   th:nth-child(4)  {{ width: 10%; }}
   th:nth-child(5)  {{ width: 8%;  }}
   th:nth-child(6)  {{ width: 4%;  }}
   th:nth-child(7)  {{ width: 5%;  }}
   th:nth-child(8)  {{ width: 10%; }}
-  th:nth-child(9)  {{ width: 14%; }}
+  th:nth-child(9)  {{ width: 13%; }}
   th:nth-child(10) {{ width: 8%;  }}
   th:nth-child(11) {{ width: 8%;  }}
   tr:nth-child(even) td {{ background: #f1f8e9; }}

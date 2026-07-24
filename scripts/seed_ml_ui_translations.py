@@ -57,8 +57,8 @@ def seed_ml_ui_translations():
             'section_access':     'ആക്സസ്',
             'optional':           'ഐഛികം',
             'required_field':     'നിർബന്ധം',
-            'col_header':                   'നിരകൾ',
-            'col_toggle_columns':           'നിര ക്രമം',
+            'col_header':         'നിരകൾ',
+            'col_toggle_columns': 'നിര ക്രമം',
             
         },
 
