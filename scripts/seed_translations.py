@@ -564,7 +564,9 @@ def seed_ui_translations(languages):
 
         # ── lang_dialog — Add/Edit Language dialog ────────────────────────
         ('lang_dialog.add_title',               'Add Language',                     'ഭാഷ ചേർക്കുക'),
+        ('lang_dialog.add_description',         'Add a new language to the platform.', 'പ്ലാറ്റ്‌ഫോമിലേക്ക് ഒരു പുതിയ ഭാഷ ചേർക്കുക' ),
         ('lang_dialog.edit_title',              'Edit Language',                    'ഭാഷ എഡിറ്റ് ചെയ്യുക'),
+        ('lang_dialog.section_details',           'Language Details',                 'ഭാഷാ വിവരങ്ങൾ'),
         ('lang_dialog.name_label',              'Name',                             'പേര്'),
         ('lang_dialog.code_label',              'Code',                             'കോഡ്'),
         ('lang_dialog.native_name_label',       'Native Name',                      'മാതൃഭാഷാ നാമം'),
@@ -580,6 +582,7 @@ def seed_ui_translations(languages):
         ('lang_dialog.toast_add_failed',        'Failed to add language',           'ഭാഷ ചേർക്കൽ പരാജയപ്പെട്ടു'),
 
         # ── lang_table — Language list columns & actions ──────────────────
+        ('lang_table.view_title',               'Language Details',                 'ഭാഷാ വിവരങ്ങൾ'),
         ('lang_table.col_name',                 'Name',                             'പേര്'),
         ('lang_table.col_code',                 'Code',                             'കോഡ്'),
         ('lang_table.col_status',               'Status',                           'സ്ഥിതി'),
@@ -2785,7 +2788,7 @@ def seed_contact_translations(languages):
         ('contact.contact_information','Contact Information',                          'ബന്ധപ്പെടൽ വിവരങ്ങൾ'),
         ('contact.contact_desc',       'Strengthening Farmer Producer Organizations through knowledge, technology, and institutional support.', 'അറിവ്, സാങ്കേതികവിദ്യ, സ്ഥാപന പിന്തുണ എന്നിവ വഴി കർഷക ഉൽപ്പാദക സംഘടനകളെ ശക്തിപ്പെടുത്തുന്നു.'),
         ('contact.hotline',            'Hotline',                                      'ഹോട്ട്ലൈൻ'),
-        ('contact.our_location',       'Our Location',                                 'ഞങ്ങളുടെ സ്ഥാനം'),
+        ('contact.our_location',       'Our Location',                                 'വിലാസം'),
         ('contact.official_email',     'Official Email',                               'ഔദ്യോഗിക ഇമെയിൽ'),
         ('contact.error_name',         'Name is required.',                            'പേര് ആവശ്യമാണ്.'),
         ('contact.error_email_req',    'Email is required.',                           'ഇമെയിൽ ആവശ്യമാണ്.'),
