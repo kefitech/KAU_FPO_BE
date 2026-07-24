@@ -60,6 +60,7 @@ TEMPLATE_CODES = [
     ('claim_docs_requested',        'email',  'Notify claimant that admin is requesting additional documents', ['user_name', 'fpo_name', 'admin_message']),
     ('claim_docs_requested',        'sms',    'SMS to claimant: admin requesting additional documents',        ['user_name', 'fpo_name']),
     ('claim_docs_requested',        'in_app', 'In-app: admin requesting additional documents for claim',       ['user_name', 'fpo_name', 'admin_message']),
+    ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
 ]
 
 
@@ -633,6 +634,11 @@ TEMPLATES = [
         'claim_docs_requested', 'in_app', 'ml',
         'ഉടമസ്ഥ അവകാശവാദത്തിന് രേഖകൾ ആവശ്യപ്പെട്ടു',
         'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ഉടമസ്ഥ അവകാശവാദത്തിന് KAU അഡ്‌മിൻ അധിക രേഖകൾ ആവശ്യപ്പെട്ടിരിക്കുന്നു. സന്ദേശം: {{admin_message}}',
+    ),
+    (
+        'claim_docs_submitted', 'in_app', 'en',
+        'Documents Submitted for the Ownership Claim',
+        '<strong>{{claimant_name}}</strong> has submitted the document requested for the Ownership Claim of <strong>{{fpo_name}}</strong>. Please review immediatly.',
     ),
 ]
 

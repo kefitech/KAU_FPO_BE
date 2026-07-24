@@ -366,7 +366,7 @@ class FPOClaimRespondView(APIView):
             try:
                 send_notification(
                     user=admin,
-                    code='claim_new_admin',
+                    code='claim_docs_submitted',
                     channel='in_app',
                     context={
                         'fpo_name':      fpo_name,
