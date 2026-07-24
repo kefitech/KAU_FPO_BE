@@ -2869,11 +2869,11 @@ def seed_nav_translations(languages):
         # key,                    EN value,                   ML value
         ('nav.get_started',       'Get Started',              'ആരംഭിക്കുക'),
         ('nav.sign_in',           'Sign In',                  'സൈൻ ഇൻ'),
-        ('nav.register',          'Register',                 'രജിസ്റ്റർ ചെയ്യുക'),
+        ('nav.register',          'Register FPO',             'FPO രജിസ്റ്റർ ചെയ്യുക'),
         ('nav.pages',             'Pages',                    'പേജുകൾ'),
         ('nav.about_us',          'About Us',                 'ഞങ്ങളെക്കുറിച്ച്'),
         ('nav.team',              'Team',                     'ടീം'),
-        ('nav.how_to_register',   'How To Register',          'എങ്ങനെ രജിസ്റ്റർ ചെയ്യാം'),
+        ('nav.how_to_register FPO','How To Register FPO',     'എങ്ങനെ FPO രജിസ്റ്റർ ചെയ്യാം'),
         ('nav.in_the_news',       'In the News',              'വാർത്തകൾ'),
         ('nav.faqs',              'FAQs',                     'പതിവ് ചോദ്യങ്ങൾ'),
         ('nav.contact_us',        'Contact Us',               'ഞങ്ങളെ ബന്ധപ്പെടുക'),
