@@ -183,19 +183,19 @@ _PDF_HTML = """
   table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
   th {{ background: #2e7d32; color: #fff; padding: 5px 6px; text-align: left; font-size: 8pt; box-sizing: border-box;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  td {{ padding: 4px 6px; border-bottom: 1px solid #e0e0e0; font-size: 8pt; box-sizing: border-box;
-        word-break: break-word; overflow-wrap: break-word; }}
+  td {{ padding: 4px 6px; border-bottom: 1px solid #e0e0e0; font-size: 8pt;
+        overflow-wrap: break-word; }}
   th:nth-child(1)  {{ width: 10%; }}
   th:nth-child(2)  {{ width: 14%; }}
   th:nth-child(3)  {{ width: 8%;  }}
   th:nth-child(4)  {{ width: 10%; }}
-  th:nth-child(5)  {{ width: 8%;  }}
-  th:nth-child(6)  {{ width: 4%;  }}
+  th:nth-child(5)  {{ width: 7%;  }}
+  th:nth-child(6)  {{ width: 5%;  }}
   th:nth-child(7)  {{ width: 5%;  }}
   th:nth-child(8)  {{ width: 10%; }}
   th:nth-child(9)  {{ width: 13%; }}
   th:nth-child(10) {{ width: 8%;  }}
-  th:nth-child(11) {{ width: 8%;  }}
+  th:nth-child(11) {{ width: 10%; }}
   tr:nth-child(even) td {{ background: #f1f8e9; }}
   .badge-approved {{ color: #2e7d32; font-weight: bold; }}
   .badge-rejected {{ color: #c62828; font-weight: bold; }}
