@@ -93,7 +93,7 @@ def seed_ml_ui_translations():
             'stat_rejected':                'നിരസിക്കപ്പെട്ടവ',
             # Chart titles — keys the frontend actually uses
             'chart_reg_trend':              'രജിസ്ട്രേഷൻ ട്രെൻഡ്',
-            'chart_reg_trend_subtitle':     'മാസ FPO രജിസ്ട്രേഷനുകൾ — കഴിഞ്ഞ 12 മാസം',
+            'chart_reg_trend_subtitle':     'പ്രതിമാസ FPO രജിസ്ട്രേഷൻ',
             'chart_status_breakdown':       'സ്ഥിതി വിഭജനം',
             'chart_status_subtitle':        'നിലവിലെ സ്ഥിതി അനുസരിച്ച് എല്ലാ FPOകൾ',
             'chart_tier_dist':              'ടയർ വിതരണം',

@@ -353,6 +353,10 @@ def seed_ui_translations(languages):
         ('common.badge_inactive',       'Inactive',                                 'നിഷ്ക്രിയം'),
         ('common.action_failed',        'Action failed',                            'പ്രവർത്തനം പരാജയപ്പെട്ടു'),
         ('common.delete_failed',        'Failed to delete',                         'ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു'),
+        ('common.status',               'Status',                                   'സ്ഥിതി'),
+        ('common.columns_header',       'Columns',                                  'നിരകൾ'),
+        ('common.columns_toggle_columns','Toggle Columns',                           'നിര ക്രമം'),
+        ('common.send_test',            'Send Test',                                'ടെസ്റ്റ് അയക്കുക'),
 
         # ── login — /v1/login ─────────────────────────────────────────────
         ('login.username_label',        'Username',                                 'ഉപയോക്തൃനാമം'),
@@ -556,6 +560,7 @@ def seed_ui_translations(languages):
         ('admin_languages.tab_languages',       'Languages',                        'ഭാഷകൾ'),
         ('admin_languages.tab_categories',      'Categories',                       'വിഭാഗങ്ങൾ'),
         ('admin_languages.tab_translations',    'Translations',                     'വിവർത്തനങ്ങൾ'),
+        ('admin_languages.tab_menu',            'Menu Items',                       'മെനു ഇനങ്ങൾ'),
         ('admin_languages.add_language_btn',    'Add Language',                     'ഭാഷ ചേർക്കുക'),
         ('admin_languages.add_category_btn',    'Add Category',                     'വിഭാഗം ചേർക്കുക'),
         ('admin_languages.export_btn',          'Export',                           'എക്സ്പോർട്ട്'),
@@ -566,7 +571,7 @@ def seed_ui_translations(languages):
         ('lang_dialog.add_title',               'Add Language',                     'ഭാഷ ചേർക്കുക'),
         ('lang_dialog.add_description',         'Add a new language to the platform.', 'പ്ലാറ്റ്‌ഫോമിലേക്ക് ഒരു പുതിയ ഭാഷ ചേർക്കുക' ),
         ('lang_dialog.edit_title',              'Edit Language',                    'ഭാഷ എഡിറ്റ് ചെയ്യുക'),
-        ('lang_dialog.section_details',           'Language Details',                 'ഭാഷാ വിവരങ്ങൾ'),
+        ('lang_dialog.section_details',         'Language Details',                 'ഭാഷാ വിവരങ്ങൾ'),
         ('lang_dialog.name_label',              'Name',                             'പേര്'),
         ('lang_dialog.code_label',              'Code',                             'കോഡ്'),
         ('lang_dialog.native_name_label',       'Native Name',                      'മാതൃഭാഷാ നാമം'),
@@ -593,7 +598,9 @@ def seed_ui_translations(languages):
         ('lang_table.badge_default',            'Default',                          'ഡിഫോൾട്ട്'),
 
         # ── cat_dialog — Add/Edit Category dialog ─────────────────────────
+        ('cat_dialog.section_details',          'Category Details',                 'വിഭാഗ വിവരങ്ങൾ'),
         ('cat_dialog.add_title',                'Add Category',                     'വിഭാഗം ചേർക്കുക'),
+        ('cat_dialog.add_description',          'Create a new translation category.','പുതിയൊരു പരിഭാഷാ വിഭാഗം ഉണ്ടാക്കുക.'),
         ('cat_dialog.edit_title',               'Edit Category',                    'വിഭാഗം എഡിറ്റ് ചെയ്യുക'),
         ('cat_dialog.name_label',               'Name',                             'പേര്'),
         ('cat_dialog.code_label',               'Code',                             'കോഡ്'),
@@ -604,6 +611,7 @@ def seed_ui_translations(languages):
         ('cat_dialog.description_placeholder',  'Describe what translations belong here', 'ഇവിടെ ഏതൊക്കെ വിവർത്തനങ്ങൾ ഉൾപ്പെടുന്നു എന്ന് വിവരിക്കുക'),
 
         # ── cat_table — Category list columns & actions ───────────────────
+        
         ('cat_table.col_name',                  'Name',                             'പേര്'),
         ('cat_table.col_code',                  'Code',                             'കോഡ്'),
         ('cat_table.col_description',           'Description',                      'വിവരണം'),
@@ -632,6 +640,11 @@ def seed_ui_translations(languages):
         ('trans_table.action_verify',           'Mark as Verified',                 'സ്ഥിരീകരിച്ചതായി അടയാളപ്പെടുത്തുക'),
         ('trans_table.badge_verified',          'Verified',                         'സ്ഥിരീകരിച്ചത്'),
         ('trans_table.badge_unverified',        'Unverified',                       'സ്ഥിരീകരിക്കാത്തത്'),
+        ('trans_table.col_verified',            'Verified',                         'സ്ഥിരീകരണം'),
+        ('trans_table.col_context',             'Context',                          'സന്ദർഭം'),
+        ('trans_table.col_variables',           'Variables',                        'വേരിയബിളുകൾ'),
+        ('trans_table.view_title',              'Translation Details',              'പരിഭാഷയുടെ വിശദാംശങ്ങൾ'),
+        ('trans_table.toast_verified',          'Translation marked as verified',   'പരിഭാഷ സ്ഥിരീകരിച്ചതായി അടയാളപ്പെടുത്തി'),
 
         # ── export_dialog — Export Translation Template dialog ────────────
         ('export_dialog.title',                 'Export Translation Template',       'വിവർത്തന ടെംപ്ലേറ്റ് എക്സ്പോർട്ട് ചെയ്യുക'),
@@ -689,7 +702,9 @@ def seed_ui_translations(languages):
         ('tmpl_code_dialog.toast_create_failed','Failed to create template code',   'ടെംപ്ലേറ്റ് കോഡ് സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടു'),
 
         # ── tmpl_code_table — Template Code list columns & actions ─────────
+        ('tmpl_code_table.view_title',          'Template Code Details',            'ടെംപ്ലേറ്റ് കോഡ് വിശദാംശങ്ങൾ'),
         ('tmpl_code_table.col_name',            'Name',                             'പേര്'),
+        ('tmpl_code_table.filter_status',       'Status',                           'നില'),
         ('tmpl_code_table.col_channel',         'Channel',                          'ചാനൽ'),
         ('tmpl_code_table.col_variables',       'Variables',                        'വേരിയബിളുകൾ'),
         ('tmpl_code_table.col_templates',       'Templates',                        'ടെംപ്ലേറ്റുകൾ'),
@@ -700,6 +715,8 @@ def seed_ui_translations(languages):
         # ── tmpl_dialog — Add/Edit Template dialog ────────────────────────
         ('tmpl_dialog.add_title',               'Add Template',                     'ടെംപ്ലേറ്റ് ചേർക്കുക'),
         ('tmpl_dialog.edit_title',              'Edit Template',                    'ടെംപ്ലേറ്റ് എഡിറ്റ് ചെയ്യുക'),
+        ('tmpl_dialog.section_details',         'Template Details',                 'ടെംപ്ലേറ്റ് വിവരങ്ങൾ'),
+        ('tmpl_dialog.add_description',         'Add a language version for a notification template code.', 'ഒരു നോട്ടിഫിക്കേഷൻ ടെംപ്ലേറ്റ് കോഡിനായി പുതിയ ഭാഷാ പതിപ്പ് ചേർക്കുക'),
         ('tmpl_dialog.code_label',              'Template Code',                    'ടെംപ്ലേറ്റ് കോഡ്'),
         ('tmpl_dialog.language_label',          'Language',                         'ഭാഷ'),
         ('tmpl_dialog.subject_label',           'Subject',                          'വിഷയം'),
@@ -719,6 +736,7 @@ def seed_ui_translations(languages):
         ('tmpl_table.col_status',               'Status',                           'സ്ഥിതി'),
         ('tmpl_table.action_test_render',       'Test Render',                      'ടെസ്റ്റ് റെൻഡർ'),
         ('tmpl_table.action_toggle',            'Activate / Deactivate',            'സജീവമാക്കുക / നിഷ്ക്രിയമാക്കുക'),
+        ('tmpl_table.view_title',               'Template Details',                 'ടെംപ്ലേറ്റ് വിവരങ്ങൾ'),
 
         # ── test_render_dialog — Test Render dialog ───────────────────────
         ('test_render_dialog.title',            'Test Render',                      'ടെസ്റ്റ് റെൻഡർ'),
@@ -737,8 +755,11 @@ def seed_ui_translations(languages):
         ('channel_settings_table.col_config',        'Configuration',                    'ക്രമീകരണം'),
         ('channel_settings_table.col_status',        'Status',                           'സ്ഥിതി'),
         ('channel_settings_table.col_updated',       'Last Updated',                     'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്'),
+        ('channel_settings_table.view_title',        'Channel Setting Details',          'ചാനൽ ക്രമീകരണങ്ങളുടെ വിവരങ്ങൾ'),
 
         # ── channel_settings_dialog — Add/Edit Channel Setting dialog ─────
+        ('channel_settings_dialog.add_description',        'Configure a notification delivery channel.', 'അറിയിപ്പുകൾ അയക്കുന്നതിനുള്ള മാർഗ്ഗം സജ്ജമാക്കുക'),
+        ('channel_settings_dialog.section_details',        'Channel Setting',                  'ചാനൽ ക്രമീകരണം'),
         ('channel_settings_dialog.add_title',              'Add Channel Setting',              'ചാനൽ ക്രമീകരണം ചേർക്കുക'),
         ('channel_settings_dialog.edit_title',             'Edit Channel Setting',             'ചാനൽ ക്രമീകരണം എഡിറ്റ് ചെയ്യുക'),
         ('channel_settings_dialog.channel_label',          'Channel',                          'ചാനൽ'),
@@ -784,6 +805,7 @@ def seed_ui_translations(languages):
 
         # ── menu_table — Menu CMS list columns & actions ─────────────────
         ('menu_table.page_title',               'Menu Items',                       'മെനു ഇനങ്ങൾ'),
+        ('menu_table.view_title',               'Menu Item Details',                'മെനു ഇനം വിവരങ്ങൾ'),
         ('menu_table.add_button',               'Add Menu Item',                    'മെനു ഇനം ചേർക്കുക'),
         ('menu_table.col_label_key',            'Label Key',                        'ലേബൽ കീ'),
         ('menu_table.col_path',                 'Path',                             'പാത്ത്'),
@@ -803,6 +825,8 @@ def seed_ui_translations(languages):
 
         # ── menu_dialog — Add/Edit/Delete Menu Item dialog ────────────────
         ('menu_dialog.add_title',               'Add Menu Item',                    'മെനു ഇനം ചേർക്കുക'),
+        ('menu_dialog.section_details',         'Menu item Details',                'മെനു ഇനം വിവരങ്ങൾ'),
+        ('menu_dialog.add_description',         'Add a new item to the admin sidebar menu.', 'അഡ്മിൻ സൈഡ്‌ബാർ മെനുവിലേക്ക് ഒരു പുതിയ മെനു ചേർക്കുക.'),
         ('menu_dialog.edit_title',              'Edit Menu Item',                   'മെനു ഇനം എഡിറ്റ് ചെയ്യുക'),
         ('menu_dialog.label_key',               'Label Key',                        'ലേബൽ കീ'),
         ('menu_dialog.label_key_placeholder',   'e.g. sidebar.dashboard',           'ഉദാ. sidebar.dashboard'),
@@ -817,6 +841,7 @@ def seed_ui_translations(languages):
         ('menu_dialog.order',                   'Order',                            'ക്രമം'),
         ('menu_dialog.order_placeholder',       'e.g. 1',                           'ഉദാ. 1'),
         ('menu_dialog.is_active',               'Active',                           'സജീവം'),
+        ('menu_dialog.is_active_description',   'Inactive items are hidden from the sidebar', 'നിഷ്ക്രിയ ഇനങ്ങൾ സൈഡ്ബാറിൽ നിന്ന് മറച്ചിരിക്കുന്നു'),
         ('menu_dialog.btn_save',                'Save',                             'സേവ് ചെയ്യുക'),
         ('menu_dialog.btn_cancel',              'Cancel',                           'റദ്ദാക്കുക'),
         ('menu_dialog.btn_reset',               'Reset',                            'റീസെറ്റ് ചെയ്യുക'),
