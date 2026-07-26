@@ -234,34 +234,44 @@ class PublicQuickLinksView(APIView):
 
 
 class PublicNewsSourcesView(APIView):
-    permission_classes = [AllowAny]
+     permission_classes = [AllowAny]
 
-    @extend_schema(
-        tags=['Public - CMS'],
-        summary='Get active news sources grouped by category',
-        description=(
-            'Returns active news sources (newspapers + magazines) with logo URLs.\n\n'
-            'Results are grouped by category: `newspaper` and `magazine`.\n'
-            'Redis-cached (24h). No auth required.'
-        ),
-    )
-    def get(self, request):
-        cached = cache.get('public:news_sources')
+     @extend_schema(
+         tags=['Public - CMS'],
+         summary='Get active news sources by category',
+         description=(
+             'Returns active news sources (newspapers or magazines) with logo URLs.\n\n'
+             '**Filter:** `?category=newspaper` or `?category=magazine`\n\n'
+             '**Pagination:** `?page=1&page_size=6` (max 100)\n\n'
+             'Redis-cached (24h). No auth required.'
+         ),
+     )
+     def get(self, request):
+        category = request.query_params.get('category', '').strip()
+ 
+        cache_key = f'public:news_sources:{category or "all"}'
+        cached = cache.get(cache_key)
         if cached is not None:
-            return StandardResponse.success(data=cached)
-
+            paginator = StandardPagination()
+            page = paginator.paginate_queryset(cached, request)
+            return paginator.get_paginated_response(page) 
         qs = NewsSource.objects.filter(is_active=True, is_deleted=False)
-        data = {'newspaper': [], 'magazine': []}
-        for ns in qs:
-            data[ns.category].append({
+        if category:
+            qs = qs.filter(category=category)
+            data = [
+            {
                 'id':       ns.id,
                 'name':     ns.name,
                 'url':      ns.url,
                 'logo_url': request.build_absolute_uri(ns.logo.url) if ns.logo else None,
-            })
-        cache.set('public:news_sources', data, timeout=60 * 60 * 24)
-        return StandardResponse.success(data=data)
-
+            }
+            for ns in qs
+        ]
+        cache.set(cache_key, data, timeout=60 * 60 * 24)
+ 
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(data, request)
+        return paginator.get_paginated_response(page)
 
 class PublicTeamMembersView(APIView):
     permission_classes = [AllowAny]

@@ -765,7 +765,7 @@ class NewsSourceListView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(created_by=request.user)
-        cache.delete('public:news_sources')
+        cache.delete_pattern('public:news_sources:*')
         return StandardResponse.created(
             data=NewsSourceSerializer(obj, context={'request': request}).data,
             message='News source created.',
@@ -794,7 +794,7 @@ class NewsSourceDetailView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(updated_by=request.user)
-        cache.delete('public:news_sources')
+        cache.delete_pattern('public:news_sources:*')
         return StandardResponse.success(
             data=NewsSourceSerializer(obj, context={'request': request}).data,
             message='Updated.',
@@ -810,7 +810,7 @@ class NewsSourceDetailView(APIView):
         if obj.logo:
             obj.logo.delete(save=False)
         obj.soft_delete(user=request.user)
-        cache.delete('public:news_sources')
+        cache.delete_pattern('public:news_sources:*')
         return StandardResponse.success(message='Deleted.')
 
 
@@ -829,7 +829,7 @@ class NewsSourceLogoDeleteView(APIView):
         obj.logo.delete(save=False)
         obj.logo = None
         obj.save(update_fields=['logo'])
-        cache.delete('public:news_sources')
+        cache.delete_pattern('public:news_sources:*')
         return StandardResponse.success(message='Logo deleted.')
 
 
@@ -845,7 +845,7 @@ class NewsSourceActivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = True
         obj.save(update_fields=['is_active'])
-        cache.delete('public:news_sources')
+        cache.delete_pattern('public:news_sources:*')
         return StandardResponse.success(message='Activated.')
 
 
@@ -861,7 +861,7 @@ class NewsSourceDeactivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = False
         obj.save(update_fields=['is_active'])
-        cache.delete('public:news_sources')
+        cache.delete_pattern('public:news_sources:*')
         return StandardResponse.success(message='Deactivated.')
 
 
