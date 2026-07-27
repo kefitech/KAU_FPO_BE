@@ -957,6 +957,26 @@ def seed_ui_translations(languages):
         ('fpo_roles_dialog.toast_updated',         'Role updated',                     'റോൾ അപ്ഡേറ്റ് ചെയ്തു'),
         ('fpo_roles_dialog.toast_failed',          'Failed to save role',              'റോൾ സേവ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
 
+        # ── fpo_summary_report─────────────────────────────────────────────────
+        ('fpo_report.card_title',           'FPO Summary Report',                        'FPO സംഗ്രഹ റിപ്പോർട്ട്'),
+        ('fpo_report.card_description',     'Download filtered FPO data as Excel or PDF','ഫിൽട്ടർ ചെയ്ത FPO ഡാറ്റ Excel അല്ലെങ്കിൽ PDF ആയി ഡൗൺലോഡ് ചെയ്യുക'),
+        ('fpo_report.format_excel',         'Excel',                                     'Excel'),
+        ('fpo_report.format_pdf',           'PDF',                                       'PDF'),
+        ('fpo_report.label_district',       'District',                                  'ജില്ല'),
+        ('fpo_report.label_status',         'Status',                                    'സ്ഥിതി'),
+        ('fpo_report.label_tier',           'Tier',                                      'ടയർ'),
+        ('fpo_report.label_from_date',      'From Date',                                 'ആരംഭ തീയതി'),
+        ('fpo_report.label_to_date',        'To Date',                                   'അവസാന തീയതി'),
+        ('fpo_report.option_all',           'All',                                       'എല്ലാം'),
+        ('fpo_report.clear_filters',        'Clear filters',                             'ഫിൽട്ടറുകൾ മായ്ക്കുക'),
+        ('fpo_report.btn_downloading',      'Downloading…',                              'ഡൗൺലോഡ് ചെയ്യുന്നു…'),
+        ('fpo_report.btn_download_excel',   'Download Excel',                            'Excel ഡൗൺലോഡ് ചെയ്യുക'),
+        ('fpo_report.btn_download_pdf',     'Download PDF',                              'PDF ഡൗൺലോഡ് ചെയ്യുക'),
+        ('fpo_report.toast_success',        'Report downloaded successfully',            'റിപ്പോർട്ട് വിജയകരമായി ഡൗൺലോഡ് ചെയ്തു'),
+        ('fpo_report.toast_failed',         'Failed to download report',                 'റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
+
+
+
         # ── fpo_permissions ───────────────────────────────────────────────────
         ('fpo_permissions.page_title',             'FPO Permissions',                  'FPO അനുമതികൾ'),
         ('fpo_permissions.page_description',       'Manage FPO actions, member roles and their permission matrix', 'FPO ആക്ഷനുകളും അംഗ റോളുകളും അനുമതി മാട്രിക്സും നിയന്ത്രിക്കുക'),

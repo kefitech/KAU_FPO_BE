@@ -334,6 +334,7 @@ def _transition(fpo, to_status, changed_by, notes=''):
                     'application_id':  fpo.application_id,
                     'request_message': notes,
                 },
+                lang=getattr(fpo.primary_user.profile, 'preferred_language', 'en'),
             )
         except Exception:
             pass
