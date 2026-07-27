@@ -2839,6 +2839,89 @@ def seed_contact_translations(languages):
     return count
 
 
+def seed_home_section_translations(languages):
+    """Seed homepage section heading/label strings (team, services, etc.)."""
+    en = languages.get('en')
+    ml = languages.get('ml')
+    if not en or not ml:
+        print("  ⚠ EN or ML language missing — skipping home section translations")
+        return 0
+
+    try:
+        category = TranslationCategory.objects.get(code='ui')
+    except TranslationCategory.DoesNotExist:
+        print("  ⚠ 'ui' category not found — skipping home section translations")
+        return 0
+
+    HOME_KEYS = [
+        # key,                          EN value,                   ML value
+        # ── Team section ────────────────────────────────────────────────────
+        ('home.team_subtitle',          'Our Team',                 'ഞങ്ങളുടെ ടീം'),
+        ('home.team_title',             'Meet Our Leadership',      'ഞങ്ങളുടെ നേതൃത്വത്തെ കാണുക'),
+        ('home.team_empty',             'No team members available.','ടീം അംഗങ്ങൾ ലഭ്യമല്ല.'),
+        ('home.team_page_heading',      'Our Team',                 'ഞങ്ങളുടെ ടീം'),
+        # ── News & Announcements section ─────────────────────────────────────
+        ('home.news_title',             'News and Announcements',       'വാർത്തകളും അറിയിപ്പുകളും'),
+        ('home.news_see_more',          'See More',                     'കൂടുതൽ കാണുക'),
+        ('home.news_tab_announcements', 'Announcements',                'അറിയിപ്പുകൾ'),
+        ('home.news_tab_news',          'News',                         'വാർത്തകൾ'),
+        ('home.news_empty_announcements','No announcements available at the moment.', 'ഇപ്പോൾ അറിയിപ്പുകൾ ലഭ്യമല്ല.'),
+        ('home.news_empty_news',        'No news available at the moment.', 'ഇപ്പോൾ വാർത്തകൾ ലഭ്യമല്ല.'),
+        ('home.news_last_updated',      'Last Updated on',              'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്'),
+        ('home.news_read_more',         'Read More',                    'കൂടുതൽ വായിക്കുക'),
+        # ── Stats / Facts section ────────────────────────────────────────────
+        ('home.stats_subtitle',         'Platform Stats',               'പ്ലാറ്റ്ഫോം സ്റ്റാറ്റിസ്റ്റിക്സ്'),
+        ('home.stats_title',            'KAU–FPO Linkage in Numbers',   'KAU–FPO ലിങ്കേജ് സംഖ്യകളിൽ'),
+        ('home.stats_visitors',         'Platform Visitors',            'പ്ലാറ്റ്ഫോം സന്ദർശകർ'),
+        ('home.stats_registrations',    'FPO Registrations',            'FPO രജിസ്ട്രേഷനുകൾ'),
+        ('home.stats_experts',          'Empanelled Experts',           'ഉൾപ്പെടുത്തിയ വിദഗ്ദ്ധർ'),
+        # ── Gallery section ──────────────────────────────────────────────────
+        ('home.gallery_subtitle',       'Capture The Moments',      'നിമിഷങ്ങൾ പകർത്തുക'),
+        ('home.gallery_title',          'Gallery',                  'ഗ്യാലറി'),
+        # ── Why Choose / FAQ section ─────────────────────────────────────────
+        ('home.why_subtitle',           'Get to know us',                               'ഞങ്ങളെ അറിയൂ'),
+        ('home.why_title',              'Agriculture matters to the future of development', 'കൃഷി വികസനത്തിന്റെ ഭാവിക്ക് പ്രധാനമാണ്'),
+        ('home.why_faq_counter_label',  'FAQs',                                         'FAQകൾ'),
+        ('home.why_faq_counter_sub',    'Have query? Check FAQ',                        'സംശയമുണ്ടോ? FAQ പരിശോധിക്കൂ'),
+        ('home.why_view_all_faqs',      'View All FAQs',                                'എല്ലാ FAQകളും കാണുക'),
+        # ── How to Register page ────────────────────────────────────────────
+        ('home.how_to_register_title',  'How to Register FPO',      'FPO എങ്ങനെ രജിസ്റ്റർ ചെയ്യാം'),
+        # ── More Info / KAU Services section ───────────────────────────────
+        ('home.more_info_title',        'Agriculture Information Technologies & Services', 'കൃഷി വിവര സാങ്കേതിക വിദ്യകളും സേവനങ്ങളും'),
+        ('home.service_crop_husbandry', 'Crop Husbandry',           'വിള കൃഷി'),
+        ('home.service_animal_husbandry','Animal Husbandry',        'മൃഗപരിപാലനം'),
+        ('home.service_fisheries',      'Fisheries',                'മത്സ്യബന്ധനം'),
+        ('home.service_forestry',       'Forestry',                 'വനം'),
+        ('home.service_kau_moodle',     'KAU Moodle',               'KAU മൂഡിൽ'),
+        ('home.service_ecrop_doctor',   'e-Crop Doctor',            'ഇ-ക്രോപ്പ് ഡോക്ടർ'),
+        ('home.service_seed_rate',      'Seed Rate & Spacing',      'വിത്ത് നിരക്കും അകലവും'),
+        ('home.service_fertulator',     'Fertulator',               'ഫർട്ടുലേറ്റർ'),
+        ('home.service_agri_almanac',   'Agri Almanac',             'കൃഷി അൽമനാക്ക്'),
+        ('home.service_farm_machinery', 'Farm Machinery',           'കൃഷി യന്ത്രങ്ങൾ'),
+        ('home.service_agri_enterprises','Agri Enterprises',        'കൃഷി സംരംഭങ്ങൾ'),
+        ('home.service_edid',           'e-DID',                    'ഇ-ഡിഐഡി'),
+        ('home.service_knowledge_bank', 'Knowledge Bank',           'നോളജ് ബാങ്ക്'),
+        ('home.service_market_intel',   'Market Intelligence',      'മാർക്കറ്റ് ഇന്റലിജൻസ്'),
+        ('home.service_agri_videos',    'Agri Videos',              'കൃഷി വീഡിയോകൾ'),
+        ('home.service_weather',        'Weather Advisory',         'കാലാവസ്ഥ ഉപദേശം'),
+        ('home.service_kerala_dir',     'Kerala Directory',         'കേരള ഡയറക്ടറി'),
+        ('home.service_library',        'Library',                  'ലൈബ്രറി'),
+    ]
+
+    count = 0
+    for full_key, en_val, ml_val in HOME_KEYS:
+        for lang, val in [(en, en_val), (ml, ml_val)]:
+            _, created = Translation.objects.update_or_create(
+                category=category,
+                key=full_key,
+                language=lang,
+                defaults={'value': val, 'is_verified': True},
+            )
+            if created:
+                count += 1
+    return count
+
+
 def seed_banner_translations(languages):
     """Seed homepage carousel/banner UI strings."""
     en = languages.get('en')
@@ -2901,7 +2984,7 @@ def seed_nav_translations(languages):
         ('nav.pages',             'Pages',                    'പേജുകൾ'),
         ('nav.about_us',          'About Us',                 'ഞങ്ങളെക്കുറിച്ച്'),
         ('nav.team',              'Team',                     'ടീം'),
-        ('nav.how_to_register FPO','How To Register FPO',     'എങ്ങനെ FPO രജിസ്റ്റർ ചെയ്യാം'),
+        ('nav.how_to_register_FPO','How To Register FPO',     'എങ്ങനെ FPO രജിസ്റ്റർ ചെയ്യാം'),
         ('nav.in_the_news',       'In the News',              'വാർത്തകൾ'),
         ('nav.faqs',              'FAQs',                     'പതിവ് ചോദ്യങ്ങൾ'),
         ('nav.contact_us',        'Contact Us',               'ഞങ്ങളെ ബന്ധപ്പെടുക'),
@@ -2916,6 +2999,7 @@ def seed_nav_translations(languages):
         ('nav.home',              'HOME',                     'ഹോം'),
         ('nav.our_partners',      'Our Partners',             'ഞങ്ങളുടെ പങ്കാളികൾ'),
         ('nav.subscribe_thanks',  'Thanks For Subscribing!',  'സബ്‌സ്ക്രൈബ് ചെയ്തതിന് നന്ദി!'),
+        ('nav.kau_address',       'Kerala Agricultural University, Mannuthy P.O, Pin- 680651.', 'കേരള കാർഷിക സർവ്വകലാശാല, മണ്ണുത്തി പി.ഒ, പിൻ- 680651.'),
     ]
 
     count = 0
@@ -3009,6 +3093,12 @@ def seed_translations():
     banner_count = seed_banner_translations(languages)
     print(f"✅ Seeded {banner_count} banner translations")
     total_count += banner_count
+
+    # Step 9d: Seed homepage section translations (team, services, etc.)
+    print("\nSeeding homepage section translations...")
+    home_count = seed_home_section_translations(languages)
+    print(f"✅ Seeded {home_count} home section translations")
+    total_count += home_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
