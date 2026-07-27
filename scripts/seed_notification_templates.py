@@ -61,6 +61,8 @@ TEMPLATE_CODES = [
     ('claim_docs_requested',        'sms',    'SMS to claimant: admin requesting additional documents',        ['user_name', 'fpo_name']),
     ('claim_docs_requested',        'in_app', 'In-app: admin requesting additional documents for claim',       ['user_name', 'fpo_name', 'admin_message']),
     ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
+    # Expert enquiry
+    ('expert_enquiry',              'email',  'Email sent to expert when an FPO submits a contact enquiry',            ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
 ]
 
 
@@ -639,6 +641,35 @@ TEMPLATES = [
         'claim_docs_submitted', 'in_app', 'en',
         'Documents Submitted for the Ownership Claim',
         '<strong>{{claimant_name}}</strong> has submitted the document requested for the Ownership Claim of <strong>{{fpo_name}}</strong>. Please review immediatly.',
+    ),
+    # Expert enquiry — email sent to expert
+    (
+        'expert_enquiry', 'email', 'en',
+        'New Enquiry from {{fpo_name}} via KAU-FPO Platform',
+        '''<p>Dear <strong>{{expert_name}}</strong>,</p>
+<p>You have received a new enquiry from an FPO through the KAU-FPO Linkage Platform.</p>
+<table style="border-collapse:collapse;width:100%;margin:16px 0;">
+  <tr><td style="padding:8px 12px;font-weight:600;background:#f5f5f5;border:1px solid #e0e0e0;width:140px;">FPO Name</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{{fpo_name}}</td></tr>
+  <tr><td style="padding:8px 12px;font-weight:600;background:#f5f5f5;border:1px solid #e0e0e0;">Contact Person</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{{user_name}}</td></tr>
+  <tr><td style="padding:8px 12px;font-weight:600;background:#f5f5f5;border:1px solid #e0e0e0;">Email</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{{user_email}}</td></tr>
+</table>
+<p style="font-weight:600;">Message:</p>
+<p style="background:#f9f9f9;border-left:4px solid #2e7d32;padding:12px 16px;border-radius:4px;">{{message}}</p>
+<p>Please reply directly to <a href="mailto:{{user_email}}">{{user_email}}</a> to respond to this enquiry.</p>''',
+    ),
+    (
+        'expert_enquiry', 'email', 'ml',
+        '{{fpo_name}}-ൽ നിന്ന് KAU-FPO പ്ലാറ്റ്‌ഫോം വഴി പുതിയ അന്വേഷണം',
+        '''<p>പ്രിയ <strong>{{expert_name}}</strong>,</p>
+<p>KAU-FPO ലിങ്കേജ് പ്ലാറ്റ്‌ഫോം വഴി ഒരു FPO-ൽ നിന്ന് നിങ്ങൾക്ക് പുതിയ അന്വേഷണം ലഭിച്ചിരിക്കുന്നു.</p>
+<table style="border-collapse:collapse;width:100%;margin:16px 0;">
+  <tr><td style="padding:8px 12px;font-weight:600;background:#f5f5f5;border:1px solid #e0e0e0;width:140px;">FPO പേര്</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{{fpo_name}}</td></tr>
+  <tr><td style="padding:8px 12px;font-weight:600;background:#f5f5f5;border:1px solid #e0e0e0;">ബന്ധപ്പെടേണ്ട വ്യക്തി</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{{user_name}}</td></tr>
+  <tr><td style="padding:8px 12px;font-weight:600;background:#f5f5f5;border:1px solid #e0e0e0;">ഇമെയിൽ</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{{user_email}}</td></tr>
+</table>
+<p style="font-weight:600;">സന്ദേശം:</p>
+<p style="background:#f9f9f9;border-left:4px solid #2e7d32;padding:12px 16px;border-radius:4px;">{{message}}</p>
+<p>ഈ അന്വേഷണത്തിന് മറുപടി നൽകാൻ <a href="mailto:{{user_email}}">{{user_email}}</a>-ലേക്ക് നേരിട്ട് മറുപടി അയക്കുക.</p>''',
     ),
 ]
 

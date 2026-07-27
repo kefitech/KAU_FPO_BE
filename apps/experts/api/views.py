@@ -147,7 +147,7 @@ class ExpertEnquiryView(APIView):
 
         message = serializer.validated_data['message']
         user_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.email
-        fpo_name = fpo.fpo_name if fpo else user_name
+        fpo_name = fpo.name if fpo else user_name
 
         enquiry = ExpertEnquiry.objects.create(
             expert=expert,
