@@ -258,7 +258,7 @@ class PublicNewsSourcesView(APIView):
         qs = NewsSource.objects.filter(is_active=True, is_deleted=False)
         if category:
             qs = qs.filter(category=category)
-            data = [
+        data = [
             {
                 'id':       ns.id,
                 'name':     ns.name,
