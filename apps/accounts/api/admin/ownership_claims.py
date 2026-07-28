@@ -43,9 +43,14 @@ User = get_user_model()
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _ClaimListSerializer(serializers.ModelSerializer):
+<<<<<<< Updated upstream
     fpo_name        = serializers.CharField(source='fpo.name', read_only=True)
     fpo_id          = serializers.IntegerField(source='fpo.id', read_only=True)
     fpo_identity    = serializers.SerializerMethodField()
+=======
+    fpo_name       = serializers.CharField(source='fpo.name', read_only=True)
+    fpo_id         = serializers.IntegerField(source='fpo.id', read_only=True)
+>>>>>>> Stashed changes
     fpo_email      = serializers.EmailField(source='fpo.office_email', read_only=True)
     claimant_name  = serializers.SerializerMethodField()
     claimant_email = serializers.CharField(source='claimant.email', read_only=True)
@@ -57,7 +62,11 @@ class _ClaimListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = FPOOwnershipClaim
         fields = [
+<<<<<<< Updated upstream
             'id', 'fpo_id', 'fpo_name', 'fpo_identity',
+=======
+            'id', 'fpo_id', 'fpo_name',
+>>>>>>> Stashed changes
             'fpo_email',
             'claimant_name', 'claimant_email', 'claimant_phone',
             'reason', 'supporting_docs',
