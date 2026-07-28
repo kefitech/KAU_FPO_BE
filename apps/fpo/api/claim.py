@@ -116,14 +116,7 @@ class FPOClaimView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-<<<<<<< Updated upstream
-        # Block claiming any FPO that was itself created via an ownership claim transfer.
-        # origin_claim_id is set when admin approves a claim and creates a new FPO for the claimant.
-        # That FPO is permanently protected regardless of its current wizard/approval status.
-        if fpo.origin_claim_id:
-=======
         if fpo.status not in ('approved', 'submitted', 'draft', 'info_required'):
->>>>>>> Stashed changes
             return StandardResponse.error(
                 'This FPO has already been transferred to its verified owner and cannot be claimed again.',
                 status_code=status.HTTP_400_BAD_REQUEST,
