@@ -364,6 +364,13 @@ def seed_ui_translations(languages):
         ('login.password_label',        'Password',                                 'രഹസ്യവാക്ക്'),
         ('login.password_placeholder',  '••••••••',                                 '••••••••'),
         ('login.submit_btn',            'Sign In',                                  'സൈൻ ഇൻ ചെയ്യുക'),
+        ('login.title',                 'Login to your account',                    'നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ലോഗിൻ ചെയ്യുക'),
+        ('login.subtitle',              'Enter your email below to login to your account', 'ലോഗിൻ ചെയ്യാൻ നിങ്ങളുടെ ഇമെയിൽ താഴെ നൽകുക'),
+        ('login.no_account',            "Don't have an account?",                   'അക്കൗണ്ട് ഇല്ലേ?'),
+        ('login.sign_up',               'Sign up',                                  'സൈൻ അപ്പ് ചെയ്യുക'),
+        ('login.back_to_home',          '← Back to Home',                          '← ഹോം പേജിലേക്ക് മടങ്ങുക'),
+        ('login.forgot_password',       'Forgot password?',                         'പാസ്‌വേഡ് മറന്നോ?'),
+        ('login.signing_in',            'Signing in...',                            'സൈൻ ഇൻ ചെയ്യുന്നു...'),
 
         # ── register — /register page ─────────────────────────────────────
         ('register.stage_eligibility',          'Eligibility',                              'യോഗ്യത'),

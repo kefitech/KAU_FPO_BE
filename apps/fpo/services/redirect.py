@@ -13,7 +13,7 @@ Stages:
     upload_documents → /fpo/register  (step 6)
     submit           → /fpo/register  (step 7)
     status           → /fpo/status  (submitted, under_review, suspended, info_required)
-    claim_status     → /fpo/claim/status  (docs_requested claim pending)
+    claim_status     → /fpo/claim/status  (pending or docs_requested claim)
     dashboard        → /fpo/dashboard
     None             → no redirect (admin/other roles use menu)
 """
@@ -30,8 +30,11 @@ def get_fpo_redirect(user):
     if not user.groups.filter(name=UserRole.FPO_MANAGER).exists():
         return None
 
-    # If user has a docs_requested claim, send them to claim status page first
-    if FPOOwnershipClaim.objects.filter(claimant=user, status=ClaimStatus.DOCS_REQUESTED).exists():
+    # If user has any active claim (pending review or docs requested), send to claim status page
+    if FPOOwnershipClaim.objects.filter(
+        claimant=user,
+        status__in=[ClaimStatus.PENDING, ClaimStatus.DOCS_REQUESTED]
+    ).exists():
         return {'stage': 'claim_status', 'step': None}
 
     fpo = FPO.objects.filter(primary_user=user).first()
