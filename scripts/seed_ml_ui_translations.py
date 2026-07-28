@@ -49,6 +49,8 @@ def seed_ml_ui_translations():
             'update_failed':      'അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു',
             'delete_failed':      'ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു',
             'action_failed':      'പ്രവർത്തനം പരാജയപ്പെട്ടു',
+            'action_deactivate':  'നിഷ്ക്രിയമാക്കുക',
+            'action_activate':    'സജീവമാക്കുക',
             'never':              'ഒരിക്കലും ഇല്ല',
             'created_at':         'സൃഷ്ടിച്ച സമയം',
             'updated_at':         'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്',
@@ -62,6 +64,7 @@ def seed_ml_ui_translations():
             'field_name':         'പേര്',
             'field_email':        'ഇമെയിൽ',
             'field_phone':        'ഫോൺ',
+            
             
         },
 
@@ -94,6 +97,11 @@ def seed_ml_ui_translations():
             'stat_approved':                'അംഗീകൃത FPOകൾ',
             'stat_pending':                 'അവലോകനം നിൽക്കുന്നവ',
             'stat_rejected':                'നിരസിക്കപ്പെട്ടവ',
+            'stat_total_desc':              'എല്ലാ സ്ഥിതികളിലുമായി',
+            'stat_approved_desc':           'സജീവവും പ്രവർത്തനക്ഷമവും',
+            'stat_pending_desc':            'അവലോകനത്തിനായി കാത്തിരിക്കുന്നു',
+            'stat_suspended_desc':          'ശ്രദ്ധ ആവശ്യമാണ്',
+            'stat_suspended_ok':            'സസ്‌പെൻഡ് ചെയ്തവയൊന്നുമില്ല',            
             # Chart titles — keys the frontend actually uses
             'chart_reg_trend':              'രജിസ്ട്രേഷൻ ട്രെൻഡ്',
             'chart_reg_trend_subtitle':     'പ്രതിമാസ FPO രജിസ്ട്രേഷൻ',
@@ -109,6 +117,11 @@ def seed_ml_ui_translations():
             'chart_district_title':         'ജില്ലാ അടിസ്ഥാനത്തിൽ FPOകൾ',
             # Pending actions
             'action_required':              'നടപടി ആവശ്യമാണ്',
+            'btn_download':                 'ഡൗൺലോഡ് ചെയ്യുക',
+            'download_label_filtered':      'സജീവ ഫിൽട്ടറുകൾ ഉപയോഗിച്ച് ഡൗൺലോഡ് ചെയ്യുന്നു',
+            'download_label_all':           'എല്ലാ അപേക്ഷകളും ഡൗൺലോഡ് ചെയ്യുന്നു',
+            'download_as_excel':            'Excel ആയി ഡൗൺലോഡ് ചെയ്യുക',
+            'download_as_pdf':              'PDF ആയി ഡൗൺലോഡ് ചെയ്യുക',
             'no_pending_actions':           'നിൽക്കുന്ന നടപടികൾ ഇല്ല — എല്ലാം കൃത്യമാണ്.',
             'pending_actions_title':        'നിൽക്കുന്ന പ്രവർത്തനങ്ങൾ',
             'pending_ownership_claims':     'ഉടമസ്ഥാവകാശ അഭ്യർത്ഥനകൾ',
@@ -126,6 +139,7 @@ def seed_ml_ui_translations():
             'status_rejected':              'നിരസിക്കപ്പെട്ടു',
             'status_suspended':             'സസ്‌പെൻഡ് ചെയ്തു',
             'status_claimed':               'ക്ലെയിം ചെയ്തു',
+
             # Tier labels
             
             'tier_a':                       'ടയർ A',
@@ -847,6 +861,19 @@ def seed_ml_ui_translations():
             'toast_rejected':            'അപേക്ഷ നിരസിച്ചു',
             'toast_info_requested':      'വിവരം ആവശ്യപ്പെടൽ അയച്ചു',
             'toast_suspended':           'അപേക്ഷ സസ്‌പെൻഡ് ചെയ്തു',
+            # Suspend — additional states
+            'btn_suspend_loading':       'സസ്‌പെൻഡ് ചെയ്യുന്നു…',
+            'suspend_dialog_title':      'FPO സസ്‌പെൻഡ് ചെയ്യുക',
+            'suspend_dialog_desc':       'ഇത് FPO അക്കൗണ്ട് സസ്‌പെൻഡ് ചെയ്യും. വീണ്ടും സജീവമാക്കുന്നത് വരെ അവർക്ക് പ്ലാറ്റ്‌ഫോമിലേക്ക് പ്രവേശനം ഉണ്ടാകില്ല.',
+            'toast_deactivate_error':    'സസ്‌പെൻഡ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു',
+ 
+            # Activate / Reactivate — currently missing entirely
+            'btn_activate':              'സജീവമാക്കുക',
+            'btn_activate_loading':      'സജീവമാക്കുന്നു…',
+            'reactivate_dialog_title':   'FPO വീണ്ടും സജീവമാക്കുക',
+            'reactivate_dialog_desc':    'ഇത് FPO യുടെ പ്ലാറ്റ്‌ഫോം പ്രവേശനം പുനഃസ്ഥാപിക്കും.',
+            'toast_activate_success':    'FPO വിജയകരമായി സജീവമാക്കി',
+            'toast_activate_error':      'സജീവമാക്കുന്നതിൽ പരാജയപ്പെട്ടു',           
             'toast_tier_assigned':       'ടയർ വിജയകരമായി നിശ്ചയിച്ചു',
             'toast_action_failed':       'പ്രവർത്തനം പരാജയപ്പെട്ടു',
             'empty_state':               'അപേക്ഷകൾ ഒന്നും കണ്ടെത്തിയില്ല.',
