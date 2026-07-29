@@ -58,7 +58,7 @@ def create_languages():
     ]
 
     for lang_data in languages:
-        lang, created = Language.objects.get_or_create(
+        lang, created = Language.objects.update_or_create(
             code=lang_data['code'],
             defaults=lang_data
         )
@@ -126,7 +126,7 @@ def create_categories():
     ]
 
     for cat_data in categories:
-        cat, created = TranslationCategory.objects.get_or_create(
+        cat, created = TranslationCategory.objects.update_or_create(
             code=cat_data['code'],
             defaults=cat_data
         )
@@ -159,7 +159,7 @@ def migrate_message_class(category_code: str, message_class, languages):
             key = attr_name.lower()
 
             # Create English translation
-            Translation.objects.get_or_create(
+            Translation.objects.update_or_create(
                 category=category,
                 key=key,
                 language=lang_en,
@@ -171,7 +171,7 @@ def migrate_message_class(category_code: str, message_class, languages):
             )
 
             # Create Malayalam translation
-            Translation.objects.get_or_create(
+            Translation.objects.update_or_create(
                 category=category,
                 key=key,
                 language=lang_ml,
@@ -310,11 +310,11 @@ def seed_admin_translations(languages):
 
     count = 0
     for key, en_value, ml_value in admin_messages:
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=key, language=lang_en,
             defaults={'value': en_value, 'context': 'Admin management', 'is_verified': True}
         )
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'Admin management', 'is_verified': True}
         )
@@ -1289,7 +1289,7 @@ def seed_frontend_ui_translations(languages):
 
     All 24 screens seeded as ui category keys: {screen}.{key}
     Malayalam seeded with English placeholder (is_verified=False) — admin fills later.
-    Uses get_or_create so safe to re-run.
+    Uses update_or_create so safe to re-run.
     """
     category = TranslationCategory.objects.get(code='ui')
     lang_en  = languages['en']
@@ -2554,12 +2554,12 @@ def seed_frontend_ui_translations(languages):
     for screen, entries in screens.items():
         for key, en_value in entries.items():
             full_key = f'{screen}.{key}'
-            Translation.objects.get_or_create(
+            Translation.objects.update_or_create(
                 category=category, key=full_key, language=lang_en,
                 defaults={'value': en_value, 'context': 'Frontend UI label', 'is_verified': True}
             )
             # Seed ML with English value as placeholder — admin to translate later
-            Translation.objects.get_or_create(
+            Translation.objects.update_or_create(
                 category=category, key=full_key, language=lang_ml,
                 defaults={'value': en_value, 'context': 'Frontend UI label', 'is_verified': False}
             )
@@ -3051,11 +3051,11 @@ def seed_menu_translations(languages):
 
     count = 0
     for key, en_value, ml_value in menu_keys:
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=key, language=lang_en,
             defaults={'value': en_value, 'context': 'Sidebar navigation menu label', 'is_verified': True}
         )
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'Sidebar navigation menu label', 'is_verified': True}
         )

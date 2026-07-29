@@ -1218,7 +1218,7 @@ def seed_ml_ui_translations():
 
     lang_en = Language.objects.get(code='en')
     for full_key, en_value in new_en_keys.items():
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=full_key, language=lang_en,
             defaults={'value': en_value, 'context': 'Frontend UI label', 'is_verified': True}
         )

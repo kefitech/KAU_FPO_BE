@@ -30,7 +30,7 @@ def seed_fpo_master_data():
 
     def _seed_lookup(category, entries, category_label, category_desc):
         """Helper: seed MasterLookup + Translation rows for a category."""
-        cat, _ = TranslationCategory.objects.get_or_create(
+        cat, _ = TranslationCategory.objects.update_or_create(
             code=category,
             defaults={'name': category_label, 'description': category_desc},
         )
@@ -120,7 +120,7 @@ def seed_fpo_master_data():
         code = re.sub(r'[^a-z0-9]+', '_', act.lower()).strip('_')[:50]
         csa_entries.append({'code': code, 'en': act, 'ml': act, 'metadata': {'parent': 'state_specific_csa'}})
 
-    cat_csa, _ = TranslationCategory.objects.get_or_create(
+    cat_csa, _ = TranslationCategory.objects.update_or_create(
         code='state_csa_act',
         defaults={'name': 'State CSA Acts', 'description': 'State-specific cooperative societies acts'},
     )
@@ -206,7 +206,7 @@ def seed_fpo_master_data():
         'WYD': ['Kalpetta', 'Mananthavady', 'Panamaram', 'Sulthan Bathery'],
     }
 
-    cat_block, _ = TranslationCategory.objects.get_or_create(
+    cat_block, _ = TranslationCategory.objects.update_or_create(
         code='block',
         defaults={'name': 'Kerala Blocks', 'description': 'Administrative blocks per Kerala district'},
     )
