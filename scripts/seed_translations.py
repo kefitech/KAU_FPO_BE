@@ -371,6 +371,28 @@ def seed_ui_translations(languages):
         ('login.back_to_home',          '← Back to Home',                          '← ഹോം പേജിലേക്ക് മടങ്ങുക'),
         ('login.forgot_password',       'Forgot password?',                         'പാസ്‌വേഡ് മറന്നോ?'),
         ('login.signing_in',            'Signing in...',                            'സൈൻ ഇൻ ചെയ്യുന്നു...'),
+        
+        # ── forgot_password — /forgot-password ─────────────────────────────
+        ('forgot_password.email_label',           'Email address',                                    'ഇമെയിൽ വിലാസം'),
+        ('forgot_password.email_sending',         'Sending...',                                       'അയക്കുന്നു...'),
+        ('forgot_password.email_submit_btn',      'Send Reset Link',                                  'റീസെറ്റ് ലിങ്ക് അയക്കുക'),
+        ('forgot_password.email_error',           'Failed to send reset link. Please try again.',     'റീസെറ്റ് ലിങ്ക് അയക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('forgot_password.phone_label',           'Phone number',                                     'ഫോൺ നമ്പർ'),
+        ('forgot_password.phone_sending',         'Sending OTP...',                                   'OTP അയക്കുന്നു...'),
+        ('forgot_password.phone_submit_btn',      'Send OTP',                                         'OTP അയക്കുക'),
+        ('forgot_password.phone_error',           'Failed to send OTP. Please try again.',            'OTP അയക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('forgot_password.check_email_title',     'Check your email',                                 'നിങ്ങളുടെ ഇമെയിൽ പരിശോധിക്കുക'),
+        ('forgot_password.check_email_desc_prefix', "We've sent a password reset link to",            'പാസ്‌വേഡ് റീസെറ്റ് ലിങ്ക് ഇവിടേക്ക് അയച്ചിട്ടുണ്ട്'),
+        ('forgot_password.check_email_desc_suffix', 'Check your inbox and click the link to reset your password.', 'നിങ്ങളുടെ ഇൻബോക്സ് പരിശോധിച്ച് ലിങ്കിൽ ക്ലിക്ക് ചെയ്ത് പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക.'),
+        ('forgot_password.no_receive_prefix',     "Didn't receive it?",                               'ലഭിച്ചില്ലേ?'),
+        ('forgot_password.try_again',             'Try again',                                        'വീണ്ടും ശ്രമിക്കുക'),
+        ('forgot_password.page_title',            'Forgot password?',                                 'പാസ്‌വേഡ് മറന്നോ?'),
+        ('forgot_password.page_subtitle',         'Enter your email or phone number to receive a reset link or OTP.', 'റീസെറ്റ് ലിങ്ക് അല്ലെങ്കിൽ OTP ലഭിക്കാൻ നിങ്ങളുടെ ഇമെയിൽ അല്ലെങ്കിൽ ഫോൺ നമ്പർ നൽകുക.'),
+        ('forgot_password.tab_email',             'Email',                                            'ഇമെയിൽ'),
+        ('forgot_password.tab_phone',             'Phone (OTP)',                                      'ഫോൺ (OTP)'),
+        ('forgot_password.remember_password',     'Remember your password?',                          'നിങ്ങളുടെ പാസ്‌വേഡ് ഓർമ്മയുണ്ടോ?'),
+        ('forgot_password.back_to_login',         'Back to login',                                    'ലോഗിനിലേക്ക് മടങ്ങുക'),
+        ('forgot_password.back_to_home',          '← Back to Home',                                   '← ഹോം പേജിലേക്ക് മടങ്ങുക'),
 
         # ── register — /register page ─────────────────────────────────────
         ('register.stage_eligibility',          'Eligibility',                              'യോഗ്യത'),
@@ -429,7 +451,6 @@ def seed_ui_translations(languages):
         ('register.account_passwords_mismatch', 'Passwords do not match',                   'പാസ്‌വേഡുകൾ യോജിക്കുന്നില്ല'),
         ('register.account_btn_create',         'Create Account & Continue',                'അക്കൗണ്ട് ഉണ്ടാക്കി തുടരുക'),
         ('register.account_btn_creating',       'Creating account…',                        'അക്കൗണ്ട് ഉണ്ടാക്കുന്നു…'),
-
         ('register.btn_back',                   '← Back',                                   '← തിരിച്ച്'),
 
         # ── wizard — FPO registration wizard (7 steps) ────────────────────
@@ -439,6 +460,26 @@ def seed_ui_translations(languages):
         ('wizard.btn_saving',               'Saving…',                              'സേവ് ചെയ്യുന്നു…'),
         ('wizard.btn_next',                 'Next →',                               'അടുത്തത് →'),
         ('wizard.btn_get_started',          'Get Started →',                        'ആരംഭിക്കുക →'),
+        ('wizard.doc_fpo_reg_cert',         'FPO Registration Certificate',         'എഫ്.പി.ഒ. രജിസ്ട്രേഷൻ സർട്ടിഫിക്കറ്റ്'),
+        ('wizard.doc_bank_details',         'Bank Statement / Details',             'ബാങ്ക് സ്റ്റേറ്റ്മെന്റ് / വിവരങ്ങൾ'),
+        ('wizard.doc_pan_card',             'PAN Card',                             'പാൻ കാർഡ്'),
+        ('wizard.doc_gst_cert',             'GST Certificate',                      'ജി.എസ്.ടി. സർട്ടിഫിക്കറ്റ്'),
+        ('wizard.doc_annual_report',        'Annual Report',                        'വാർഷിക റിപ്പോർട്ട്'),
+        ('wizard.doc_member_list',          'Member List (PDF / XLSX)',             'അംഗ പട്ടിക (PDF / XLSX)'),
+        ('wizard.doc_board_resolution',     'Board Resolution',                     'ബോർഡ് പ്രമേയം'),
+        ('wizard.doc_moa_aoa',              'MOA / AOA',                            'MOA / AOA'),
+        ('wizard.doc_other',                'Other Document',                       'മറ്റ് രേഖ'),
+        ('wizard.err_file_too_large',       'File too large. Maximum size is {size} MB.','ഫയൽ വളരെ വലുതാണ്. പരമാവധി വലുപ്പം {size} MB ആണ്.'),
+        ('wizard.err_invalid_file_type',    'Invalid file type. Allowed: PDF, JPG, PNG{extra}','അസാധുവായ ഫയൽ തരം. അനുവദനീയം: PDF, JPG, PNG{extra}'),
+        ('wizard.err_incomplete_required',  'Please upload all {count} required documents before continuing.','തുടരുന്നതിന് മുമ്പ് ആവശ്യമായ എല്ലാ {count} രേഖകളും അപ്‌ലോഡ് ചെയ്യുക.'),
+        ('wizard.step6_remove_doc_aria',    'Remove document',                      'രേഖ നീക്കം ചെയ്യുക'),
+        ('wizard.step1_label',              'Basic Info',                           'അടിസ്ഥാന വിവരങ്ങൾ'),
+        ('wizard.step2_label',              'Contact',                              'ബന്ധപ്പെടാൻ'),
+        ('wizard.step3_label',              'Signatory',                            'ഒപ്പ്'),
+        ('wizard.step4_label',              'Business & Bank',                      'ബിസിനസ്സ് & ബാങ്ക്'),
+        ('wizard.step5_label',              'Verification',                         'പരിശോധന'),
+        ('wizard.step6_label',              'Documents',                            'രേഖകൾ'),
+        ('wizard.step7_label',              'Review & Submit',                      'അവലോകനം'),
 
         # Step 1 — Basic Information
         ('wizard.step1_heading',            'Basic Information',                    'അടിസ്ഥാന വിവരങ്ങൾ'),
@@ -456,7 +497,8 @@ def seed_ui_translations(languages):
         ('wizard.step1_duplicate_alert',    'An FPO with these details already exists', 'ഈ വിവരങ്ങൾ ഉള്ള ഒരു FPO ഇതിനകം നിലവിലുണ്ട്'),
         ('wizard.step1_duplicate_msg',      'If this is your FPO, you can claim it instead of creating a new one.', 'ഇത് നിങ്ങളുടെ FPO ആണെങ്കിൽ, പുതുതായി ഉണ്ടാക്കുന്നതിന് പകരം ക്ലെയിം ചെയ്യാം.'),
         ('wizard.step1_claim_btn',          'Claim Your Business',                 'നിങ്ങളുടെ ബിസിനസ് ക്ലെയിം ചെയ്യുക'),
-
+        ('wizard.step1_details_saved',      'Details updated',                     'വിവരങ്ങൾ പുതുക്കി'),
+        ('wizard.step1_fpo_created',        "FPO created. Let's fill in the details.","FPO സൃഷ്‌ടിച്ചു. വിവരങ്ങൾ പൂരിപ്പിക്കാം." ),
         # Step 2 — Contact & Location
         ('wizard.step2_heading',            'Contact & Location',                  'ബന്ധപ്പെടൽ & സ്ഥാനം'),
         ('wizard.step2_subheading',         'Office address, contact information and map location', 'ഓഫീസ് വിലാസം, ബന്ധപ്പെടൽ വിവരങ്ങൾ, മാപ്പ് ലൊക്കേഷൻ'),
@@ -477,6 +519,7 @@ def seed_ui_translations(languages):
         ('wizard.step2_map_required',       'Please pin your FPO location on the map', 'മാപ്പിൽ FPO ലൊക്കേഷൻ പിൻ ചെയ്യുക'),
         ('wizard.step2_map_loading',        'Loading map…',                        'മാപ്പ് ലോഡ് ചെയ്യുന്നു…'),
         ('wizard.step2_district_first',     'Select district first…',              'ആദ്യം ജില്ല തിരഞ്ഞെടുക്കുക…'),
+        ('wizard.step2_contact_saved',      'Contact details saved',               'ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ നൽകി'),
 
         # Step 3 — Signatory & Members
         ('wizard.step3_heading',            'Signatory & Members',                 'ഒപ്പ് ചാർത്തുന്നയാൾ & അംഗങ്ങൾ'),
@@ -502,6 +545,7 @@ def seed_ui_translations(languages):
         ('wizard.step3_accountant_available','Accountant Available',               'അക്കൗണ്ടൻ്റ് ലഭ്യം'),
         ('wizard.step3_ceo_label',          'FPO has a dedicated CEO',             'FPO-ന് ഒരു ഡെഡിക്കേറ്റഡ് CEO ഉണ്ട്'),
         ('wizard.step3_accountant_label',   'FPO has a dedicated accountant',      'FPO-ന് ഒരു ഡെഡിക്കേറ്റഡ് അക്കൗണ്ടൻ്റ് ഉണ്ട്'),
+        ('wizard.step3_details_saved',      'Signatory details saved',              'ഒപ്പിടാനുള്ള വ്യക്തിയുടെ വിവരങ്ങൾ ചേർത്തു'),
 
         # Step 4 — Business & Bank
         ('wizard.step4_heading',            'Business & Bank Details',             'ബിസിനസ് & ബാങ്ക് വിവരങ്ങൾ'),
@@ -516,6 +560,7 @@ def seed_ui_translations(languages):
         ('wizard.step4_branch',             'Branch',                              'ബ്രാഞ്ച്'),
         ('wizard.step4_account_number',     'Account Number',                      'അക്കൗണ്ട് നമ്പർ'),
         ('wizard.step4_ifsc',               'IFSC Code',                           'IFSC കോഡ്'),
+        ('wizard.step4_details_saved',      'Business details saved',              'വ്യാപാര വിവരങ്ങൾ ചേർത്തു'),
 
         # Step 5 — Verification
         ('wizard.step5_heading',            'Verify Contact Details',              'ബന്ധപ്പെടൽ വിവരങ്ങൾ സ്ഥിരീകരിക്കുക'),
@@ -531,6 +576,11 @@ def seed_ui_translations(languages):
         ('wizard.step5_btn_verifying',      'Verifying…',                          'സ്ഥിരീകരിക്കുന്നു…'),
         ('wizard.step5_btn_resend',         'Resend',                              'വീണ്ടും അയക്കുക'),
         ('wizard.step5_btn_continue',       'Continue →',                          'തുടരുക →'),
+        ('wizard.step5_otp_sents',           'OTP sent to {contact}',              'OTP {contact} -ലേക്ക് അയച്ചിട്ടുണ്ട്' ),
+        ('wizard.step5_email_verified',     'Email verified successfully',        'ഇമെയിൽ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
+        ('wizard.step5_phone_verified',      'Phone verified successfully',        'ഫോൺ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
+        ('wizard.step5_err_invalid_otp',    'Invalid OTP. Please check and try again.', 'തെറ്റായ OTP. പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.'),        
+
 
         # Step 6 — Documents
         ('wizard.step6_heading',            'Upload Documents',                    'രേഖകൾ അപ്‌ലോഡ് ചെയ്യുക'),
@@ -560,6 +610,7 @@ def seed_ui_translations(languages):
         ('wizard.step7_summary_commodities','Primary Commodities',                 'പ്രാഥമിക ചരക്കുകൾ'),
         ('wizard.step7_summary_bank',       'Bank',                                'ബാങ്ക്'),
         ('wizard.step7_summary_ifsc',       'IFSC',                                'IFSC'),
+        ('wizard.step7_application_submit', 'Application submitted successfully!', 'അപേക്ഷ വിജയകരമായി സമർപ്പിച്ചു!'),
 
         # ── admin_languages — /admin/languages page ───────────────────────
         ('admin_languages.page_title',          'Languages & Translations',         'ഭാഷകളും വിവർത്തനങ്ങളും'),
@@ -954,6 +1005,58 @@ def seed_ui_translations(languages):
         ('confirm_dialog.toast_channel_activated',      'Channel activated',                'ചാനൽ സജീവമാക്കി'),
         ('confirm_dialog.toast_setting_deleted_suffix', 'setting deleted',                  'ക്രമീകരണം ഇല്ലാതാക്കി'),
         ('confirm_dialog.delete_channel_setting_note',  'the {channel} channel setting?',   '{channel} ചാനൽ ക്രമീകരണം?'),
+
+        # ── status labels/descriptions ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+        ('fpo_status.status_draft_label',         'Draft',                                        'ഡ്രാഫ്റ്റ്'),
+        ('fpo_status.status_draft_desc',          'Your application is still being filled out.',  'നിങ്ങളുടെ അപേക്ഷ ഇപ്പോഴും പൂരിപ്പിച്ചുകൊണ്ടിരിക്കുന്നു.'),
+        ('fpo_status.status_submitted_label',     'Submitted',                                    'സമർപ്പിച്ചു'),
+        ('fpo_status.status_submitted_desc',      'Your application has been submitted and is awaiting review.', 'നിങ്ങളുടെ അപേക്ഷ സമർപ്പിച്ചിട്ടുണ്ട്, അവലോകനത്തിനായി കാത്തിരിക്കുന്നു.'),
+        ('fpo_status.status_under_review_label',  'Under Review',                                 'അവലോകനത്തിലാണ്'),
+        ('fpo_status.status_under_review_desc',   'Our team is reviewing your application.',      'ഞങ്ങളുടെ ടീം നിങ്ങളുടെ അപേക്ഷ അവലോകനം ചെയ്യുന്നു.'),
+        ('fpo_status.status_approved_label',      'Approved',                                     'അംഗീകരിച്ചു'),
+        ('fpo_status.status_approved_desc',       'Congratulations! Your FPO has been approved.', 'അഭിനന്ദനങ്ങൾ! നിങ്ങളുടെ FPO അംഗീകരിച്ചു.'),
+        ('fpo_status.status_rejected_label',      'Rejected',                                     'നിരസിച്ചു'),
+        ('fpo_status.status_rejected_desc',       'Your application was not approved. See notes below.', 'നിങ്ങളുടെ അപേക്ഷ അംഗീകരിച്ചില്ല. താഴെയുള്ള കുറിപ്പുകൾ കാണുക.'),
+        ('fpo_status.status_info_required_label', 'Info Required',                                'വിവരം ആവശ്യമാണ്'),
+        ('fpo_status.status_info_required_desc',  'Additional information is required to proceed.', 'തുടരുന്നതിന് അധിക വിവരങ്ങൾ ആവശ്യമാണ്.'),
+        ('fpo_status.status_suspended_label',     'Suspended',                                    'സസ്പെൻഡ് ചെയ്തു'),
+        ('fpo_status.status_suspended_desc',      'Your FPO account has been suspended. Please contact the administrator.', 'നിങ്ങളുടെ FPO അക്കൗണ്ട് സസ്പെൻഡ് ചെയ്തിരിക്കുന്നു. അഡ്മിനിസ്ട്രേറ്ററെ ബന്ധപ്പെടുക.'),
+
+        # ── header ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+        ('fpo_status.page_title',                 'Application Status',                           'അപേക്ഷയുടെ നില'),
+        ('fpo_status.application_id_label',       'Application ID:',                              'അപേക്ഷ ഐഡി:'),
+        ('fpo_status.btn_refresh',                'Refresh',                                      'പുതുക്കുക'),
+        ('fpo_status.tier_label',                 'Tier:',                                        'ടയർ:'),
+
+        # ── info required section ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+        ('fpo_status.action_required_heading',    'Action Required',                              'നടപടി ആവശ്യമാണ്'),
+        ('fpo_status.your_response_heading',      'Your Response',                                'നിങ്ങളുടെ മറുപടി'),
+        ('fpo_status.reply_message_label',        'Reply Message',                                'മറുപടി സന്ദേശം'),
+        ('fpo_status.reply_message_placeholder',  'Describe the additional information or clarification you are providing…', 'നിങ്ങൾ നൽകുന്ന അധിക വിവരങ്ങളോ വ്യക്തതയോ വിവരിക്കുക…'),
+        ('fpo_status.min_chars_warning',          'Minimum 10 characters required',               'കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ ആവശ്യമാണ്'),
+        ('fpo_status.attach_doc_label',           'Attach Supporting Document (optional)',        'അനുബന്ധ രേഖ അറ്റാച്ച് ചെയ്യുക (ഓപ്ഷണൽ)'),
+        ('fpo_status.btn_uploading',              'Uploading…',                                   'അപ്‌ലോഡ് ചെയ്യുന്നു…'),
+        ('fpo_status.btn_attach_file',            'Attach File',                                  'ഫയൽ അറ്റാച്ച് ചെയ്യുക'),
+        ('fpo_status.uploaded_suffix',            'uploaded',                                     'അപ്‌ലോഡ് ചെയ്തു'),
+        ('fpo_status.file_hint',                  'PDF, JPG or PNG · max 5 MB',                    'PDF, JPG അല്ലെങ്കിൽ PNG · പരമാവധി 5 MB'),
+        ('fpo_status.btn_submitting',             'Submitting…',                                  'സമർപ്പിക്കുന്നു…'),
+        ('fpo_status.btn_submit_response',        'Submit Response',                              'മറുപടി സമർപ്പിക്കുക'),
+        ('fpo_status.btn_update_application',     'Update Application',                           'അപേക്ഷ അപ്ഡേറ്റ് ചെയ്യുക'),
+
+        # ── rejected / approved ──────────────────────────────────────────────────────────────────────────────────────
+        ('fpo_status.rejection_reason_heading',   'Rejection Reason',                             'നിരസിക്കാനുള്ള കാരണം'),
+        ('fpo_status.btn_go_to_dashboard',        'Go to Dashboard',                              'ഡാഷ്ബോർഡിലേക്ക് പോകുക'),
+
+        # ── timeline ──────────────────────────────────────────────────────────────────────────────────────
+        ('fpo_status.activity_timeline_heading',  'Activity Timeline',                            'പ്രവർത്തന ടൈംലൈൻ'),
+        ('fpo_status.by_prefix',                  'by',                                           'ചെയ്തത്'),
+
+        # ── toasts ──────────────────────────────────────────────────────────────────────────────────────
+        ('fpo_status.toast_doc_uploaded',         'Document uploaded',                            'രേഖ അപ്‌ലോഡ് ചെയ്തു'),
+        ('fpo_status.toast_doc_upload_failed',    'Failed to upload document',                    'രേഖ അപ്‌ലോഡ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു'),
+        ('fpo_status.toast_response_submitted',   'Response submitted',                           'മറുപടി സമർപ്പിച്ചു'),
+        ('fpo_status.toast_response_failed',      'Failed to submit response',                    'മറുപടി സമർപ്പിക്കുന്നതിൽ പരാജയപ്പെട്ടു'),
+
         # ── fpo_actions_table ─────────────────────────────────────────────────
         ('fpo_actions_table.page_title',           'FPO Actions',                      'FPO ആക്ഷനുകൾ'),
         ('fpo_actions_table.page_description',     'Manage actions that can be performed within an FPO', 'FPO-നുള്ളിൽ നടത്താവുന്ന ആക്ഷനുകൾ നിയന്ത്രിക്കുക'),
@@ -1099,7 +1202,7 @@ def seed_ui_translations(languages):
         ('applications_table.field_signatory_phone',        'Signatory Phone',                          'ഒപ്പിടുന്നയാളുടെ ഫോൺ'),
         ('applications_table.field_signatory_email',        'Signatory Email',                          'ഒപ്പിടുന്നയാളുടെ ഇമെയിൽ'),
         ('applications_table.field_aadhaar_last4',          'Aadhaar Last 4 Digits',                    'ആധാർ അവസാന 4 അക്കങ്ങൾ'),
-        ('applications_table.field_total_members',          'Total',                                    'ആകെ'),
+        ('applications_table.field_total_members',          'Total Members',                            'ആകെ അംഗങ്ങൾ'),
         ('applications_table.field_male_members',           'Male',                                     'പുരുഷൻ'),
         ('applications_table.field_female_members',         'Female',                                   'സ്ത്രീ'),
         ('applications_table.field_sc_st_members',          'SC / ST',                                  'SC / ST'),
@@ -1167,11 +1270,11 @@ def seed_ui_translations(languages):
 
     count = 0
     for key, en_value, ml_value in ui_keys:
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=key, language=lang_en,
             defaults={'value': en_value, 'context': 'Frontend UI label', 'is_verified': True}
         )
-        Translation.objects.get_or_create(
+        Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'Frontend UI label', 'is_verified': True}
         )

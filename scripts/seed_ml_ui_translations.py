@@ -877,6 +877,23 @@ def seed_ml_ui_translations():
             'toast_tier_assigned':       'ടയർ വിജയകരമായി നിശ്ചയിച്ചു',
             'toast_action_failed':       'പ്രവർത്തനം പരാജയപ്പെട്ടു',
             'empty_state':               'അപേക്ഷകൾ ഒന്നും കണ്ടെത്തിയില്ല.',
+
+            # Documents tab — additional states
+            'doc_info_response_badge':   'വിവര മറുപടി',
+            'doc_verified_by':           'സ്ഥിരീകരിച്ചത്',
+            'doc_info_details_btn':      'വിവര വിശദാംശങ്ങൾ',
+
+            # Team / Tier Assessment tabs
+            'section_team':              'ടീം',
+            'section_tier_assessment':   'ടയർ വിലയിരുത്തൽ',
+
+            # Info Request Details dialog
+            'info_request_dialog_title': 'വിവര അഭ്യർത്ഥന വിശദാംശങ്ങൾ',
+            'admin_request_label':       'അഡ്മിൻ അഭ്യർത്ഥന',
+            'admin_fallback_name':       'അഡ്മിൻ',
+            'fpo_response_label':        'FPO മറുപടി',
+            'fpo_fallback_name':         'FPO',
+            'attached_document_label':   'അറ്റാച്ച് ചെയ്ത രേഖ',           
         },
 
         'fpo_users_table': {
