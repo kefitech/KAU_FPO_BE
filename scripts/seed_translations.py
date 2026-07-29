@@ -1057,6 +1057,22 @@ def seed_ui_translations(languages):
         ('fpo_status.toast_response_submitted',   'Response submitted',                           'മറുപടി സമർപ്പിച്ചു'),
         ('fpo_status.toast_response_failed',      'Failed to submit response',                    'മറുപടി സമർപ്പിക്കുന്നതിൽ പരാജയപ്പെട്ടു'),
 
+        ('fpo_claim.page_title',              'Claim Your Business',                                                          'നിങ്ങളുടെ ബിസിനസ് ക്ലെയിം ചെയ്യുക'),
+        ('fpo_claim.submit_claim_for',        'Submit a claim for',                                                           'ക്ലെയിം സമർപ്പിക്കുക'),
+        ('fpo_claim.reason_label',            'Why are you the legitimate owner?',                                            'നിങ്ങൾ എന്തുകൊണ്ട് നിയമാനുസൃത ഉടമയാണ്?'),
+        ('fpo_claim.reason_placeholder',      'Explain why you are the legitimate owner of this FPO. Include your role, how the FPO was registered, and any supporting details…', 'ഈ FPO-യുടെ നിയമാനുസൃത ഉടമ നിങ്ങളാണെന്ന് വിശദീകരിക്കുക. നിങ്ങളുടെ പങ്ക്, FPO എങ്ങനെ രജിസ്റ്റർ ചെയ്തു, മറ്റ് പിന്തുണയ്ക്കുന്ന വിവരങ്ങൾ എന്നിവ ഉൾപ്പെടുത്തുക…'),
+        ('fpo_claim.min_chars',               'Minimum 20 characters',                                                        'കുറഞ്ഞത് 20 അക്ഷരങ്ങൾ'),
+        ('fpo_claim.cancel',                  'Cancel',                                                                        'റദ്ദാക്കുക'),
+        ('fpo_claim.submitting',              'Submitting…',                                                                   'സമർപ്പിക്കുന്നു…'),
+        ('fpo_claim.submit_claim',            'Submit Claim',                                                                  'ക്ലെയിം സമർപ്പിക്കുക'),
+        ('fpo_claim.review_notice',           'KAU Admin will review your claim and notify you within 3–5 business days.',    'KAU അഡ്മിൻ നിങ്ങളുടെ ക്ലെയിം അവലോകനം ചെയ്ത് 3–5 പ്രവൃത്തി ദിവസങ്ങൾക്കുള്ളിൽ അറിയിക്കും.'),
+        ('fpo_claim.toast_claim_submitted',   "Claim submitted. We'll review it shortly.",                                    'ക്ലെയിം സമർപ്പിച്ചു. ഞങ്ങൾ ഉടൻ അവലോകനം ചെയ്യും.'),
+        ('fpo_claim.toast_claim_pending',     'You already have a pending claim for this FPO.',                               'ഈ FPO-യ്ക്കായി നിങ്ങൾക്ക് ഇതിനകം ഒരു തീർപ്പുകൽപ്പിക്കാത്ത ക്ലെയിം ഉണ്ട്.'),
+        ('fpo_claim.toast_claim_failed',      'Failed to submit claim. Please try again.',                                    'ക്ലെയിം സമർപ്പിക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('fpo_claim.invalid_link',            'Invalid claim link. Please go back and try again.',                            'അസാധുവായ ക്ലെയിം ലിങ്ക്. തിരികെ പോയി വീണ്ടും ശ്രമിക്കുക.'),
+        ('fpo_claim.go_back',                 'Go Back',                                                                        'തിരികെ പോകുക'),
+
+
         # ── fpo_actions_table ─────────────────────────────────────────────────
         ('fpo_actions_table.page_title',           'FPO Actions',                      'FPO ആക്ഷനുകൾ'),
         ('fpo_actions_table.page_description',     'Manage actions that can be performed within an FPO', 'FPO-നുള്ളിൽ നടത്താവുന്ന ആക്ഷനുകൾ നിയന്ത്രിക്കുക'),
