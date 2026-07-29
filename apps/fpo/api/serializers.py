@@ -450,7 +450,7 @@ class FPOStep4Serializer(serializers.Serializer):
         help_text='List of secondary commodities (optional)'
     )
     annual_turnover = serializers.DecimalField(
-        max_digits=15, decimal_places=2,
+        max_digits=15, decimal_places=5,
         required=False, allow_null=True,
         help_text='Annual turnover in INR (optional)'
     )

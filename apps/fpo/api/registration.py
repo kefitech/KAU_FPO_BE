@@ -126,7 +126,7 @@ class _FPOWizardPatchSerializer(drf_serializers.Serializer):
     # Step 4
     primary_commodities   = drf_serializers.ListField(child=drf_serializers.CharField(), required=False)
     secondary_commodities = drf_serializers.ListField(child=drf_serializers.CharField(), required=False)
-    annual_turnover       = drf_serializers.DecimalField(max_digits=15, decimal_places=2, required=False, help_text='Annual turnover in Lakhs (INR)')
+    annual_turnover       = drf_serializers.DecimalField(max_digits=15, decimal_places=5, required=False, help_text='Annual turnover in Lakhs (INR)')
     bank_name             = drf_serializers.CharField(required=False, help_text='From /api/public/master-data/?category=bank_name')
     bank_branch           = drf_serializers.CharField(required=False)
     account_number        = drf_serializers.CharField(required=False)

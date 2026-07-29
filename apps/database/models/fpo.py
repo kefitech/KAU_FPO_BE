@@ -142,7 +142,7 @@ class FPO(BaseModel):
     primary_commodities   = models.JSONField(default=list, blank=True)
     secondary_commodities = models.JSONField(default=list, blank=True)
     annual_turnover       = models.DecimalField(
-        max_digits=15, decimal_places=2, null=True, blank=True
+        max_digits=15, decimal_places=5, null=True, blank=True
     )
     bank_name      = models.CharField(max_length=100, blank=True)
     bank_branch    = models.CharField(max_length=100, blank=True)
