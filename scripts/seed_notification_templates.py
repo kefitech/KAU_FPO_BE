@@ -642,6 +642,11 @@ TEMPLATES = [
         'Documents Submitted for the Ownership Claim',
         '<strong>{{claimant_name}}</strong> has submitted the document requested for the Ownership Claim of <strong>{{fpo_name}}</strong>. Please review immediatly.',
     ),
+    (
+        'claim_docs_submitted',  'in_app', 'ml',
+        'ഉടമസ്ഥാവകാശ അവകാശവാദത്തിനായി സമർപ്പിച്ച രേഖകൾ',
+        '<strong>{{claimant_name}}</strong>, <strong>{{fpo_name}}</strong>-ന്റെ ഉടമസ്ഥാവകാശ അവകാശവാദത്തിനായി ആവശ്യപ്പെട്ട രേഖ സമർപ്പിച്ചിരിക്കുന്നു. ദയവായി ഉടൻ പരിശോധിക്കുക.',
+    ),
     # Expert enquiry — email sent to expert
     (
         'expert_enquiry', 'email', 'en',

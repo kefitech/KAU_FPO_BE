@@ -52,6 +52,7 @@ class _ClaimListSerializer(serializers.ModelSerializer):
     supporting_docs = serializers.SerializerMethodField()
     conflict_count  = serializers.SerializerMethodField()
     has_conflict    = serializers.SerializerMethodField()
+    fpo_identity    = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPOOwnershipClaim
@@ -62,6 +63,7 @@ class _ClaimListSerializer(serializers.ModelSerializer):
             'reason', 'supporting_docs',
             'status', 'reviewed_at', 'review_notes',
             'conflict_count', 'has_conflict',
+            'fpo_identity',
             'created_at',
         ]
 

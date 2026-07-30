@@ -18,15 +18,49 @@ from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 
-from apps.database.models import InAppNotification
+from apps.database.models import InAppNotification, NotificationTemplate
 
 
 class InAppNotificationSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    body = serializers.SerializerMethodField()
 
     class Meta:
         model  = InAppNotification
         fields = ['id', 'title', 'body', 'is_read', 'read_at', 'created_at']
-        read_only_fields = fields
+        read_only_fields = ['id', 'is_read', 'read_at', 'created_at']
+
+    def _get_language(self):
+        request = self.context.get('request')
+        return getattr(request, 'language', 'en') if request else 'en'
+ 
+    def _render(self, obj):
+        # Fall back to the stored static text if there's no log/template link
+        # (e.g. legacy rows created before this change, or template deleted since).
+        if not obj.log or not obj.log.template_code:
+            return {'subject': obj.title, 'body': obj.body}
+ 
+        lang = self._get_language()
+        template = (
+            NotificationTemplate.objects.filter(
+                template_code=obj.log.template_code, language__code=lang, is_active=True
+            ).select_related('language').first()
+            or NotificationTemplate.objects.filter(
+                template_code=obj.log.template_code, language__code='en', is_active=True
+            ).select_related('language').first()
+        )
+        if not template:
+            return {'subject': obj.title, 'body': obj.body}
+ 
+        return template.render(obj.log.context or {})
+ 
+    def get_title(self, obj):
+        rendered = self._render(obj)
+        return rendered.get('subject') or obj.title
+ 
+    def get_body(self, obj):
+        rendered = self._render(obj)
+        return rendered.get('body') or obj.body
 
 
 @extend_schema_view(
@@ -53,7 +87,7 @@ class InboxViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericView
     def get_queryset(self):
         return InAppNotification.objects.filter(
             user=self.request.user
-        ).order_by('-created_at')
+        ).select_related('log', 'log__template_code').order_by('-created_at')
 
     @extend_schema(tags=['Notifications - Inbox'])
     @action(detail=False, methods=['get'])

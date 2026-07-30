@@ -554,6 +554,10 @@ def seed_ui_translations(languages):
         ('wizard.step4_bank_section',       'Bank Details',                        'ബാങ്ക് വിവരങ്ങൾ'),
         ('wizard.step4_primary_commodities','Primary Commodities',                 'പ്രാഥമിക ചരക്കുകൾ'),
         ('wizard.step4_secondary_commodities','Secondary Commodities',             'ദ്വിതീയ ചരക്കുകൾ'),
+        ('wizard.step4_select_commodity',      'Select a commodity…',            'ഒരു ചരക്ക് തിരഞ്ഞെടുക്കുക…'),
+        ('wizard.step4_search_commodity',      'Search commodities…',            'ചരക്കുകൾ തിരയുക…'),
+        ('wizard.step4_no_results',            'No results found',               'ഫലങ്ങളൊന്നും കണ്ടെത്തിയില്ല'),
+        ('wizard.step4_commodities_selected',  '{count} selected',               '{count} തിരഞ്ഞെടുത്തു'),
         ('wizard.step4_turnover',           'Annual Turnover (Lakhs ₹)',           'വാർഷിക വിറ്റുവരവ് (ലക്ഷം ₹)'),
         ('wizard.step4_about',              'About the FPO',                       'FPO-യെ കുറിച്ച്'),
         ('wizard.step4_bank_name',          'Bank Name',                           'ബാങ്ക് പേര്'),
@@ -1256,6 +1260,23 @@ def seed_ui_translations(languages):
         ('applications_table.no_tier_history',              'No tier history recorded yet.',            'ഇതുവരെ ടയർ ചരിത്രം രേഖപ്പെടുത്തിയിട്ടില്ല.'),
         ('applications_table.badge_manual',                 'Manual',                                   'മാനുവൽ'),
         ('applications_table.badge_auto',                    'Auto',                                     'ഓട്ടോ'),
+        # ── Documents tab — additional states ──
+        ('applications_table.doc_info_response_badge',   'Info Response',                              'വിവര മറുപടി'),
+        ('applications_table.doc_verified_by',           'Verified by',                                'സ്ഥിരീകരിച്ചത്'),
+        ('applications_table.doc_info_details_btn',      'Info Details',                                'വിവര വിശദാംശങ്ങൾ'),
+
+        # ── Info Request Details dialog ──
+        ('applications_table.info_request_dialog_title', 'Info Request Details',                        'വിവര അഭ്യർത്ഥന വിശദാംശങ്ങൾ'),
+        ('applications_table.admin_request_label',       'Admin Request',                                'അഡ്മിൻ അഭ്യർത്ഥന'),
+        ('applications_table.admin_fallback_name',       'Admin',                                        'അഡ്മിൻ'),
+        ('applications_table.fpo_response_label',        'FPO Response',                                 'FPO മറുപടി'),
+        ('applications_table.fpo_fallback_name',         'FPO',                                          'FPO'),
+        ('applications_table.attached_document_label',   'Attached Document',                            'അറ്റാച്ച് ചെയ്ത രേഖ'),
+
+        # ── Tab bar (overview / documents / team / audit-log / tier-assessment) ──
+        ('applications_table.tab_overview',              'Overview',                                     'അവലോകനം'),
+        ('applications_table.tab_documents',             'Documents',                                    'രേഖകൾ'),
+        ('applications_table.tab_audit_log',              'Audit Log',                                    'ഓഡിറ്റ് ലോഗ്'),
         # External APIs table
         ('external_apis_table.page_title',          'External API Settings',                                'എക്സ്റ്റേണൽ API ക്രമീകരണങ്ങൾ'),
         ('external_apis_table.page_description',    'Manage credentials for PAN / GSTIN / CIN verification', 'PAN / GSTIN / CIN പരിശോധനയ്ക്കുള്ള ക്രെഡൻഷ്യലുകൾ നിയന്ത്രിക്കുക'),

@@ -56,7 +56,7 @@ class PublicMasterDataView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        lang     = getattr(request, 'language', 'en')
+        lang     = request.query_params.get('lang', '').strip() or getattr(request, 'language', 'en')
         district = request.query_params.get('district', '').strip().upper()
 
         qs = MasterLookup.objects.filter(category=category, is_active=True).order_by('display_order', 'code')
