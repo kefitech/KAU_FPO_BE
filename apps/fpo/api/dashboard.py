@@ -95,15 +95,36 @@ def _documents_summary(fpo):
     }
 
 
-def _notifications_summary(user):
-    qs = InAppNotification.objects.filter(user=user).order_by('-created_at')
+def _render_notification(notif, lang: str):
+    """Re-render a notification's title/body in the requested language.
+    Falls back to the stored (frozen) text if no log/template link exists."""
+    from apps.database.models.language import NotificationTemplate
+    if not notif.log or not notif.log.template_code:
+        return notif.title, notif.body
+    template = (
+        NotificationTemplate.objects.filter(
+            template_code=notif.log.template_code, language__code=lang, is_active=True
+        ).select_related('language').first()
+        or NotificationTemplate.objects.filter(
+            template_code=notif.log.template_code, language__code='en', is_active=True
+        ).select_related('language').first()
+    )
+    if not template:
+        return notif.title, notif.body
+    rendered = template.render(notif.log.context or {})
+    return rendered.get('subject') or notif.title, rendered.get('body') or notif.body
+def _notifications_summary(user, lang: str):
+    qs = InAppNotification.objects.filter(user=user).select_related(
+        'log', 'log__template_code'
+    ).order_by('-created_at')
     unread_count = qs.filter(is_read=False).count()
     previews = []
     for notif in qs[:3]:
+        title, body = _render_notification(notif, lang)
         previews.append({
             'id':         notif.id,
-            'title':      notif.title,
-            'body':       notif.body,
+            'title':      title,
+            'body':       body,
             'is_read':    notif.is_read,
             'created_at': notif.created_at.isoformat(),
         })
@@ -164,6 +185,8 @@ class FPODashboardView(APIView):
 
         is_primary   = fpo.primary_user == request.user
         quick_links  = _quick_links(fpo, is_primary)
+        lang = getattr(request, 'language', 'en')
+
 
         data = {
             'profile':       _profile_summary(fpo),
@@ -171,7 +194,7 @@ class FPODashboardView(APIView):
             'location':      _location(fpo),
             'team':          _team_summary(fpo),
             'documents':     _documents_summary(fpo),
-            'notifications': _notifications_summary(request.user),
+            'notifications': _notifications_summary(request.user, lang),
             'quick_links':   quick_links,
             'is_primary':    is_primary,
         }

@@ -607,6 +607,7 @@ def seed_ui_translations(languages):
         ('wizard.step7_disclaimer',         'By submitting, you confirm that all information provided is accurate. The application will be reviewed by the KAU team.', 'സമർപ്പിക്കുന്നതിലൂടെ, നൽകിയ എല്ലാ വിവരങ്ങളും കൃത്യമാണെന്ന് നിങ്ങൾ സ്ഥിരീകരിക്കുന്നു. KAU ടീം അപേക്ഷ അവലോകനം ചെയ്യും.'),
         ('wizard.step7_btn_submit',         'Submit Application',                  'അപേക്ഷ സമർപ്പിക്കുക'),
         ('wizard.step7_btn_submitting',     'Submitting…',                         'സമർപ്പിക്കുന്നു…'),
+        ('wizard.step7_btn_go_to_status',   'Go to Status',                        'സ്റ്റാറ്റസിലേക്ക് പോവുക'),
         ('wizard.step7_summary_fpo_name',   'FPO Name',                            'FPO പേര്'),
         ('wizard.step7_summary_reg',        'Registration No.',                    'രജിസ്ട്രേഷൻ നമ്പർ'),
         ('wizard.step7_summary_district',   'District',                            'ജില്ല'),

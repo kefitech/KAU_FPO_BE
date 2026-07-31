@@ -129,14 +129,17 @@ class _ApplicationListSerializer(serializers.ModelSerializer):
 
     def get_district_display(self, obj):
         from apps.core.utils.constants import get_district_name
-        return get_district_name(obj.district) if obj.district else None
-
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        return get_district_name(obj.district, language=lang) if obj.district else None
 
 class _ApplicationDetailSerializer(serializers.ModelSerializer):
     documents      = serializers.SerializerMethodField()
     status_history = serializers.SerializerMethodField()
     primary_user   = serializers.SerializerMethodField()
     claim_origin   = serializers.SerializerMethodField()
+    district_display    = serializers.SerializerMethodField()
+    block_taluk_display = serializers.SerializerMethodField()
+    bank_name_display   = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
@@ -145,7 +148,7 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
             'name', 'name_ml', 'legal_structure', 'legal_structure_detail',
             'registration_number', 'cin_number',
             'date_of_registration', 'pan_number', 'gst_number',
-            'district', 'block_taluk', 'village_town',
+            'district', 'district_display', 'block_taluk', 'block_taluk_display', 'village_town',
             'address_line1', 'address_line2', 'pincode',
             'office_phone', 'office_email', 'website',
             'email_verified', 'phone_verified',
@@ -157,13 +160,31 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
             'ceo_available', 'accountant_available',
             'total_directors', 'women_directors', 'directors_under_35',
             'primary_commodities', 'secondary_commodities',
-            'annual_turnover', 'bank_name', 'bank_branch',
+            'annual_turnover', 'bank_name', 'bank_name_display', 'bank_branch',
             'account_number', 'ifsc_code', 'description',
             'primary_user',
             'documents', 'status_history',
             'claim_origin',
             'created_at', 'updated_at',
         ]
+
+
+    def get_district_display(self, obj):
+        from apps.core.utils.constants import get_district_name
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        return get_district_name(obj.district, language=lang) if obj.district else None
+ 
+    def get_block_taluk_display(self, obj):
+        from apps.core.models.generic import MasterLookup
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        lookup = MasterLookup.objects.filter(category='block', code=obj.block_taluk).first()
+        return lookup.get_name(lang) if lookup else obj.block_taluk
+ 
+    def get_bank_name_display(self, obj):
+        from apps.core.models.generic import MasterLookup
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        lookup = MasterLookup.objects.filter(category='bank_name', code=obj.bank_name).first()
+        return lookup.get_name(lang) if lookup else obj.bank_name
 
     def get_primary_user(self, obj):
         if not obj.primary_user:
@@ -392,7 +413,7 @@ class ApplicationListView(APIView):
 
         paginator = StandardPagination()
         page      = paginator.paginate_queryset(qs, request)
-        data      = _ApplicationListSerializer(page, many=True).data
+        data      = _ApplicationListSerializer(page, many=True, context={'request': request}).data
         return paginator.get_paginated_response(data)
 
 

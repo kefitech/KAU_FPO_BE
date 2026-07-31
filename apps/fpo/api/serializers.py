@@ -491,11 +491,36 @@ class FPODetailSerializer(serializers.ModelSerializer):
     """Full FPO profile — returned on GET /api/fpo/me/"""
 
     status_display       = serializers.CharField(source='get_status_display', read_only=True)
-    district_display     = serializers.CharField(source='get_district_display', read_only=True)
+    district_display     = serializers.SerializerMethodField()
+    block_taluk_display  = serializers.SerializerMethodField()
+    bank_name_display    = serializers.SerializerMethodField()
     current_tier         = serializers.SerializerMethodField()
     required_docs_uploaded  = serializers.SerializerMethodField()
     required_docs_verified  = serializers.SerializerMethodField()
     submission_errors    = serializers.SerializerMethodField()
+
+    
+    def get_district_display(self, obj):
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        if lang != 'en':
+            from apps.core.services.translation import t
+            key = f'districts.district_{obj.district}'
+            translated = t(f'ui.{key}', language=lang, fallback_to_default=False)
+            if translated != f'ui.{key}':
+                return translated
+        return obj.get_district_display()
+
+    def get_block_taluk_display(self, obj):
+        from apps.core.models.generic import MasterLookup
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        lookup = MasterLookup.objects.filter(category='block', code=obj.block_taluk).first()
+        return lookup.get_name(lang) if lookup else obj.block_taluk
+
+    def get_bank_name_display(self, obj):
+        from apps.core.models.generic import MasterLookup
+        lang = getattr(self.context.get('request'), 'language', 'en')
+        lookup = MasterLookup.objects.filter(category='bank_name', code=obj.bank_name).first()
+        return lookup.get_name(lang) if lookup else obj.bank_name
 
     class Meta:
         model  = FPO
@@ -508,6 +533,7 @@ class FPODetailSerializer(serializers.ModelSerializer):
             'date_of_registration', 'pan_number', 'gst_number',
             # Step 2
             'district', 'district_display', 'block_taluk', 'village_town',
+            'block_taluk_display',
             'address_line1', 'address_line2', 'pincode',
             'office_phone', 'office_email', 'website', 'email_verified', 'phone_verified',
             'latitude', 'longitude',
@@ -521,6 +547,7 @@ class FPODetailSerializer(serializers.ModelSerializer):
             # Step 4
             'primary_commodities', 'secondary_commodities', 'annual_turnover',
             'bank_name', 'bank_branch', 'account_number', 'ifsc_code', 'description',
+            'bank_name_display',
             # Meta
             'required_docs_uploaded', 'required_docs_verified', 'submission_errors',
             'created_at', 'updated_at',

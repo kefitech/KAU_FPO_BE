@@ -447,7 +447,7 @@ class FPORegisterView(APIView):
         )
 
         return StandardResponse.created(
-            data=FPODetailSerializer(fpo).data,
+            data=FPODetailSerializer(fpo, context={'request': request}).data,
             message='FPO registration started. Continue to Step 2.',
         )
 
@@ -495,7 +495,7 @@ class FPOMeView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         return StandardResponse.success(
-            data=FPODetailSerializer(fpo).data,
+            data=FPODetailSerializer(fpo, context={'request': request}).data,
             message='FPO profile retrieved.',
         )
 
@@ -581,7 +581,7 @@ class FPOMeView(APIView):
             )
 
         return StandardResponse.success(
-            data=FPODetailSerializer(fpo).data,
+            data=FPODetailSerializer(fpo, context={'request': request}).data,
             message=f'Step {step} saved successfully.',
         )
 
