@@ -507,4 +507,13 @@ class FPOClaimDocumentDeleteView(APIView):
         doc.is_deleted = True
         doc.save(update_fields=['is_deleted'])
 
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.DOCUMENT_DELETE,
+            instance=doc,
+            request=request,
+            changes={'claim_id': claim_id, 'document_type': doc.document_type},
+        )
+ 
+
         return StandardResponse.success(message='Document removed.')

@@ -180,7 +180,6 @@ class OwnershipClaimListView(APIView):
         )
 
         search = request.query_params.get('search', '').strip()
-        print("SEARCH =", repr(search))
         if search:
             qs = qs.filter(
                 Q(fpo__name__icontains=search) |
@@ -223,8 +222,6 @@ class OwnershipClaimListView(APIView):
         qs = qs.order_by(ordering)  # always gets the real ORM path, never the raw client string
         
 
-
-        print("COUNT =", qs.count())
         paginator  = StandardPagination()
         page       = paginator.paginate_queryset(qs, request)
         serializer = _ClaimListSerializer(page, many=True, context={'request': request})
@@ -488,6 +485,7 @@ class OwnershipClaimApproveView(APIView):
             )
 
             # ── Approve this claim ────────────────────────────────────────────
+            old_claim_status    = claim.status
             claim.status       = ClaimStatus.APPROVED
             claim.reviewed_by  = request.user
             claim.reviewed_at  = timezone.now()
@@ -556,18 +554,31 @@ class OwnershipClaimApproveView(APIView):
 
         AuditService.log(
             user=request.user,
-            action=AuditLog.Action.UPDATE,
+            action=AuditLog.Action.FPO_STATUS_CHANGE,
             instance=fpo,
             request=request,
             changes={
                 'claim_id':    claim_id,
-                'action':      'ownership_transferred',
+                'from_status': old_fpo_status,
+                'to_status':   FPOStatus.CLAIMED,
+                'notes':       f'Ownership transferred to claimant (claim #{claim_id})',
                 'old_primary': old_primary.email if old_primary else None,
                 'new_primary': claimant.email,
                 'old_fpo_id':  fpo.id,
-                'old_fpo_status_set_to': 'CLAIMED',
                 'new_fpo_id':  new_fpo.id,
-                'notes':       ser.validated_data['notes'],
+                'review_notes': ser.validated_data['notes'],
+            },
+        )
+ 
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=claim,
+            request=request,
+            changes={
+                'status':  {'old': old_claim_status, 'new': ClaimStatus.APPROVED},
+                'fpo_id':  fpo.id,
+                'notes':   ser.validated_data['notes'],
             },
         )
 
@@ -610,7 +621,7 @@ class OwnershipClaimRejectView(APIView):
         claimant = claim.claimant
         fpo      = claim.fpo
         notes    = ser.validated_data['notes']
-
+        old_claim_status   = claim.status
         claim.status       = ClaimStatus.REJECTED
         claim.reviewed_by  = request.user
         claim.reviewed_at  = timezone.now()
@@ -620,12 +631,12 @@ class OwnershipClaimRejectView(APIView):
         AuditService.log(
             user=request.user,
             action=AuditLog.Action.UPDATE,
-            instance=fpo,
+            instance=claim,
             request=request,
             changes={
-                'claim_id': claim_id,
-                'action':   'claim_rejected',
-                'notes':    notes,
+                'status':  {'old': old_claim_status, 'new': ClaimStatus.REJECTED},
+                'fpo_id':  fpo.id,
+                'notes':   notes,
             },
         )
 
@@ -686,7 +697,7 @@ class OwnershipClaimRequestDocsView(APIView):
         claimant = claim.claimant
         fpo      = claim.fpo
         message  = ser.validated_data['notes']
-
+        old_claim_status   = claim.status
         claim.status       = ClaimStatus.DOCS_REQUESTED
         claim.reviewed_by  = request.user
         claim.reviewed_at  = timezone.now()
@@ -696,12 +707,12 @@ class OwnershipClaimRequestDocsView(APIView):
         AuditService.log(
             user=request.user,
             action=AuditLog.Action.UPDATE,
-            instance=fpo,
+            instance=claim,
             request=request,
             changes={
-                'claim_id': claim_id,
-                'action':   'docs_requested',
-                'message':  message,
+                'status':  {'old': old_claim_status, 'new': ClaimStatus.DOCS_REQUESTED},
+                'fpo_id':  fpo.id,
+                'message': message,
             },
         )
 
