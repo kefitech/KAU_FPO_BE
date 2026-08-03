@@ -393,6 +393,7 @@ class OwnershipClaimApproveView(APIView):
                         'reason':   'ownership_transfer',
                         'claim_id': claim_id,
                         'fpo_id':   fpo.id,
+                        'fpo_name': fpo.name or f'FPO #{fpo.email}',
                     },
                 )
             if secondary_memberships:

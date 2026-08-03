@@ -46,6 +46,15 @@ STATUS_LABELS = {
 }
 
 
+CLAIM_STATUS_LABELS = {
+    'pending':         'Pending',
+    'docs_requested':  'Docs Requested',
+    'docs_submitted':  'Docs Submitted',
+    'approved':        'Approved',
+    'rejected':        'Rejected',
+}
+
+
 class AuditLogSerializer(serializers.ModelSerializer):
     performed_by      = serializers.SerializerMethodField()
     action_display    = serializers.CharField(source='get_action_display', read_only=True)
@@ -81,6 +90,28 @@ class AuditLogSerializer(serializers.ModelSerializer):
             if from_s and to_s:
                 base = f'Status changed from "{from_s}" to "{to_s}"'
                 return f'{base} — {notes}' if notes else base
+
+
+        # Claim status transitions (approve / reject / request-docs) —
+        # AuditService is called with instance=claim, changes={'status': {'old': X, 'new': Y}, ...}
+        status_change = changes.get('status')
+        if isinstance(status_change, dict) and 'old' in status_change and 'new' in status_change:
+            from_s = CLAIM_STATUS_LABELS.get(status_change['old'], status_change['old'])
+            to_s   = CLAIM_STATUS_LABELS.get(status_change['new'], status_change['new'])
+            notes  = changes.get('notes') or changes.get('message', '')
+            base   = f'Claim status changed from "{from_s}" to "{to_s}"'
+            return f'{base} — {notes}' if notes else base
+
+        # Account deactivation on ownership transfer —
+        # AuditService called with instance=user, changes={'action': 'account_deactivated', ...}
+        if changes.get('action') == 'account_deactivated':
+            reason   = changes.get('reason', '')
+            fpo_name = changes.get('fpo_name', '')
+            if reason == 'ownership_transfer':
+                suffix = f' (FPO: {fpo_name})' if fpo_name else ''
+                return f'Account deactivated — ownership transferred{suffix}'
+            return f'Account deactivated — {reason}' if reason else 'Account deactivated'
+
 
         if action == AuditLog.Action.DOCUMENT_UPLOAD:
             doc_type = changes.get('document_type', '')
