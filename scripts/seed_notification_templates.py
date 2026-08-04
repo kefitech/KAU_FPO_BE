@@ -90,11 +90,11 @@ TEMPLATES = [
     ),
     (
         'password_reset', 'email', 'ml',
-        'നിങ്ങളുടെ KAU-FPO പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക',
+        'നിങ്ങളുടെ KAU-FPO രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യുക',
         (
             '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
-            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിന്റെ പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യാൻ ഒരു അഭ്യർത്ഥന ലഭിച്ചു.</p>'
-            '<p>പുതിയ പാസ്‌വേഡ് സജ്ജമാക്കാൻ ചുവടെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക. ഈ ലിങ്ക് <strong>15 മിനിറ്റ്</strong> സാധുവാണ്.</p>'
+            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിന്റെ രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യാൻ ഒരു അഭ്യർത്ഥന ലഭിച്ചു.</p>'
+            '<p>പുതിയ രഹസ്യവാക്ക് സജ്ജമാക്കാൻ ചുവടെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക. ഈ ലിങ്ക് <strong>15 മിനിറ്റ്</strong> സാധുവാണ്.</p>'
             '<p style="margin-top:16px;font-size:13px;color:#888888;">നിങ്ങൾ ഇത് അഭ്യർത്ഥിച്ചില്ലെങ്കിൽ ഈ ഇമെയിൽ അവഗണിക്കുക.</p>'
         ),
     ),
@@ -114,16 +114,16 @@ TEMPLATES = [
     ),
     (
         'password_reset_by_admin', 'email', 'ml',
-        'നിങ്ങളുടെ KAU-FPO പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു',
+        'നിങ്ങളുടെ KAU-FPO രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്തു',
         (
             '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
-            '<p>ഒരു അഡ്മിനിസ്ട്രേറ്റർ നിങ്ങളുടെ KAU-FPO അക്കൗണ്ട് പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു.</p>'
-            '<p>നിങ്ങളുടെ പുതിയ താൽക്കാലിക പാസ്‌വേഡ്:</p>'
+            '<p>ഒരു അഡ്മിനിസ്ട്രേറ്റർ നിങ്ങളുടെ KAU-FPO അക്കൗണ്ട് രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്തു.</p>'
+            '<p>നിങ്ങളുടെ പുതിയ താൽക്കാലിക രഹസ്യവാക്ക്:</p>'
             '<table style="margin:12px 0;border-collapse:collapse;">'
-            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">താൽക്കാലിക പാസ്‌വേഡ്</td>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">താൽക്കാലിക രഹസ്യവാക്ക്</td>'
             '<td style="padding:4px 0;font-weight:600;letter-spacing:1px;">{{temp_password}}</td></tr>'
             '</table>'
-            '<p style="margin-top:4px;font-size:13px;color:#888888;">ദയവായി ലോഗിൻ ചെയ്ത് ഉടൻ പാസ്‌വേഡ് മാറ്റുക.</p>'
+            '<p style="margin-top:4px;font-size:13px;color:#888888;">ദയവായി ലോഗിൻ ചെയ്ത് ഉടൻ രഹസ്യവാക്ക് മാറ്റുക.</p>'
         ),
     ),
     (
@@ -132,7 +132,7 @@ TEMPLATES = [
     ),
     (
         'password_reset_by_admin', 'sms', 'ml', '',
-        'KAU-FPO: അഡ്മിൻ നിങ്ങളുടെ പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു. താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
+        'KAU-FPO: അഡ്മിൻ നിങ്ങളുടെ രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്തു. താൽക്കാലിക രഹസ്യവാക്ക്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
     ),
     (
         'password_changed', 'email', 'en',
@@ -147,10 +147,10 @@ TEMPLATES = [
     ),
     (
         'password_changed', 'email', 'ml',
-        'നിങ്ങളുടെ KAU-FPO പാസ്‌വേഡ് മാറ്റി',
+        'നിങ്ങളുടെ KAU-FPO രഹസ്യവാക്ക് മാറ്റി',
         (
             '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
-            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിന്റെ പാസ്‌വേഡ് വിജയകരമായി മാറ്റി.</p>'
+            '<p>നിങ്ങളുടെ KAU-FPO അക്കൗണ്ടിന്റെ രഹസ്യവാക്ക് വിജയകരമായി മാറ്റി.</p>'
             '<p style="margin-top:16px;font-size:13px;color:#888888;">'
             'നിങ്ങൾ ഈ മാറ്റം വരുത്തിയില്ലെങ്കിൽ, ഉടൻ സപ്പോർട്ടിനെ ബന്ധപ്പെടുക.'
             '</p>'
@@ -182,10 +182,10 @@ TEMPLATES = [
             '<table style="margin:12px 0;border-collapse:collapse;">'
             '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">ഇമെയിൽ</td>'
             '<td style="padding:4px 0;font-weight:600;">{{email}}</td></tr>'
-            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">താൽക്കാലിക പാസ്‌വേഡ്</td>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">താൽക്കാലിക രഹസ്യവാക്ക്</td>'
             '<td style="padding:4px 0;font-weight:600;letter-spacing:1px;">{{temp_password}}</td></tr>'
             '</table>'
-            '<p style="margin-top:4px;font-size:13px;color:#888888;">ദയവായി ലോഗിൻ ചെയ്ത് ഉടൻ പാസ്‌വേഡ് മാറ്റുക.</p>'
+            '<p style="margin-top:4px;font-size:13px;color:#888888;">ദയവായി ലോഗിൻ ചെയ്ത് ഉടൻ രഹസ്യവാക്ക് മാറ്റുക.</p>'
         ),
     ),
     (
@@ -383,7 +383,7 @@ TEMPLATES = [
     ),
     (
         'welcome', 'whatsapp', 'ml', '',
-        'KAU-FPO-ലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ താൽക്കാലിക പാസ്‌വേഡ്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
+        'KAU-FPO-ലേക്ക് സ്വാഗതം, {{user_name}}! നിങ്ങളുടെ താൽക്കാലിക രഹസ്യവാക്ക്: {{temp_password}}. ഉടൻ ലോഗിൻ ചെയ്ത് മാറ്റുക.',
         {'whatsapp_template_name': 'kau_fpo_welcome', 'whatsapp_template_language': 'ml'},
     ),
     (

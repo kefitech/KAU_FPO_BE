@@ -32,7 +32,7 @@ class AuthMessages:
     )
     INVALID_CREDENTIALS: Tuple[str, str] = (
         "Invalid email or password",
-        "തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ പാസ്‌വേഡ്"
+        "തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ രഹസ്യവാക്ക്"
     )
     ACCOUNT_DISABLED: Tuple[str, str] = (
         "Your account has been disabled. Please contact support.",
@@ -80,11 +80,11 @@ class AuthMessages:
     )
     PASSWORD_RESET_SENT: Tuple[str, str] = (
         "Password reset link sent to your email",
-        "പാസ്‌വേഡ് റീസെറ്റ് ലിങ്ക് നിങ്ങളുടെ ഇമെയിലിലേക്ക് അയച്ചു"
+        "രഹസ്യവാക്ക് റീസെറ്റ് ലിങ്ക് നിങ്ങളുടെ ഇമെയിലിലേക്ക് അയച്ചു"
     )
     PASSWORD_CHANGED: Tuple[str, str] = (
         "Password changed successfully",
-        "പാസ്‌വേഡ് വിജയകരമായി മാറ്റി"
+        "രഹസ്യവാക്ക് വിജയകരമായി മാറ്റി"
     )
     PROFILE_RETRIEVED: Tuple[str, str] = (
         "Profile retrieved successfully",
@@ -96,7 +96,7 @@ class AuthMessages:
     )
     CURRENT_PASSWORD_INCORRECT: Tuple[str, str] = (
         "Current password is incorrect",
-        "നിലവിലെ പാസ്‌വേഡ് തെറ്റാണ്"
+        "നിലവിലെ രഹസ്യവാക്ക് തെറ്റാണ്"
     )
     ACCOUNT_LOCKED: Tuple[str, str] = (
         "Account locked due to too many failed attempts. Try after {{minutes}} minutes.",
@@ -108,7 +108,7 @@ class AuthMessages:
     )
     PASSWORD_TOO_SHORT: Tuple[str, str] = (
         "Password must be at least 8 characters long",
-        "പാസ്‌വേഡ് കുറഞ്ഞത് 8 അക്ഷരങ്ങൾ ദൈർഘ്യമുള്ളതായിരിക്കണം"
+        "രഹസ്യവാക്ക് കുറഞ്ഞത് 8 അക്ഷരങ്ങൾ ദൈർഘ്യമുള്ളതായിരിക്കണം"
     )
     PASSWORD_TOO_WEAK: Tuple[str, str] = (
         "Password must contain at least one uppercase letter, one lowercase letter, and one number",
