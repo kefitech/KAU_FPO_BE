@@ -53,6 +53,7 @@ from .cms import (
     FAQ,
     FAQCategory,
     QuickLink,
+    Partner,
     NewsSource,
     NewsSourceCategory,
     TeamMember,

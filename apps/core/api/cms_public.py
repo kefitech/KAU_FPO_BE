@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.cms import SiteBlock, Announcement, FAQ, QuickLink, NewsSource, TeamMember, GalleryPhoto, DocumentLibrary, Feedback, VisitorCount
+from apps.database.models.cms import SiteBlock, Announcement, FAQ, QuickLink, Partner, NewsSource, TeamMember, GalleryPhoto, DocumentLibrary, Feedback, VisitorCount
 from apps.database.models.fpo import FPO
 from apps.database.models.language import Language
 from apps.database.models.schemes import Expert
@@ -230,6 +230,34 @@ class PublicQuickLinksView(APIView):
             for ql in qs
         ]
         cache.set('public:quick_links', data, timeout=60 * 60 * 24)
+        return StandardResponse.success(data=data)
+
+
+class PublicPartnersView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Public - CMS'],
+        summary='Get active partners',
+        description='Returns all active partners with logo URLs. Redis-cached (24h). No auth required.',
+    )
+    def get(self, request):
+        cached = cache.get('public:partners')
+        if cached is not None:
+            return StandardResponse.success(data=cached)
+
+        qs = Partner.objects.filter(is_active=True)
+        data = [
+            {
+                'id':       p.id,
+                'name':     p.name,
+                'url':      p.url,
+                'logo_url': request.build_absolute_uri(p.logo.url) if p.logo else None,
+                'order':    p.order,
+            }
+            for p in qs
+        ]
+        cache.set('public:partners', data, timeout=60 * 60 * 24)
         return StandardResponse.success(data=data)
 
 

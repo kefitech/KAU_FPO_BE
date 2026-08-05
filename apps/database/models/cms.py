@@ -123,6 +123,25 @@ class QuickLink(BaseModel):
         return self.name
 
 
+def _partner_logo_path(instance, filename):
+    ext = os.path.splitext(filename)[1]
+    return f'cms/partners/{uuid.uuid4()}{ext}'
+
+
+class Partner(BaseModel):
+    name      = models.CharField(max_length=200)
+    url       = models.URLField(max_length=500, blank=True)
+    logo      = models.ImageField(upload_to=_partner_logo_path, null=True, blank=True)
+    order     = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name
+
+
 class NewsSourceCategory(models.TextChoices):
     NEWSPAPER = 'newspaper', 'Newspaper'
     MAGAZINE  = 'magazine',  'Magazine'

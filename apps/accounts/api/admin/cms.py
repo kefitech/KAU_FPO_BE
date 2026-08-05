@@ -32,7 +32,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.cms import (
     SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,
-    QuickLink, NewsSource, NewsSourceCategory, TeamMember, GalleryPhoto, DocumentLibrary,
+    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, GalleryPhoto, DocumentLibrary,
     Feedback, FeedbackStatus,
 )
 from apps.database.models.language import Language
@@ -706,6 +706,156 @@ class QuickLinkDeactivateView(APIView):
         obj.is_active = False
         obj.save(update_fields=['is_active'])
         cache.delete('public:quick_links')
+        return StandardResponse.success(message='Deactivated.')
+
+
+# =============================================================================
+# PARTNERS
+# =============================================================================
+
+class PartnerSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Partner
+        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'order', 'is_active', 'created_at']
+        extra_kwargs = {
+            'logo':      {'write_only': True, 'required': False},
+            'is_active': {'default': True},
+        }
+
+    def get_logo_url(self, obj):
+        request = self.context.get('request')
+        if obj.logo and request:
+            return request.build_absolute_uri(obj.logo.url)
+        return obj.logo.url if obj.logo else None
+
+    def validate_logo(self, file):
+        if file.size > _LOGO_MAX_SIZE:
+            raise serializers.ValidationError('Logo must not exceed 5 MB.')
+        return _compress_logo(file)
+
+
+class PartnerListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='List all partners',
+                   responses={200: PartnerSerializer(many=True)})
+    def get(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        qs = Partner.objects.all()
+        serializer = PartnerSerializer(qs, many=True, context={'request': request})
+        return StandardResponse.success(data=serializer.data)
+
+    @extend_schema(tags=['Admin - CMS'], summary='Create a partner',
+                   request=PartnerSerializer, responses={201: PartnerSerializer})
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        serializer = PartnerSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save()
+        cache.delete('public:partners')
+        return StandardResponse.success(
+            data=PartnerSerializer(obj, context={'request': request}).data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class PartnerDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_obj(self, pk):
+        try:
+            return Partner.objects.get(pk=pk)
+        except Partner.DoesNotExist:
+            return None
+
+    @extend_schema(tags=['Admin - CMS'], summary='Update a partner',
+                   request=PartnerSerializer, responses={200: PartnerSerializer})
+    def patch(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get_obj(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        serializer = PartnerSerializer(obj, data=request.data, partial=True,
+                                       context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save()
+        cache.delete('public:partners')
+        return StandardResponse.success(
+            data=PartnerSerializer(obj, context={'request': request}).data,
+        )
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete a partner')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get_obj(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        if obj.logo:
+            obj.logo.delete(save=False)
+        obj.delete()
+        cache.delete('public:partners')
+        return StandardResponse.success(message='Deleted.')
+
+
+class PartnerLogoDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete logo from a partner',
+                   description='Removes the logo file from storage. The partner record remains.')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = Partner.objects.get(pk=pk)
+        except Partner.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        if obj.logo:
+            obj.logo.delete(save=False)
+            obj.logo = None
+            obj.save(update_fields=['logo'])
+        cache.delete('public:partners')
+        return StandardResponse.success(message='Logo removed.')
+
+
+class PartnerActivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Activate a partner')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = Partner.objects.get(pk=pk)
+        except Partner.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = True
+        obj.save(update_fields=['is_active'])
+        cache.delete('public:partners')
+        return StandardResponse.success(message='Activated.')
+
+
+class PartnerDeactivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Deactivate a partner')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = Partner.objects.get(pk=pk)
+        except Partner.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = False
+        obj.save(update_fields=['is_active'])
+        cache.delete('public:partners')
         return StandardResponse.success(message='Deactivated.')
 
 
