@@ -310,7 +310,7 @@ def _get_fpo(fpo_id):
         return None
 
 
-def _transition(fpo, to_status, changed_by, notes=''):
+def _transition(fpo, to_status, changed_by, notes='', request=None):
     from apps.notifications.services import send_notification
 
     from_status = fpo.status
@@ -329,6 +329,7 @@ def _transition(fpo, to_status, changed_by, notes=''):
         user=changed_by,
         action=AuditLog.Action.FPO_STATUS_CHANGE,
         instance=fpo,
+        request=request,
         changes={
             'from_status': from_status,
             'to_status':   to_status,
@@ -575,7 +576,7 @@ class ApplicationRejectView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        _transition(fpo, FPOStatus.REJECTED, request.user, notes=serializer.validated_data['reason'])
+        _transition(fpo, FPOStatus.REJECTED, request.user, notes=serializer.validated_data['reason'], request=request)
         return StandardResponse.success(
             data={'status': fpo.status},
             message=t('admin.fpo_rejected', request.language),
@@ -618,7 +619,7 @@ class ApplicationRequestInfoView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        _transition(fpo, FPOStatus.INFO_REQUIRED, request.user, notes=serializer.validated_data['notes'])
+        _transition(fpo, FPOStatus.INFO_REQUIRED, request.user, notes=serializer.validated_data['notes'], request=request)
         return StandardResponse.success(
             data={'status': fpo.status},
             message=t('admin.fpo_info_requested', request.language),
@@ -764,15 +765,9 @@ class ApplicationActivateView(APIView):
                 )
 
         notes = ser.validated_data.get('notes', '')
-        _transition(fpo, FPOStatus.APPROVED, request.user, notes=notes)
+        _transition(fpo, FPOStatus.APPROVED, request.user, notes=notes, request=request)
 
-        AuditService.log(
-            user=request.user,
-            action=AuditLog.Action.FPO_STATUS_CHANGE,
-            instance=fpo,
-            request=request,
-            changes={'action': 'fpo_activated', 'new_status': FPOStatus.APPROVED, 'notes': notes},
-        )
+        
 
         return StandardResponse.success(
             data={'status': fpo.status, 'fpo_id': fpo.id},
@@ -817,15 +812,7 @@ class ApplicationDeactivateView(APIView):
             )
 
         notes = ser.validated_data.get('notes', '')
-        _transition(fpo, FPOStatus.SUSPENDED, request.user, notes=notes)
-
-        AuditService.log(
-            user=request.user,
-            action=AuditLog.Action.FPO_STATUS_CHANGE,
-            instance=fpo,
-            request=request,
-            changes={'action': 'fpo_deactivated', 'new_status': FPOStatus.SUSPENDED, 'notes': notes},
-        )
+        _transition(fpo, FPOStatus.SUSPENDED, request.user, notes=notes, request=request)
 
         return StandardResponse.success(
             data={'status': fpo.status, 'fpo_id': fpo.id},

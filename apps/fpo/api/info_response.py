@@ -6,7 +6,8 @@ from apps.core.permissions.rbac import IsFPOManager
 from apps.core.utils.constants import FPOStatus
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, ApplicationStatusHistory
-
+from apps.core.models.generic import AuditLog
+from apps.core.services.audit import AuditService
 
 class _InfoResponseSerializer(serializers.Serializer):
     notes = serializers.CharField(
@@ -59,5 +60,19 @@ class FPOInfoResponseView(APIView):
 
         fpo.status = FPOStatus.SUBMITTED
         fpo.save(update_fields=['status'])
+        
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_STATUS_CHANGE,
+            instance=fpo,
+            request=request,
+            changes={
+                'from_status': FPOStatus.INFO_REQUIRED,
+                'to_status':   FPOStatus.SUBMITTED,
+                'notes':       ser.validated_data['notes'],
+            },
+        )
+ 
 
         return StandardResponse.success(message='Response submitted. Your application is now under review.')
