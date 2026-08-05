@@ -3359,6 +3359,7 @@ def seed_nav_translations(languages):
         ('nav.faqs',              'FAQs',                     'പതിവ് ചോദ്യങ്ങൾ'),
         ('nav.contact_us',        'Contact Us',               'ഞങ്ങളെ ബന്ധപ്പെടുക'),
         ('nav.events_updates',    'Events & Updates',         'ഇവന്റുകളും അദ്ധ്യതനങ്ങളും'),
+        ('nav.more-info',         'More Info',                'കൂടുതൽ വിവരങ്ങൾ'),
         ('nav.tagline',           'Smart & Empowered Farmers','സ്മാർട്ടും ശക്തരുമായ കർഷകർ'),
         ('nav.explore',           'Explore',                  'പര്യവേക്ഷണം'),
         ('nav.meet_our_team',     'Meet Our Team',            'ഞങ്ങളുടെ ടീമിനെ കാണുക'),
