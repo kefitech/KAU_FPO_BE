@@ -57,6 +57,7 @@ from .cms import (
     NewsSource,
     NewsSourceCategory,
     TeamMember,
+    GalleryAlbum,
     GalleryPhoto,
     DocumentLibrary,
     Feedback,

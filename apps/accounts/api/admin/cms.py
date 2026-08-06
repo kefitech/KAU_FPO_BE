@@ -32,7 +32,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.cms import (
     SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,
-    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, GalleryPhoto, DocumentLibrary,
+    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, GalleryAlbum, GalleryPhoto, DocumentLibrary,
     Feedback, FeedbackStatus,
 )
 from apps.database.models.language import Language
@@ -1391,7 +1391,139 @@ class DocumentLibraryDeactivateView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Gallery
+# Gallery Albums
+# ─────────────────────────────────────────────────────────────────────────────
+
+class GalleryAlbumSerializer(serializers.ModelSerializer):
+    cover_photo_url = serializers.SerializerMethodField()
+    photo_count     = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = GalleryAlbum
+        fields = ['id', 'title', 'order', 'is_active', 'cover_photo_url', 'photo_count', 'created_at']
+        read_only_fields = ['id', 'cover_photo_url', 'photo_count', 'created_at']
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_cover_photo_url(self, obj):
+        cover = obj.cover_photo()
+        if not cover or not cover.photo:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(cover.photo.url) if request else cover.photo.url
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_photo_count(self, obj):
+        return obj.photo_count()
+
+
+class GalleryAlbumListView(APIView):
+
+    @extend_schema(tags=['Admin - CMS'], summary='List gallery albums',
+                   responses={200: GalleryAlbumSerializer(many=True)})
+    def get(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        qs = GalleryAlbum.objects.filter(is_deleted=False)
+        return StandardResponse.success(
+            GalleryAlbumSerializer(qs, many=True, context={'request': request}).data,
+            'Albums retrieved.',
+        )
+
+    @extend_schema(tags=['Admin - CMS'], summary='Create a gallery album',
+                   description='Fields: `title` (required), `order` (optional), `is_active` (optional).')
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        serializer = GalleryAlbumSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save(created_by=request.user)
+        cache.delete('public:gallery_albums')
+        return StandardResponse.created(
+            data=GalleryAlbumSerializer(obj, context={'request': request}).data,
+            message='Album created.',
+        )
+
+
+class GalleryAlbumDetailView(APIView):
+
+    def _get(self, pk):
+        try:
+            return GalleryAlbum.objects.get(pk=pk, is_deleted=False)
+        except GalleryAlbum.DoesNotExist:
+            return None
+
+    @extend_schema(tags=['Admin - CMS'], summary='Update a gallery album')
+    def patch(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        serializer = GalleryAlbumSerializer(obj, data=request.data, partial=True, context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save(updated_by=request.user)
+        cache.delete('public:gallery_albums')
+        return StandardResponse.success(
+            data=GalleryAlbumSerializer(obj, context={'request': request}).data,
+            message='Updated.',
+        )
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete a gallery album',
+                   description='Deletes the album and all its photos.')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        for photo in obj.photos.filter(is_deleted=False):
+            if photo.photo:
+                photo.photo.delete(save=False)
+            photo.soft_delete(user=request.user)
+        obj.soft_delete(user=request.user)
+        cache.delete('public:gallery_albums')
+        cache.delete('public:gallery')
+        return StandardResponse.success(message='Album and all its photos deleted.')
+
+
+class GalleryAlbumActivateView(APIView):
+
+    @extend_schema(tags=['Admin - CMS'], summary='Activate a gallery album')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = GalleryAlbum.objects.get(pk=pk, is_deleted=False)
+        except GalleryAlbum.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = True
+        obj.save(update_fields=['is_active'])
+        cache.delete('public:gallery_albums')
+        return StandardResponse.success(message='Activated.')
+
+
+class GalleryAlbumDeactivateView(APIView):
+
+    @extend_schema(tags=['Admin - CMS'], summary='Deactivate a gallery album')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = GalleryAlbum.objects.get(pk=pk, is_deleted=False)
+        except GalleryAlbum.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = False
+        obj.save(update_fields=['is_active'])
+        cache.delete('public:gallery_albums')
+        return StandardResponse.success(message='Deactivated.')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gallery Photos (scoped to album)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class GalleryPhotoSerializer(serializers.ModelSerializer):
@@ -1399,11 +1531,12 @@ class GalleryPhotoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = GalleryPhoto
-        fields = ['id', 'photo', 'photo_url', 'caption', 'order', 'is_active', 'created_at']
+        fields = ['id', 'album', 'photo', 'photo_url', 'caption', 'order', 'is_active', 'created_at']
         extra_kwargs = {
             'photo':      {'write_only': True, 'required': True},
             'caption':    {'required': False, 'default': dict},
             'is_active':  {'default': True},
+            'album':      {'required': False},
         }
 
     @extend_schema_field(serializers.URLField(allow_null=True))
@@ -1422,11 +1555,15 @@ class GalleryPhotoSerializer(serializers.ModelSerializer):
 class GalleryListView(APIView):
 
     @extend_schema(tags=['Admin - CMS'], summary='List gallery photos',
+                   description='Pass `?album_id=<id>` to filter photos by album.',
                    responses={200: GalleryPhotoSerializer(many=True)})
     def get(self, request):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         qs = GalleryPhoto.objects.filter(is_deleted=False)
+        album_id = request.query_params.get('album_id')
+        if album_id:
+            qs = qs.filter(album_id=album_id)
         return StandardResponse.success(
             GalleryPhotoSerializer(qs, many=True, context={'request': request}).data,
             'Gallery retrieved.',
@@ -1434,13 +1571,16 @@ class GalleryListView(APIView):
 
     @extend_schema(
         tags=['Admin - CMS'],
-        summary='Upload a gallery photo',
+        summary='Upload one or multiple gallery photos',
         description=(
-            'Multipart form:\n'
-            '- `photo` — JPG/PNG/WebP, max 5 MB (auto-compressed to max 1200×800, quality 85)\n'
-            '- `caption` — optional JSON string e.g. `{"en": "Opening ceremony", "ml": "..."}`\n'
+            'Multipart form — supports single or bulk upload:\n\n'
+            '**Single upload:** send `photo` (one file)\n'
+            '**Bulk upload:** send `photos` (multiple files via `photos[]`)\n\n'
+            '- `photo` / `photos` — JPG/PNG/WebP, max 5 MB each (auto-compressed to max 1200×800, quality 85)\n'
+            '- `caption` — optional JSON string e.g. `{"en": "Opening ceremony", "ml": "..."}` (applied to all in bulk)\n'
             '- `order` — display order (default 0)\n'
-            '- `is_active` — default true'
+            '- `is_active` — default true\n\n'
+            'Returns a single object for single upload, or an array for bulk upload.'
         ),
         request=GalleryPhotoSerializer,
         responses={201: GalleryPhotoSerializer},
@@ -1458,29 +1598,72 @@ class GalleryListView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        photo_file = request.FILES.get('photo')
-        if photo_file:
+        album_id = request.data.get('album_id') or request.data.get('album')
+
+        # Support both `photos[]` (bulk) and `photo` (single)
+        photo_files = request.FILES.getlist('photos') or request.FILES.getlist('photos[]')
+        single_file = request.FILES.get('photo')
+
+        if not photo_files and single_file:
+            # Single upload — original behaviour
             try:
-                photo_file = _compress_photo(photo_file)
+                single_file = _compress_photo(single_file)
             except serializers.ValidationError as e:
                 return StandardResponse.error(str(e.detail[0]), status_code=status.HTTP_400_BAD_REQUEST)
 
-        data = {
-            'photo':     photo_file,
-            'caption':   caption,
-            'order':     request.data.get('order', 0),
-            'is_active': request.data.get('is_active', True),
-        }
+            data = {
+                'photo':     single_file,
+                'caption':   caption,
+                'order':     request.data.get('order', 0),
+                'is_active': request.data.get('is_active', True),
+            }
+            if album_id:
+                data['album'] = album_id
+            serializer = GalleryPhotoSerializer(data=data, context={'request': request})
+            if not serializer.is_valid():
+                return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                              status_code=status.HTTP_400_BAD_REQUEST)
+            obj = serializer.save(created_by=request.user)
+            cache.delete('public:gallery')
+            cache.delete('public:gallery_albums')
+            return StandardResponse.created(
+                data=GalleryPhotoSerializer(obj, context={'request': request}).data,
+                message='Photo uploaded.',
+            )
 
-        serializer = GalleryPhotoSerializer(data=data, context={'request': request})
-        if not serializer.is_valid():
-            return StandardResponse.error('Validation failed.', errors=serializer.errors,
-                                          status_code=status.HTTP_400_BAD_REQUEST)
-        obj = serializer.save(created_by=request.user)
+        if not photo_files:
+            return StandardResponse.error('No photo(s) provided.', status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Bulk upload
+        created = []
+        errors = []
+        for i, f in enumerate(photo_files):
+            try:
+                compressed = _compress_photo(f)
+            except serializers.ValidationError as e:
+                errors.append({'file': f.name, 'error': str(e.detail[0])})
+                continue
+
+            data = {
+                'photo':     compressed,
+                'caption':   caption,
+                'order':     request.data.get('order', 0),
+                'is_active': request.data.get('is_active', True),
+            }
+            if album_id:
+                data['album'] = album_id
+            serializer = GalleryPhotoSerializer(data=data, context={'request': request})
+            if serializer.is_valid():
+                obj = serializer.save(created_by=request.user)
+                created.append(GalleryPhotoSerializer(obj, context={'request': request}).data)
+            else:
+                errors.append({'file': f.name, 'error': serializer.errors})
+
         cache.delete('public:gallery')
+        cache.delete('public:gallery_albums')
         return StandardResponse.created(
-            data=GalleryPhotoSerializer(obj, context={'request': request}).data,
-            message='Photo uploaded.',
+            data={'uploaded': created, 'errors': errors},
+            message=f'{len(created)} photo(s) uploaded.',
         )
 
 

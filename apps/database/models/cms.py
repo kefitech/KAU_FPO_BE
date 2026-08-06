@@ -191,7 +191,26 @@ class TeamMember(BaseModel):
         return self.name
 
 
+class GalleryAlbum(BaseModel):
+    title     = models.CharField(max_length=300)
+    order     = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def cover_photo(self):
+        return self.photos.filter(is_deleted=False, is_active=True).order_by('order', 'id').first()
+
+    def photo_count(self):
+        return self.photos.filter(is_deleted=False).count()
+
+    def __str__(self):
+        return self.title
+
+
 class GalleryPhoto(BaseModel):
+    album   = models.ForeignKey(GalleryAlbum, on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
     photo   = models.ImageField(upload_to=_gallery_photo_path)
     caption = models.JSONField(default=dict, blank=True, help_text='{"en": "...", "ml": "..."}')
     order   = models.PositiveSmallIntegerField(default=0)
