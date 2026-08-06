@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.cms import SiteBlock, Announcement, FAQ, QuickLink, Partner, NewsSource, TeamMember, GalleryPhoto, DocumentLibrary, Feedback, VisitorCount
+from apps.database.models.cms import SiteBlock, Announcement, FAQ, QuickLink, Partner, NewsSource, TeamMember, GalleryAlbum, GalleryPhoto, DocumentLibrary, Feedback, VisitorCount
 from apps.database.models.fpo import FPO
 from apps.database.models.language import Language
 from apps.database.models.schemes import Expert
@@ -353,6 +353,64 @@ class PublicGalleryView(APIView):
             for p in qs
         ]
         cache.set('public:gallery', data, timeout=60 * 60 * 24)
+        return StandardResponse.success(data=data)
+
+
+class PublicGalleryAlbumsView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Public - CMS'],
+        summary='Get gallery albums',
+        description='Returns active albums with cover photo and photo count. Redis-cached (24h). No auth required.',
+    )
+    def get(self, request):
+        cached = cache.get('public:gallery_albums')
+        if cached is not None:
+            return StandardResponse.success(data=cached)
+
+        albums = GalleryAlbum.objects.filter(is_active=True, is_deleted=False)
+        data = []
+        for album in albums:
+            cover = album.cover_photo()
+            data.append({
+                'id':             album.id,
+                'title':          album.title,
+                'cover_photo_url': request.build_absolute_uri(cover.photo.url) if cover and cover.photo else None,
+                'photo_count':    album.photo_count(),
+            })
+        cache.set('public:gallery_albums', data, timeout=60 * 60 * 24)
+        return StandardResponse.success(data=data)
+
+
+class PublicGalleryAlbumDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Public - CMS'],
+        summary='Get photos in a gallery album',
+        description='Returns all active photos inside the given album. No auth required.',
+    )
+    def get(self, request, pk):
+        try:
+            album = GalleryAlbum.objects.get(pk=pk, is_active=True, is_deleted=False)
+        except GalleryAlbum.DoesNotExist:
+            return StandardResponse.error('Album not found.', status_code=404)
+
+        photos = album.photos.filter(is_active=True, is_deleted=False)
+        data = {
+            'id':     album.id,
+            'title':  album.title,
+            'photos': [
+                {
+                    'id':        p.id,
+                    'photo_url': request.build_absolute_uri(p.photo.url) if p.photo else None,
+                    'caption':   p.get_caption(_lang(request)),
+                    'order':     p.order,
+                }
+                for p in photos
+            ],
+        }
         return StandardResponse.success(data=data)
 
 
