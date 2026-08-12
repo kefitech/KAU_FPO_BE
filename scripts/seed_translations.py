@@ -2918,8 +2918,13 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.toast_save_failed':         'ഫയൽ സേവ് ചെയ്യാൻ പരാജയപ്പെട്ടു.',
                 # ── Gallery tab ────────────────────────────────────────────────────────
         'admin_site_content.gallery_section_title':      'ഗ്യാലറി',
+        'admin_site_content.btn_new_album':              'പുതിയ അൽബങ്ങൾ',
         'admin_site_content.btn_add_photo':              'ഫോട്ടോ ചേർക്കുക',
+        'admin_site_content.dialog_edit_album':          'അൽബങ്ങൾ എഡിറ്റ് ചെയ്യുക',
+        'admin_site_content.dialog_create_album':        'പുതിയ അൽബങ്ങൾ സൃഷ്ടിക്കുക',
         'admin_site_content.toast_photo_updated':        'ഫോട്ടോ അപ്‌ഡേറ്റ് ചെയ്തു.',
+        'admin_site_content.action_saving':              'സേവ് ചെയ്യുന്നു…',
+        'admin_site_content.action_save':                'സേവ് ചെയ്യുക',
         'admin_site_content.toast_photo_update_failed':  'ഫോട്ടോ അപ്‌ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
         'admin_site_content.toast_photo_deleted':        'ഫോട്ടോ ഇല്ലാതാക്കി.',
         'admin_site_content.toast_photo_delete_failed':  'ഫോട്ടോ ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു.',
@@ -3273,6 +3278,11 @@ def seed_home_section_translations(languages):
         ('home.news_empty_news',        'No news available at the moment.', 'ഇപ്പോൾ വാർത്തകൾ ലഭ്യമല്ല.'),
         ('home.news_last_updated',      'Last Updated on',              'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്'),
         ('home.news_read_more',         'Read More',                    'കൂടുതൽ വായിക്കുക'),
+        # ── News Sources section ─────────────────────────────────────────────
+        ('home.news_sources_tab_newspapers', 'Newspapers',                   'പത്രങ്ങൾ'),
+        ('home.news_sources_tab_magazines',  'Magazines',                    'മാസികകൾ'),
+
+
         # ── Stats / Facts section ────────────────────────────────────────────
         ('home.stats_subtitle',         'Platform Stats',               'പ്ലാറ്റ്ഫോം സ്റ്റാറ്റിസ്റ്റിക്സ്'),
         ('home.stats_title',            'KAU–FPO Linkage in Numbers',   'KAU–FPO ലിങ്കേജ് സംഖ്യകളിൽ'),
