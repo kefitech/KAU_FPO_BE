@@ -3414,7 +3414,7 @@ def seed_nav_translations(languages):
         ('nav.home',              'HOME',                     'ഹോം'),
         ('nav.our_partners',      'Our Partners',             'ഞങ്ങളുടെ പങ്കാളികൾ'),
         ('nav.subscribe_thanks',  'Thanks For Subscribing!',  'സബ്‌സ്ക്രൈബ് ചെയ്തതിന് നന്ദി!'),
-        ('nav.kau_address',       'Kerala Agricultural University, Mannuthy P.O, Pin- 680651.', 'കേരള കാർഷിക സർവ്വകലാശാല, മണ്ണുത്തി പി.ഒ, പിൻ- 680651.'),
+        ('nav.kau_address',       'Directorate of Extension, Mannuthy P.O, Thrissur - 680651 ', 'എക്സ്റ്റൻഷൻ ഡയറക്ടറേറ്റ്, മണ്ണുത്തി പി.ഒ, തൃശൂർ - 680651.'),
     ]
 
     count = 0

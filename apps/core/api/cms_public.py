@@ -30,7 +30,7 @@ from apps.database.models.fpo import FPO
 from apps.database.models.language import Language
 from apps.database.models.schemes import Expert
 from apps.core.utils.constants import FPOStatus, UserRole
-
+from django.db.models import Count, Q
 
 def _lang(request):
     return getattr(request, 'language', 'en')
@@ -369,9 +369,14 @@ class PublicGalleryAlbumsView(APIView):
         if cached is not None:
             return StandardResponse.success(data=cached)
 
-        albums = GalleryAlbum.objects.filter(is_active=True, is_deleted=False)
+        albums = GalleryAlbum.objects.filter(is_active=True, is_deleted=False).annotate(
+            active_photo_count=Count(
+                'photos', filter=Q(photos__is_active=True, photos__is_deleted=False)
+            )
+        ).filter(active_photo_count__gt=0)
         data = []
         for album in albums:
+            
             cover = album.cover_photo()
             data.append({
                 'id':             album.id,

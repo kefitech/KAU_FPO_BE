@@ -199,8 +199,11 @@ class GalleryAlbum(BaseModel):
     class Meta:
         ordering = ['order', 'id']
 
-    def cover_photo(self):
-        return self.photos.filter(is_deleted=False, is_active=True).order_by('order', 'id').first()
+    def cover_photo(self, include_inactive=False):
+        qs = self.photos.filter(is_deleted=False)
+        if not include_inactive:
+            qs = qs.filter(is_active=True)
+        return qs.order_by('order', 'id').first()
 
     def photo_count(self):
         return self.photos.filter(is_deleted=False).count()

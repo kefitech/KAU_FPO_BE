@@ -1405,7 +1405,7 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_cover_photo_url(self, obj):
-        cover = obj.cover_photo()
+        cover = obj.cover_photo(include_inactive=True)
         if not cover or not cover.photo:
             return None
         request = self.context.get('request')
@@ -1502,7 +1502,9 @@ class GalleryAlbumActivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = True
         obj.save(update_fields=['is_active'])
+        obj.photos.filter(is_deleted=False).update(is_active=True)
         cache.delete('public:gallery_albums')
+        cache.delete('public:gallery')
         return StandardResponse.success(message='Activated.')
 
 
@@ -1518,7 +1520,9 @@ class GalleryAlbumDeactivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = False
         obj.save(update_fields=['is_active'])
+        obj.photos.filter(is_deleted=False).update(is_active=False)
         cache.delete('public:gallery_albums')
+        cache.delete('public:gallery')
         return StandardResponse.success(message='Deactivated.')
 
 
@@ -1734,6 +1738,12 @@ class GalleryActivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = True
         obj.save(update_fields=['is_active'])
+
+        # If the album was inactive, this is its first active photo again — reactivate it.
+        if not obj.album.is_active:
+            obj.album.is_active = True
+            obj.album.save(update_fields=['is_active'])
+            cache.delete('public:gallery_albums')
         cache.delete('public:gallery')
         return StandardResponse.success(message='Activated.')
 
@@ -1750,6 +1760,15 @@ class GalleryDeactivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = False
         obj.save(update_fields=['is_active'])
+        # If this was the last active photo in the album, deactivate the album too.
+        if obj.album.is_active:
+            has_active_photos = obj.album.photos.filter(is_deleted=False, is_active=True).exists()
+            if not has_active_photos:
+                obj.album.is_active = False
+                obj.album.save(update_fields=['is_active'])
+                cache.delete('public:gallery_albums')
+
+
         cache.delete('public:gallery')
         return StandardResponse.success(message='Deactivated.')
 
