@@ -2931,6 +2931,7 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.photo_delete_title':         'ഫോട്ടോ ഇല്ലാതാക്കുക',
         'admin_site_content.photo_delete_description':   'ഈ ഫോട്ടോ ഇല്ലാതാക്കണമോ? ഈ നടപടി പഴയപടിയാക്കാൻ കഴിയില്ല.',
         'admin_site_content.gallery_section_title':      'ഗാലറി',
+        'admin_site_content.action_open':                'തുറക്കുക',
         'admin_site_content.btn_add_photo':              'ഫോട്ടോ ചേർക്കുക',
         'admin_site_content.toast_photo_updated':        'ഫോട്ടോ അപ്‌ഡേറ്റ് ചെയ്തു.',
         'admin_site_content.toast_photo_update_failed':  'ഫോട്ടോ അപ്‌ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
@@ -3231,6 +3232,7 @@ def seed_contact_translations(languages):
         ('contact.error_subject',      'Subject is required.',                         'വിഷയം ആവശ്യമാണ്.'),
         ('contact.error_message',      'Message is required.',                         'സന്ദേശം ആവശ്യമാണ്.'),
         ('contact.error_generic',      'Something went wrong. Please try again.',      'എന്തോ പ്രശ്‌നം സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('contact.kau_address',        'Directorate of Extension, Mannuthy P.O, \n Thrissur - 680651', 'എക്സ്റ്റൻഷൻ ഡയറക്ടറേറ്റ്, മണ്ണുത്തി പി.ഒ.,\n തൃശ്ശൂർ - 680651'),
     ]
 
     count = 0
@@ -3265,8 +3267,8 @@ def seed_home_section_translations(languages):
     HOME_KEYS = [
         # key,                          EN value,                   ML value
         # ── Team section ────────────────────────────────────────────────────
-        ('home.team_subtitle',          'Our Team',                 'ഞങ്ങളുടെ ടീം'),
-        ('home.team_title',             'Meet Our Leadership',      'ഞങ്ങളുടെ നേതൃത്വത്തെ കാണുക'),
+        ('home.team_subtitle',          'KAU-FPO Linkage Programme',    'KAU–FPO ലിങ്കേജ് പ്രോഗ്രാം'),
+        ('home.team_title',             'Our Team',                  'ഞങ്ങളുടെ ടീം'),
         ('home.team_empty',             'No team members available.','ടീം അംഗങ്ങൾ ലഭ്യമല്ല.'),
         ('home.team_page_heading',      'Our Team',                 'ഞങ്ങളുടെ ടീം'),
         # ── News & Announcements section ─────────────────────────────────────
