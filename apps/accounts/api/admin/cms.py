@@ -1721,7 +1721,18 @@ class GalleryDetailView(APIView):
         obj = self._get(pk)
         if not obj:
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        album= obj.album
         obj.soft_delete(user=request.user)
+ 
+        # If this was the last active photo in the album, deactivate the album too
+        # (mirrors GalleryDeactivateView) so the landing page stops showing it.
+        if album.is_active:
+            has_active_photos = album.photos.filter(is_deleted=False, is_active=True).exists()
+            if not has_active_photos:
+                album.is_active = False
+                album.save(update_fields=['is_active'])
+                cache.delete('public:gallery_albums')
+ 
         cache.delete('public:gallery')
         return StandardResponse.success(message='Deleted.')
 
