@@ -3361,6 +3361,13 @@ def seed_banner_translations(languages):
                                    'AI-ശക്തിപ്പെടുത്തിയ വിള ശുപാർശകൾ, ONDC വഴി മാർക്കറ്റ് ലിങ്കേജ്, വിദഗ്ദ്ധ കൺസൾട്ടൻസി, GIS മാപ്പിംഗ് — കേരളത്തിലെ കർഷക സമൂഹത്തിനായി ഒരൊറ്റ പ്ലാറ്റ്ഫോമിൽ.'),
         ('banner.slide2_btn',      'Learn More',                               'കൂടുതൽ അറിയൂ'),
         ('banner.login_btn',       'Login',                                    'ലോഗിൻ'),
+        # Quick access card descriptions
+        ('banner.card_about_desc',        'About KAU-FPO Linkage Programme',    'KAU-FPO ലിങ്കേജ് പ്രോഗ്രാമിനെ കുറിച്ച്'),
+        ('banner.card_register_desc',     'Step-by-step registration guide',    'ഘട്ടം ഘട്ടമായുള്ള രജിസ്ട്രേഷൻ ഗൈഡ്'),
+        ('banner.card_events_desc',       'Latest announcements and news',       'ഏറ്റവും പുതിയ അറിയിപ്പുകളും വാർത്തകളും'),
+        ('banner.card_faq_desc',          'Frequently asked questions',          'പതിവായി ചോദിക്കുന്ന ചോദ്യങ്ങൾ'),
+        ('banner.card_contact_desc',      'Get in touch with us',               'ഞങ്ങളുമായി ബന്ധപ്പെടുക'),
+        ('banner.card_more_info_desc',    'Resources, documents & guidelines',   'റിസോഴ്സുകൾ, രേഖകൾ & മാർഗ്ഗനിർദ്ദേശങ്ങൾ'),
     ]
 
     count = 0
