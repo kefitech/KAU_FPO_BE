@@ -2847,6 +2847,7 @@ def seed_fpo_portal_ml_translations(languages):
         'fpo_tier_assessment.toast_reopen_failed':      'മൂല്യനിർണ്ണയം വീണ്ടും തുറക്കൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.',
 
         # ── admin_site_content ─────────────────────────────────────────────────
+        'admin_site_content.field_order':                'പ്രദർശന ക്രമം',
         'admin_site_content.page_title':                 'സൈറ്റ് ഉള്ളടക്കം',
         'admin_site_content.page_description':           'ലാൻഡിംഗ് പേജ് ഉള്ളടക്കം, ഡോക്യുമെന്റുകൾ, മീഡിയ എന്നിവ നിർവ്വഹിക്കുക',
         'admin_site_content.tab_content_blocks':         'ഉള്ളടക്ക ബ്ലോക്കുകൾ',
@@ -2920,8 +2921,11 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.gallery_section_title':      'ഗ്യാലറി',
         'admin_site_content.btn_new_album':              'പുതിയ അൽബങ്ങൾ',
         'admin_site_content.btn_add_photo':              'ഫോട്ടോ ചേർക്കുക',
+        'admin_site_content.field_album_title':          'ആൽബം',
         'admin_site_content.dialog_edit_album':          'അൽബങ്ങൾ എഡിറ്റ് ചെയ്യുക',
         'admin_site_content.dialog_create_album':        'പുതിയ അൽബങ്ങൾ സൃഷ്ടിക്കുക',
+        'admin_site_content.album_delete_title':         'ആൽബം ഇല്ലാതാക്കുക',
+        'admin_site_content.album_delete_description':   '"{album.title}" ഇല്ലാതാക്കണമോ? ഈ പ്രവർത്തി പഴയപടിയാക്കാൻ കഴിയില്ല.',
         'admin_site_content.toast_photo_updated':        'ഫോട്ടോ അപ്‌ഡേറ്റ് ചെയ്തു.',
         'admin_site_content.action_saving':              'സേവ് ചെയ്യുന്നു…',
         'admin_site_content.action_save':                'സേവ് ചെയ്യുക',
@@ -2990,6 +2994,7 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.field_designation':          'പദവി',
         'admin_site_content.field_designation_placeholder': 'ഉദാ. വൈസ് ചാൻസലർ, KAU',
         'admin_site_content.field_display_order':        'പ്രദർശന ക്രമം',
+        'admin_site_content.col_order':                   'ക്രമം',
         'admin_site_content.action_add_member':          'അംഗത്തെ ചേർക്കുക',
         'admin_site_content.empty_state_team':           'ഇതുവരെ ടീം അംഗങ്ങളെ ചേർത്തിട്ടില്ല.',
         # ── Quick Links tab ────────────────────────────────────────────────────
@@ -3006,6 +3011,7 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.toast_save_failed':          'ക്വിക്ക് ലിങ്ക് സേവ് ചെയ്യാൻ പരാജയപ്പെട്ടു.',
         'admin_site_content.dialog_edit_title':          'ക്വിക്ക് ലിങ്ക് എഡിറ്റ് ചെയ്യുക',
         'admin_site_content.dialog_add_title':           'ക്വിക്ക് ലിങ്ക് ചേർക്കുക',
+        
         'admin_site_content.field_name':                 'പേര്',
         'admin_site_content.field_link_name_placeholder':'ഉദാ. കേരള അഗ്രികൾച്ചറൽ യൂണിവേഴ്‌സിറ്റി',
         'admin_site_content.field_url':                  'URL',
@@ -3036,8 +3042,8 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.toast_updated':              'വാർത്താ സ്രോതസ്സ് അപ്‌ഡേറ്റ് ചെയ്തു.',
         'admin_site_content.toast_added':                'വാർത്താ സ്രോതസ്സ് ചേർത്തു.',
         'admin_site_content.toast_save_failed':          'വാർത്താ സ്രോതസ്സ് സേവ് ചെയ്യാൻ പരാജയപ്പെട്ടു.',
-        'admin_site_content.dialog_edit_title':          'വാർത്താ സ്രോതസ്സ് എഡിറ്റ് ചെയ്യുക',
-        'admin_site_content.dialog_add_title':           'വാർത്താ സ്രോതസ്സ് ചേർക്കുക',
+        'admin_site_content.dialog_edit_source':         'വാർത്താ സ്രോതസ്സ് എഡിറ്റ് ചെയ്യുക',
+        'admin_site_content.dialog_add_source':          'വാർത്താ സ്രോതസ്സ് ചേർക്കുക',
         'admin_site_content.field_name':                 'പേര്',
         'admin_site_content.field_source_name_placeholder': 'ഉദാ. മാതൃഭൂമി',
         'admin_site_content.field_url':                  'URL',
@@ -3074,6 +3080,14 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.btn_mark_read':        'വായിച്ചതായി അടയാളപ്പെടുത്തുക',
         'admin_site_content.btn_resolve':          'പരിഹരിച്ചു',
         'admin_site_content.btn_mark_unread':      'വായിക്കാത്തതായി അടയാളപ്പെടുത്തുക',
+        # ── Team tab ───────────────────────────────────────────────────────
+        'admin_site_content.dialog_add_team':      'ടീം അംഗം ചേർക്കുക',
+        'admin_site_content.dialog_edit_team':     'ടീം അംഗം എഡിറ്റ് ചെയ്യുക',
+        'admin_site_content.dialog_add_partner':   'പങ്കാളിയെ ചേർക്കുക',
+        'admin_site_content.dialog_edit_partner':   'പങ്കാളിയെ എഡിറ്റ് ചെയ്യുക',
+
+        'admin_site_content.btn_add_partner':      'പങ്കാളിയെ ചേർക്കുക',
+        'admin_site_content.partner_title':         'പങ്കാളികൾ',
     }
 
     count = 0

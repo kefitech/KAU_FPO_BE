@@ -5,10 +5,15 @@ Updates all `ui` category Malayalam translations from English placeholders
 to proper Malayalam text using update_or_create.
 
 Usage:
+
     source venv/bin/activate && python manage.py shell -c "
     exec(open('scripts/seed_ml_ui_translations.py').read())
-    seed_ml_ui_translations()
-    "
+    seed_ml_ui_translations()"
+
+    python manage.py shell -c"
+    exec(open('scripts/seed_ml_ui_translations.py').read())
+    seed_ml_ui_translations()"
+
 """
 
 import os
@@ -657,6 +662,19 @@ def seed_ml_ui_translations():
             'empty_state':              'ഇതുവരെ പങ്കാളികളെ ചേർത്തിട്ടില്ല.',
             'badge_active':             'സജീവം',
             'badge_inactive':           'നിഷ്ക്രിയം',
+            'field_url_error':          'URL http:// അല്ലെങ്കിൽ https:// ൽ തുടങ്ങണം',
+            'btn_cancel':               'റദ്ദാക്കുക',
+            'btn_saving':               'സേവ് ചെയ്യുന്നു…',
+            'btn_save_changes':         'മാറ്റങ്ങൾ സേവ് ചെയ്യുക',
+            'logo_current':             'നിലവിലെ ലോഗോ',
+            'logo_none':                'ലോഗോ സെറ്റ് ചെയ്തിട്ടില്ല',
+            'logo_replace':             'മാറ്റുക',
+            'logo_upload':              'ലോഗോ അപ്‌ലോഡ് ചെയ്യുക',
+            'logo_hint':                'JPG, PNG, അല്ലെങ്കിൽ WebP — പരമാവധി 5 MB',
+            'logo_replace_notice':      'ഇത് നിലവിലുള്ള ലോഗോ മാറ്റിസ്ഥാപിക്കും.',
+            'toast_save_failed':        'പങ്കാളിയെ സേവ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു.',
+            'toast_update_failed':      'പങ്കാളിയെ അപ്ഡേറ്റ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു.',
+            'toast_delete_failed':      'പങ്കാളിയെ ഇല്ലാതാക്കുന്നതിൽ പരാജയപ്പെട്ടു.',
         },
 
         'admin_news_sources': {
