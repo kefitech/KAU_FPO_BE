@@ -182,7 +182,7 @@ _PDF_HTML = """
   .meta {{ color: #757575; font-size: 8pt; margin-bottom: 12px; }}
   table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
   th {{ background: #2e7d32; color: #fff; padding: 5px 6px; text-align: left; font-size: 8pt; box-sizing: border-box;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        overflow-wrap: break-word; white-space: normal; vertical-align: bottom; }}
   td {{ padding: 4px 6px; border-bottom: 1px solid #e0e0e0; font-size: 8pt;
         overflow-wrap: break-word; }}
   th:nth-child(1)  {{ width: 10%; }}
@@ -191,8 +191,8 @@ _PDF_HTML = """
   th:nth-child(4)  {{ width: 10%; }}
   th:nth-child(5)  {{ width: 7%;  }}
   th:nth-child(6)  {{ width: 5%;  }}
-  th:nth-child(7)  {{ width: 5%;  }}
-  th:nth-child(8)  {{ width: 10%; }}
+  th:nth-child(7)  {{ width: 7%;  }}
+  th:nth-child(8)  {{ width: 8%; }}
   th:nth-child(9)  {{ width: 13%; }}
   th:nth-child(10) {{ width: 8%;  }}
   th:nth-child(11) {{ width: 10%; }}

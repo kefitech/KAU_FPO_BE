@@ -3434,7 +3434,7 @@ def seed_nav_translations(languages):
         ('nav.contact_info',      'Contact Info',             'ബന്ധപ്പെടൽ വിവരങ്ങൾ'),
         ('nav.address',           'Address',                  'വിലാസം'),
         ('nav.support',           'Support',                  'സഹായം'),
-        ('nav.home',              'HOME',                     'ഹോം'),
+        ('nav.home',              'Home',                     'ഹോം'),
         ('nav.our_partners',      'Our Partners',             'ഞങ്ങളുടെ പങ്കാളികൾ'),
         ('nav.subscribe_thanks',  'Thanks For Subscribing!',  'സബ്‌സ്ക്രൈബ് ചെയ്തതിന് നന്ദി!'),
         ('nav.kau_address',       'Directorate of Extension, Mannuthy P.O, Thrissur - 680651 ', 'എക്സ്റ്റൻഷൻ ഡയറക്ടറേറ്റ്, മണ്ണുത്തി പി.ഒ, തൃശൂർ - 680651.'),
