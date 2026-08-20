@@ -33,7 +33,7 @@ class DPRProject(BaseModel):
         help_text='MasterLookup category: dpr_project_type (new, expansion, diversification, modernisation)'
     )
     primary_commodity = models.ForeignKey(
-        'database.MasterLookup', on_delete=models.PROTECT,
+        'core.MasterLookup', on_delete=models.PROTECT,
         related_name='dpr_projects'
     )
     secondary_commodities = models.JSONField(

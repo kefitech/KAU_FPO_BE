@@ -30,7 +30,7 @@ class Product(BaseModel):
     )
     name = models.JSONField(help_text='{"en":"Organic Rice","ml":"ഓർഗാനിക് അരി"}')
     commodity = models.ForeignKey(
-        'database.MasterLookup', on_delete=models.PROTECT, related_name='products'
+        'core.MasterLookup', on_delete=models.PROTECT, related_name='products'
     )
     description = models.JSONField(default=dict, help_text='{"en":"...","ml":"..."}')
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
@@ -123,7 +123,7 @@ class BuyerSellerMatch(BaseModel):
 
 class MarketPrice(BaseModel):
     commodity = models.ForeignKey(
-        'database.MasterLookup', on_delete=models.PROTECT, related_name='market_prices'
+        'core.MasterLookup', on_delete=models.PROTECT, related_name='market_prices'
     )
     market_name = models.CharField(
         max_length=200,
