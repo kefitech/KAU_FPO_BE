@@ -10,6 +10,80 @@ One file per developer. Read your file before writing a single line of code.
 | Jobin | [JOBIN.md](JOBIN.md) | P2-01 Row-Level Security + P2-02 Govt Portal + P2-03 CBBO + P2-08 Expert Booking |
 | Aleena | [ALEENA.md](ALEENA.md) | P2-09 Analytics + P2-10 Chatbot + P2-04 Auto-Translate + P2-13 WhatsApp |
 
+## Local Machine Setup — Do This Before Anything Else
+
+### Step 1 — Install system packages (Ubuntu/Debian)
+
+Required for GeoDjango (GIS maps). Without these, even importing GIS models will fail.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  libgdal-dev \
+  libgeos-dev \
+  libproj-dev \
+  postgresql-12-postgis-3 \
+  postgresql-12-postgis-3-scripts \
+  binutils
+```
+
+### Step 2 — Clone the repo and set up Python environment
+
+```bash
+git clone <repo-url>
+cd kau-fpo-backend
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements/development.txt
+```
+
+### Step 3 — Set up local database
+
+```bash
+# Create the database (replace credentials as needed)
+createdb -U postgres kau_fpo
+
+# Enable PostGIS — MUST be done as superuser, BEFORE running migrations
+sudo -u postgres psql -p 5432 -d kau_fpo -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+```
+
+> If your PostgreSQL runs on a non-standard port (e.g. 5434), add `-p 5434`.
+
+### Step 4 — Configure environment
+
+```bash
+# Copy the example env (ask Athul for actual values)
+cp .env.example .env
+# Edit .env with your local DB credentials
+```
+
+### Step 5 — Run migrations
+
+```bash
+source venv/bin/activate
+python manage.py migrate
+```
+
+Confirm it runs with no errors before touching any code.
+
+### Step 6 — Run seed scripts
+
+```bash
+# Translations
+python manage.py shell -c "exec(open('scripts/seed_translations.py').read()); seed_translations()"
+
+# Master data (dropdowns)
+python manage.py shell -c "exec(open('scripts/seed_fpo_master_data.py').read()); seed_fpo_master_data()"
+
+# Menu items
+python manage.py shell -c "exec(open('scripts/seed_menu.py').read()); seed_menu()"
+```
+
+> Full seeding guide: `scripts/SEEDING_GUIDE.md`
+
+---
+
 ## Git Workflow — Everyone Follows This
 
 ```
