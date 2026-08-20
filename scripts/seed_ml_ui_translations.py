@@ -144,7 +144,7 @@ def seed_ml_ui_translations():
             'chart_tier_dist':              'ടയർ വിതരണം',
             'chart_tier_subtitle':          'പ്രകടന ടയർ അനുസരിച്ച് അംഗീകൃത FPOകൾ',
             'chart_district_dist':          'ജില്ലാ വിതരണം',
-            'chart_district_subtitle':      'ജില്ലലനുസരിച്ച് രജിസ്റ്റർ ചെയ്ത FPOകൾ',
+            'chart_district_subtitle':      'ജില്ല തിരിച്ചുള്ള വിതരണം',
             # old chart keys (kept for backward compat)
             'chart_status_title':           'FPO സ്ഥിതി വിതരണം',
             'chart_tier_title':             'ടയർ വിതരണം',
