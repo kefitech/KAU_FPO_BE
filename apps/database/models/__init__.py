@@ -89,6 +89,44 @@ from .fpo import (
     AssessmentUpload,
 )
 
+# Phase 2 — Government Portal
+from .government import GovernmentOfficialProfile
+
+# Phase 2 — CBBO Portal
+from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
+
+# Phase 2 — GIS (requires PostGIS + django.contrib.gis in INSTALLED_APPS)
+from .gis import AgroClimaticZone, DistrictBoundary
+
+# Phase 2 — AI Crop Recommendations
+from .recommendations import MLModelVersion, CropRecommendation
+
+# Phase 2 — AI DPR Generation
+from .dpr import (
+    DPRProject,
+    DPRSection,
+    DPRCalculation,
+    DPRAIContent,
+    DPRDocument,
+    DPRMasterConfig,
+)
+
+# Phase 2 — Expert Booking
+from .expert_booking import ExpertAvailability, ExpertBooking
+
+# Phase 2 — Analytics
+from .analytics import AnalyticsSnapshot
+
+# Phase 2 — AI Chatbot
+from .chat import ChatConversation, ChatMessage
+
+# Phase 2 — Marketplace
+from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice
+
+# Phase 2 — AI Marketing
+from .marketing import MarketingStrategy
+
+
 __all__ = [
     # Multilingual
     'Language',
@@ -143,4 +181,38 @@ __all__ = [
     'AnnouncementCategory',
     'FAQ',
     'FAQCategory',
+    # Phase 2 — Government Portal
+    'GovernmentOfficialProfile',
+    # Phase 2 — CBBO Portal
+    'CapacityBuildingReport',
+    'TrainingSession',
+    'TrainingAttendance',
+    # Phase 2 — GIS
+    'AgroClimaticZone',
+    'DistrictBoundary',
+    # Phase 2 — AI Crop Recommendations
+    'MLModelVersion',
+    'CropRecommendation',
+    # Phase 2 — AI DPR Generation
+    'DPRProject',
+    'DPRSection',
+    'DPRCalculation',
+    'DPRAIContent',
+    'DPRDocument',
+    'DPRMasterConfig',
+    # Phase 2 — Expert Booking
+    'ExpertAvailability',
+    'ExpertBooking',
+    # Phase 2 — Analytics
+    'AnalyticsSnapshot',
+    # Phase 2 — AI Chatbot
+    'ChatConversation',
+    'ChatMessage',
+    # Phase 2 — Marketplace
+    'Product',
+    'BuyerDirectory',
+    'BuyerSellerMatch',
+    'MarketPrice',
+    # Phase 2 — AI Marketing
+    'MarketingStrategy',
 ]
