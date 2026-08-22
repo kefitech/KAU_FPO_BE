@@ -164,6 +164,14 @@ def seed_menu():
         order     = 17,
     )
 
+    seed_item(
+        label_key = 'menu.ml_models',
+        path      = '/admin/ml-models',
+        icon      = 'brain-circuit',
+        roles     = [super_admin_group],
+        order     = 18,
+    )
+
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
     fpo_roles = [primary_group, secondary_group]
