@@ -13,7 +13,7 @@ from pathlib import Path
 
 import httpx
 from django.conf import settings
-from rest_framework import serializers, status
+from rest_framework import serializers, status, filters
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -25,6 +25,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.permissions.rbac import IsAdmin
 
+from django.db.models import Q
 from apps.database.models import FPO, MLModelVersion, CropRecommendation
 from apps.recommendations.services import (
     get_crop_recommendation,
@@ -241,6 +242,13 @@ class MLModelVersionAdminView(APIView):
         lang = request.language
         versions = MLModelVersion.objects.all().order_by('-deployed_at')
 
+        search = request.query_params.get('search')
+        if search:
+            versions = versions.filter(
+                Q(version_code__icontains=search) |
+                Q(description__icontains=search)
+            )
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(versions, request, view=self)
         serializer = MLModelVersionSerializer(page, many=True)
@@ -387,6 +395,8 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     serializer_class = RecommendationFeedbackSerializer
     permission_classes = [IsAdmin]
     pagination_class = StandardPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['fpo__name', 'feedback_comment']
 
     list_message = 'recommendations.feedback_list_retrieved'
 
