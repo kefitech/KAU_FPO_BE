@@ -57,6 +57,8 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 
 # Site URL for email links, etc.
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
+ML_SERVICE_URL = config('ML_SERVICE_URL', default='http://localhost:8001')
+ML_MODELS_DIR = config('ML_MODELS_DIR', default=str(BASE_DIR.parent / 'ml_models'))
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
 # =============================================================================
