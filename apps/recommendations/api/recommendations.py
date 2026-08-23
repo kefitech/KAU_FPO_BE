@@ -240,10 +240,24 @@ class MLModelVersionAdminView(APIView):
     def get(self, request, *args, **kwargs):
         lang = request.language
         versions = MLModelVersion.objects.all().order_by('-deployed_at')
-        serializer = MLModelVersionSerializer(versions, many=True)
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(versions, request, view=self)
+        serializer = MLModelVersionSerializer(page, many=True)
+
         return StandardResponse.success(
             data=serializer.data,
             message=t('recommendations.models_retrieved', lang),
+            meta={
+                "pagination": {
+                    "page": paginator.page.number,
+                    "page_size": paginator.page_size,
+                    "total_count": paginator.page.paginator.count,
+                    "total_pages": paginator.page.paginator.num_pages,
+                    "has_next": paginator.page.has_next(),
+                    "has_previous": paginator.page.has_previous(),
+                }
+            },
         )
 
     @extend_schema(tags=["Admin - ML Models"])
