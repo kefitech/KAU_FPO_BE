@@ -376,6 +376,19 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
 
     list_message = 'recommendations.feedback_list_retrieved'
 
+    def get_queryset(self):
+        """
+        Supports ?model_version=<id> to filter feedback down to
+        recommendations produced by one specific ML model version —
+        used by the "View Feedback" action on each row of the
+        ml-models admin table.
+        """
+        qs = super().get_queryset()
+        model_version_id = self.request.query_params.get('model_version')
+        if model_version_id:
+            qs = qs.filter(model_version_id=model_version_id)
+        return qs
+
     @extend_schema(tags=["Admin - Recommendations"])
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
