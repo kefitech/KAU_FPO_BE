@@ -19,7 +19,9 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
+from apps.core.views import TranslatedViewSet
 from apps.core.utils.responses import StandardResponse
+from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.permissions.rbac import IsAdmin
 
@@ -326,3 +328,54 @@ class MLModelVersionActivateView(APIView):
             data=data,
             message=t('recommendations.model_activated', lang),
         )
+
+# ---------------------------------------------------------------------------
+# Admin — recommendation feedback (read-only)
+# ---------------------------------------------------------------------------
+
+class RecommendationFeedbackSerializer(serializers.ModelSerializer):
+    """
+    Read-only view of a CropRecommendation for admin feedback review.
+    Includes the FPO's name and a flat list of the crops that were
+    recommended (pulled from the JSON recommendations field) so an
+    admin can see what was rated without opening the full record.
+    """
+    fpo_name = serializers.CharField(source='fpo.name', read_only=True)
+    crops = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CropRecommendation
+        fields = [
+            'id', 'fpo_name', 'financial_year',
+            'feedback_rating', 'feedback_comment',
+            'crops', 'created_at',
+        ]
+
+    def get_crops(self, obj):
+        return [item.get('crop') for item in (obj.recommendations or []) if item.get('crop')]
+
+
+class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
+    """
+    GET /api/admin/recommendations/feedback/ — list recommendations
+    that have farmer feedback (feedback_rating is not null), most
+    recent first.
+
+    Read-only by design — admins review feedback here, they don't edit
+    it. Wired via an explicit GET-only path() in admin/urls.py.
+    """
+    queryset = (
+        CropRecommendation.objects
+        .exclude(feedback_rating__isnull=True)
+        .select_related('fpo')
+        .order_by('-created_at')
+    )
+    serializer_class = RecommendationFeedbackSerializer
+    permission_classes = [IsAdmin]
+    pagination_class = StandardPagination
+
+    list_message = 'recommendations.feedback_list_retrieved'
+
+    @extend_schema(tags=["Admin - Recommendations"])
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
