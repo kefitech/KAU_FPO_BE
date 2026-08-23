@@ -386,7 +386,10 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
         qs = super().get_queryset()
         model_version_id = self.request.query_params.get('model_version')
         if model_version_id:
-            qs = qs.filter(model_version_id=model_version_id)
+            try:
+                qs = qs.filter(model_version_id=int(model_version_id))
+            except (TypeError, ValueError):
+                qs = qs.none()
         return qs
 
     @extend_schema(tags=["Admin - Recommendations"])
