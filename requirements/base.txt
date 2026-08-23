@@ -117,6 +117,7 @@ weasyprint>=69.0,<70.0              # PDF generation for FPO summary reports
 
 # -----------------------------------------------------------------------------
 # GIS / GeoDjango (P2-05)
+djangorestframework-gis==1.2.1
 # Requires system packages — see team/README.md for install instructions
 # -----------------------------------------------------------------------------
 GDAL>=3.4,<4.0                      # Geospatial Data Abstraction Library
