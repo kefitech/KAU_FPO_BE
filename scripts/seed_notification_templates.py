@@ -63,6 +63,10 @@ TEMPLATE_CODES = [
     ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
     # Expert enquiry
     ('expert_enquiry',              'email',  'Email sent to expert when an FPO submits a contact enquiry',            ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
+    # Crop recommendations (P2-06)
+    ('recommendation_ready',        'email',  'Notify FPO that their crop recommendation is ready',                    ['user_name', 'top_crop', 'financial_year']),
+    ('recommendation_ready',        'in_app', 'In-app notification when crop recommendation is ready',                 ['user_name', 'top_crop', 'financial_year']),
+
 ]
 
 
@@ -675,6 +679,36 @@ TEMPLATES = [
 <p style="font-weight:600;">സന്ദേശം:</p>
 <p style="background:#f9f9f9;border-left:4px solid #2e7d32;padding:12px 16px;border-radius:4px;">{{message}}</p>
 <p>ഈ അന്വേഷണത്തിന് മറുപടി നൽകാൻ <a href="mailto:{{user_email}}">{{user_email}}</a>-ലേക്ക് നേരിട്ട് മറുപടി അയക്കുക.</p>''',
+    ),
+        (
+        'recommendation_ready', 'email', 'en',
+        'Your Crop Recommendation is Ready',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Your AI-powered crop recommendation for <strong>{{financial_year}}</strong> is ready.</p>'
+            '<p>Top suggestion: <strong>{{top_crop}}</strong></p>'
+            '<p>Log in to the KAU-FPO Platform to view the full recommendation with reasoning and business guidance.</p>'
+        ),
+    ),
+    (
+        'recommendation_ready', 'email', 'ml',
+        'നിങ്ങളുടെ വിള ശുപാർശ തയ്യാറാണ്',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{financial_year}}</strong>-നുള്ള നിങ്ങളുടെ AI വിള ശുപാർശ തയ്യാറാണ്.</p>'
+            '<p>മുൻനിര നിർദ്ദേശം: <strong>{{top_crop}}</strong></p>'
+            '<p>പൂർണ്ണ ശുപാർശ കാണാൻ KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ ലോഗിൻ ചെയ്യുക.</p>'
+        ),
+    ),
+    (
+        'recommendation_ready', 'in_app', 'en',
+        'Your Crop Recommendation is Ready',
+        'Dear {{user_name}}, your crop recommendation for {{financial_year}} is ready. Top suggestion: {{top_crop}}.',
+    ),
+    (
+        'recommendation_ready', 'in_app', 'ml',
+        'നിങ്ങളുടെ വിള ശുപാർശ തയ്യാറാണ്',
+        'പ്രിയ {{user_name}}, {{financial_year}}-നുള്ള നിങ്ങളുടെ വിള ശുപാർശ തയ്യാറാണ്. മുൻനിര നിർദ്ദേശം: {{top_crop}}.',
     ),
 ]
 

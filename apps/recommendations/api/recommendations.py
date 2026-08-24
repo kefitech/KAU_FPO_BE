@@ -8,12 +8,13 @@ Endpoints:
     GET  /api/admin/ml-models/                 — list all ML model versions (admin only)
     POST /api/admin/ml-models/                 — register new model version
     POST /api/admin/ml-models/{id}/activate/   — set as active model
+    GET  /api/admin/recommendations/feedback/  — list recommendations that have farmer feedback
 """
 from pathlib import Path
 
 import httpx
 from django.conf import settings
-from rest_framework import serializers, status, filters
+from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -25,13 +26,13 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.permissions.rbac import IsAdmin
 
-from django.db.models import Q
 from apps.database.models import FPO, MLModelVersion, CropRecommendation
 from apps.recommendations.services import (
     get_crop_recommendation,
     get_current_financial_year,
     build_recommendation_payload,
 )
+from apps.recommendations.tasks import generate_crop_recommendation_task
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +57,7 @@ class CropRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = CropRecommendation
         fields = [
-            'id', 'financial_year', 'input_snapshot', 'recommendations',
+            'id', 'financial_year', 'status', 'input_snapshot', 'recommendations',
             'feedback_rating', 'feedback_comment', 'created_at',
         ]
 
@@ -103,7 +104,14 @@ class MyRecommendationView(APIView):
 
 
 class RequestRecommendationView(APIView):
-    """POST /api/recommendations/me/request/ — triggers a fresh FastAPI call."""
+    """
+    POST /api/recommendations/me/request/
+    Accepts the request immediately and dispatches a Celery task to do
+    the actual FastAPI call + save + notify — does NOT wait for FastAPI.
+    Returns 202 Accepted with the pending record, matching the async
+    dispatch pattern this project already uses for notification
+    delivery (apps/notifications/services.py).
+    """
     permission_classes = [IsAuthenticated]
 
     @extend_schema(tags=["Recommendations"])
@@ -122,32 +130,27 @@ class RequestRecommendationView(APIView):
             )
 
         fy = get_current_financial_year()
-        result = get_crop_recommendation(fpo, active_model, fy)
 
-        # Same payload-building logic used for the actual FastAPI call —
-        # stored as the audit snapshot, matching the doc's requirement
-        # that input_snapshot capture "district, zone, soil, season at
-        # time of request".
-        input_snapshot = build_recommendation_payload(fpo, active_model, fy)
-
+        # Create/reset the record as 'pending' immediately — the actual
+        # FastAPI call happens in the Celery task, not here.
         rec, _created = CropRecommendation.objects.update_or_create(
             fpo=fpo,
             financial_year=fy,
             defaults={
                 'model_version': active_model,
-                'input_snapshot': input_snapshot,
-                'recommendations': result.get('recommendations', []),
+                'input_snapshot': {},
+                'recommendations': [],
+                'status': CropRecommendation.Status.PENDING,
             },
         )
 
-        serializer = CropRecommendationSerializer(rec)
-        data = serializer.data
-        if result.get('cached'):
-            data['warning'] = result.get('warning', t('recommendations.service_unavailable', lang))
+        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy)
 
+        serializer = CropRecommendationSerializer(rec)
         return StandardResponse.success(
-            data=data,
+            data=serializer.data,
             message=t('recommendations.requested', lang),
+            status_code=status.HTTP_202_ACCEPTED,
         )
 
 
@@ -241,31 +244,10 @@ class MLModelVersionAdminView(APIView):
     def get(self, request, *args, **kwargs):
         lang = request.language
         versions = MLModelVersion.objects.all().order_by('-deployed_at')
-
-        search = request.query_params.get('search')
-        if search:
-            versions = versions.filter(
-                Q(version_code__icontains=search) |
-                Q(description__icontains=search)
-            )
-
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(versions, request, view=self)
-        serializer = MLModelVersionSerializer(page, many=True)
-
+        serializer = MLModelVersionSerializer(versions, many=True)
         return StandardResponse.success(
             data=serializer.data,
             message=t('recommendations.models_retrieved', lang),
-            meta={
-                "pagination": {
-                    "page": paginator.page.number,
-                    "page_size": paginator.page_size,
-                    "total_count": paginator.page.paginator.count,
-                    "total_pages": paginator.page.paginator.num_pages,
-                    "has_next": paginator.page.has_next(),
-                    "has_previous": paginator.page.has_previous(),
-                }
-            },
         )
 
     @extend_schema(tags=["Admin - ML Models"])
@@ -351,6 +333,7 @@ class MLModelVersionActivateView(APIView):
             message=t('recommendations.model_activated', lang),
         )
 
+
 # ---------------------------------------------------------------------------
 # Admin — recommendation feedback (read-only)
 # ---------------------------------------------------------------------------
@@ -384,7 +367,12 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     recent first.
 
     Read-only by design — admins review feedback here, they don't edit
-    it. Wired via an explicit GET-only path() in admin/urls.py.
+    it (feedback belongs to the FPO who submitted it). Same MRO note as
+    AgroClimaticZoneViewSet: TranslatedViewSet already provides list()
+    via ModelViewSet, so no extra mixins are added as bases. Wired via
+    an explicit GET-only path() in admin/urls.py, same reasoning as
+    zones/districts — a full router would also expose create/update/
+    delete, which isn't wanted here.
     """
     queryset = (
         CropRecommendation.objects
@@ -395,26 +383,8 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     serializer_class = RecommendationFeedbackSerializer
     permission_classes = [IsAdmin]
     pagination_class = StandardPagination
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['fpo__name', 'feedback_comment']
 
     list_message = 'recommendations.feedback_list_retrieved'
-
-    def get_queryset(self):
-        """
-        Supports ?model_version=<id> to filter feedback down to
-        recommendations produced by one specific ML model version —
-        used by the "View Feedback" action on each row of the
-        ml-models admin table.
-        """
-        qs = super().get_queryset()
-        model_version_id = self.request.query_params.get('model_version')
-        if model_version_id:
-            try:
-                qs = qs.filter(model_version_id=int(model_version_id))
-            except (TypeError, ValueError):
-                qs = qs.none()
-        return qs
 
     @extend_schema(tags=["Admin - Recommendations"])
     def list(self, request, *args, **kwargs):
