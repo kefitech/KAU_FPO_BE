@@ -26,6 +26,14 @@ from .translations import TranslationViewSet
 from .fpo_roles import FPOMemberRoleViewSet
 from .fpo_actions import FPOActionViewSet
 from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
+#-----------------------------------------------------------------------------
+#aug21 import buyer
+#Arunima
+from apps.marketplace.api.buyers import BuyerDirectoryViewSet
+from apps.marketplace.api.matches import AdminMatchViewSet
+from apps.marketplace.api.market_prices import AdminMarketPriceViewSet
+#-------------------------------------------------------------------------------
+
 from .applications import (
     ApplicationListView,
     ApplicationDetailView,
@@ -133,6 +141,15 @@ router.register(r'menu', MenuItemViewSet, basename='menu')
 router.register(r'sub-admins', SubAdminViewSet, basename='sub-admin')
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
+
+#---------------------------------------------------------------------------
+#Arunima
+#aug21 for buyers.py in marketplace app
+router.register(r'buyers', BuyerDirectoryViewSet, basename='admin-buyer')
+router.register(r'matches', AdminMatchViewSet, basename='admin-match')
+router.register(r'prices', AdminMarketPriceViewSet, basename='admin-price')
+
+ #------------------------------------------------------------------------------
 
 # URL patterns
 urlpatterns = [

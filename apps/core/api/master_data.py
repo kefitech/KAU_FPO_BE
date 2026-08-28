@@ -67,6 +67,9 @@ class PublicMasterDataView(APIView):
         results = []
         for obj in qs:
             item = {
+                #Arunima 24th august
+                'id': obj.id, # ← the number the backend actually needs
+                #----------------------
                 'code': obj.code,
                 'name': obj.get_name(lang),
             }
