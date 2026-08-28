@@ -233,22 +233,26 @@ def _save_model_file(uploaded_file, version_code: str) -> str:
 
 class MLModelVersionAdminView(APIView):
     """
-    GET  /api/admin/ml-models/  — list all versions
+    GET  /api/admin/ml-models/  — list all versions (paginated, matching
+                                   the standard admin list pattern used
+                                   everywhere else in this project)
     POST /api/admin/ml-models/  — register a new version, with an
                                    optional file upload ("model_file")
     """
     permission_classes = [IsAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = StandardPagination
 
     @extend_schema(tags=["Admin - ML Models"])
     def get(self, request, *args, **kwargs):
-        lang = request.language
         versions = MLModelVersion.objects.all().order_by('-deployed_at')
-        serializer = MLModelVersionSerializer(versions, many=True)
-        return StandardResponse.success(
-            data=serializer.data,
-            message=t('recommendations.models_retrieved', lang),
-        )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(versions, request, view=self)
+        serializer = MLModelVersionSerializer(page, many=True)
+        # StandardPagination.get_paginated_response() already builds the
+        # full {status, message, data, meta.pagination} envelope itself —
+        # don't double-wrap with StandardResponse.success() here.
+        return paginator.get_paginated_response(serializer.data)
 
     @extend_schema(tags=["Admin - ML Models"])
     def post(self, request, *args, **kwargs):
@@ -374,12 +378,18 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     zones/districts — a full router would also expose create/update/
     delete, which isn't wanted here.
     """
-    queryset = (
-        CropRecommendation.objects
-        .exclude(feedback_rating__isnull=True)
-        .select_related('fpo')
-        .order_by('-created_at')
-    )
+    def get_queryset(self):
+        queryset = (
+            CropRecommendation.objects
+            .exclude(feedback_rating__isnull=True)
+            .select_related('fpo')
+            .order_by('-created_at')
+        )
+        model_version = self.request.query_params.get('model_version')
+        if model_version:
+            queryset = queryset.filter(model_version_id=model_version)
+        return queryset
+
     serializer_class = RecommendationFeedbackSerializer
     permission_classes = [IsAdmin]
     pagination_class = StandardPagination
