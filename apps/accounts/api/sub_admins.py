@@ -10,10 +10,12 @@ SUB_ADMIN_PERMISSIONS (constants.py).
 
 import secrets
 import logging
-
+from apps.database.models import FPO, SubAdminFPOAssignment
 from django.conf import settings as django_settings
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from rest_framework.views import APIView
+from rest_framework.generics import get_object_or_404
 
 from rest_framework import serializers, filters
 from rest_framework.decorators import action
@@ -75,6 +77,7 @@ class SubAdminCreateSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
+              # SMS is only usable if a phone number was actually given
         if attrs.get('notification_channel') == 'sms' and not attrs.get('phone'):
             raise serializers.ValidationError({
                 'notification_channel': 'Cannot use SMS — no phone number provided.'
@@ -175,6 +178,8 @@ class SubAdminViewSet(TranslatedViewSet):
     destroy_message = 'admin.sub_admin_deleted'
 
     def get_queryset(self):
+          # scoped to the SUB_ADMIN group — this is what defines "is a sub-admin"
+        # for list/retrieve/destroy/permissions/etc across the whole viewset
         try:
             sub_admin_group = Group.objects.get(name=UserRole.SUB_ADMIN)
             return User.objects.filter(
@@ -187,7 +192,10 @@ class SubAdminViewSet(TranslatedViewSet):
         if self.action == 'create':
             return SubAdminCreateSerializer
         return SubAdminSerializer
-
+ # ── CREATE SUB-ADMIN ─────────────────────────────────────────────────────
+    # Creates the User, puts them in the SUB_ADMIN group, optionally assigns
+    # initial permissions, and emails/SMSs a temp password with
+    # must_change_password=True so they're forced to set their own on first login.
     def create(self, request, *args, **kwargs):
         lang = self.get_language()
         serializer = SubAdminCreateSerializer(data=request.data)
@@ -241,6 +249,13 @@ class SubAdminViewSet(TranslatedViewSet):
             status_code=201,
         )
 
+
+    # ── EDIT SUB-ADMIN PROFILE ───────────────────────────────────────────────
+    # Only name/phone — permissions, activation, and password are all
+    # handled by their own dedicated actions below, not this endpoint.
+
+
+
     def partial_update(self, request, *args, **kwargs):
         """PATCH /api/admin/sub-admins/{id}/ — edit name and/or phone."""
         lang = self.get_language()
@@ -278,6 +293,8 @@ class SubAdminViewSet(TranslatedViewSet):
             message=t(self.update_message, lang),
         )
 
+    # ── DELETE SUB-ADMIN ─────────────────────────────────────────────────────
+    # Hard delete — no soft-delete/is_deleted flag here, unlike CBBO/FPO records.
     def destroy(self, request, *args, **kwargs):
         lang = self.get_language()
         obj  = self.get_object()
@@ -434,3 +451,22 @@ class SubAdminViewSet(TranslatedViewSet):
         elif action == 'remove':
             if codenames:
                 user.user_permissions.remove(*all_sub_admin_perms.filter(codename__in=codenames))
+
+#jobin
+#20/8/26
+
+
+
+#for sub admin fpo table
+class AssignFPOSerializer(serializers.Serializer):
+    fpo_id = serializers.IntegerField(help_text="ID of the FPO to assign to this sub-admin")
+
+    def validate_fpo_id(self, value):
+        from apps.database.models import FPO
+        if not FPO.objects.filter(id=value, is_deleted=False).exists():
+            raise serializers.ValidationError('FPO not found.')
+        return value
+
+
+class UnassignFPOSerializer(serializers.Serializer):
+    fpo_id = serializers.IntegerField(help_text="ID of the FPO to unassign from this sub-admin")
