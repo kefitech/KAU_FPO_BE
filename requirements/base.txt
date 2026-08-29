@@ -120,7 +120,7 @@ weasyprint>=69.0,<70.0              # PDF generation for FPO summary reports
 djangorestframework-gis==1.2.1
 # Requires system packages — see team/README.md for install instructions
 # -----------------------------------------------------------------------------
-GDAL>=3.4,<4.0                      # Geospatial Data Abstraction Library
+GDAL==3.10.3                        # Pinned to match Docker image's system libgdal exactly (was >=3.4,<4.0 which auto-picked 3.13.3 and broke the build)
 
 # -----------------------------------------------------------------------------
 # Numerical / Financial Calculations (P2-07 DPR)
