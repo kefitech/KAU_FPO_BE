@@ -3934,6 +3934,18 @@ def seed_translations():
     print(f"✅ Seeded {home_count} home section translations")
     total_count += home_count
 
+    # Step 9e: Seed GIS module translations (P2-05)
+    print("\nSeeding GIS module translations...")
+    gis_count = seed_gis_translations(languages)
+    print(f"✅ Seeded {gis_count} GIS translations")
+    total_count += gis_count
+
+    # Step 9f: Seed AI Recommendations translations (P2-06)
+    print("\nSeeding AI Recommendations translations...")
+    rec_count = seed_recommendations_translations(languages)
+    print(f"✅ Seeded {rec_count} recommendation translations")
+    total_count += rec_count
+
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
     seed_fixes(languages)
@@ -3953,6 +3965,110 @@ def seed_translations():
     print("\nSample translations (auth category):")
     for trans in Translation.objects.filter(category__code='auth')[:5]:
         print(f"  {trans.full_key} ({trans.language.code}): {trans.value[:50]}...")
+
+
+
+
+def seed_gis_translations(languages):
+    """
+    Seed GIS module messages (P2-05) — zones, districts, cultivation
+    area, weather. Malayalam values are best-effort (not from a native
+    speaker) — marked is_verified=False so they're flagged for review,
+    same as everything else in this GIS module that's a placeholder
+    pending real review/data.
+    """
+    category, _ = TranslationCategory.objects.get_or_create(
+        code='gis',
+        defaults={
+            'name': 'GIS Integration',
+            'description': 'Agro-climatic zones, districts, cultivation area, weather messages',
+            'display_order': 9,
+        }
+    )
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    gis_messages = [
+        ('zones_retrieved',            'Zones retrieved successfully',                       'മേഖലകൾ ലഭ്യമാക്കി'),
+        ('districts_retrieved',        'Districts retrieved successfully',                   'ജില്ലകൾ ലഭ്യമാക്കി'),
+        ('zone_detected',              'Zone detected successfully',                         'മേഖല കണ്ടെത്തി'),
+        ('zone_not_found',             'No zone found for the given location',               'ഈ സ്ഥലത്തിന് മേഖല കണ്ടെത്തിയില്ല'),
+        ('fpo_not_found',              'No FPO found for this user',                         'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
+        ('location_not_set',           'Location has not been set yet',                      'സ്ഥലം ഇതുവരെ സജ്ജമാക്കിയിട്ടില്ല'),
+        ('lat_lng_required',           'Latitude and longitude are required',                'അക്ഷാംശവും രേഖാംശവും ആവശ്യമാണ്'),
+        ('invalid_coordinates',        'Invalid coordinates provided',                       'അസാധുവായ കോർഡിനേറ്റുകൾ'),
+        ('cultivation_area_retrieved', 'Cultivation area retrieved successfully',            'കൃഷിഭൂമി വിവരങ്ങൾ ലഭ്യമാക്കി'),
+        ('cultivation_area_saved',     'Cultivation area saved successfully',                'കൃഷിഭൂമി വിജയകരമായി സംരക്ഷിച്ചു'),
+        ('cultivation_area_deleted',   'Cultivation area deleted successfully',              'കൃഷിഭൂമി വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('cultivation_area_not_found', 'No cultivation area found',                          'കൃഷിഭൂമി കണ്ടെത്തിയില്ല'),
+        ('weather_retrieved',          'Weather data retrieved successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ ലഭ്യമാക്കി'),
+        ('weather_refreshed',          'Weather data refreshed successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ പുതുക്കി'),
+        ('weather_not_found',          'No weather data found. Please refresh to fetch it.', 'കാലാവസ്ഥാ വിവരങ്ങൾ കണ്ടെത്തിയില്ല. ദയവായി പുതുക്കുക.'),
+    ]
+
+    count = 0
+    for key, en_text, ml_text in gis_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_text, 'context': 'GIS module (P2-05)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_text, 'context': 'GIS module (P2-05) — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
+
+
+def seed_recommendations_translations(languages):
+    """
+    Seed AI Crop Recommendations messages (P2-06). Malayalam values
+    are best-effort (not from a native speaker) — marked
+    is_verified=False so they're flagged for review.
+    """
+    category, _ = TranslationCategory.objects.get_or_create(
+        code='recommendations',
+        defaults={
+            'name': 'AI Crop Recommendations',
+            'description': 'Crop recommendation requests, feedback, and admin ML model management messages',
+            'display_order': 10,
+        }
+    )
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    recommendation_messages = [
+        ('retrieved',               'Recommendation retrieved successfully',                     'ശുപാർശ ലഭ്യമാക്കി'),
+        ('requested',                'Recommendation generated successfully',                     'ശുപാർശ വിജയകരമായി തയ്യാറാക്കി'),
+        ('feedback_saved',           'Feedback saved successfully',                               'പ്രതികരണം സംരക്ഷിച്ചു'),
+        ('not_found',                'No recommendation found for this financial year',           'ഈ സാമ്പത്തിക വർഷത്തിന് ശുപാർശ കണ്ടെത്തിയില്ല'),
+        ('fpo_not_found',            'No FPO found for this user',                                'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
+        ('invalid_rating',           'Rating must be between 1 and 5',                            'റേറ്റിംഗ് 1 നും 5 നും ഇടയിൽ ആയിരിക്കണം'),
+        ('no_active_model',          'No active AI model is currently configured',                'നിലവിൽ സജീവമായ AI മോഡൽ ഇല്ല'),
+        ('service_unavailable',      'AI service is temporarily unavailable',                     'AI സേവനം താൽക്കാലികമായി ലഭ്യമല്ല'),
+        ('models_retrieved',         'Model versions retrieved successfully',                     'മോഡൽ പതിപ്പുകൾ ലഭ്യമാക്കി'),
+        ('model_registered',         'Model version registered successfully',                     'മോഡൽ പതിപ്പ് രജിസ്റ്റർ ചെയ്തു'),
+        ('model_activated',          'Model version activated successfully',                      'മോഡൽ പതിപ്പ് സജീവമാക്കി'),
+        ('model_not_found',          'Model version not found',                                   'മോഡൽ പതിപ്പ് കണ്ടെത്തിയില്ല'),
+        ('model_reload_failed',      'Model activated, but the AI service could not be notified', 'മോഡൽ സജീവമാക്കി, പക്ഷേ AI സേവനത്തെ അറിയിക്കാൻ കഴിഞ്ഞില്ല'),
+        ('version_code_required',    'Version code is required',                                  'പതിപ്പ് കോഡ് ആവശ്യമാണ്'),
+        ('feedback_list_retrieved',  'Feedback list retrieved successfully',                      'പ്രതികരണ പട്ടിക ലഭ്യമാക്കി'),
+    ]
+
+    count = 0
+    for key, en_text, ml_text in recommendation_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_text, 'context': 'AI Recommendations (P2-06)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_text, 'context': 'AI Recommendations (P2-06) — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
 
 
 if __name__ == '__main__':

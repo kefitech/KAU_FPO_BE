@@ -1,25 +1,56 @@
 """
 GIS Weather Service — apps/gis_module/services.py
 
-TEMPORARY: get_weather_for_point() currently returns a SIMULATED
-estimate combining season (from today's date) and zone (from a live
-spatial lookup against AgroClimaticZone) — not real weather data.
-India Meteorological Department's Agromet Advisories API
-(api.imd.gov.in) is the intended real source — agriculture-focused,
-official government data, a strong fit for this platform. It requires
-account registration and IP whitelisting through IMD's portal
-(api.imd.gov.in/public/login.php), which is an organizational step for
-whoever manages vendor/API registrations, not something wireable
-directly in this module.
+Tries OpenWeatherMap's real Current Weather API first — reading the
+API key from ExternalAPISettings (service='weather_api'), the same
+encrypted-credential system used for PAN/GSTIN/CIN verification and
+the AI chat feature (apps/database/models/external_api.py). Manage
+the key via the existing admin dashboard (/admin/external-apis in the
+frontend) — no new UI needed, this system was already built to be
+generic across services.
 
-When that's set up: replace the body of get_weather_for_point() with a
-real API call, keep the same return shape, and set is_simulated=False.
-No other code (views, models) needs to change — everything downstream
-consumes this function's return value, not its implementation.
+Falls back to a SIMULATED estimate (season + zone based) if the
+service isn't registered, isn't active, or the API call fails for any
+reason — same graceful-degradation pattern used throughout this
+project (e.g. the FastAPI recommendation proxy's cached-fallback
+logic).
+
+Chose OpenWeatherMap over Open-Meteo: Open-Meteo's free tier is
+explicitly non-commercial-use-only per their Terms of Service — not
+appropriate for this commercially-contracted platform. OpenWeatherMap's
+free tier explicitly permits commercial use with attribution.
+
+India Meteorological Department's Agromet Advisories API
+(api.imd.gov.in) remains the eventual ideal (agriculture-focused,
+official government data) but requires organizational registration +
+IP whitelisting — out of scope for this module alone. OpenWeatherMap
+is the pragmatic interim real data source.
 """
 from datetime import date
 
+import httpx
 from django.contrib.gis.geos import Point
+
+OPENWEATHERMAP_URL = "https://api.openweathermap.org/data/2.5/weather"
+
+
+def _get_weather_api_key() -> str | None:
+    """
+    Looks up the active weather_api credential from ExternalAPISettings.
+    Returns None if no entry exists, it's inactive, or has no api_key —
+    any of which triggers the simulated fallback in get_weather_for_point().
+    """
+    from apps.database.models import ExternalAPISettings
+    from apps.notifications.utils import decrypt_config
+
+    settings_obj = ExternalAPISettings.objects.filter(
+        service=ExternalAPISettings.SERVICE_WEATHER, is_active=True
+    ).first()
+    if not settings_obj or not settings_obj.config:
+        return None
+
+    config = decrypt_config(settings_obj.config)
+    return config.get('api_key') or None
 
 
 def find_zone_for_point(lat: float, lng: float):
@@ -90,6 +121,49 @@ def get_current_season(reference_date: date | None = None) -> str:
     return 'dry_season'
 
 
+# ── Real weather — OpenWeatherMap ──
+
+def _fetch_real_weather(lat: float, lng: float) -> dict | None:
+    """
+    Calls OpenWeatherMap's Current Weather API. Returns None (which
+    triggers fallback to simulation below) if no API key is configured,
+    or if the call fails for any reason — network error, rate limit,
+    invalid response, etc.
+
+    HONEST NOTE on rainfall: OpenWeatherMap's 'rain' field is real,
+    measured rainfall in the LAST 1 HOUR (mm) — not a seasonal or daily
+    total. This is genuinely a different quantity than the simulated
+    fallback's 'rainfall_mm' (an illustrative SEASONAL estimate). Both
+    are returned under the same field name for API-contract stability,
+    but the MEANING differs by is_simulated: "recent measured rainfall"
+    when False, vs. "illustrative seasonal estimate" when True. Don't
+    conflate the two when interpreting stored FPOWeatherSnapshot rows.
+    """
+    api_key = _get_weather_api_key()
+    if not api_key:
+        return None
+
+    try:
+        response = httpx.get(
+            OPENWEATHERMAP_URL,
+            params={'lat': lat, 'lon': lng, 'appid': api_key, 'units': 'metric'},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        return {
+            'temperature_c': round(data['main']['temp'], 1),
+            'humidity_percent': round(data['main']['humidity'], 1),
+            'rainfall_mm': round(data.get('rain', {}).get('1h', 0.0), 1),
+            'description': data['weather'][0]['description'].capitalize(),
+        }
+    except Exception:
+        return None
+
+
+# ── Simulated fallback — used only if the real API is unavailable ──
+
 # Rough seasonal baselines for Kerala — deliberately simple, illustrative
 # ranges, not derived from any real dataset.
 _SEASON_PROFILES = {
@@ -140,31 +214,9 @@ _ZONE_ADJUSTMENTS = {
 }
 
 
-def get_weather_for_point(lat: float, lng: float, reference_date: date | None = None) -> dict:
-    """
-    Returns a weather estimate for the given coordinates.
-
-    TEMPORARY / SIMULATED: does not call any real weather service.
-    Combines Kerala's seasonal calendar (varies by date) with a live
-    lookup of which AgroClimaticZone the point falls in (varies by
-    location, via find_zone_for_point above) to produce a more
-    location-aware estimate than season alone. Still illustrative, not
-    measured data.
-
-    Return shape (kept stable so callers don't need to change when
-    this is swapped for a real API):
-        {
-            'temperature_c': float,
-            'humidity_percent': float,
-            'rainfall_mm': float,
-            'season': str,
-            'description': str,
-            'is_simulated': bool,
-        }
-    """
-    season = get_current_season(reference_date)
+def _simulate_weather(lat: float, lng: float, season: str) -> dict:
+    """Illustrative fallback — only used when the real API is unavailable."""
     profile = _SEASON_PROFILES[season]
-
     zone = find_zone_for_point(lat, lng)
     adjustment = _ZONE_ADJUSTMENTS.get(zone.code, {}) if zone else {}
 
@@ -181,7 +233,40 @@ def get_weather_for_point(lat: float, lng: float, reference_date: date | None = 
         'temperature_c': round(temperature_c, 1),
         'humidity_percent': round(humidity_percent, 1),
         'rainfall_mm': round(rainfall_mm, 1),
-        'season': season,
         'description': description,
+    }
+
+
+def get_weather_for_point(lat: float, lng: float, reference_date: date | None = None) -> dict:
+    """
+    Returns a weather estimate for the given coordinates. Tries the
+    real OpenWeatherMap API first; falls back to a simulated
+    season+zone-based estimate if the API call fails or no key is
+    configured.
+
+    Return shape (kept stable regardless of source):
+        {
+            'temperature_c': float,
+            'humidity_percent': float,
+            'rainfall_mm': float,
+            'season': str,
+            'description': str,
+            'is_simulated': bool,
+        }
+    """
+    season = get_current_season(reference_date)
+
+    real = _fetch_real_weather(lat, lng)
+    if real is not None:
+        return {
+            **real,
+            'season': season,
+            'is_simulated': False,
+        }
+
+    simulated = _simulate_weather(lat, lng, season)
+    return {
+        **simulated,
+        'season': season,
         'is_simulated': True,
     }

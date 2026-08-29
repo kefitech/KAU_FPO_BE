@@ -127,6 +127,7 @@ from apps.accounts.api.sub_admins import SubAdminViewSet
 from apps.recommendations.api.recommendations import (
     MLModelVersionAdminView,
     MLModelVersionActivateView,
+    RecommendationFeedbackAdminViewSet,
 )
 
 # Create DRF router
@@ -247,10 +248,8 @@ urlpatterns = [
     # ML Model Versions (P2-06)
     path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
     path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
+    path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),
 
     # DPR — Admin CRUD routes mounted at /api/admin/dpr/
-    #   /api/admin/dpr/master/<slug>/            — 33 list-create endpoints
-    #   /api/admin/dpr/master/<slug>/<int:pk>/   — 33 detail endpoints
-    # Section endpoints will be added as Phase 2 backend is built.
     path('dpr/', include('apps.accounts.api.admin.dpr.urls')),
 ]

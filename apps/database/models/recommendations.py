@@ -1,6 +1,5 @@
 """
 AI Crop Recommendations Models — P2-06
-
 Django acts as proxy to FastAPI ML service on port 8001 (internal only).
 """
 from django.db import models
@@ -37,6 +36,12 @@ class MLModelVersion(BaseModel):
 
 
 class CropRecommendation(BaseModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
     fpo = models.ForeignKey(
         'database.FPO', on_delete=models.CASCADE, related_name='recommendations'
     )
@@ -49,7 +54,14 @@ class CropRecommendation(BaseModel):
         help_text='District, zone, soil type, season at time of request'
     )
     recommendations = models.JSONField(
+        default=list,
         help_text='[{crop, confidence, reasoning, estimated_yield}]'
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING,
+        help_text='Tracks the async request lifecycle — pending while '
+                   'queued for Celery, processing while the FastAPI call '
+                   'is in flight, completed/failed once resolved.'
     )
     feedback_rating = models.IntegerField(
         null=True, blank=True,
@@ -64,4 +76,4 @@ class CropRecommendation(BaseModel):
         # One active recommendation per FPO per financial year
 
     def __str__(self):
-        return f"{self.fpo} — {self.financial_year}"
+        return f"{self.fpo} — {self.financial_year} ({self.status})"

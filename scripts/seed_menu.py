@@ -190,7 +190,7 @@ def seed_menu():
         path      = '/admin/ml-models',
         icon      = 'brain-circuit',
         roles     = [super_admin_group],
-        order     = 18,
+        order     = 21,
     )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
