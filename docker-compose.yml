@@ -16,8 +16,16 @@ services:
     image: redis:7-alpine
     restart: always
 
+  ml-service:
+    image: athulkefitech1123/kau-fpo-ml-service:testing
+    restart: always
+    # Mock crop recommendation FastAPI service (Aravind — P2-06).
+    # Django (web) proxies /api/recommendations/ requests to this on port 8001.
+    depends_on:
+      - redis
+
   web:
-    build: .
+    image: athulkefitech1123/kau-fpo-backend:testing
     restart: always
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
     volumes:
@@ -29,9 +37,10 @@ services:
     depends_on:
       - db
       - redis
+      - ml-service
 
   celery:
-    build: .
+    image: athulkefitech1123/kau-fpo-backend:testing
     restart: always
     command: celery -A config worker --loglevel=info --concurrency=1
     volumes:
@@ -43,7 +52,7 @@ services:
       - redis
 
   celery-beat:
-    build: .
+    image: athulkefitech1123/kau-fpo-backend:testing
     restart: always
     command: celery -A config beat --loglevel=info
     volumes:
