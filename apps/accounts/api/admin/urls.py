@@ -18,6 +18,9 @@ Created: 28-04-2026
 """
 
 from django.urls import path, include
+# DPR admin (P2-07) removed 2026-08-24. v2 will rebuild admin API in Phase 4.
+# AI service admin endpoints also removed — will move to a dedicated ai_admin.py.
+# See context/phase2/Dpr/DPR_V2_CONTEXT.md
 from rest_framework.routers import DefaultRouter
 
 from .languages import LanguageViewSet
@@ -244,4 +247,10 @@ urlpatterns = [
     # ML Model Versions (P2-06)
     path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
     path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
+
+    # DPR — Admin CRUD routes mounted at /api/admin/dpr/
+    #   /api/admin/dpr/master/<slug>/            — 33 list-create endpoints
+    #   /api/admin/dpr/master/<slug>/<int:pk>/   — 33 detail endpoints
+    # Section endpoints will be added as Phase 2 backend is built.
+    path('dpr/', include('apps.accounts.api.admin.dpr.urls')),
 ]

@@ -5,7 +5,7 @@ All FPO-facing API endpoints.
 Base: /api/fpo/
 """
 
-from django.urls import path
+from django.urls import path, include
 
 # Auth (registration) — included in /api/auth/ via accounts/urls.py
 from .auth import RegisterFPOUserView
@@ -42,6 +42,8 @@ from .tier_assessment import (
     TierAssessmentUploadView,
     TierAssessmentUploadDeleteView,
 )
+# DPR v1 imports removed 2026-08-24. v2 endpoints will live under /api/fpo/dpr/v2/
+# See context/phase2/Dpr/DPR_V2_CONTEXT.md
 
 # FPO-facing auth urls exposed to accounts/urls.py
 fpo_auth_urls = [
@@ -98,4 +100,7 @@ urlpatterns = [
     path('me/tier-assessment/<int:assessment_id>/reopen/', TierAssessmentReopenView.as_view(), name='fpo-tier-assessment-reopen'),
     path('me/tier-assessment/<int:assessment_id>/upload/', TierAssessmentUploadView.as_view(), name='fpo-tier-assessment-upload'),
     path('me/tier-assessment/<int:assessment_id>/upload/<int:upload_id>/', TierAssessmentUploadDeleteView.as_view(), name='fpo-tier-assessment-upload-delete'),
+
+    # DPR module — routes registered in apps/fpo/api/dpr/urls.py, mounted at /api/fpo/dpr/
+    path('dpr/', include('apps.fpo.api.dpr.urls')),
 ]

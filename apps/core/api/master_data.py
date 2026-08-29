@@ -67,6 +67,7 @@ class PublicMasterDataView(APIView):
         results = []
         for obj in qs:
             item = {
+                'id':   obj.id,
                 'code': obj.code,
                 'name': obj.get_name(lang),
             }

@@ -63,6 +63,9 @@ TEMPLATE_CODES = [
     ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
     # Expert enquiry
     ('expert_enquiry',              'email',  'Email sent to expert when an FPO submits a contact enquiry',            ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
+    # DPR Generation (P2-07)
+    ('dpr_generated',               'email',  'Email to FPO when DPR PDF is ready to download',                       ['user_name', 'project_title', 'financial_year', 'button_link', 'button_text']),
+    ('dpr_generated',               'in_app', 'In-app notification when DPR PDF is ready',                            ['user_name', 'project_title', 'financial_year']),
 ]
 
 
@@ -675,6 +678,34 @@ TEMPLATES = [
 <p style="font-weight:600;">സന്ദേശം:</p>
 <p style="background:#f9f9f9;border-left:4px solid #2e7d32;padding:12px 16px;border-radius:4px;">{{message}}</p>
 <p>ഈ അന്വേഷണത്തിന് മറുപടി നൽകാൻ <a href="mailto:{{user_email}}">{{user_email}}</a>-ലേക്ക് നേരിട്ട് മറുപടി അയക്കുക.</p>''',
+    ),
+
+    # ── DPR Generated (P2-07) ─────────────────────────────────────────────
+    (
+        'dpr_generated', 'email', 'en',
+        'Your Detailed Project Report is Ready — {{project_title}}',
+        '''<p>Dear <strong>{{user_name}}</strong>,</p>
+<p>Your <strong>Detailed Project Report (DPR)</strong> for <strong>{{project_title}}</strong> (Financial Year: {{financial_year}}) has been generated successfully and is ready for download.</p>
+<p>The DPR includes complete financial projections, market analysis, technical feasibility assessment, and all supporting sections required for bank and agency submission.</p>
+<p style="margin-top:16px;color:#555;">You can download the PDF from your FPO portal using the button below.</p>''',
+    ),
+    (
+        'dpr_generated', 'email', 'ml',
+        'നിങ്ങളുടെ വിശദ പദ്ധതി റിപ്പോർട്ട് തയ്യാറായി — {{project_title}}',
+        '''<p>പ്രിയ <strong>{{user_name}}</strong>,</p>
+<p><strong>{{project_title}}</strong> (സാമ്പത്തിക വർഷം: {{financial_year}}) എന്ന പദ്ധതിക്കുള്ള <strong>വിശദ പദ്ധതി റിപ്പോർട്ട് (DPR)</strong> വിജയകരമായി തയ്യാറാക്കപ്പെട്ടിരിക്കുന്നു.</p>
+<p>ബാങ്ക്, ഏജൻസി സമർപ്പണത്തിനാവശ്യമായ സമ്പൂർണ്ണ സാമ്പത്തിക പ്രൊജക്ഷനുകൾ, വിപണി വിശകലനം, സാങ്കേതിക സാദ്ധ്യതാ പഠനം എന്നിവ DPR-ൽ ഉൾപ്പെടുത്തിയിട്ടുണ്ട്.</p>
+<p>ചുവടെയുള്ള ബട്ടൺ ഉപയോഗിച്ച് PDF ഡൗൺലോഡ് ചെയ്യാം.</p>''',
+    ),
+    (
+        'dpr_generated', 'in_app', 'en',
+        'DPR Ready — {{project_title}}',
+        'Your Detailed Project Report for <strong>{{project_title}}</strong> (FY {{financial_year}}) is ready. Click to download.',
+    ),
+    (
+        'dpr_generated', 'in_app', 'ml',
+        'DPR തയ്യാർ — {{project_title}}',
+        '<strong>{{project_title}}</strong> (FY {{financial_year}}) DPR തയ്യാറായി. ഡൗൺലോഡ് ചെയ്യാൻ ക്ലിക്ക് ചെയ്യുക.',
     ),
 ]
 

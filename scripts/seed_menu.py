@@ -163,6 +163,27 @@ def seed_menu():
         roles     = [super_admin_group, sub_admin_group],
         order     = 17,
     )
+    seed_item(
+        label_key = 'menu.dpr_projects',
+        path      = '/admin/dpr',
+        icon      = 'file-bar-chart',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 18,
+    )
+    seed_item(
+        label_key = 'menu.dpr_config',
+        path      = '/admin/dpr-config',
+        icon      = 'sliders-horizontal',
+        roles     = [super_admin_group],
+        order     = 19,
+    )
+    seed_item(
+        label_key = 'menu.ai_services',
+        path      = '/admin/ai-services',
+        icon      = 'bot',
+        roles     = [super_admin_group],
+        order     = 20,
+    )
 
     seed_item(
         label_key = 'menu.ml_models',
@@ -233,11 +254,18 @@ def seed_menu():
         order     = 8,
     )
     seed_item(
+        label_key = 'menu.fpo_dpr',
+        path      = '/fpo/dpr',
+        icon      = 'file-bar-chart',
+        roles     = fpo_roles,
+        order     = 9,
+    )
+    seed_item(
         label_key = 'menu.fpo_settings',
         path      = '/fpo/settings',
         icon      = 'settings',
         roles     = fpo_roles,
-        order     = 9,
+        order     = 10,
     )
 
     print("\n" + "=" * 60)
