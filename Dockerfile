@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
+    g++ \
     libmagic1 \
     binutils \
     libproj-dev \
