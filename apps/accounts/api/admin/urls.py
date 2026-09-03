@@ -35,6 +35,7 @@ from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
 from apps.marketplace.api.buyers import BuyerDirectoryViewSet
 from apps.marketplace.api.matches import AdminMatchViewSet
 from apps.marketplace.api.market_prices import AdminMarketPriceViewSet
+from apps.accounts.api.admin.market_linkage import (AdminMarketLinkageFPOListView,AdminMarketLinkageFPOProductsView,)
 #-------------------------------------------------------------------------------
 
 from .applications import (
@@ -177,6 +178,13 @@ urlpatterns = [
     path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),
     path('applications/<int:fpo_id>/activate/',                              ApplicationActivateView.as_view(),        name='admin-applications-activate'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
+    #--------------------------------------------------------------------------
+    #Arunima S 29th august 2026
+    # Market Linkage
+    
+    path('market-linkage/fpos/',                       AdminMarketLinkageFPOListView.as_view(),     name='admin-market-linkage-fpos'),
+    path('market-linkage/fpos/<int:fpo_id>/products/',  AdminMarketLinkageFPOProductsView.as_view(), name='admin-market-linkage-fpo-products'),
+    #-----------------------------------------------------------------------------------
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
     # Audit Logs
