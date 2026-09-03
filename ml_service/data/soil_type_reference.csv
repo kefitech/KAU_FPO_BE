@@ -1,0 +1,7 @@
+soil_type,ph_lo,ph_hi,zones_present_in
+Coastal sandy / laterite patches,5.5,7.0,coastal_zone
+"Coastal alluvium / sandy, backwater-adjacent",5.5,7.5,coastal_zone
+Laterite,4.5,6.0,"southern_zone, central_zone, northern_zone"
+Lateritic loam (transitional),4.8,6.3,"southern_zone, high_ranges"
+Black soil (Chittoor black soil) / red loam,6.5,8.5,central_zone
+"Forest loam / hill soil (acidic, high organic matter)",4.5,6.0,"northern_zone, high_ranges"

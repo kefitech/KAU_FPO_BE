@@ -1,0 +1,110 @@
+{
+  "random_80_20_split": {
+    "accuracy": 0.8453796889295517,
+    "precision": 0.8353052531945102,
+    "recall": 0.9173596673596673,
+    "f1": 0.8744116918503839,
+    "roc_auc": 0.9210899801305704,
+    "confusion_matrix": [
+      [
+        1007,
+        348
+      ],
+      [
+        159,
+        1765
+      ]
+    ],
+    "n_train": 13113,
+    "n_test": 3279
+  },
+  "leave_one_zone_out_cv": [
+    {
+      "held_out": "high_ranges",
+      "accuracy": 0.5536130536130536,
+      "f1": 0.5517846693973084,
+      "n_test": 3432
+    },
+    {
+      "held_out": "central_zone",
+      "accuracy": 0.8401785714285714,
+      "f1": 0.8923200320834169,
+      "n_test": 3360
+    },
+    {
+      "held_out": "southern_zone",
+      "accuracy": 0.8360906862745098,
+      "f1": 0.8816633488166334,
+      "n_test": 3264
+    },
+    {
+      "held_out": "northern_zone",
+      "accuracy": 0.8428308823529411,
+      "f1": 0.8864290458268762,
+      "n_test": 3264
+    },
+    {
+      "held_out": "coastal_zone",
+      "accuracy": 0.8538411458333334,
+      "f1": 0.8972775108670785,
+      "n_test": 3072
+    }
+  ],
+  "leave_one_soil_type_out_cv": [
+    {
+      "held_out": "Laterite",
+      "accuracy": 0.8131067961165048,
+      "f1": 0.8729722298597745,
+      "n_test": 4944
+    },
+    {
+      "held_out": "Lateritic loam (transitional)",
+      "accuracy": 0.8509557945041816,
+      "f1": 0.8383543893747976,
+      "n_test": 3348
+    },
+    {
+      "held_out": "Forest loam / hill soil (acidic, high organic matter)",
+      "accuracy": 0.8557347670250897,
+      "f1": 0.8518859245630175,
+      "n_test": 3348
+    },
+    {
+      "held_out": "Black soil (Chittoor black soil) / red loam",
+      "accuracy": 0.8333333333333334,
+      "f1": 0.8848684210526315,
+      "n_test": 1680
+    },
+    {
+      "held_out": "Coastal sandy / laterite patches",
+      "accuracy": 0.8359375,
+      "f1": 0.8865886588658866,
+      "n_test": 1536
+    },
+    {
+      "held_out": "Coastal alluvium / sandy, backwater-adjacent",
+      "accuracy": 0.8391927083333334,
+      "f1": 0.8879818594104308,
+      "n_test": 1536
+    }
+  ],
+  "feature_importance_by_field": {
+    "crop_name": 0.3084242749124401,
+    "crop_group": 0.22712726100096306,
+    "temperature_avg_C": 0.18357843859913286,
+    "zone": 0.1257447502018435,
+    "season": 0.0660798933199477,
+    "soil_type": 0.04869908685510134,
+    "rainfall_mm": 0.0166480586815488,
+    "humidity_pct": 0.015110643411965602,
+    "soil_ph_mid": 0.008587593017056552
+  },
+  "n_rows_total": 16392,
+  "n_crops": 149,
+  "crops_with_no_positive_label": 20,
+  "class_balance": {
+    "1": 0.5866276232308443,
+    "0": 0.41337237676915567
+  },
+  "caveat": "Label is rule-derived (PoP crop requirements matched against real zone climate and a documented-approximation soil-type-per-zone mix); a crop is 'suitable' if temperature matches AND (season matches OR soil matches). Not an observed real-world outcome. Leave-one-zone-out and leave-one-soil-type-out CV are the honest generalization signals, since both dimensions have few distinct values."
+}

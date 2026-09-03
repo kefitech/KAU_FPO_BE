@@ -1,0 +1,61 @@
+zone,month,season,towns_used,temperature_avg_C,temperature_max_C,temperature_min_C,rainfall_mm,humidity_pct,elevation_m
+coastal_zone,1,dry_season,Thiruvananthapuram; Kochi; Kozhikode,27.5,32.2,22.7,7.1,71.3,8.0
+coastal_zone,2,dry_season,Thiruvananthapuram; Kochi; Kozhikode,28.2,32.8,23.5,9.3,72.3,8.0
+coastal_zone,3,dry_season,Thiruvananthapuram; Kochi; Kozhikode,29.2,33.4,25.0,16.4,73.7,8.0
+coastal_zone,4,dry_season,Thiruvananthapuram; Kochi; Kozhikode,29.4,33.1,25.6,72.5,75.7,8.0
+coastal_zone,5,dry_season,Thiruvananthapuram; Kochi; Kozhikode,28.6,32.0,25.3,153.3,77.7,8.0
+coastal_zone,6,southwest_monsoon,Thiruvananthapuram; Kochi; Kozhikode,26.7,29.5,23.9,383.5,82.3,8.0
+coastal_zone,7,southwest_monsoon,Thiruvananthapuram; Kochi; Kozhikode,26.2,28.8,23.6,330.8,83.3,8.0
+coastal_zone,8,southwest_monsoon,Thiruvananthapuram; Kochi; Kozhikode,26.4,29.1,23.8,213.1,82.3,8.0
+coastal_zone,9,southwest_monsoon,Thiruvananthapuram; Kochi; Kozhikode,26.8,29.9,23.8,168.6,80.3,8.0
+coastal_zone,10,northeast_monsoon,Thiruvananthapuram; Kochi; Kozhikode,27.3,30.5,24.0,211.4,79.0,8.0
+coastal_zone,11,northeast_monsoon,Thiruvananthapuram; Kochi; Kozhikode,27.5,31.3,23.8,116.9,76.7,8.0
+coastal_zone,12,northeast_monsoon,Thiruvananthapuram; Kochi; Kozhikode,27.4,31.9,22.9,31.9,73.3,8.0
+southern_zone,1,dry_season,Kottayam; Thiruvananthapuram,27.4,32.6,22.2,13.0,65.0,4.5
+southern_zone,2,dry_season,Kottayam; Thiruvananthapuram,28.0,33.2,22.8,20.2,65.5,4.5
+southern_zone,3,dry_season,Kottayam; Thiruvananthapuram,29.0,34.0,24.0,48.5,67.0,4.5
+southern_zone,4,dry_season,Kottayam; Thiruvananthapuram,29.2,33.6,24.6,136.8,71.5,4.5
+southern_zone,5,dry_season,Kottayam; Thiruvananthapuram,28.7,32.8,24.6,235.5,73.0,4.5
+southern_zone,6,southwest_monsoon,Kottayam; Thiruvananthapuram,26.8,30.4,23.4,446.8,77.0,4.5
+southern_zone,7,southwest_monsoon,Kottayam; Thiruvananthapuram,26.4,29.8,23.0,359.6,77.5,4.5
+southern_zone,8,southwest_monsoon,Kottayam; Thiruvananthapuram,26.7,30.2,23.2,283.8,76.5,4.5
+southern_zone,9,southwest_monsoon,Kottayam; Thiruvananthapuram,27.1,30.9,23.4,236.2,75.5,4.5
+southern_zone,10,northeast_monsoon,Kottayam; Thiruvananthapuram,27.2,31.0,23.3,329.7,75.5,4.5
+southern_zone,11,northeast_monsoon,Kottayam; Thiruvananthapuram,27.2,31.2,23.2,197.4,75.0,4.5
+southern_zone,12,northeast_monsoon,Kottayam; Thiruvananthapuram,27.4,32.2,22.5,57.0,69.5,4.5
+central_zone,1,dry_season,Kochi; Palakkad,27.2,31.8,22.6,1.8,70.0,46.5
+central_zone,2,dry_season,Kochi; Palakkad,28.4,33.4,23.4,3.8,70.0,46.5
+central_zone,3,dry_season,Kochi; Palakkad,29.8,34.8,24.8,11.0,70.0,46.5
+central_zone,4,dry_season,Kochi; Palakkad,29.8,34.2,25.4,32.0,71.0,46.5
+central_zone,5,dry_season,Kochi; Palakkad,28.5,32.2,24.8,77.1,74.5,46.5
+central_zone,6,southwest_monsoon,Kochi; Palakkad,26.3,28.9,23.8,218.2,76.5,46.5
+central_zone,7,southwest_monsoon,Kochi; Palakkad,25.6,27.8,23.4,268.1,76.5,46.5
+central_zone,8,southwest_monsoon,Kochi; Palakkad,25.9,28.2,23.6,210.0,76.0,46.5
+central_zone,9,southwest_monsoon,Kochi; Palakkad,26.4,29.2,23.6,119.8,75.0,46.5
+central_zone,10,northeast_monsoon,Kochi; Palakkad,27.1,30.2,24.0,115.8,74.5,46.5
+central_zone,11,northeast_monsoon,Kochi; Palakkad,27.4,30.8,23.8,57.2,73.5,46.5
+central_zone,12,northeast_monsoon,Kochi; Palakkad,26.9,30.9,23.0,9.4,70.5,46.5
+northern_zone,1,dry_season,Kozhikode,28.0,33.0,23.1,1.6,64.0,15.0
+northern_zone,2,dry_season,Kozhikode,28.8,33.5,24.1,4.8,65.0,15.0
+northern_zone,3,dry_season,Kozhikode,30.0,34.2,25.7,14.6,68.0,15.0
+northern_zone,4,dry_season,Kozhikode,30.4,34.4,26.5,83.5,70.0,15.0
+northern_zone,5,dry_season,Kozhikode,30.0,33.7,26.3,223.5,74.0,15.0
+northern_zone,6,southwest_monsoon,Kozhikode,27.5,30.6,24.4,782.9,84.0,15.0
+northern_zone,7,southwest_monsoon,Kozhikode,26.7,29.6,23.8,750.0,87.0,15.0
+northern_zone,8,southwest_monsoon,Kozhikode,26.9,29.8,24.0,432.6,85.0,15.0
+northern_zone,9,southwest_monsoon,Kozhikode,27.6,30.9,24.3,273.3,81.0,15.0
+northern_zone,10,northeast_monsoon,Kozhikode,28.1,31.8,24.4,302.6,78.0,15.0
+northern_zone,11,northeast_monsoon,Kozhikode,28.4,32.6,24.3,120.4,73.0,15.0
+northern_zone,12,northeast_monsoon,Kozhikode,28.0,32.9,23.2,21.9,66.0,15.0
+high_ranges,1,dry_season,Munnar,17.6,22.4,12.9,18.0,70.0,1532.0
+high_ranges,2,dry_season,Munnar,18.7,23.7,13.7,29.0,70.0,1532.0
+high_ranges,3,dry_season,Munnar,20.2,25.3,15.1,47.0,72.0,1532.0
+high_ranges,4,dry_season,Munnar,21.0,25.6,16.5,129.0,75.0,1532.0
+high_ranges,5,dry_season,Munnar,21.5,25.6,17.3,189.0,78.0,1532.0
+high_ranges,6,southwest_monsoon,Munnar,20.3,23.7,16.9,420.0,85.0,1532.0
+high_ranges,7,southwest_monsoon,Munnar,19.4,22.4,16.3,583.0,85.0,1532.0
+high_ranges,8,southwest_monsoon,Munnar,19.6,22.8,16.3,364.0,85.0,1532.0
+high_ranges,9,southwest_monsoon,Munnar,19.6,23.2,16.0,210.0,80.0,1532.0
+high_ranges,10,northeast_monsoon,Munnar,19.2,22.7,15.7,253.0,78.0,1532.0
+high_ranges,11,northeast_monsoon,Munnar,18.3,21.8,14.8,164.0,75.0,1532.0
+high_ranges,12,northeast_monsoon,Munnar,17.7,21.9,13.5,64.0,72.0,1532.0

@@ -60,7 +60,7 @@ SITE_URL = config('SITE_URL', default='http://localhost:8000')
 ML_SERVICE_URL = config('ML_SERVICE_URL', default='http://localhost:8001')
 ML_MODELS_DIR = config('ML_MODELS_DIR', default=str(BASE_DIR.parent / 'ml_models'))
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
-
+ML_TRAIN_TIMEOUT_SECONDS = config('ML_TRAIN_TIMEOUT_SECONDS', default=900, cast=int)
 # =============================================================================
 # APPLICATION DEFINITION
 # =============================================================================

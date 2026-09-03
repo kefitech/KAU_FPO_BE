@@ -1,0 +1,180 @@
+crop_name,agro_zone,crop_group,temp_lo,temp_hi,ph_lo,ph_hi,seasons_text,ph_is_real,temp_is_real
+Adapathiyan,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False
+Agathi,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False
+Ailanthus or Matti,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,Onset of rains (June planting; also Oct-Nov planting option),False,False
+Amaranth,General (all zones),Vegetables,22.0,32.0,5.0,6.5,Year-round (avoid sowing red-leaved varieties during periods of heavy rain; rainy season planting on raised beds),False,False
+Anthurium,High Hills,Ornamental Plants,18.0,28.0,5.6,6.5,,False,True
+Anthurium,Midland Laterites,Ornamental Plants,18.0,28.0,5.6,6.5,,False,True
+Apple,High Hills,Fruits,3.0,11.0,5.9,6.5,Late winter (planting),False,True
+Arecanut,Coastal Plain,Beverages and Stimulants,24.0,33.0,6.0,6.5,Field planting: May-June in well-drained soils; August-September in clayey soils,False,False
+Arecanut,Foothills,Beverages and Stimulants,20.0,30.0,6.0,6.5,Field planting: May-June in well-drained soils; August-September in clayey soils,False,False
+Arecanut,High Hills,Beverages and Stimulants,12.0,25.0,6.0,6.5,Field planting: May-June in well-drained soils; August-September in clayey soils,False,False
+Arecanut,Midland Laterites,Beverages and Stimulants,23.0,32.0,6.0,6.5,Field planting: May-June in well-drained soils; August-September in clayey soils,False,False
+Arecanut,Palakkad Plain,Beverages and Stimulants,24.0,36.0,6.0,6.5,Field planting: May-June in well-drained soils; August-September in clayey soils,False,False
+Arrow root,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Ash gourd,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,"January-March | September-December | May-June (rainfed crop, sown after receipt of first showers)",False,False
+Asoka,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Planted with onset of monsoon in May-June,False,False
+Banana,Coastal Plain,Fruits,23.0,31.0,5.9,6.5,"General (all zones) | January planting (rainfed,  pot-irrigated at 9 litres/plant once in 15 days until April-May)",False,True
+Banana,Midland Laterites,Fruits,23.0,31.0,5.9,6.5,April-May (rainfed) | August-September (irrigated),False,True
+Beet root,High Hills,Cool Season Vegetables,12.0,25.0,5.2,7.0,August-January,False,False
+Betel vine,General (all zones),Beverages and Stimulants,10.0,40.0,6.0,6.5,Edavakodi: planted May-June | Thulakodi: planted August-September,False,True
+Bitter gourd,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,"January-March | September-December | May-June (rainfed crop, sown after receipt of first showers)",False,False
+Black gram,General (all zones),Pulses,22.0,32.0,5.0,6.5,Throughout the year,False,False
+Black pepper,General (all zones),Spices and Condiments,10.0,40.0,5.0,6.5,April-May (planting of standards/support trees with onset of pre-monsoon showers) | June-July (planting of rooted pepper cuttings with onset of southwest monsoon),False,True
+Bottle gourd,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,"January-March | September-December | May-June (rainfed crop, sown after receipt of first showers)",False,False
+Brahmi,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Brinjal,General (all zones),Solanaceous Vegetables,22.0,32.0,5.0,6.5,"May-June (rainfed crop, before onset of southwest monsoon) | September-October (irrigated crop)",False,False
+Cabbage,High Hills,Cool Season Vegetables,12.0,25.0,5.2,7.0,October-November,False,False
+Cabbage,Midland Laterites,Cool Season Vegetables,23.0,32.0,5.2,7.0,October-November,False,False
+Camboge,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,Onset of monsoon showers (field planting),False,False
+Cardamom,High Hills,Spices and Condiments,10.0,35.0,5.0,6.5,"Onset of southwest monsoon (main field planting, before heavy rains)",False,True
+Carrot,High Hills,Cool Season Vegetables,12.0,25.0,5.2,7.0,August-January,False,False
+Carrot,Midland Laterites,Cool Season Vegetables,23.0,32.0,5.2,7.0,,False,False
+Cashew,Coastal Plain,Commercial Crops,24.0,33.0,5.0,6.5,"Onset of southwest monsoon (June-July, main planting of grafts)",False,False
+Cashew,Foothills,Commercial Crops,20.0,30.0,5.0,6.5,"Onset of southwest monsoon (June-July, main planting of grafts)",False,False
+Cashew,High Hills,Commercial Crops,12.0,25.0,5.0,6.5,"Onset of southwest monsoon (June-July, main planting of grafts)",False,False
+Cashew,Midland Laterites,Commercial Crops,23.0,32.0,5.0,6.5,"Onset of southwest monsoon (June-July, main planting of grafts)",False,False
+Cassia,General (all zones),Green Leaf Manure Crops,22.0,32.0,5.0,6.5,General,False,False
+Casuarina,Coastal Plain,Agroforestry,24.0,33.0,5.0,6.5,Onset of monsoon (site prep/planting); nursery sown Nov-Dec,False,False
+Cauliflower,High Hills,Cool Season Vegetables,12.0,25.0,5.2,7.0,October-November,False,False
+Cauliflower,Midland Laterites,Cool Season Vegetables,23.0,32.0,5.2,7.0,October-November,False,False
+Chadachi,High Hills,Agroforestry,12.0,25.0,5.0,6.5,Planting and management similar to Venga (before onset of monsoon),False,False
+Chengazhinirkizhangu,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Optimum planting with receipt of pre-monsoon showers in May-June,False,False
+Chethikoduveli,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Planting June-July,False,False
+Chilli,General (all zones),Solanaceous Vegetables,22.0,32.0,5.0,6.5,"May-June (rainfed crop, before onset of southwest monsoon) | September-October (irrigated crop)",False,False
+China aster,General (all zones),Ornamental Plants,22.0,32.0,5.6,6.5,,False,False
+Chittadalotakam,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Chittaratha,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted at any time,False,False
+Cinnamon,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,Southwest monsoon (planting of 1-2 year old seedlings in main field),False,False
+Clove,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,May-June | August-September,False,False
+Cocoa,General (all zones),Beverages and Stimulants,10.0,38.0,6.0,6.5,"Seeds sown by December-January so that 4-6 month old seedlings are available for planting by May-June | In high rainfall zones, April sowing may be taken up so that 4 month old seedlings are available for post-monsoon planting in August",False,True
+Coconut,Coastal Plain,Oil Seeds,23.0,33.0,5.0,8.0,May (planting with onset of pre-monsoon rains) | September (planting in low-lying areas after cessation of heavy rains) | May (planting),True,True
+Coconut,Foothills,Oil Seeds,20.0,30.0,5.0,8.0,May (planting),True,False
+Coconut,High Hills,Oil Seeds,12.0,25.0,5.0,8.0,May (planting),True,False
+Coconut,Midland Laterites,Oil Seeds,23.0,32.0,5.0,8.0,May (planting) | May (planting) | April (planting under assured irrigation),True,False
+Coconut,Palakkad Plain,Oil Seeds,24.0,36.0,5.0,8.0,May (planting),True,False
+Coffee,Foothills,Beverages and Stimulants,20.0,30.0,6.0,6.5,Nursery seed sowing: February-March (Robusta),True,True
+Coffee,General (all zones),Beverages and Stimulants,22.0,32.0,6.0,6.5,Field planting: June (rooted/bare-root plants) and September-October (bag plants),True,False
+Coffee,High Hills,Beverages and Stimulants,15.0,30.0,6.0,6.5,Nursery seed sowing: December-January (Arabica) | Nursery seed sowing: February-March (Robusta),True,True
+Coleus,General (all zones),Tubers,22.0,32.0,3.5,6.5,July-October,False,False
+Colocasia,General (all zones),Tubers,22.0,32.0,3.5,6.5,May-June to October-November (rainfed) | Throughout the year (irrigated),False,False
+Congosignal grass,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,May-June and September-October (with onset of rains),False,False
+Cotton,General (all zones),Commercial Crops,22.0,32.0,5.0,6.5,Winter crop (August-September) | Summer crop (February-March),False,False
+Cowpea,General (all zones),Pulses,22.0,32.0,5.0,6.5,"Kharif (rainfed,  with pre-monsoon showers) | Rabi (September-December) | Summer (after paddy harvest)",False,False
+Crossandra,General (all zones),Ornamental Plants,22.0,32.0,6.0,7.5,,True,False
+Cucumber and oriental pickling melon,Coastal Plain,Cucurbitaceous Vegetables,24.0,33.0,5.0,6.5,January-March; September-December,False,False
+Cucumber and oriental pickling melon,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,January-March | September-December,False,False
+Daincha,General (all zones),Green Manure Crops,22.0,32.0,5.0,6.5,Incorporated about 8-10 weeks after sowing (S. aculeata),False,False
+Danthappala,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Elephant foot yam,General (all zones),Tubers,22.0,32.0,3.5,6.5,February-March,False,False
+Eucalyptus,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General (planted with onset of SW monsoon),False,False
+Eucalyptus,Midland Laterites,Agroforestry,23.0,32.0,5.0,6.5,Beginning of rains (planting),False,False
+Fodder cowpea,General (all zones),Fodder Crops,23.0,31.0,5.0,6.5,Rainfed crop during May; raised as summer crop in rice fallows in Kerala; can be grown in any month with irrigation facilities,True,True
+Fodder maize,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,"Last week of June to second week of July, and September to October; can be raised throughout the year where irrigation facilities are available",False,False
+Fodder sorghum,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,Can be raised during both monsoons,False,False
+French bean,High Hills,Pulses,12.0,25.0,5.0,6.5,"Throughout the year (high ranges,  elevation above 1000 m)",False,False
+Gamba grass,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False
+Garlic,High Hills,Cool Season Vegetables,12.0,25.0,5.2,7.0,April-May | October-November,False,False
+Ginger,Midland Laterites,Spices and Condiments,23.0,32.0,5.0,6.5,"First fortnight of April, after receipt of pre-monsoon showers (rainfed) | Middle of February (irrigated, for vegetable ginger)",False,False
+Gladiolus,General (all zones),Ornamental Plants,22.0,32.0,5.5,6.5,September-November,True,False
+Gliricidia,General (all zones),Green Leaf Manure Crops,22.0,32.0,5.0,6.5,General,False,False
+Greater yam,General (all zones),Tubers,26.0,34.0,3.5,6.5,March-April,False,True
+Green gram,General (all zones),Pulses,22.0,32.0,5.0,6.5,Rice fallow (after first or second paddy crop),False,False
+Green pea,High Hills,Pulses,12.0,25.0,5.0,6.5,Rabi (October-November),False,False
+Groundnut,General (all zones),Oil Seeds,22.0,32.0,5.0,8.0,Rainfed: May-June to September-October | Irrigated: January to May,False,False
+Guava,General (all zones),Fruits,22.0,32.0,5.9,6.5,June-July (planting),False,False
+Guinea grass,General (all zones),Fodder Crops,34.0,42.0,5.0,6.5,"Onset of south west monsoon (May-June); as irrigated crop, any time of year",False,True
+Hedge lucerne,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False
+Horse gram,General (all zones),Pulses,22.0,32.0,5.0,6.5,Rabi (September-October),False,False
+Hybrid napier,General (all zones),Fodder Crops,27.0,35.0,5.0,6.5,Onset of southwest monsoon,False,True
+Indian gooseberry,General (all zones),Fruits,22.0,32.0,5.9,6.5,Rainy season (planting of seedlings),False,False
+Indigo,General (all zones),Green Manure Crops,22.0,32.0,5.0,6.5,General,False,False
+Irul,Foothills,Agroforestry,20.0,30.0,5.0,6.5,General (all zones),False,False
+Jack,General (all zones),Fruits,22.0,32.0,5.9,6.5,Onset of monsoon showers (planting of grafts),False,False
+Jasmine,General (all zones),Ornamental Plants,22.0,32.0,5.6,6.5,June-August,False,False
+Jeevakom,High Hills,Medicinal and Aromatic Plants,12.0,25.0,5.0,6.5,May-June (with receipt of summer showers),False,False
+Kacholam,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Planting in May (pre-monsoon showers),False,False
+Kampakam,High Hills,Agroforestry,12.0,25.0,5.0,6.5,Onset of monsoon (planting); sowing soon after seed collection,False,False
+Kanjiram,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Planted with onset of SW monsoon in May-June,False,False
+Karinochi,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Kasthurimanjal,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Kattarvazha,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Koovalam,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Kurumthotti,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,September-October (planting),False,False
+Lemongrass,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Nursery sown April-May; transplanted with onset of SW monsoon (June-July),False,False
+Lesser yam,General (all zones),Tubers,22.0,32.0,3.5,6.5,March-April,False,False
+Mahagony,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,Onset of monsoon; planting June-July,False,False
+Maize,General (all zones),Cereals and Millets,22.0,32.0,5.5,8.0,"Kharif (June-July) | Kharif (August-September) | Rabi (January-February,  irrigated)",True,False
+Mandarin orange,High Hills,Fruits,12.0,25.0,5.9,6.5,July-August (planting),False,False
+Mangium,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,General (planting timing not separately specified; nursery Jan-Feb pod collection),False,False
+Mango,General (all zones),Fruits,22.0,32.0,5.9,6.5,Onset of monsoon showers (or August-September in heavy rainfall areas),False,False
+Mango ginger,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,April (with commencement of pre-monsoon showers),False,False
+Marigold,General (all zones),Ornamental Plants,22.0,32.0,5.6,6.5,,True,False
+Neela amari,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,September-October (sowing),False,False
+Neem,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Nilappana,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False
+Nutmeg,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,Onset of southwest monsoon (main field planting),False,False
+Oilpalm,General (all zones),Oil Seeds,30.0,32.0,5.0,8.0,May-June (planting at onset of monsoon; nursery seed sowing/handling year-round),False,True
+Okra,General (all zones),Vegetables,22.0,32.0,5.0,6.5,February-March | June-July | October-November,False,False
+Onion,Coastal Plain,Cool Season Vegetables,24.0,33.0,5.8,6.5,October-November,True,False
+Onion,Midland Laterites,Cool Season Vegetables,23.0,32.0,5.8,6.5,October-November,True,False
+Orchids,General (all zones),Ornamental Plants,22.0,32.0,5.6,6.5,,False,False
+Palmarosa,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Seedbed prepared after 15th April; seeds sown latest by August,False,False
+Papaya,General (all zones),Fruits,22.0,26.0,5.9,6.5,February-March (seed sowing/nursery raising) | May-June (transplanting to field),False,True
+Para grass,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,Any time other than winter months; rainfed crop planted with the first monsoon showers,False,False
+Pathimugham,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Onset of South West monsoon,False,False
+Pineapple,General (all zones),Fruits,15.0,30.0,5.9,6.5,May-June (Kew - main planting season) | April-May and August-September (Mauritius; can be planted all months except heavy rain of June-July),False,True
+Potato,High Hills,Cool Season Vegetables,20.0,30.0,5.2,7.0,Summer (March-April) | Autumn (August-December) | Spring (January-February),True,True
+Pumpkin,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,"January-March | September-December | May-June (rainfed crop, sown after receipt of first showers)",False,False
+Punna,Coastal Plain,Agroforestry,24.0,33.0,5.0,6.5,Monsoon season (planting),False,False
+Radish,High Hills,Cool Season Vegetables,12.0,25.0,5.2,7.0,June-January,False,False
+Ragi,General (all zones),Cereals and Millets,23.0,31.0,5.0,8.0,Main season (June-September) | Late season (July-October) | Summer (December-January to March-April),False,True
+Red gram,General (all zones),Pulses,26.0,34.0,5.0,6.5,"Kharif (June-July,  mixed crop) | Rice fallow (after mundakan crop)",False,True
+Rice,Coastal Plain,Cereals and Millets,16.0,35.0,5.0,8.0,"Puncha, Kuttanad area, Oct-Nov to Feb-Mar | Additional Crop, Kuttanad area, May-June to Aug-Sept | Additional Crop, Kari soils, June-July to Sept-Oct | Mundakan (Kadumkrishi), Kole (single cropped area), Aug-Sept to Dec-Jan | Virippu (I crop/autumn), Pokkali area, May-June to Sept-Oct | Oorumundakan, Pokkali area, Aug-Sept to Dec-Jan | Virippu (I crop/autumn), Kaipad tract, April-May to Sept-Oct | First crop, Deep ill-drained regions of southern Kerala | Second crop, Deep ill-drained regions of southern Kerala | First crop, Waterlogged and flooded areas | Virippu (I crop/autumn), Onattukara and coastal sandy areas - where HYVs do not come up, April to August | Mundakan (II crop/winter), Onattukara and coastal sandy areas - where HYVs do not come up, Aug-Sept to Dec-Jan | Virippu (I crop/autumn), Onattukara - where HYVs come up well, April to August | Mundakan (II crop/winter), Onattukara - where HYVs come up well, Aug-Sept to Dec-Jan | Third crop, Onattukara - where HYVs come up well, Feb-Mar to April | Poonthalpadam (season not specified in source)",True,True
+Rice,High Hills,Cereals and Millets,16.0,35.0,5.0,8.0,"Nancha, High ranges, May-June to Oct-Nov | Puncha, High ranges, Dec-Jan to Apr-May | First crop, High altitude area - double crop areas | Second crop, High altitude area - double crop areas",True,True
+Rice,Midland Laterites,Cereals and Millets,16.0,35.0,5.0,8.0,"Virippu (I crop/autumn) - Upland/Modan, purely rainfed, April-May to Sept-Oct | Virippu (I crop) - Palliyals (Myals), single crop terraced, April-May to Sept-Oct | Virippu (I crop/autumn) - Double crop wetlands, semi-dry cultivation, First crop, April-May to Sept-Oct | Mundakan (II crop/winter) - Double crop wetlands, semi-dry cultivation, Second crop, Sept-Oct to Dec-Jan | Virippu (I crop/autumn) - Transplanted double/triple crop wetlands, First crop, April-May to Sept-Oct | Mundakan (II crop/winter) - Transplanted double/triple crop wetlands, Second crop, Sept-Oct to Dec-Jan | Puncha (III crop/summer) - Transplanted triple crop wetlands, Third crop, Dec-Jan to Mar-Apr | Second crop, Eastern lateritic regions of Kollam and Alappuzha districts | First crop, Koottumundakan system | Second crop, Koottumundakan system",True,True
+Rice,Palakkad Plain,Cereals and Millets,16.0,35.0,5.0,8.0,"First crop, Chittoor black soil (Palakkad) | Second crop, Chittoor black soil (Palakkad)",True,True
+Rosewood,High Hills,Agroforestry,12.0,25.0,5.0,6.5,Before onset of monsoon (planting); nursery sowing during rainy season,False,False
+Rubber,Coastal Plain,Commercial Crops,24.0,33.0,5.0,6.5,Onset of monsoon (main field planting),False,False
+Rubber,Foothills,Commercial Crops,20.0,30.0,5.0,6.5,Onset of monsoon (main field planting),False,False
+Rubber,High Hills,Commercial Crops,12.0,25.0,5.0,6.5,Not applicable - rubber is not recommended for cultivation in this zone,False,False
+Rubber,Midland Laterites,Commercial Crops,23.0,32.0,5.0,6.5,Onset of monsoon (main field planting),False,False
+Sandal,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,General (all zones),False,False
+Sapota,General (all zones),Fruits,11.0,34.0,5.9,6.5,May-June (planting),False,True
+Sesame,Coastal Plain,Oil Seeds,24.0,33.0,5.0,8.0,Lowland paddy field (third crop): December-April | Uplands: August-December,False,False
+Setaria grass,General (all zones),Fodder Crops,21.0,29.0,5.0,6.5,Rainy season (rainfed sowing); February to November if irrigation facilities available,False,True
+Shevri,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False
+Snake gourd,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,January-March | September-December,False,False
+Sorghum,General (all zones),Cereals and Millets,26.0,34.0,5.0,8.0,"Kharif (May-August,  rainfed) | Rabi (January-April,  irrigated)",False,True
+Soybean,General (all zones),Pulses,26.0,34.0,5.0,6.5,"Kharif (onset of south-west monsoon,  May-June)",False,True
+Strawberry,High Hills,Fruits,12.0,25.0,5.9,6.5,Last week of September (planting),True,False
+Stylo,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,Sowing with onset of south-west monsoon during May-June,False,False
+Subabul,General (all zones),Fodder Crops,22.0,34.0,5.0,6.5,Onset of rains in May-June or September-October | See Fodder Crops,False,True
+Sugarcane,Coastal Plain,Commercial Crops,24.0,33.0,5.0,6.5,First fortnight of January (ideal time in deltaic areas),False,False
+Sugarcane,Foothills,Commercial Crops,20.0,30.0,5.0,6.5,"After abatement of heavy rains (hilly tracts, under rainfed conditions)",False,False
+Sugarcane,General (all zones),Commercial Crops,22.0,32.0,5.0,6.5,"October-December (normal planting season, plains and semi-arid tract)",False,False
+Sugarcane,Palakkad Plain,Commercial Crops,24.0,36.0,5.0,6.5,"October-December, with fertilizer schedule specified for the Chittoor tract",False,False
+Sun hemp,General (all zones),Green Manure Crops,22.0,32.0,5.0,6.5,Incorporated at 10 weeks after sowing,False,False
+Sweet potato,General (all zones),Tubers,18.0,26.0,3.5,6.5,June-July (rainfed) | September-October (rainfed) | October-November (irrigated - uplands) | January-February (irrigated - low lands),True,True
+Tamarind,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,June to November (field planting),False,False
+Tapioca,General (all zones),Tubers,22.0,32.0,3.5,6.5,April-May (onset of southwest monsoon) | September-October (onset of northeast monsoon) | February-April (irrigated),False,False
+Tea,High Hills,Beverages and Stimulants,16.0,32.0,4.5,5.5,Planting (Southwest monsoon areas): June-July | Planting (Northeast monsoon areas): September-October,True,True
+Teak,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,Pre-monsoon stump planting April-May; onset of SW monsoon June-July for containerized stock,False,False
+Thembavu,High Hills,Agroforestry,12.0,25.0,5.0,6.5,Onset of monsoon (planting),False,False
+Thippali,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Planted during May-June after receipt of 4-5 pre-monsoon showers,False,False
+Thorny bamboo,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,Immediately before the rainy season (planting),False,False
+Thulasi,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,General,False,False
+Tobacco,General (all zones),Beverages and Stimulants,18.0,27.0,6.0,6.5,October-February,False,True
+Tomato,General (all zones),Solanaceous Vegetables,22.0,32.0,5.0,6.5,October-November (irrigated crop),False,False
+Tuberose,General (all zones),Ornamental Plants,22.0,32.0,5.6,6.5,May-July,False,False
+Turmeric,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,April (planting with receipt of pre-monsoon showers),False,False
+Vanilla,General (all zones),Spices and Condiments,22.0,32.0,5.0,6.5,Onset of monsoon rains (planting of shoot cuttings),False,False
+Vegetable cowpea,General (all zones),Solanaceous Vegetables,22.0,32.0,5.0,6.5,,False,False
+Venga,High Hills,Agroforestry,12.0,25.0,5.0,6.5,Before onset of monsoon (site prep); planting along SW monsoon,False,False
+Vetiver,General (all zones),Medicinal and Aromatic Plants,36.0,44.0,5.0,6.5,Planting June-July,False,True
+Water melon,General (all zones),Cucurbitaceous Vegetables,22.0,32.0,5.0,6.5,December-April,False,False
+West Indian Cherry,General (all zones),Fruits,22.0,32.0,5.9,6.5,July to December (planting),False,False
+White yam,General (all zones),Tubers,22.0,32.0,3.5,6.5,,False,False
+Wild indigo,General (all zones),Green Manure Crops,22.0,32.0,5.0,6.5,General,False,False
+Wild jack or Aini,General (all zones),Agroforestry,22.0,32.0,5.0,6.5,Monsoon season (collection and planting of wildings),False,False
+Xanthosoma,General (all zones),Tubers,20.0,29.0,5.5,6.5,February-March to November-December (rainfed) | Throughout the year (irrigated),True,True

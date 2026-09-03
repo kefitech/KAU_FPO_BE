@@ -1,0 +1,72 @@
+{
+  "random_80_20_split": {
+    "accuracy": 0.7945121951219513,
+    "precision": 0.7452054794520548,
+    "recall": 0.7827338129496403,
+    "f1": 0.7635087719298246,
+    "roc_auc": 0.9107837539492216,
+    "confusion_matrix": [
+      [
+        759,
+        186
+      ],
+      [
+        151,
+        544
+      ]
+    ],
+    "n_train": 6556,
+    "n_test": 1640
+  },
+  "leave_one_zone_out_cv": [
+    {
+      "held_out_zone": "high_ranges",
+      "accuracy": 0.7476689976689976,
+      "f1": 0.717915309446254,
+      "n_test": 1716
+    },
+    {
+      "held_out_zone": "central_zone",
+      "accuracy": 0.8196428571428571,
+      "f1": 0.7906012439530062,
+      "n_test": 1680
+    },
+    {
+      "held_out_zone": "southern_zone",
+      "accuracy": 0.8253676470588235,
+      "f1": 0.8024948024948025,
+      "n_test": 1632
+    },
+    {
+      "held_out_zone": "northern_zone",
+      "accuracy": 0.8069852941176471,
+      "f1": 0.7780126849894292,
+      "n_test": 1632
+    },
+    {
+      "held_out_zone": "coastal_zone",
+      "accuracy": 0.8118489583333334,
+      "f1": 0.7910339840925524,
+      "n_test": 1536
+    }
+  ],
+  "feature_importance_by_field": {
+    "crop_name": 0.3348505079788933,
+    "crop_group": 0.3194221482214983,
+    "season": 0.17867867166904036,
+    "humidity": 0.05892691087153712,
+    "rainfall": 0.049773698106223015,
+    "temperature": 0.04053253480631249,
+    "zone": 0.008602850842422826,
+    "elevation": 0.005313563711583865,
+    "soil": 0.0038991137924888697
+  },
+  "n_rows_total": 8196,
+  "n_crops": 149,
+  "crops_with_no_positive_label": 33,
+  "class_balance": {
+    "0": 0.5760126891166423,
+    "1": 0.4239873108833577
+  },
+  "caveat": "Label is rule-derived (PoP crop requirements matched against real zone climate, cross-walked from KAU's 5 AEZs onto this service's 5 geographic zones). Not an observed real-world outcome. Leave-one-zone-out CV is the honest generalization signal since only 5 zones exist in the training data."
+}
