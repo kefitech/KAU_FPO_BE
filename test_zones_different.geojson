@@ -1,0 +1,170 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "coastal_zone"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              74.7,
+              8.0
+            ],
+            [
+              75.26,
+              8.0
+            ],
+            [
+              75.26,
+              12.9
+            ],
+            [
+              74.7,
+              12.9
+            ],
+            [
+              74.7,
+              8.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "high_ranges"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.26,
+              8.0
+            ],
+            [
+              75.82000000000001,
+              8.0
+            ],
+            [
+              75.82000000000001,
+              12.9
+            ],
+            [
+              75.26,
+              12.9
+            ],
+            [
+              75.26,
+              8.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "southern_zone"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.82000000000001,
+              8.0
+            ],
+            [
+              76.38,
+              8.0
+            ],
+            [
+              76.38,
+              12.9
+            ],
+            [
+              75.82000000000001,
+              12.9
+            ],
+            [
+              75.82000000000001,
+              8.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "central_zone"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              76.38,
+              8.0
+            ],
+            [
+              76.94,
+              8.0
+            ],
+            [
+              76.94,
+              12.9
+            ],
+            [
+              76.38,
+              12.9
+            ],
+            [
+              76.38,
+              8.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "northern_zone"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              76.94,
+              8.0
+            ],
+            [
+              77.5,
+              8.0
+            ],
+            [
+              77.5,
+              12.9
+            ],
+            [
+              76.94,
+              12.9
+            ],
+            [
+              76.94,
+              8.0
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -163,6 +163,42 @@ def seed_menu():
         roles     = [super_admin_group, sub_admin_group],
         order     = 17,
     )
+    seed_item(
+        label_key = 'menu.dpr_projects',
+        path      = '/admin/dpr',
+        icon      = 'file-bar-chart',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 18,
+    )
+    seed_item(
+        label_key = 'menu.dpr_config',
+        path      = '/admin/dpr-config',
+        icon      = 'sliders-horizontal',
+        roles     = [super_admin_group],
+        order     = 19,
+    )
+    seed_item(
+        label_key = 'menu.ai_services',
+        path      = '/admin/ai-services',
+        icon      = 'bot',
+        roles     = [super_admin_group],
+        order     = 20,
+    )
+
+    seed_item(
+        label_key = 'menu.ml_models',
+        path      = '/admin/ml-models',
+        icon      = 'brain-circuit',
+        roles     = [super_admin_group],
+        order     = 21,
+    )
+    seed_item(
+        label_key = 'menu.gis_zones',
+        path      = '/admin/gis-zones',
+        icon      = 'map',
+        roles     = [super_admin_group],
+        order     = 22,
+    )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
