@@ -34,7 +34,7 @@ class BuyerDirectorySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'organisation', 'contact_email', 'contact_phone', 'location',
             'commodities_interested', 'min_quantity', 'max_quantity', 'unit', 'is_verified',
-            'created_at', 'updated_at',
+            'fpo', 'status', 'created_at', 'updated_at',
         ]
         # Admin manages this directly (ARUNIMA.md: "Buyer Directory (Admin only)"),
         # so is_verified is writable here — set explicitly via the /verify/ action instead

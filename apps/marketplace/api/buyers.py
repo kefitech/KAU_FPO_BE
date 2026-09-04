@@ -60,10 +60,22 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     def verify(self, request, pk=None):
         buyer = self.get_object()
         buyer.is_verified = True
-        buyer.save(update_fields=['is_verified', 'updated_at'])
+        buyer.status = BuyerDirectory.Status.VERIFIED
+        buyer.save(update_fields=['is_verified', 'status', 'updated_at'])
         return StandardResponse.success(
             data=BuyerDirectorySerializer(buyer).data,
             message=t('marketplace.buyer_verified', self.get_language())
+        )
+    @extend_schema(tags=['Marketplace - Buyers'])
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        buyer = self.get_object()
+        buyer.is_verified = False
+        buyer.status = BuyerDirectory.Status.REJECTED
+        buyer.save(update_fields=['is_verified', 'status', 'updated_at'])
+        return StandardResponse.success(
+            data=BuyerDirectorySerializer(buyer).data,
+            message=t('marketplace.buyer_rejected', self.get_language())
         )
 
 
@@ -103,3 +115,83 @@ class FPOBuyerListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             data=serializer.data,
             message=t('marketplace.buyers_retrieved', lang),
         )
+    #Arunima 04 sep-----
+    @extend_schema(tags=['Marketplace - Buyers'])
+    @action(detail=False, methods=['get'], url_path='my-status')
+    def my_status(self, request):
+        """
+        GET /api/marketplace/buyers/my-status/
+
+        Returns the requesting FPO's own BuyerDirectory row, if any.
+        Drives the 3-state UI: not registered / pending / verified.
+        """
+        from apps.database.models import FPO
+
+        fpo = FPO.objects.filter(primary_user=request.user).first()
+        if not fpo:
+            return StandardResponse.error(
+                'No FPO found for this user.',
+                status_code=404,
+            )
+
+        buyer = BuyerDirectory.objects.filter(fpo=fpo, is_deleted=False).first()
+        lang = getattr(request, 'language', 'en')
+
+        if not buyer:
+            return StandardResponse.success(
+                data={'registered': False, 'status': None},
+                message=t('marketplace.buyers_retrieved', lang),
+            )
+
+        return StandardResponse.success(
+            data={'registered': True, **BuyerDirectorySerializer(buyer).data},
+            message=t('marketplace.buyers_retrieved', lang),
+        )
+
+    @extend_schema(tags=['Marketplace - Buyers'])
+    @action(detail=False, methods=['post'], url_path='register')
+    def register_as_buyer(self, request):
+        """
+        POST /api/marketplace/buyers/register/
+
+        Primary User only. Registers the requesting FPO as a buyer —
+        creates a pending BuyerDirectory row awaiting KAU verification.
+        """
+        from apps.database.models import FPO
+
+        fpo = FPO.objects.filter(primary_user=request.user).first()
+        if not fpo:
+            return StandardResponse.error(
+                'No FPO found for this user.',
+                status_code=404,
+            )
+
+        if fpo.primary_user_id != request.user.id:
+            return StandardResponse.error(
+                'Only the FPO Primary User can register as a buyer.',
+                status_code=403,
+            )
+
+        if BuyerDirectory.objects.filter(fpo=fpo, is_deleted=False).exists():
+            return StandardResponse.error(
+                'This FPO has already registered as a buyer.',
+                status_code=400,
+            )
+
+        buyer = BuyerDirectory.objects.create(
+            fpo=fpo,
+            name=fpo.name,
+            organisation=fpo.name,
+            contact_email=fpo.office_email or '',
+            contact_phone=fpo.office_phone or '',
+            location=fpo.district,
+            status=BuyerDirectory.Status.PENDING,
+            is_verified=False,
+        )
+
+        lang = getattr(request, 'language', 'en')
+        return StandardResponse.created(
+            data=BuyerDirectorySerializer(buyer).data,
+            message=t('marketplace.buyer_created', lang),
+        )
+    #--------------------------
