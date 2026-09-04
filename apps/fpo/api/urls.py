@@ -5,7 +5,7 @@ All FPO-facing API endpoints.
 Base: /api/fpo/
 """
 
-from django.urls import path
+from django.urls import path, include
 
 # Auth (registration) — included in /api/auth/ via accounts/urls.py
 from .auth import RegisterFPOUserView
