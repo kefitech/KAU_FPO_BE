@@ -18,6 +18,9 @@ Created: 28-04-2026
 """
 
 from django.urls import path, include
+# DPR admin (P2-07) removed 2026-08-24. v2 will rebuild admin API in Phase 4.
+# AI service admin endpoints also removed — will move to a dedicated ai_admin.py.
+# See context/phase2/Dpr/DPR_V2_CONTEXT.md
 from rest_framework.routers import DefaultRouter
 
 from .languages import LanguageViewSet
@@ -26,6 +29,14 @@ from .translations import TranslationViewSet
 from .fpo_roles import FPOMemberRoleViewSet
 from .fpo_actions import FPOActionViewSet
 from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
+#-----------------------------------------------------------------------------
+#aug21 import buyer
+#Arunima
+from apps.marketplace.api.buyers import BuyerDirectoryViewSet
+from apps.marketplace.api.matches import AdminMatchViewSet
+from apps.marketplace.api.market_prices import AdminMarketPriceViewSet
+#-------------------------------------------------------------------------------
+
 from .applications import (
     ApplicationListView,
     ApplicationDetailView,
@@ -142,6 +153,15 @@ router.register(r'sub-admins', SubAdminViewSet, basename='sub-admin')
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
 
+#---------------------------------------------------------------------------
+#Arunima
+#aug21 for buyers.py in marketplace app
+router.register(r'buyers', BuyerDirectoryViewSet, basename='admin-buyer')
+router.register(r'matches', AdminMatchViewSet, basename='admin-match')
+router.register(r'prices', AdminMarketPriceViewSet, basename='admin-price')
+
+ #------------------------------------------------------------------------------
+
 # URL patterns
 urlpatterns = [
     path('', include(router.urls)),
@@ -246,7 +266,6 @@ urlpatterns = [
     path('experts/<int:pk>/deactivate/',   ExpertDeactivateView.as_view(),  name='admin-experts-deactivate'),
     path('experts/<int:pk>/enquiries/',    ExpertEnquiriesView.as_view(),   name='admin-experts-enquiries'),
     # ML Model Versions (P2-06)
-# ML Model Versions (P2-06)
     path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
     path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
     path('ml-models/retrain/',             MLModelRetrainView.as_view(),         name='admin-ml-models-retrain'),
@@ -254,12 +273,6 @@ urlpatterns = [
     path('gis/zone-versions/', ZoneBoundaryVersionListView.as_view(), name='admin-gis-zone-versions'),
     path('gis/zone-versions/<int:pk>/activate/', ZoneBoundaryVersionActivateView.as_view(), name='admin-gis-zone-versions-activate'),
     path('gis/zone-versions/<int:pk>/', ZoneBoundaryVersionDetailView.as_view(), name='admin-gis-zone-versions-detail'),
-
-
-
-
-
-    
 
     # DPR — Admin CRUD routes mounted at /api/admin/dpr/
     path('dpr/', include('apps.accounts.api.admin.dpr.urls')),

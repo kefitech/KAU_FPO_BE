@@ -261,11 +261,18 @@ def seed_menu():
         order     = 8,
     )
     seed_item(
+        label_key = 'menu.fpo_dpr',
+        path      = '/fpo/dpr',
+        icon      = 'file-bar-chart',
+        roles     = fpo_roles,
+        order     = 9,
+    )
+    seed_item(
         label_key = 'menu.fpo_settings',
         path      = '/fpo/settings',
         icon      = 'settings',
         roles     = fpo_roles,
-        order     = 9,
+        order     = 10,
     )
 
     print("\n" + "=" * 60)

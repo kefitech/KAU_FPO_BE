@@ -101,6 +101,8 @@ from .gis import AgroClimaticZone, DistrictBoundary, FPOZoneAssignment, FPOCulti
 from .recommendations import MLModelVersion, CropRecommendation
 
 # Phase 2 — AI DPR Generation
+# v1 removed 2026-08-24. Fresh rebuild in progress under `dpr/` package.
+# See context/phase2/Dpr/DPR_V2_CONTEXT.md
 from .dpr import (
     DPRProject,
     DPRSectionRawMaterial,
@@ -213,6 +215,9 @@ from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice
 # Phase 2 — AI Marketing
 from .marketing import MarketingStrategy
 
+# Phase 2 — AI Service Control & Usage Tracking
+from .ai_config import AIServiceConfig, AIUsageLog
+
 
 __all__ = [
     # Multilingual
@@ -284,7 +289,7 @@ __all__ = [
     # Phase 2 — AI Crop Recommendations
     'MLModelVersion',
     'CropRecommendation',
-    # Phase 2 — AI DPR Generation
+    # Phase 2 — AI DPR Generation — Project + Sections
     'DPRProject',
     'DPRSectionRawMaterial',
     'DPRRawMaterial',
@@ -343,6 +348,7 @@ __all__ = [
     'DPRImplementationMilestone',
     'DPRSectionRisk',
     'DPRRiskItem',
+    # Phase 2 — AI DPR Generation — Master Data
     'DPRProjectType',
     'DPRProjectObjective',
     'DPRProjectOutcome',
@@ -392,4 +398,7 @@ __all__ = [
     'MarketPrice',
     # Phase 2 — AI Marketing
     'MarketingStrategy',
+    # Phase 2 — AI Service Control & Usage Tracking
+    'AIServiceConfig',
+    'AIUsageLog',
 ]

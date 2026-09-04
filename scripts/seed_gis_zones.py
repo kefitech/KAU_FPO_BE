@@ -1,94 +1,100 @@
 """
-Seed script — placeholder Agro-Climatic Zones for Kerala.
+Seed script — REAL Kerala agro-climatic zone boundaries.
 
-TEMPORARY: These are dummy grid polygons roughly covering Kerala's
-bounding box, NOT accurate zone boundaries. Replace with the real
-KAU-provided GeoJSON once available (see doc: "What NOT to Build Yet").
+Replaces the earlier placeholder version (5 equal horizontal latitude
+bands, which incorrectly split mountainous districts like Idukki
+across multiple zones purely based on raw latitude).
+
+This version builds each zone's actual shape by dissolving together
+real taluk (sub-district) boundaries — sourced from LGD/Survey of
+India via github.com/yashveeeeeeer/india-geodata — that have been
+manually classified into a zone based on real Kerala geography (which
+taluks are genuinely coastal, mountainous, etc.), not a raw
+coordinate formula.
+
+This is still NOT KAU's official agro-climatic zone system — it's a
+geographically-grounded interim proxy, built from real administrative
+boundaries and real geographic knowledge, pending KAU's actual data.
+The taluk->zone classification is a best-effort judgment call — worth
+a sanity check from someone with real local knowledge before treating
+as final.
+
+Requires zone_geometries.json to be present at the path below.
 
 Usage:
     python manage.py shell < scripts/seed_gis_zones.py
-    (or wrap this in a management command if the project prefers that)
 """
-from django.contrib.gis.geos import Polygon, MultiPolygon
+import json
+from pathlib import Path
+
+from django.conf import settings
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
 
 from apps.database.models import AgroClimaticZone
 
-# Kerala's rough bounding box: lat 8.2–12.8, lng 74.8–77.4
-# Split into 5 non-overlapping horizontal bands (south to north) —
-# not geographically meaningful, just distinct valid polygons for testing.
+GEOMETRY_PATH = Path(settings.BASE_DIR) / 'scripts' / 'data' / 'zone_geometries.json'
 
-ZONES = [
-    {
-        'code': 'coastal_zone',
-        'name_en': 'Coastal Zone',
-        'name_ml': 'തീരദേശ മേഖല',
-        'suitable_crops': ['coconut', 'rice', 'banana'],
-        'soil_type': 'Sandy, alluvial coastal soil',
-        'bbox': (74.8, 8.2, 77.4, 9.0),  # (min_lng, min_lat, max_lng, max_lat)
-    },
-    {
-        'code': 'southern_zone',
-        'name_en': 'Southern Zone',
-        'name_ml': 'തെക്കൻ മേഖല',
-        'suitable_crops': ['rubber', 'coconut', 'tapioca'],
-        'soil_type': 'Laterite',
-        'bbox': (74.8, 9.0, 77.4, 9.8),
-    },
-    {
-        'code': 'central_zone',
-        'name_en': 'Central Zone',
-        'name_ml': 'മധ്യമേഖല',
-        'suitable_crops': ['rice', 'coconut', 'arecanut'],
-        'soil_type': 'Alluvial, riverine',
-        'bbox': (74.8, 9.8, 77.4, 10.6),
-    },
-    {
-        'code': 'high_ranges',
-        'name_en': 'High Ranges Zone',
-        'name_ml': 'ഹൈ റേഞ്ച് മേഖല',
-        'suitable_crops': ['cardamom', 'coffee', 'tea', 'pepper'],
-        'soil_type': 'Forest loam, high organic content',
-        'bbox': (74.8, 10.6, 77.4, 11.6),
-    },
-    {
-        'code': 'northern_zone',
-        'name_en': 'Northern Zone',
-        'name_ml': 'വടക്കൻ മേഖല',
-        'suitable_crops': ['rice', 'coconut', 'cashew'],
-        'soil_type': 'Laterite, sandy loam',
-        'bbox': (74.8, 11.6, 77.4, 12.8),
-    },
-]
-
-
-def make_multipolygon(bbox):
-    min_lng, min_lat, max_lng, max_lat = bbox
-    ring = (
-        (min_lng, min_lat),
-        (max_lng, min_lat),
-        (max_lng, max_lat),
-        (min_lng, max_lat),
-        (min_lng, min_lat),  # ring must close
-    )
-    polygon = Polygon(ring, srid=4326)
-    return MultiPolygon(polygon, srid=4326)
+# Zone metadata — unchanged from the original placeholder version.
+# code -> (name_en, name_ml, suitable_crops, soil_type)
+ZONE_METADATA = {
+    'coastal_zone': (
+        'Coastal Zone', 'തീരദേശ മേഖല',
+        ['coconut', 'rice', 'cashew', 'banana'],
+        'Sandy, alluvial coastal soil',
+    ),
+    'southern_zone': (
+        'Southern Zone', 'തെക്കൻ മേഖല',
+        ['rubber', 'tapioca', 'coconut', 'pepper'],
+        'Laterite soil',
+    ),
+    'central_zone': (
+        'Central Zone', 'മധ്യ മേഖല',
+        ['arecanut', 'rice', 'coconut', 'banana'],
+        'Alluvial and riverine soil',
+    ),
+    'high_ranges': (
+        'High Ranges', 'ഉയർന്ന പ്രദേശങ്ങൾ',
+        ['cardamom', 'tea', 'coffee', 'pepper'],
+        'Forest loam, high organic content',
+    ),
+    'northern_zone': (
+        'Northern Zone', 'വടക്കൻ മേഖല',
+        ['cashew', 'coconut', 'rice', 'pepper'],
+        'Laterite and sandy soil',
+    ),
+}
 
 
 def run():
+    if not GEOMETRY_PATH.exists():
+        print(f"ERROR: file not found at {GEOMETRY_PATH}")
+        print("Place zone_geometries.json at scripts/data/zone_geometries.json")
+        return
+
+    with open(GEOMETRY_PATH) as f:
+        zone_geometries = json.load(f)
+
     created_count = 0
     updated_count = 0
 
-    for zone_data in ZONES:
-        boundary = make_multipolygon(zone_data['bbox'])
+    for code, (name_en, name_ml, crops, soil_type) in ZONE_METADATA.items():
+        geom_json = zone_geometries.get(code)
+        if not geom_json:
+            print(f"WARNING: no geometry found for {code} — skipping")
+            continue
+
+        geometry = GEOSGeometry(json.dumps(geom_json), srid=4326)
+        if isinstance(geometry, Polygon):
+            geometry = MultiPolygon(geometry, srid=4326)
 
         obj, created = AgroClimaticZone.objects.update_or_create(
-            code=zone_data['code'],
+            code=code,
             defaults={
-                'name_en': zone_data['name_en'],
-                'name_ml': zone_data['name_ml'],
-                'suitable_crops': zone_data['suitable_crops'],
-                'soil_type': zone_data['soil_type'],
-                'boundary': boundary,
+                'name_en': name_en,
+                'name_ml': name_ml,
+                'boundary': geometry,
+                'suitable_crops': crops,
+                'soil_type': soil_type,
             },
         )
 

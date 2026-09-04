@@ -75,6 +75,15 @@ def create_categories():
     print("\nCreating translation categories...")
 
     categories = [
+        #--------------------------------------------------------------------
+        #Arunima S
+        {
+            'code': 'marketplace',
+            'name': 'Marketplace',
+            'description': 'P2-11 Marketplace — products, buyers, matches, prices',
+            'display_order': 9,
+        },
+        #---------------------------------------------------------------------------
         {
             'code': 'auth',
             'name': 'Authentication & Authorization',
@@ -322,6 +331,61 @@ def seed_admin_translations(languages):
 
     return count
 
+#---------------------------------------------------------------------------------------
+#Arunima S 
+
+def seed_marketplace_translations(languages):
+    """Seed P2-11 Marketplace API response messages (marketplace.* keys)."""
+    category = TranslationCategory.objects.get(code='marketplace')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    marketplace_messages = [
+        # Products
+        ('products_retrieved',        'Products retrieved successfully',                   'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+        ('product_created',           'Product created successfully',                      'ഉൽപ്പന്നം വിജയകരമായി സൃഷ്ടിച്ചു'),
+        ('product_updated',           'Product updated successfully',                      'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('product_deleted',           'Product deleted successfully',                      'ഉൽപ്പന്നം വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('product_not_editable',      'Product cannot be edited in its current status',    'നിലവിലെ സ്ഥിതിയിൽ ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല'),
+        ('only_draft_deletable',      'Only draft products can be deleted',                'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
+        ('only_draft_publishable',    'Only draft products can be published',              'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
+        ('product_published',         'Product published successfully',                    'ഉൽപ്പന്നം വിജയകരമായി പ്രസിദ്ധീകരിച്ചു'),
+        ('only_active_can_be_sold',   'Only active products can be marked as sold',        'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
+
+        # Buyers
+        ('buyers_retrieved',          'Buyers retrieved successfully',                     'ക്രേതാക്കൾ വിജയകരമായി ലഭിച്ചു'),
+        ('buyer_created',             'Buyer created successfully',                        'ക്രേതാവിനെ വിജയകരമായി സൃഷ്ടിച്ചു'),
+        ('buyer_updated',             'Buyer updated successfully',                        'ക്രേതാവിനെ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('buyer_deleted',             'Buyer deleted successfully',                        'ക്രേതാവിനെ വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('buyer_verified',            'Buyer verified successfully',                       'ക്രേതാവിനെ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
+
+        # Matches
+        ('matches_retrieved',         'Matches retrieved successfully',                    'പൊരുത്തങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+        ('match_accepted',            'Match accepted successfully',                       'പൊരുത്തം വിജയകരമായി അംഗീകരിച്ചു'),
+        ('match_rejected',            'Match rejected successfully',                       'പൊരുത്തം വിജയകരമായി നിരസിച്ചു'),
+        ('match_not_actionable',      'This match has already been decided',               'ഈ പൊരുത്തം ഇതിനകം തീരുമാനിച്ചു'),
+
+        # Prices & Opportunities
+        ('prices_retrieved',          'Prices retrieved successfully',                     'വിലകൾ വിജയകരമായി ലഭിച്ചു'),
+        ('price_seeded',              'Price data added successfully',                     'വില വിവരം വിജയകരമായി ചേർത്തു'),
+        ('opportunities_retrieved',   'Opportunities retrieved successfully',              'അവസരങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in marketplace_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#--------------------------------------------------------------------------------------------
 
 def seed_ui_translations(languages):
     """
@@ -2619,6 +2683,209 @@ def seed_frontend_ui_translations(languages):
             'toast_reopened':              'Assessment reopened. You can now edit your answers.',
             'toast_reopen_failed':         'Failed to reopen assessment. Please try again.',
         },
+
+        'fpo_dpr': {
+            # Page header
+            'page_title':                  'DPR Projects',
+            'page_description':            'Detailed Project Reports for your FPO business plans',
+            # Empty state
+            'empty_title':                 'No DPR Projects Yet',
+            'empty_description':           'Create your first Detailed Project Report to plan and present your FPO business project.',
+            # New project dialog
+            'btn_new_project':             'New DPR Project',
+            'dialog_title':                'New DPR Project',
+            'label_project_title':         'Project Title',
+            'placeholder_project_title':   'e.g. Banana Processing Unit',
+            'label_financial_year':        'Financial Year',
+            'placeholder_financial_year':  '2025-26',
+            'btn_create':                  'Create & Open',
+            'btn_creating':                'Creating…',
+            'toast_create_failed':         'Failed to create DPR project. Please try again.',
+            # Project card
+            'label_readiness':             'Readiness',
+            'btn_continue':                'Continue Wizard',
+            'btn_download':                'Download PDF',
+            'btn_view_project':            'View',
+            # Status labels
+            'status_draft':                'Draft',
+            'status_data_complete':        'Data Complete',
+            'status_validated':            'Validated',
+            'status_generating':           'Generating…',
+            'status_generated':            'Generated',
+            'status_failed':               'Failed',
+            # Project detail page
+            'back_to_list':                'Back to DPR Projects',
+            'project_not_found':           'Project not found.',
+            'heading_sections':            'Project Sections',
+            'heading_readiness':           'Readiness',
+            'heading_documents':           'Generated Documents',
+            'label_version':               'Version',
+            'label_score':                 'Score',
+            'label_can_generate':          'Ready to Generate',
+            'label_errors':                'Blocking Issues',
+            'label_warnings':              'Warnings',
+            'label_suggestions':           'Suggestions',
+            'btn_generate':                'Generate PDF',
+            'btn_generating':              'Generating…',
+            'btn_validate':                'Run Validation',
+            'toast_generate_success':      'PDF generation started. This may take a few minutes.',
+            'toast_generate_failed':       'Failed to start PDF generation. Please try again.',
+            'no_documents':                'No PDFs generated yet.',
+            'no_errors':                   'No blocking issues.',
+            'no_warnings':                 'All checks passed.',
+            # Section names (21 wizard sections)
+            'section_project_basics':          'Project Basics',
+            'section_promoter_details':        'Promoter Details',
+            'section_project_location':        'Project Location',
+            'section_nature_of_business':      'Nature of Business',
+            'section_product_details':         'Product Details',
+            'section_raw_material':            'Raw Material',
+            'section_market_linkages':         'Market Linkages',
+            'section_land_details':            'Land Details',
+            'section_civil_works':             'Civil Works',
+            'section_machinery':               'Machinery & Equipment',
+            'section_utilities':               'Utilities',
+            'section_manpower':                'Manpower',
+            'section_working_capital':         'Working Capital',
+            'section_means_of_finance':        'Means of Finance',
+            'section_subsidy_details':         'Subsidy Details',
+            'section_revenue_projections':     'Revenue Projections',
+            'section_implementation_plan':     'Implementation Plan',
+            'section_risk_analysis':           'Risk Analysis',
+            'section_swot_analysis':           'SWOT Analysis',
+            'section_environmental_clearances':'Environmental Clearances',
+            'section_declaration':             'Declaration',
+            # Section status chips
+            'status_complete':             'Complete',
+            'status_incomplete':           'Incomplete',
+            'status_not_started':          'Not Started',
+            # Section fill page
+            'section_not_found':           'Section not found.',
+            'label_section_data':          'Section Data (JSON)',
+            'json_hint':                   'Edit the JSON data for this section. Guided forms will be added in a future update.',
+            'json_parse_error':            'Invalid JSON — fix before saving',
+            'btn_save':                    'Save',
+            'btn_saving':                  'Saving…',
+            'save_indicator_saving':       'Saving…',
+            'save_indicator_saved':        'Saved',
+            'toast_save_failed':           'Failed to save. Please try again.',
+            # Project Basics form fields
+            'label_project_type':          'Project Type',
+            'option_processing':           'Processing',
+            'option_storage':              'Storage',
+            'option_marketing':            'Marketing',
+            'option_aggregation':          'Aggregation',
+            'option_other':                'Other',
+            'label_key_components':        'Key Components',
+            'placeholder_key_components':  'Comma-separated list of main project components',
+            'hint_key_components':         'Comma-separated list of main project components',
+            'label_notes':                 'Project Notes',
+            'placeholder_notes':           'Any additional notes about this project…',
+            'option_select_type':          'Select project type',
+            'label_project':               'Project',
+            'label_complete':              'complete',
+            'label_last_saved':            'Last saved',
+            'btn_back':                    'Back to Project',
+            # project_location form
+            'label_district':              'District',
+            'placeholder_district':        'e.g. Thrissur',
+            'label_block':                 'Block / Taluk',
+            'option_select_block':         'Select block',
+            'label_village':               'Village / Town',
+            'placeholder_village':         'e.g. Irinjalakuda',
+            'label_pin_code':              'PIN Code',
+            'label_survey_number':         'Survey Number',
+            'placeholder_survey_number':   'e.g. 45/2A',
+            'label_nearest_town':          'Nearest Town / City',
+            'placeholder_nearest_town':    'e.g. Thrissur',
+            'label_distance_km':           'Distance (km)',
+            'label_project_site_location': 'Project Site Location',
+            'hint_map':                    'Search for the project site, click on the map to drop a pin, or drag the pin to adjust. You can also use your current GPS location.',
+        },
+
+        'admin_dpr': {
+            'page_title':           'DPR Projects',
+            'page_description':     'All DPR projects across all FPOs',
+            'col_fpo':              'FPO',
+            'col_title':            'Project Title',
+            'col_year':             'Financial Year',
+            'col_status':           'Status',
+            'col_score':            'Score',
+            'col_created':          'Created',
+            'status_draft':         'Draft',
+            'status_data_complete': 'Data Complete',
+            'status_validated':     'Validated',
+            'status_generating':    'Generating',
+            'status_generated':     'Generated',
+            'status_failed':        'Failed',
+            'back_to_list':         'Back to DPR Projects',
+            'project_not_found':    'Project not found.',
+            'heading_sections':     'Section Completion',
+            'heading_financials':   'Financial Summary',
+            'heading_documents':    'Generated Documents',
+            'label_fpo':            'FPO',
+            'label_year':           'Financial Year',
+            'label_score':          'Score',
+            'label_version':        'Version',
+            'no_documents':         'No documents yet.',
+            'btn_download':         'Download',
+            'label_errors':         'Blocking Issues',
+            'label_warnings':       'Warnings',
+        },
+
+        'admin_dpr_config': {
+            'page_title':              'DPR Configuration',
+            'page_description':        'Financial assumptions used for DPR generation',
+            'section_financial':       'Financial Assumptions',
+            'col_config_key':          'Config Key',
+            'col_value':               'Value',
+            'col_description':         'Description',
+            'col_updated':             'Last Updated',
+            'col_action':              'Action',
+            'dialog_title':            'Edit Configuration',
+            'label_value':             'Value',
+            'btn_save':                'Save',
+            'btn_saving':              'Saving…',
+            'btn_cancel':              'Cancel',
+            'toast_updated':           'Configuration updated.',
+            'toast_update_failed':     'Failed to update configuration.',
+        },
+
+        'admin_ai_services': {
+            'page_title':                   'AI Services',
+            'page_description':             'Manage AI service availability, budget caps and monitor usage',
+            'section_services':             'Service Configuration',
+            'section_usage_log':            'Usage Log',
+            'stat_total_calls':             'Total Calls This Month',
+            'stat_total_cost':              'Total Cost This Month',
+            'stat_active_services':         'Active Services',
+            'stat_of':                      'of',
+            'stat_configured':              'configured',
+            'col_service':                  'Service',
+            'col_fpo':                      'FPO',
+            'col_tokens':                   'Tokens',
+            'col_cost':                     'Cost (₹)',
+            'col_status':                   'Status',
+            'col_date':                     'Date',
+            'status_success':               'Success',
+            'status_failed':                'Failed',
+            'label_calls_this_month':       'calls this month',
+            'label_spent':                  'spent',
+            'label_enabled':                'Enabled',
+            'label_disabled':               'Disabled',
+            'label_monthly_cap':            'Monthly cap (₹):',
+            'label_no_limit':               'No limit',
+            'btn_save':                     'Save',
+            'btn_cancel':                   'Cancel',
+            'toast_cap_updated':            'Budget cap updated.',
+            'toast_cap_failed':             'Failed to update budget cap.',
+            'toast_toggle_failed':          'Failed to update AI service.',
+            'search_placeholder':           'Search by FPO name…',
+            'service_dpr_generation':       'DPR Generation',
+            'service_dpr_risk':             'DPR Risk Analysis',
+            'service_dpr_swot':             'DPR SWOT Analysis',
+            'service_dpr_executive':        'DPR Executive Summary',
+        },
     }
 
     count = 0
@@ -2645,6 +2912,15 @@ def seed_fpo_portal_ml_translations(languages):
     lang_ml  = languages['ml']
 
     ml_keys = {
+        #-------------------------------------------------------------------------
+        #Arunima S --> 28 Aug 2026
+
+        # ── common — fix keys clobbered by seed_frontend_ui_translations's
+        # English-placeholder pass (Step 7 runs after seed_ui_translations
+        # and overwrote these with unverified English placeholders) ────────
+        'common.edit':                          'എഡിറ്റ് ചെയ്യുക',
+        'common.delete':                        'ഇല്ലാതാക്കുക',
+        #-------------------------------------------------------------------------
         # ── fpo_dashboard new keys ─────────────────────────────────────────
         'fpo_dashboard.label_docs_verified':    'പരിശോധിച്ചു',
         'fpo_dashboard.label_docs_pending':     'പരിശോധന ആവശ്യം',
@@ -2845,6 +3121,194 @@ def seed_fpo_portal_ml_translations(languages):
         'fpo_tier_assessment.toast_start_failed':       'മൂല്യനിർണ്ണയം ആരംഭിക്കൽ പരാജയപ്പെട്ടു',
         'fpo_tier_assessment.toast_reopened':           'മൂല്യനിർണ്ണയം വീണ്ടും തുറന്നു. ഉത്തരങ്ങൾ എഡിറ്റ് ചെയ്യാം.',
         'fpo_tier_assessment.toast_reopen_failed':      'മൂല്യനിർണ്ണയം വീണ്ടും തുറക്കൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.',
+
+        # ── fpo_dpr ────────────────────────────────────────────────────────────
+        'fpo_dpr.page_title':                  'DPR പ്രൊജക്ടുകൾ',
+        'fpo_dpr.page_description':            'നിങ്ങളുടെ FPO ബിസിനസ് പദ്ധതികൾക്കുള്ള വിശദ പദ്ധതി റിപ്പോർട്ടുകൾ',
+        'fpo_dpr.empty_title':                 'DPR പ്രൊജക്ടുകൾ ഒന്നുമില്ല',
+        'fpo_dpr.empty_description':           'നിങ്ങളുടെ ആദ്യ വിശദ പദ്ധതി റിപ്പോർട്ട് സൃഷ്ടിക്കുക',
+        'fpo_dpr.btn_new_project':             'പുതിയ DPR പ്രൊജക്ട്',
+        'fpo_dpr.dialog_title':                'പുതിയ DPR പ്രൊജക്ട്',
+        'fpo_dpr.label_project_title':         'പ്രൊജക്ട് ശീർഷകം',
+        'fpo_dpr.placeholder_project_title':   'ഉദാ: വാഴ സംസ്കരണ യൂണിറ്റ്',
+        'fpo_dpr.label_financial_year':        'സാമ്പത്തിക വർഷം',
+        'fpo_dpr.placeholder_financial_year':  '2025-26',
+        'fpo_dpr.btn_create':                  'സൃഷ്ടിക്കുക',
+        'fpo_dpr.btn_creating':                'സൃഷ്ടിക്കുന്നു…',
+        'fpo_dpr.toast_create_failed':         'DPR പ്രൊജക്ട് സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടു',
+        'fpo_dpr.label_readiness':             'തയ്യാറെടുപ്പ്',
+        'fpo_dpr.btn_continue':                'വിസാർഡ് തുടരുക',
+        'fpo_dpr.btn_download':                'PDF ഡൗൺലോഡ്',
+        'fpo_dpr.btn_view_project':            'കാണുക',
+        'fpo_dpr.status_draft':                'ഡ്രാഫ്റ്റ്',
+        'fpo_dpr.status_data_complete':        'ഡേറ്റ പൂർണ്ണം',
+        'fpo_dpr.status_validated':            'സ്ഥിരീകരിച്ചു',
+        'fpo_dpr.status_generating':           'ജനറേറ്റ് ചെയ്യുന്നു…',
+        'fpo_dpr.status_generated':            'ജനറേറ്റ് ചെയ്തു',
+        'fpo_dpr.status_failed':               'പരാജയം',
+        'fpo_dpr.back_to_list':                'DPR പ്രൊജക്ടുകളിലേക്ക് മടങ്ങുക',
+        'fpo_dpr.project_not_found':           'പ്രൊജക്ട് കണ്ടെത്തിയില്ല.',
+        'fpo_dpr.heading_sections':            'പ്രൊജക്ട് വിഭാഗങ്ങൾ',
+        'fpo_dpr.heading_readiness':           'തയ്യാറെടുപ്പ്',
+        'fpo_dpr.heading_documents':           'ജനറേറ്റ് ചെയ്ത ഡോക്യുമെന്റുകൾ',
+        'fpo_dpr.label_version':               'പതിപ്പ്',
+        'fpo_dpr.label_score':                 'സ്കോർ',
+        'fpo_dpr.label_can_generate':          'ജനറേറ്റ് ചെയ്യാൻ തയ്യാർ',
+        'fpo_dpr.label_errors':                'തടസ്സ പ്രശ്നങ്ങൾ',
+        'fpo_dpr.label_warnings':              'മുന്നറിയിപ്പുകൾ',
+        'fpo_dpr.label_suggestions':           'നിർദ്ദേശങ്ങൾ',
+        'fpo_dpr.btn_generate':                'PDF ജനറേറ്റ് ചെയ്യുക',
+        'fpo_dpr.btn_generating':              'ജനറേറ്റ് ചെയ്യുന്നു…',
+        'fpo_dpr.btn_validate':                'മൂല്യനിർണ്ണയം നടത്തുക',
+        'fpo_dpr.toast_generate_success':      'PDF ജനറേഷൻ ആരംഭിച്ചു. ഇത് കുറച്ച് മിനിറ്റ് എടുക്കും.',
+        'fpo_dpr.toast_generate_failed':       'PDF ജനറേഷൻ ആരംഭിക്കൽ പരാജയപ്പെട്ടു',
+        'fpo_dpr.no_documents':                'ഇതുവരെ PDF ജനറേറ്റ് ചെയ്തിട്ടില്ല.',
+        'fpo_dpr.no_errors':                   'തടസ്സ പ്രശ്നങ്ങൾ ഒന്നുമില്ല.',
+        'fpo_dpr.no_warnings':                 'എല്ലാ പരിശോധനകളും വിജയിച്ചു.',
+        'fpo_dpr.section_project_basics':          'പ്രൊജക്ട് അടിസ്ഥാനം',
+        'fpo_dpr.section_promoter_details':        'പ്രമോട്ടർ വിവരങ്ങൾ',
+        'fpo_dpr.section_project_location':        'പ്രൊജക്ട് സ്ഥലം',
+        'fpo_dpr.section_nature_of_business':      'ബിസിനസ് സ്വഭാവം',
+        'fpo_dpr.section_product_details':         'ഉൽപ്പന്ന വിവരങ്ങൾ',
+        'fpo_dpr.section_raw_material':            'അസംസ്കൃത വസ്തു',
+        'fpo_dpr.section_market_linkages':         'വിപണി ബന്ധം',
+        'fpo_dpr.section_land_details':            'ഭൂമി വിവരങ്ങൾ',
+        'fpo_dpr.section_civil_works':             'സിവിൽ ജോലികൾ',
+        'fpo_dpr.section_machinery':               'യന്ത്രങ്ങളും ഉപകരണങ്ങളും',
+        'fpo_dpr.section_utilities':               'യൂട്ടിലിറ്റികൾ',
+        'fpo_dpr.section_manpower':                'മാൻപവർ',
+        'fpo_dpr.section_working_capital':         'വർക്കിംഗ് ക്യാപിറ്റൽ',
+        'fpo_dpr.section_means_of_finance':        'ധനസമ്പാദന മാർഗ്ഗം',
+        'fpo_dpr.section_subsidy_details':         'സബ്‌സിഡി വിവരങ്ങൾ',
+        'fpo_dpr.section_revenue_projections':     'വരുമാന പ്രൊജക്ഷൻ',
+        'fpo_dpr.section_implementation_plan':     'നടപ്പാക്കൽ പദ്ധതി',
+        'fpo_dpr.section_risk_analysis':           'അപകട വിശകലനം',
+        'fpo_dpr.section_swot_analysis':           'SWOT വിശകലനം',
+        'fpo_dpr.section_environmental_clearances':'പരിസ്ഥിതി ക്ലിയറൻസ്',
+        'fpo_dpr.section_declaration':             'പ്രഖ്യാപനം',
+        'fpo_dpr.status_complete':             'പൂർണ്ണം',
+        'fpo_dpr.status_incomplete':           'അപൂർണ്ണം',
+        'fpo_dpr.status_not_started':          'ആരംഭിച്ചിട്ടില്ല',
+        'fpo_dpr.section_not_found':           'വിഭാഗം കണ്ടെത്തിയില്ല.',
+        'fpo_dpr.label_section_data':          'വിഭാഗ ഡേറ്റ (JSON)',
+        'fpo_dpr.json_hint':                   'ഈ വിഭാഗത്തിനുള്ള JSON ഡേറ്റ എഡിറ്റ് ചെയ്യുക.',
+        'fpo_dpr.json_parse_error':            'അസാധുവായ JSON — സംരക്ഷിക്കുന്നതിന് മുൻപ് ശരിയാക്കുക',
+        'fpo_dpr.btn_save':                    'സംരക്ഷിക്കുക',
+        'fpo_dpr.btn_saving':                  'സംരക്ഷിക്കുന്നു…',
+        'fpo_dpr.save_indicator_saving':       'സംരക്ഷിക്കുന്നു…',
+        'fpo_dpr.save_indicator_saved':        'സംരക്ഷിച്ചു',
+        'fpo_dpr.toast_save_failed':           'സംരക്ഷിക്കൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.',
+        'fpo_dpr.label_project_type':          'പ്രൊജക്ട് തരം',
+        'fpo_dpr.option_processing':           'സംസ്കരണം',
+        'fpo_dpr.option_storage':              'സംഭരണം',
+        'fpo_dpr.option_marketing':            'വിപണനം',
+        'fpo_dpr.option_aggregation':          'ശേഖരണം',
+        'fpo_dpr.option_other':                'മറ്റുള്ളവ',
+        'fpo_dpr.label_key_components':        'പ്രധാന ഘടകങ്ങൾ',
+        'fpo_dpr.placeholder_key_components':  'പദ്ധതിയുടെ പ്രധാന ഘടകങ്ങൾ',
+        'fpo_dpr.hint_key_components':         'പ്രധാന ഘടകങ്ങൾ കോമ ഉപയോഗിച്ച് വേർതിരിക്കുക',
+        'fpo_dpr.label_notes':                 'പ്രൊജക്ട് കുറിപ്പുകൾ',
+        'fpo_dpr.placeholder_notes':           'പദ്ധതിയെക്കുറിച്ചുള്ള അധിക കുറിപ്പുകൾ…',
+        'fpo_dpr.option_select_type':          'പ്രൊജക്ട് തരം തിരഞ്ഞെടുക്കുക',
+        'fpo_dpr.label_project':               'പ്രൊജക്ട്',
+        'fpo_dpr.label_complete':              'പൂർത്തിയായി',
+        'fpo_dpr.label_last_saved':            'അവസാനം സംരക്ഷിച്ചത്',
+        'fpo_dpr.btn_back':                    'പ്രൊജക്ടിലേക്ക് മടങ്ങുക',
+        'fpo_dpr.label_district':              'ജില്ല',
+        'fpo_dpr.placeholder_district':        'ഉദാ: തൃശ്ശൂർ',
+        'fpo_dpr.label_block':                 'ബ്ലോക്ക് / താലൂക്ക്',
+        'fpo_dpr.option_select_block':         'ബ്ലോക്ക് തിരഞ്ഞെടുക്കുക',
+        'fpo_dpr.label_village':               'ഗ്രാമം / നഗരം',
+        'fpo_dpr.placeholder_village':         'ഉദാ: ഇരിങ്ങാലക്കുട',
+        'fpo_dpr.label_pin_code':              'പിൻ കോഡ്',
+        'fpo_dpr.label_survey_number':         'സർവേ നമ്പർ',
+        'fpo_dpr.placeholder_survey_number':   'ഉദാ: 45/2A',
+        'fpo_dpr.label_nearest_town':          'അടുത്ത നഗരം / പട്ടണം',
+        'fpo_dpr.placeholder_nearest_town':    'ഉദാ: തൃശ്ശൂർ',
+        'fpo_dpr.label_distance_km':           'ദൂരം (കി.മീ)',
+        'fpo_dpr.label_project_site_location': 'പദ്ധതി സൈറ്റ് സ്ഥാനം',
+        'fpo_dpr.hint_map':                    'പദ്ധതി സൈറ്റ് തിരയുക, മാപ്പിൽ ക്ലിക്ക് ചെയ്ത് പിൻ ഇടുക, അല്ലെങ്കിൽ GPS ഉപയോഗിക്കുക.',
+
+        # ── admin_dpr_config ───────────────────────────────────────────────────
+        'admin_dpr_config.page_title':              'DPR കോൺഫിഗറേഷൻ',
+        'admin_dpr_config.page_description':        'DPR ജനറേഷനായുള്ള സാമ്പത്തിക അനുമാനങ്ങൾ',
+        'admin_dpr_config.section_financial':       'സാമ്പത്തിക അനുമാനങ്ങൾ',
+        'admin_dpr_config.col_config_key':          'കോൺഫിഗ് കീ',
+        'admin_dpr_config.col_value':               'മൂല്യം',
+        'admin_dpr_config.col_description':         'വിവരണം',
+        'admin_dpr_config.col_updated':             'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്',
+        'admin_dpr_config.col_action':              'ആക്ഷൻ',
+        'admin_dpr_config.dialog_title':            'കോൺഫിഗറേഷൻ എഡിറ്റ് ചെയ്യുക',
+        'admin_dpr_config.label_value':             'മൂല്യം',
+        'admin_dpr_config.btn_save':                'സംരക്ഷിക്കുക',
+        'admin_dpr_config.btn_saving':              'സംരക്ഷിക്കുന്നു…',
+        'admin_dpr_config.btn_cancel':              'റദ്ദാക്കുക',
+        'admin_dpr_config.toast_updated':           'കോൺഫിഗറേഷൻ അപ്ഡേറ്റ് ചെയ്തു.',
+        'admin_dpr_config.toast_update_failed':     'കോൺഫിഗറേഷൻ അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
+
+        # ── admin_ai_services ──────────────────────────────────────────────────
+        'admin_ai_services.page_title':                   'AI സേവനങ്ങൾ',
+        'admin_ai_services.page_description':             'AI സേവന ലഭ്യത, ബജറ്റ് പരിധി, ഉപയോഗം നിരീക്ഷിക്കുക',
+        'admin_ai_services.section_services':             'സേവന കോൺഫിഗറേഷൻ',
+        'admin_ai_services.section_usage_log':            'ഉപയോഗ ലോഗ്',
+        'admin_ai_services.stat_total_calls':             'ഈ മാസം മൊത്തം കോളുകൾ',
+        'admin_ai_services.stat_total_cost':              'ഈ മാസം മൊത്തം ചെലവ്',
+        'admin_ai_services.stat_active_services':         'സജീവ സേവനങ്ങൾ',
+        'admin_ai_services.stat_of':                      'ൽ',
+        'admin_ai_services.stat_configured':              'കോൺഫിഗർ ചെയ്തത്',
+        'admin_ai_services.col_service':                  'സേവനം',
+        'admin_ai_services.col_fpo':                      'FPO',
+        'admin_ai_services.col_tokens':                   'ടോക്കണുകൾ',
+        'admin_ai_services.col_cost':                     'ചെലവ് (₹)',
+        'admin_ai_services.col_status':                   'സ്ഥിതി',
+        'admin_ai_services.col_date':                     'തീയതി',
+        'admin_ai_services.status_success':               'വിജയം',
+        'admin_ai_services.status_failed':                'പരാജയം',
+        'admin_ai_services.label_calls_this_month':       'ഈ മാസം കോളുകൾ',
+        'admin_ai_services.label_spent':                  'ചെലവഴിച്ചു',
+        'admin_ai_services.label_enabled':                'പ്രവർത്തനക്ഷമം',
+        'admin_ai_services.label_disabled':               'നിഷ്ക്രിയം',
+        'admin_ai_services.label_monthly_cap':            'പ്രതിമാസ പരിധി (₹):',
+        'admin_ai_services.label_no_limit':               'പരിധിയില്ല',
+        'admin_ai_services.btn_save':                     'സംരക്ഷിക്കുക',
+        'admin_ai_services.btn_cancel':                   'റദ്ദാക്കുക',
+        'admin_ai_services.toast_cap_updated':            'ബജറ്റ് പരിധി അപ്ഡേറ്റ് ചെയ്തു.',
+        'admin_ai_services.toast_cap_failed':             'ബജറ്റ് പരിധി അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
+        'admin_ai_services.toast_toggle_failed':          'AI സേവനം അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
+        'admin_ai_services.search_placeholder':           'FPO പേര് തിരയുക…',
+        'admin_ai_services.service_dpr_generation':       'DPR ജനറേഷൻ',
+        'admin_ai_services.service_dpr_risk':             'DPR അപകട വിശകലനം',
+        'admin_ai_services.service_dpr_swot':             'DPR SWOT വിശകലനം',
+        'admin_ai_services.service_dpr_executive':        'DPR എക്സിക്യൂട്ടീവ് സംഗ്രഹം',
+
+        # ── admin_dpr ──────────────────────────────────────────────────────────
+        'admin_dpr.page_title':           'DPR പ്രൊജക്ടുകൾ',
+        'admin_dpr.page_description':     'എല്ലാ FPO-കളിലെയും DPR പ്രൊജക്ടുകൾ',
+        'admin_dpr.col_fpo':              'FPO',
+        'admin_dpr.col_title':            'പ്രൊജക്ട് ശീർഷകം',
+        'admin_dpr.col_year':             'സാമ്പത്തിക വർഷം',
+        'admin_dpr.col_status':           'സ്ഥിതി',
+        'admin_dpr.col_score':            'സ്കോർ',
+        'admin_dpr.col_created':          'സൃഷ്ടിച്ചത്',
+        'admin_dpr.status_draft':         'ഡ്രാഫ്റ്റ്',
+        'admin_dpr.status_data_complete': 'ഡേറ്റ പൂർണ്ണം',
+        'admin_dpr.status_validated':     'സ്ഥിരീകരിച്ചു',
+        'admin_dpr.status_generating':    'ജനറേറ്റ് ചെയ്യുന്നു',
+        'admin_dpr.status_generated':     'ജനറേറ്റ് ചെയ്തു',
+        'admin_dpr.status_failed':        'പരാജയം',
+        'admin_dpr.back_to_list':         'DPR പ്രൊജക്ടുകളിലേക്ക് മടങ്ങുക',
+        'admin_dpr.project_not_found':    'പ്രൊജക്ട് കണ്ടെത്തിയില്ല.',
+        'admin_dpr.heading_sections':     'വിഭാഗ പൂർണ്ണത',
+        'admin_dpr.heading_financials':   'സാമ്പത്തിക സംഗ്രഹം',
+        'admin_dpr.heading_documents':    'ജനറേറ്റ് ചെയ്ത ഡോക്യുമെന്റുകൾ',
+        'admin_dpr.label_fpo':            'FPO',
+        'admin_dpr.label_year':           'സാമ്പത്തിക വർഷം',
+        'admin_dpr.label_score':          'സ്കോർ',
+        'admin_dpr.label_version':        'പതിപ്പ്',
+        'admin_dpr.no_documents':         'ഡോക്യുമെന്റുകൾ ഒന്നുമില്ല.',
+        'admin_dpr.btn_download':         'ഡൗൺലോഡ്',
+        'admin_dpr.label_errors':         'തടസ്സ പ്രശ്നങ്ങൾ',
+        'admin_dpr.label_warnings':       'മുന്നറിയിപ്പുകൾ',
 
         # ── admin_site_content ─────────────────────────────────────────────────
         'admin_site_content.field_order':                'പ്രദർശന ക്രമം',
@@ -3138,7 +3602,12 @@ def seed_menu_translations(languages):
         ('fpo_recommendations',    'AI Recommendations',       'AI ശുപാർശകൾ'),
         ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
         ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),
+        ('fpo_dpr',                'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('fpo_settings',           'Settings',                 'ക്രമീകരണങ്ങൾ'),
+        # Admin DPR / AI menu items
+        ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
+        ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
+        ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
     ]
 
     count = 0
@@ -3453,7 +3922,224 @@ def seed_nav_translations(languages):
             if created:
                 count += 1
     return count
+#--------------------------------------------------------------------------------
+#arunima 
 
+def seed_marketplace_translations(languages):
+    """Seed P2-11 Marketplace API response messages (marketplace.* keys)."""
+    category = TranslationCategory.objects.get(code='marketplace')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+ 
+    marketplace_messages = [
+        # Products
+        ('products_retrieved',        'Products retrieved successfully',                   'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+        ('product_created',           'Product created successfully',                      'ഉൽപ്പന്നം വിജയകരമായി സൃഷ്ടിച്ചു'),
+        ('product_updated',           'Product updated successfully',                      'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('product_deleted',           'Product deleted successfully',                      'ഉൽപ്പന്നം വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('product_not_editable',      'Product cannot be edited in its current status',    'നിലവിലെ സ്ഥിതിയിൽ ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല'),
+        ('only_draft_deletable',      'Only draft products can be deleted',                'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
+        ('only_draft_publishable',    'Only draft products can be published',              'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
+        ('product_published',         'Product published successfully',                    'ഉൽപ്പന്നം വിജയകരമായി പ്രസിദ്ധീകരിച്ചു'),
+        ('only_active_can_be_sold',   'Only active products can be marked as sold',        'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
+ 
+        # Buyers
+        ('buyers_retrieved',          'Buyers retrieved successfully',                     'ക്രേതാക്കൾ വിജയകരമായി ലഭിച്ചു'),
+        ('buyer_created',             'Buyer created successfully',                        'ക്രേതാവിനെ വിജയകരമായി സൃഷ്ടിച്ചു'),
+        ('buyer_updated',             'Buyer updated successfully',                        'ക്രേതാവിനെ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('buyer_deleted',             'Buyer deleted successfully',                        'ക്രേതാവിനെ വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('buyer_verified',            'Buyer verified successfully',                       'ക്രേതാവിനെ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
+ 
+        # Matches
+        ('matches_retrieved',         'Matches retrieved successfully',                    'പൊരുത്തങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+        ('match_accepted',            'Match accepted successfully',                       'പൊരുത്തം വിജയകരമായി അംഗീകരിച്ചു'),
+        ('match_rejected',            'Match rejected successfully',                       'പൊരുത്തം വിജയകരമായി നിരസിച്ചു'),
+        ('match_not_actionable',      'This match has already been decided',               'ഈ പൊരുത്തം ഇതിനകം തീരുമാനിച്ചു'),
+ 
+        # Prices & Opportunities
+        ('prices_retrieved',          'Prices retrieved successfully',                     'വിലകൾ വിജയകരമായി ലഭിച്ചു'),
+        ('price_seeded',              'Price data added successfully',                     'വില വിവരം വിജയകരമായി ചേർത്തു'),
+        ('opportunities_retrieved',   'Opportunities retrieved successfully',              'അവസരങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+    ]
+ 
+    count = 0
+    for key, en_value, ml_value in marketplace_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
+        )
+        count += 1
+ 
+    return count
+
+#---------------------------------------------------------------------------------------
+#Arunima S — 28-08-2026
+#Frontend UI labels for the FPO Products page (list, table, form) — these were
+#never seeded, which is why only the sidebar translated to Malayalam and the
+#actual page content (titles, columns, buttons, form labels) stayed in English.
+
+def seed_products_page_translations(languages):
+    """
+    Seed UI labels for the FPO Products screens.
+
+    Covers three screen-name prefixes actually requested by the frontend:
+      - fpo_products.*  (products/page.tsx — page header)
+      - product_table.* (products/page.tsx + _components/columns.tsx — DataTable columns, ViewSheet, row actions)
+      - product_form.*  (new/page.tsx, [id]/edit/page.tsx, _components/product-form.tsx)
+
+    All live under category='ui' with a dot-prefixed key, matching the
+    house convention used by seed_ui_translations()/seed_frontend_ui_translations().
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    products_ui_keys = [
+        # ── fpo_products — page.tsx header ──────────────────────────────
+        ('fpo_products.page_title',       'My Products',
+         'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
+        ('fpo_products.page_description', "List and manage your FPO's agricultural products for market linkage.",
+         'വിപണി ബന്ധത്തിനായി നിങ്ങളുടെ FPO-യുടെ കാർഷിക ഉൽപ്പന്നങ്ങൾ പട്ടികപ്പെടുത്തി നിയന്ത്രിക്കുക.'),
+        ('fpo_products.add_btn',          'Add Product',
+         'ഉൽപ്പന്നം ചേർക്കുക'),
+
+        # ── product_table — columns, ViewSheet, row actions ─────────────
+        ('product_table.view_title',            'Product Details',
+         'ഉൽപ്പന്ന വിശദാംശങ്ങൾ'),
+        ('product_table.col_name',               'Name',
+         'പേര്'),
+        ('product_table.col_commodity',          'Commodity ID',
+         'ചരക്ക് ഐഡി'),
+        ('product_table.col_quantity',           'Quantity',
+         'അളവ്'),
+        ('product_table.col_price',              'Price',
+         'വില'),
+        ('product_table.col_quality',            'Quality Certification',
+         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
+        ('product_table.col_available_from',     'Available From',
+         'ലഭ്യമായ തീയതി മുതൽ'),
+        ('product_table.col_available_until',    'Available Until',
+         'ലഭ്യമായ തീയതി വരെ'),
+        ('product_table.col_available',          'Available',
+         'ലഭ്യത'),
+        ('product_table.col_status',             'Status',
+         'സ്ഥിതി'),
+        ('product_table.col_public',             'Public',
+         'പൊതു'),
+        ('product_table.toast_published',        'Product published',
+         'ഉൽപ്പന്നം പ്രസിദ്ധീകരിച്ചു'),
+        ('product_table.err_publish_failed',     'Only draft products can be published',
+         'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
+        ('product_table.toast_marked_sold',      'Product marked as sold',
+         'ഉൽപ്പന്നം വിറ്റതായി അടയാളപ്പെടുത്തി'),
+        ('product_table.err_mark_sold_failed',   'Only active products can be marked sold',
+         'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('product_table.toast_deleted',          'Product deleted',
+         'ഉൽപ്പന്നം ഇല്ലാതാക്കി'),
+        ('product_table.err_delete_failed',      'Only draft products can be deleted',
+         'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
+        ('product_table.confirm_delete_title',   'Delete Product',
+         'ഉൽപ്പന്നം ഇല്ലാതാക്കുക'),
+        ('product_table.confirm_delete_description',
+         'Are you sure you want to delete this product? This action cannot be undone.',
+         'ഈ ഉൽപ്പന്നം ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഈ പ്രവർത്തി പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('product_table.action_publish',         'Publish',
+         'പ്രസിദ്ധീകരിക്കുക'),
+        ('product_table.action_mark_sold',       'Mark Sold',
+         'വിറ്റതായി അടയാളപ്പെടുത്തുക'),
+
+         #--------------------------------------------------------------------------
+         #Arunima S --> 28th August 2026
+
+        ('product_table.status_draft',           'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('product_table.status_active',          'Active',
+         'സജീവം'),
+        ('product_table.status_sold',             'Sold',
+         'വിറ്റു'),
+        ('product_table.status_expired',          'Expired',
+         'കാലഹരണപ്പെട്ടു'),
+         #--------------------------------------------------------------------------
+
+        # ── product_form — new/edit wrapper pages + ProductForm ─────────
+        ('product_form.add_title',               'Add Product',
+         'ഉൽപ്പന്നം ചേർക്കുക'),
+        ('product_form.add_description',         'List a new product for buyers to discover.',
+         'ക്രേതാക്കൾക്ക് കണ്ടെത്താൻ ഒരു പുതിയ ഉൽപ്പന്നം പട്ടികപ്പെടുത്തുക.'),
+        ('product_form.edit_title',               'Edit Product',
+         'ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യുക'),
+        ('product_form.section_details',          'Product Details',
+         'ഉൽപ്പന്ന വിശദാംശങ്ങൾ'),
+        ('product_form.name_en_label',            'Name (English)',
+         'പേര് (ഇംഗ്ലീഷ്)'),
+        ('product_form.name_en_placeholder',      'e.g. Organic Coconut',
+         'ഉദാ. ഓർഗാനിക് തേങ്ങ'),
+        ('product_form.name_ml_label',            'Name (Malayalam)',
+         'പേര് (മലയാളം)'),
+        ('product_form.name_ml_placeholder',      'Optional — falls back to English',
+         'ഐച്ഛികം — ഇംഗ്ലീഷിലേക്ക് തിരികെ പോകും'),
+        ('product_form.commodity_label',          'Commodity',
+         'ചരക്ക്'),
+        ('product_form.commodity_loading',        'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+        ('product_form.commodity_placeholder',    'Select a commodity',
+         'ഒരു ചരക്ക് തിരഞ്ഞെടുക്കുക'),
+        ('product_form.description_en_label',     'Description (English)',
+         'വിവരണം (ഇംഗ്ലീഷ്)'),
+        ('product_form.description_ml_label',     'Description (Malayalam)',
+         'വിവരണം (മലയാളം)'),
+        ('product_form.quantity_label',           'Quantity',
+         'അളവ്'),
+        ('product_form.unit_label',               'Unit',
+         'യൂണിറ്റ്'),
+        ('product_form.price_label',              'Price per unit (₹)',
+         'യൂണിറ്റ് വില (₹)'),
+        ('product_form.quality_label',            'Quality certification',
+         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
+        ('product_form.quality_placeholder',      'e.g. FSSAI, NPOP Organic, ISO 22000',
+         'ഉദാ. FSSAI, NPOP ഓർഗാനിക്, ISO 22000'),
+        ('product_form.available_from_label',     'Available from',
+         'ലഭ്യമായ തീയതി മുതൽ'),
+        ('product_form.available_until_label',    'Available until',
+         'ലഭ്യമായ തീയതി വരെ'),
+        ('product_form.public_label',             'Visible on public Market Hub',
+         'പൊതു മാർക്കറ്റ് ഹബ്ബിൽ ദൃശ്യമാണ്'),
+        ('product_form.toast_updated',            'Product updated successfully',
+         'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('product_form.toast_created',            'Product added successfully',
+         'ഉൽപ്പന്നം വിജയകരമായി ചേർത്തു'),
+
+        # ── missing common.* keys used by columns.tsx / product-form.tsx ─
+        # (save_btn, cancel_btn, reset_btn, edit, delete etc. already exist —
+        # only these three were genuinely missing)
+        ('common.yes',            'Yes',
+         'അതെ'),
+        ('common.no',             'No',
+         'ഇല്ല'),
+        ('common.clear_filters',  'Clear filters',
+         'ഫിൽട്ടറുകൾ മായ്ക്കുക'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in products_ui_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'FPO Products page UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'FPO Products page UI label', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#---------------------------------------------------------------------------------------
+ 
 
 def seed_translations():
     """Main seed function"""
@@ -3490,6 +4176,25 @@ def seed_translations():
     admin_count = seed_admin_translations(languages)
     print(f"✅ Seeded {admin_count} admin translations")
     total_count += admin_count
+
+    #-------------------------------------------------------------------------------
+    #Arunima S
+    # Step 4b: Seed marketplace messages (P2-11)
+    print("\nSeeding marketplace translations...")
+    marketplace_count = seed_marketplace_translations(languages)
+    print(f"✅ Seeded {marketplace_count} marketplace translations")
+    total_count += marketplace_count
+
+    
+    #Arunima S — 28-08-2026
+    # Step 4c: Seed FPO Products page frontend UI labels (list, table, form)
+    print("\nSeeding FPO Products page UI translations...")
+    products_page_count = seed_products_page_translations(languages)
+    print(f"✅ Seeded {products_page_count} FPO Products page translations")
+    total_count += products_page_count
+    #--------------------------------------------------------------------------------
+
+    
 
     # Step 5: Seed UI labels (frontend field labels, buttons, page titles)
     print("\nSeeding UI label translations...")
@@ -3538,6 +4243,18 @@ def seed_translations():
     print(f"✅ Seeded {home_count} home section translations")
     total_count += home_count
 
+    # Step 9e: Seed GIS module translations (P2-05)
+    print("\nSeeding GIS module translations...")
+    gis_count = seed_gis_translations(languages)
+    print(f"✅ Seeded {gis_count} GIS translations")
+    total_count += gis_count
+
+    # Step 9f: Seed AI Recommendations translations (P2-06)
+    print("\nSeeding AI Recommendations translations...")
+    rec_count = seed_recommendations_translations(languages)
+    print(f"✅ Seeded {rec_count} recommendation translations")
+    total_count += rec_count
+
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
     seed_fixes(languages)
@@ -3557,6 +4274,110 @@ def seed_translations():
     print("\nSample translations (auth category):")
     for trans in Translation.objects.filter(category__code='auth')[:5]:
         print(f"  {trans.full_key} ({trans.language.code}): {trans.value[:50]}...")
+
+
+
+
+def seed_gis_translations(languages):
+    """
+    Seed GIS module messages (P2-05) — zones, districts, cultivation
+    area, weather. Malayalam values are best-effort (not from a native
+    speaker) — marked is_verified=False so they're flagged for review,
+    same as everything else in this GIS module that's a placeholder
+    pending real review/data.
+    """
+    category, _ = TranslationCategory.objects.get_or_create(
+        code='gis',
+        defaults={
+            'name': 'GIS Integration',
+            'description': 'Agro-climatic zones, districts, cultivation area, weather messages',
+            'display_order': 9,
+        }
+    )
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    gis_messages = [
+        ('zones_retrieved',            'Zones retrieved successfully',                       'മേഖലകൾ ലഭ്യമാക്കി'),
+        ('districts_retrieved',        'Districts retrieved successfully',                   'ജില്ലകൾ ലഭ്യമാക്കി'),
+        ('zone_detected',              'Zone detected successfully',                         'മേഖല കണ്ടെത്തി'),
+        ('zone_not_found',             'No zone found for the given location',               'ഈ സ്ഥലത്തിന് മേഖല കണ്ടെത്തിയില്ല'),
+        ('fpo_not_found',              'No FPO found for this user',                         'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
+        ('location_not_set',           'Location has not been set yet',                      'സ്ഥലം ഇതുവരെ സജ്ജമാക്കിയിട്ടില്ല'),
+        ('lat_lng_required',           'Latitude and longitude are required',                'അക്ഷാംശവും രേഖാംശവും ആവശ്യമാണ്'),
+        ('invalid_coordinates',        'Invalid coordinates provided',                       'അസാധുവായ കോർഡിനേറ്റുകൾ'),
+        ('cultivation_area_retrieved', 'Cultivation area retrieved successfully',            'കൃഷിഭൂമി വിവരങ്ങൾ ലഭ്യമാക്കി'),
+        ('cultivation_area_saved',     'Cultivation area saved successfully',                'കൃഷിഭൂമി വിജയകരമായി സംരക്ഷിച്ചു'),
+        ('cultivation_area_deleted',   'Cultivation area deleted successfully',              'കൃഷിഭൂമി വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('cultivation_area_not_found', 'No cultivation area found',                          'കൃഷിഭൂമി കണ്ടെത്തിയില്ല'),
+        ('weather_retrieved',          'Weather data retrieved successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ ലഭ്യമാക്കി'),
+        ('weather_refreshed',          'Weather data refreshed successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ പുതുക്കി'),
+        ('weather_not_found',          'No weather data found. Please refresh to fetch it.', 'കാലാവസ്ഥാ വിവരങ്ങൾ കണ്ടെത്തിയില്ല. ദയവായി പുതുക്കുക.'),
+    ]
+
+    count = 0
+    for key, en_text, ml_text in gis_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_text, 'context': 'GIS module (P2-05)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_text, 'context': 'GIS module (P2-05) — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
+
+
+def seed_recommendations_translations(languages):
+    """
+    Seed AI Crop Recommendations messages (P2-06). Malayalam values
+    are best-effort (not from a native speaker) — marked
+    is_verified=False so they're flagged for review.
+    """
+    category, _ = TranslationCategory.objects.get_or_create(
+        code='recommendations',
+        defaults={
+            'name': 'AI Crop Recommendations',
+            'description': 'Crop recommendation requests, feedback, and admin ML model management messages',
+            'display_order': 10,
+        }
+    )
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    recommendation_messages = [
+        ('retrieved',               'Recommendation retrieved successfully',                     'ശുപാർശ ലഭ്യമാക്കി'),
+        ('requested',                'Recommendation generated successfully',                     'ശുപാർശ വിജയകരമായി തയ്യാറാക്കി'),
+        ('feedback_saved',           'Feedback saved successfully',                               'പ്രതികരണം സംരക്ഷിച്ചു'),
+        ('not_found',                'No recommendation found for this financial year',           'ഈ സാമ്പത്തിക വർഷത്തിന് ശുപാർശ കണ്ടെത്തിയില്ല'),
+        ('fpo_not_found',            'No FPO found for this user',                                'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
+        ('invalid_rating',           'Rating must be between 1 and 5',                            'റേറ്റിംഗ് 1 നും 5 നും ഇടയിൽ ആയിരിക്കണം'),
+        ('no_active_model',          'No active AI model is currently configured',                'നിലവിൽ സജീവമായ AI മോഡൽ ഇല്ല'),
+        ('service_unavailable',      'AI service is temporarily unavailable',                     'AI സേവനം താൽക്കാലികമായി ലഭ്യമല്ല'),
+        ('models_retrieved',         'Model versions retrieved successfully',                     'മോഡൽ പതിപ്പുകൾ ലഭ്യമാക്കി'),
+        ('model_registered',         'Model version registered successfully',                     'മോഡൽ പതിപ്പ് രജിസ്റ്റർ ചെയ്തു'),
+        ('model_activated',          'Model version activated successfully',                      'മോഡൽ പതിപ്പ് സജീവമാക്കി'),
+        ('model_not_found',          'Model version not found',                                   'മോഡൽ പതിപ്പ് കണ്ടെത്തിയില്ല'),
+        ('model_reload_failed',      'Model activated, but the AI service could not be notified', 'മോഡൽ സജീവമാക്കി, പക്ഷേ AI സേവനത്തെ അറിയിക്കാൻ കഴിഞ്ഞില്ല'),
+        ('version_code_required',    'Version code is required',                                  'പതിപ്പ് കോഡ് ആവശ്യമാണ്'),
+        ('feedback_list_retrieved',  'Feedback list retrieved successfully',                      'പ്രതികരണ പട്ടിക ലഭ്യമാക്കി'),
+    ]
+
+    count = 0
+    for key, en_text, ml_text in recommendation_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_text, 'context': 'AI Recommendations (P2-06)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_text, 'context': 'AI Recommendations (P2-06) — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
 
 
 if __name__ == '__main__':
