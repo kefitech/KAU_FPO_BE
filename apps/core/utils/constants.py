@@ -42,6 +42,12 @@ class District(models.TextChoices):
     KANNUR = "KNR", "Kannur"
     KASARAGOD = "KSD", "Kasaragod"
 
+DISTRICT_ZONE = {
+    "TVM": "South", "KLM": "South", "PTA": "South", "ALP": "South", "KTM": "South",
+    "IDK": "Central", "EKM": "Central", "TSR": "Central", "PKD": "Central",
+    "MLP": "North", "KZD": "North", "WYD": "North", "KNR": "North", "KSD": "North",
+}
+
 
 # District names with Malayalam translations
 DISTRICTS_BILINGUAL = {

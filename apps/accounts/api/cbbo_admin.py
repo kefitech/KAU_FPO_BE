@@ -30,6 +30,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, extend_sche
 
 from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
+from apps.database.models.organisation import Organisation
+from apps.database.models.cbbo_profile import CBBOOfficerProfile
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
@@ -61,6 +63,10 @@ class CBBOCreateSerializer(serializers.Serializer):
         required=False,
         default=list,
         help_text="Required when level=district. Ignored when level=state.",
+    )
+    organisation = serializers.PrimaryKeyRelatedField(
+        queryset=Organisation.objects.filter(is_deleted=False, is_active=True),
+        help_text="The CBBO/NGO organisation this officer belongs to.",
     )
 
     def validate_email(self, value):
@@ -105,22 +111,33 @@ class _AssignmentRowSerializer(serializers.ModelSerializer):
         lang = getattr(self.context.get('request'), 'language', 'en')
         return get_district_name(obj.district, language=lang)
 
-
 class CBBOSerializer(serializers.ModelSerializer):
-    """Read-only representation — never used to accept input (see
+    """Read-only representation - never used to accept input (see
     CBBOCreateSerializer/CBBOUpdateSerializer for that)."""
     phone       = serializers.SerializerMethodField()
     scope       = serializers.SerializerMethodField()
     assignments = serializers.SerializerMethodField()
+    organisation_id   = serializers.SerializerMethodField()
+    organisation_name = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name']
         read_only_fields = fields
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
         return getattr(getattr(obj, 'profile', None), 'phone', '')
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_organisation_id(self, obj):
+        profile = getattr(obj, 'cbbo_profile', None)
+        return profile.organisation_id if profile else None
+
+    @extend_schema_field(serializers.CharField())
+    def get_organisation_name(self, obj):
+        profile = getattr(obj, 'cbbo_profile', None)
+        return profile.organisation.name if profile else None
 
     @extend_schema_field(serializers.CharField())
     def get_scope(self, obj):
@@ -249,6 +266,11 @@ class CBBOViewSet(TranslatedViewSet):
 
         cbbo_group, _ = Group.objects.get_or_create(name=UserRole.CBBO)
         user.groups.add(cbbo_group)
+        CBBOOfficerProfile.objects.create(
+            user=user,
+            organisation=data['organisation'],
+            registration_status='approved',
+        )
 
         if data['level'] == CBBOAssignment.LEVEL_STATE:
             CBBOAssignment.objects.create(
@@ -546,3 +568,74 @@ class CBBOViewSet(TranslatedViewSet):
                     cbbo=user, level=CBBOAssignment.LEVEL_DISTRICT,
                     district=code, is_active=True,
                 )
+
+    @extend_schema(tags=['Admin - CBBO'], responses=CBBOSerializer(many=True))
+    @action(detail=False, methods=['get'], url_path='pending')
+    def pending_registrations(self, request):
+        lang = self.get_language()
+        qs = self.get_queryset().filter(cbbo_profile__registration_status='pending')
+        return StandardResponse.success(
+            data=CBBOSerializer(qs, many=True, context={"request": request}).data,
+            message=t(self.list_message, lang),
+        )
+
+
+    @extend_schema(tags=['Admin - CBBO'], responses=CBBOSerializer)
+    @action(detail=True, methods=['post'], url_path='approve-registration')
+    def approve_registration(self, request, pk=None):
+        lang = self.get_language()
+        user = self.get_object()
+        profile = user.cbbo_profile
+
+        if profile.registration_status != 'pending':
+            return StandardResponse.error(message='This registration is not pending approval.', status_code=400)
+
+        from django.utils import timezone
+        profile.registration_status = 'approved'
+        profile.approved_by = request.user
+        profile.approved_at = timezone.now()
+        profile.save(update_fields=['registration_status', 'approved_by', 'approved_at'])
+
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+
+        try:
+            frontend_url = getattr(django_settings, 'FRONTEND_URL', '')
+            send_notification(
+                user=user,
+                code='welcome',
+                channel='email',
+                context={
+                    'user_name': user.first_name or user.username,
+                    'email': user.email,
+                    'button_link': frontend_url,
+                    'button_text': 'Login Now',
+                },
+                lang=lang,
+            )
+        except Exception:
+            logger.exception(f"Failed to send approval notification to {user.email}")
+
+        return StandardResponse.success(
+            data=CBBOSerializer(user, context={"request": request}).data,
+            message='Registration approved. The officer can now log in.',
+        )
+
+
+    @extend_schema(tags=['Admin - CBBO'], responses=CBBOSerializer)
+    @action(detail=True, methods=['post'], url_path='reject-registration')
+    def reject_registration(self, request, pk=None):
+        lang = self.get_language()
+        user = self.get_object()
+        profile = user.cbbo_profile
+
+        if profile.registration_status != 'pending':
+            return StandardResponse.error(message='This registration is not pending approval.', status_code=400)
+
+        profile.registration_status = 'rejected'
+        profile.save(update_fields=['registration_status'])
+
+        return StandardResponse.success(
+            data=CBBOSerializer(user, context={"request": request}).data,
+            message='Registration rejected.',
+        )

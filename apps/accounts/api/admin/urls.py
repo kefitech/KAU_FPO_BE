@@ -102,6 +102,7 @@ from .cms import (
     FeedbackListView,
     FeedbackDetailView,
 )
+from .organisations import OrganisationListView, OrganisationDetailView
 from .schemes import (
     SchemeListView,
     SchemeDetailView,
@@ -230,6 +231,8 @@ urlpatterns = [
     path('documents/<int:pk>/activate/',       DocumentLibraryActivateView.as_view(),   name='admin-documents-activate'),
     path('documents/<int:pk>/deactivate/',     DocumentLibraryDeactivateView.as_view(), name='admin-documents-deactivate'),
     # Schemes & Subsidies
+    path('organisations/',                 OrganisationListView.as_view(),   name='admin-organisations-list'),
+    path('organisations/<int:pk>/',        OrganisationDetailView.as_view(), name='admin-organisations-detail'),
     path('schemes/',                       SchemeListView.as_view(),        name='admin-schemes-list'),
     path('schemes/<int:pk>/',              SchemeDetailView.as_view(),      name='admin-schemes-detail'),
     path('schemes/<int:pk>/activate/',     SchemeActivateView.as_view(),    name='admin-schemes-activate'),
