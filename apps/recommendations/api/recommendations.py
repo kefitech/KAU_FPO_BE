@@ -16,11 +16,13 @@ from pathlib import Path
 from django.utils import timezone
 import httpx
 from django.conf import settings
-from rest_framework import serializers, status
+from rest_framework import serializers, status, filters
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema
+
+from django.db.models import Q
 
 from apps.core.views import TranslatedViewSet
 from apps.core.utils.responses import StandardResponse
@@ -312,7 +314,15 @@ class MLModelVersionAdminView(APIView):
 
     @extend_schema(tags=["Admin - ML Models"])
     def get(self, request, *args, **kwargs):
-        versions = MLModelVersion.objects.all().order_by('-deployed_at')
+        versions = MLModelVersion.objects.filter(is_deleted=False).order_by('-deployed_at')
+
+        search = request.query_params.get('search')
+        if search:
+            versions = versions.filter(
+                Q(version_code__icontains=search) |
+                Q(description__icontains=search)
+            )
+
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(versions, request, view=self)
         serializer = MLModelVersionSerializer(page, many=True)
@@ -717,6 +727,8 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     serializer_class = RecommendationFeedbackSerializer
     permission_classes = [IsAdmin]
     pagination_class = StandardPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['fpo__name', 'feedback_comment']
 
     list_message = 'recommendations.feedback_list_retrieved'
 
