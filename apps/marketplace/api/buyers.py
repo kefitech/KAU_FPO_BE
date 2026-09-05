@@ -10,7 +10,7 @@ FPO browse (verified only, read-only): /api/marketplace/buyers/
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
-
+from rest_framework import filters
 from apps.core.permissions.rbac import IsAdmin, IsAuthenticated, IsFPOManager
 from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
@@ -40,13 +40,22 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
     pagination_class = StandardPagination
 
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'organisation', 'contact_email', 'contact_phone']
+
     list_message = 'marketplace.buyers_retrieved'
     create_message = 'marketplace.buyer_created'
     update_message = 'marketplace.buyer_updated'
     destroy_message = 'marketplace.buyer_deleted'
 
     def get_queryset(self):
-        return BuyerDirectory.objects.filter(is_deleted=False).order_by('-created_at')
+        queryset = BuyerDirectory.objects.filter(is_deleted=False).order_by('-created_at')
+        buyer_type = self.request.query_params.get('buyer_type')
+        if buyer_type == 'fpo':
+            queryset = queryset.filter(fpo__isnull=False)
+        elif buyer_type == 'external':
+            queryset = queryset.filter(user__isnull=False)
+        return queryset
 
     def perform_destroy(self, instance):
         # BaseModel provides soft_delete() — use it instead of a hard delete.
