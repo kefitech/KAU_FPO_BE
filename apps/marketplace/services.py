@@ -104,3 +104,28 @@ def compute_opportunities():
         })
 
     return sorted(opportunities, key=lambda o: o['interested_buyer_count'], reverse=True)
+
+def _get_buyer_row(user):
+    """Resolve the BuyerDirectory row for this user, whichever way they're linked."""
+    buyer = getattr(user, 'buyer_profile', None)
+    if buyer is not None:
+        return buyer
+
+    fpo = getattr(user, 'fpo', None)
+    if fpo is not None:
+        buyer = getattr(fpo, 'buyer_registration', None)
+        if buyer is not None:
+            return buyer
+
+    return None
+
+
+def get_buyer_redirect(user):
+    """
+    Return redirect status dict for buyer users (external or FPO-as-buyer).
+    Returns None if the user has no BuyerDirectory row at all.
+    """
+    buyer = _get_buyer_row(user)
+    if buyer is None:
+        return None
+    return {'status': buyer.status}
