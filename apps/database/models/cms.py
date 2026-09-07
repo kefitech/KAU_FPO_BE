@@ -192,7 +192,7 @@ class TeamMember(BaseModel):
 
 
 class GalleryAlbum(BaseModel):
-    title     = models.CharField(max_length=300)
+    title     = models.JSONField(default=dict, help_text='{"en": "...", "ml": "..."}')
     order     = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -208,8 +208,13 @@ class GalleryAlbum(BaseModel):
     def photo_count(self):
         return self.photos.filter(is_deleted=False).count()
 
+    def get_title(self, lang='en'):
+        if isinstance(self.title, dict):
+            return self.title.get(lang) or self.title.get('en', '')
+        return self.title or ''
+
     def __str__(self):
-        return self.title
+        return self.get_title() or f'Album {self.id}'
 
 
 class GalleryPhoto(BaseModel):
