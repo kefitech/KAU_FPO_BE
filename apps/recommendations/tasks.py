@@ -128,12 +128,36 @@ TRAINING_DESCRIPTION_PLACEHOLDER = 'Training in progress'
 DATASET_FILENAME = 'dataset.csv'
 
 
+def _notify_admins_retrain(version, code: str, context: dict) -> None:
+    """
+    Broadcasts an in-app notification to every active super admin's inbox.
+    Same pattern as claim_new_admin in apps/fpo/api/claim.py — one
+    send_notification() call per admin, each wrapped so a bad/missing
+    template never breaks the training task itself.
+    """
+    from django.contrib.auth import get_user_model
+    from apps.core.utils.constants import UserRole
+    from apps.notifications.services import send_notification
+
+    User = get_user_model()
+    admin_users = User.objects.filter(groups__name=UserRole.SUPER_ADMIN, is_active=True)
+    for admin in admin_users:
+        try:
+            send_notification(user=admin, code=code, channel='in_app', context=context)
+        except Exception:
+            logger.exception(f"retrain_model_task: failed to notify admin {admin.pk} for {version.version_code}")
+
+
 def _mark_failed(version, reason: str) -> None:
     from apps.database.models import MLModelVersion
     version.status = MLModelVersion.Status.FAILED
     version.training_error = reason[:4000]
     version.save()  # plain save: the model's is_active hook is a no-op for an inactive row
     logger.error(f"retrain_model_task: version {version.version_code} failed: {reason}")
+    _notify_admins_retrain(version, 'model_retrain_failed', {
+        'version_code': version.version_code,
+        'reason': reason[:500],
+    })
 
 
 @shared_task(
@@ -234,9 +258,13 @@ def retrain_model_task(self, model_version_id):
     version.training_error = ''
     version.save()
 
+    accuracy = result['metrics'].get('random_80_20_split', {}).get('accuracy', 0)
     logger.info(
         f"retrain_model_task: version {version.version_code} ready "
-        f"({result['metrics'].get('n_rows_total')} rows, "
-        f"accuracy {result['metrics'].get('random_80_20_split', {}).get('accuracy', 0):.3f})"
+        f"({result['metrics'].get('n_rows_total')} rows, accuracy {accuracy:.3f})"
     )
+    _notify_admins_retrain(version, 'model_retrain_ready', {
+        'version_code': version.version_code,
+        'accuracy': f'{accuracy:.1%}',
+    })
     return version.pk

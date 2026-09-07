@@ -69,6 +69,9 @@ TEMPLATE_CODES = [
     # Crop recommendations (P2-06)
     ('recommendation_ready',        'email',  'Notify FPO that their crop recommendation is ready',                    ['user_name', 'top_crop', 'financial_year']),
     ('recommendation_ready',        'in_app', 'In-app notification when crop recommendation is ready',                 ['user_name', 'top_crop', 'financial_year']),
+    # ML model retraining (P2-06)
+    ('model_retrain_ready',         'in_app', 'Notify admin inbox when async model retraining finishes successfully', ['version_code', 'accuracy']),
+    ('model_retrain_failed',        'in_app', 'Notify admin inbox when async model retraining fails',                 ['version_code', 'reason']),
 ]
 
 
@@ -741,6 +744,28 @@ TEMPLATES = [
         'recommendation_ready', 'in_app', 'ml',
         'നിങ്ങളുടെ വിള ശുപാർശ തയ്യാറാണ്',
         'പ്രിയ {{user_name}}, {{financial_year}}-നുള്ള നിങ്ങളുടെ വിള ശുപാർശ തയ്യാറാണ്. മുൻനിര നിർദ്ദേശം: {{top_crop}}.',
+    ),
+
+    # ── Model Retraining (P2-06) ──────────────────────────────────────────
+    (
+        'model_retrain_ready', 'in_app', 'en',
+        'Model Retraining Complete',
+        'Model version {{version_code}} finished training and is ready (accuracy: {{accuracy}}).',
+    ),
+    (
+        'model_retrain_ready', 'in_app', 'ml',
+        'മോഡൽ പരിശീലനം പൂർത്തിയായി',
+        'മോഡൽ പതിപ്പ് {{version_code}} പരിശീലനം പൂർത്തിയാക്കി തയ്യാറാണ് (കൃത്യത: {{accuracy}}).',
+    ),
+    (
+        'model_retrain_failed', 'in_app', 'en',
+        'Model Retraining Failed',
+        'Model version {{version_code}} failed to train. Reason: {{reason}}',
+    ),
+    (
+        'model_retrain_failed', 'in_app', 'ml',
+        'മോഡൽ പരിശീലനം പരാജയപ്പെട്ടു',
+        'മോഡൽ പതിപ്പ് {{version_code}} പരിശീലനം പരാജയപ്പെട്ടു. കാരണം: {{reason}}',
     ),
 ]
 

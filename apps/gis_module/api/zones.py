@@ -26,6 +26,8 @@ from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.permissions.rbac import IsAdmin
+from apps.core.models.generic import AuditLog
+from apps.core.services.audit import AuditService
 
 from apps.database.models import AgroClimaticZone, FPO, ZoneBoundaryVersion
 
@@ -322,6 +324,14 @@ class ZoneBoundaryVersionListView(APIView):
             is_active=False,
         )
 
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.CREATE,
+            instance=version,
+            request=request,
+            changes={'label': version.label, 'feature_count': len(data.get('features') or [])},
+        )
+
         serializer = ZoneBoundaryVersionSerializer(version)
         return StandardResponse.success(
             data=serializer.data,
@@ -369,6 +379,14 @@ class ZoneBoundaryVersionActivateView(APIView):
 
         version.is_active = True
         version.save(update_fields=['is_active', 'updated_at'])
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=version,
+            request=request,
+            changes={'activated_version': version.label, 'updated_zones': updated},
+        )
 
         return StandardResponse.success(
             data={'updated_zones': updated},
@@ -433,6 +451,7 @@ class ZoneBoundaryVersionDetailView(APIView):
             )
 
         version.soft_delete(user=request.user)
+        AuditService.log_soft_delete(user=request.user, instance=version, request=request)
         return StandardResponse.success(
             data=None,
             message=t('gis.zone_version_deleted', lang),

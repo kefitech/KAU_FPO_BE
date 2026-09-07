@@ -27,6 +27,8 @@ from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.permissions.rbac import IsAdmin
+from apps.core.models.generic import AuditLog
+from apps.core.services.audit import AuditService
 
 from apps.database.models import FPO, MLModelVersion, CropRecommendation
 from apps.recommendations.services import (
@@ -155,6 +157,14 @@ class RequestRecommendationView(APIView):
             },
         )
 
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.CREATE if _created else AuditLog.Action.UPDATE,
+            instance=rec,
+            request=request,
+            changes={'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code},
+        )
+
         generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy)
 
         serializer = CropRecommendationSerializer(rec)
@@ -203,6 +213,14 @@ class RecommendationFeedbackView(APIView):
         rec.feedback_rating = rating
         rec.feedback_comment = comment
         rec.save(update_fields=['feedback_rating', 'feedback_comment'])
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=rec,
+            request=request,
+            changes={'feedback_rating': rating, 'feedback_comment': comment},
+        )
 
         serializer = CropRecommendationSerializer(rec)
         return StandardResponse.success(
@@ -389,7 +407,15 @@ class MLModelVersionAdminView(APIView):
 
         serializer = MLModelVersionSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        version = serializer.save()
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.CREATE,
+            instance=version,
+            request=request,
+            changes={'version_code': version.version_code, 'via_file_upload': bool(uploaded_file)},
+        )
 
         response_data = dict(serializer.data)
         if validation_warnings:
@@ -563,6 +589,14 @@ class MLModelRetrainView(APIView):
             status=MLModelVersion.Status.TRAINING,
         )
 
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.CREATE,
+            instance=version,
+            request=request,
+            changes={'version_code': version.version_code, 'trigger': 'retrain', 'dataset_file': dataset_file.name},
+        )
+
         retrain_model_task.delay(version.pk)
 
         response_data = dict(MLModelVersionSerializer(version).data)
@@ -626,6 +660,14 @@ class MLModelVersionActivateView(APIView):
 
         version.is_active = True
         version.save()  # triggers the model's own save() deactivation logic
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=version,
+            request=request,
+            changes={'activated_version': version.version_code},
+        )
 
         reload_warning = None
         try:
