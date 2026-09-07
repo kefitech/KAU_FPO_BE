@@ -43,12 +43,18 @@ class BulkAvailabilitySerializer(serializers.Serializer):
 class ExpertBookingSerializer(serializers.ModelSerializer):
     expert_name = serializers.SerializerMethodField()
     fpo_name = serializers.SerializerMethodField()
+    fpo_email = serializers.SerializerMethodField()
+    fpo_phone = serializers.SerializerMethodField()
+    fpo_contact_name = serializers.SerializerMethodField()
+    fpo_application_id = serializers.SerializerMethodField()
+    fpo_location = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ExpertBooking
         fields = [
-            'id', 'expert', 'expert_name', 'fpo', 'fpo_name', 'requested_date', 'requested_time',
+            'id', 'expert', 'expert_name', 'fpo', 'fpo_name', 'fpo_email', 'fpo_phone', 'fpo_contact_name', 'fpo_application_id', 'fpo_location',
+            'requested_date', 'requested_time',
             'topic', 'notes', 'status', 'status_display', 'cancellation_reason',
             'created_at', 'updated_at',
         ]
@@ -58,6 +64,27 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
 
     def get_fpo_name(self, obj):
         return obj.fpo.name
+
+    def get_fpo_email(self, obj):
+        return obj.fpo.primary_user.email if obj.fpo.primary_user else None
+
+    def get_fpo_phone(self, obj):
+        if obj.fpo.primary_user and hasattr(obj.fpo.primary_user, 'profile'):
+            return obj.fpo.primary_user.profile.phone
+        return None
+
+    def get_fpo_contact_name(self, obj):
+        if obj.fpo.primary_user:
+            full_name = obj.fpo.primary_user.get_full_name()
+            return full_name or obj.fpo.primary_user.username
+        return None
+
+    def get_fpo_application_id(self, obj):
+        return obj.fpo.application_id
+
+    def get_fpo_location(self, obj):
+        parts = [p for p in [obj.fpo.block_taluk, obj.fpo.get_district_display() if obj.fpo.district else None] if p]
+        return ', '.join(parts) if parts else None
 
     def get_status_display(self, obj):
         return obj.get_status_display()
@@ -117,6 +144,12 @@ class CreateBookingView(APIView):
         fpo = _get_fpo(request.user)
         if not fpo or fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error('Your FPO must be approved to book experts.', status_code=status.HTTP_403_FORBIDDEN)
+
+        if ExpertBooking.objects.filter(fpo=fpo, status=ExpertBooking.Status.PENDING, is_deleted=False).exists():
+            return StandardResponse.error(
+                'You already have a pending booking request. Please wait for it to be confirmed or rejected before requesting another.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             expert = Expert.objects.get(pk=pk, is_deleted=False, is_active=True)
@@ -272,14 +305,22 @@ class AdminConfirmBookingView(APIView):
         booking.status = ExpertBooking.Status.CONFIRMED
         booking.save(update_fields=['status'])
 
-        try:
-            send_notification(
-                user=request.user, code='expert_booking_confirmed', channel='email',
-                context={'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time},
-                override_recipient=booking.fpo.primary_user.email if booking.fpo.primary_user else None,
-            )
-        except Exception:
-            pass
+        notify_context = {'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time}
+        if booking.fpo.primary_user:
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_booking_confirmed', channel='email',
+                    context=notify_context,
+                )
+            except Exception:
+                pass
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_booking_confirmed', channel='in_app',
+                    context=notify_context,
+                )
+            except Exception:
+                pass
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking confirmed.')
 
@@ -305,14 +346,22 @@ class AdminRejectBookingView(APIView):
         booking.cancellation_reason = reason
         booking.save(update_fields=['status', 'cancellation_reason'])
 
-        try:
-            send_notification(
-                user=request.user, code='expert_booking_rejected', channel='email',
-                context={'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time, 'reason': reason},
-                override_recipient=booking.fpo.primary_user.email if booking.fpo.primary_user else None,
-            )
-        except Exception:
-            pass
+        notify_context = {'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time, 'reason': reason}
+        if booking.fpo.primary_user:
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_booking_rejected', channel='email',
+                    context=notify_context,
+                )
+            except Exception:
+                pass
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_booking_rejected', channel='in_app',
+                    context=notify_context,
+                )
+            except Exception:
+                pass
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking rejected.')
 
@@ -348,16 +397,24 @@ class AdminRescheduleBookingView(APIView):
         booking.cancellation_reason = data.get('reason', '')
         booking.save(update_fields=['requested_date', 'requested_time', 'cancellation_reason'])
 
-        try:
-            send_notification(
-                user=request.user, code='expert_booking_rescheduled', channel='email',
-                context={
-                    'expert_name': booking.expert.name_en, 'date': str(data['new_date']),
-                    'time': data['new_time'], 'reason': data.get('reason', ''),
-                },
-                override_recipient=booking.fpo.primary_user.email if booking.fpo.primary_user else None,
-            )
-        except Exception:
-            pass
+        notify_context = {
+            'expert_name': booking.expert.name_en, 'date': str(data['new_date']),
+            'time': data['new_time'], 'reason': data.get('reason', ''),
+        }
+        if booking.fpo.primary_user:
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_booking_rescheduled', channel='email',
+                    context=notify_context,
+                )
+            except Exception:
+                pass
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_booking_rescheduled', channel='in_app',
+                    context=notify_context,
+                )
+            except Exception:
+                pass
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking rescheduled. Awaiting FPO confirmation.')
