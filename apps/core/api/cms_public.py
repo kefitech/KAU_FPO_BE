@@ -365,7 +365,9 @@ class PublicGalleryAlbumsView(APIView):
         description='Returns active albums with cover photo and photo count. Redis-cached (24h). No auth required.',
     )
     def get(self, request):
-        cached = cache.get('public:gallery_albums')
+        lang = _lang(request)
+        cache_key = f'public:gallery_albums:{lang}'
+        cached = cache.get(cache_key)
         if cached is not None:
             return StandardResponse.success(data=cached)
 
@@ -376,15 +378,15 @@ class PublicGalleryAlbumsView(APIView):
         ).filter(active_photo_count__gt=0)
         data = []
         for album in albums:
-            
+
             cover = album.cover_photo()
             data.append({
                 'id':             album.id,
-                'title':          album.title,
+                'title':          album.get_title(lang),
                 'cover_photo_url': request.build_absolute_uri(cover.photo.url) if cover and cover.photo else None,
                 'photo_count':    album.photo_count(),
             })
-        cache.set('public:gallery_albums', data, timeout=60 * 60 * 24)
+        cache.set(cache_key, data, timeout=60 * 60 * 24)
         return StandardResponse.success(data=data)
 
 
@@ -402,15 +404,16 @@ class PublicGalleryAlbumDetailView(APIView):
         except GalleryAlbum.DoesNotExist:
             return StandardResponse.error('Album not found.', status_code=404)
 
+        lang = _lang(request)
         photos = album.photos.filter(is_active=True, is_deleted=False)
         data = {
             'id':     album.id,
-            'title':  album.title,
+            'title':  album.get_title(lang),
             'photos': [
                 {
                     'id':        p.id,
                     'photo_url': request.build_absolute_uri(p.photo.url) if p.photo else None,
-                    'caption':   p.get_caption(_lang(request)),
+                    'caption':   p.get_caption(lang),
                     'order':     p.order,
                 }
                 for p in photos
