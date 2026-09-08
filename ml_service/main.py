@@ -57,7 +57,11 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from data_access_v3 import CropKnowledgeBase, resolve_soil_category
-from retrain_pipeline import run_retrain, validate_source_csv, DatasetValidationError
+from retrain_pipeline import (
+    run_retrain, validate_source_csv, validate_preexpanded_csv,
+    _detect_dataset_format, is_blocking, DatasetValidationError,
+    REQUIRED_COLUMNS, REQUIRED_PREEXPANDED_COLUMNS,
+)
 
 # Load the SAME .env file Django reads (config('ML_MODELS_DIR', ...) in
 # config/settings/base.py), so both services agree on ML_MODELS_DIR from one
@@ -601,6 +605,7 @@ class DatasetValidationResponse(BaseModel):
     problems: list[str]
     warnings: list[str]
     n_rows: int
+    detected_format: str  # "rule_based", "pre_expanded", or "unknown" -- see retrain_pipeline._detect_dataset_format()
 
 
 @app.post("/validate-dataset/", response_model=DatasetValidationResponse)
@@ -610,6 +615,11 @@ async def validate_dataset(dataset_file: UploadFile = File(...)):
     before training, exposed on their own so Django can refuse a broken file
     immediately (missing columns -> 422) instead of queueing a Celery job that
     is guaranteed to fail. Takes milliseconds; no training happens here.
+
+    Two CSV formats are accepted (see retrain_pipeline.py's module docstring
+    and _detect_dataset_format()): the free-text rule-based KAU knowledge-base
+    format, and the pre-expanded/factual format. The format is auto-detected
+    from the header and reported in `detected_format`.
 
     `problems` = blocking (would make /train/ return 422).
     `warnings` = non-blocking (training proceeds; surfaced to the admin).
@@ -621,13 +631,31 @@ async def validate_dataset(dataset_file: UploadFile = File(...)):
         try:
             raw = pd.read_csv(tmp_path, dtype=str, keep_default_na=False)
         except Exception as exc:  # noqa: BLE001 -- unparseable CSV is itself the finding
-            return DatasetValidationResponse(valid=False, problems=[f"Could not parse CSV: {exc}"], warnings=[], n_rows=0)
-        findings = validate_source_csv(raw)
+            return DatasetValidationResponse(
+                valid=False, problems=[f"Could not parse CSV: {exc}"], warnings=[], n_rows=0, detected_format="unknown"
+            )
+        fmt = _detect_dataset_format(raw)
+        if fmt == "unknown":
+            return DatasetValidationResponse(
+                valid=False,
+                problems=[
+                    "Could not tell which training CSV format this is from its header. This service accepts "
+                    f"either the rule-based KAU knowledge-base format (columns: {REQUIRED_COLUMNS}) or the "
+                    f"pre-expanded/factual format (columns: {REQUIRED_PREEXPANDED_COLUMNS}). "
+                    f"Header found: {list(raw.columns)}."
+                ],
+                warnings=[],
+                n_rows=len(raw),
+                detected_format="unknown",
+            )
+        findings = validate_source_csv(raw) if fmt == "rule_based" else validate_preexpanded_csv(raw)
     finally:
         tmp_path.unlink(missing_ok=True)
-    problems = [f for f in findings if f.startswith("Missing required columns")]
+    problems = [f for f in findings if is_blocking(f)]
     warnings_ = [f for f in findings if f not in problems]
-    return DatasetValidationResponse(valid=not problems, problems=problems, warnings=warnings_, n_rows=len(raw))
+    return DatasetValidationResponse(
+        valid=not problems, problems=problems, warnings=warnings_, n_rows=len(raw), detected_format=fmt
+    )
 
 
 class RetrainResponse(BaseModel):

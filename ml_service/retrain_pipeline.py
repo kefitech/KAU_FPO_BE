@@ -44,6 +44,38 @@ REQUIRED_COLUMNS = [
 VALID_KAU_ZONES = {"Coastal Plain", "Midland Laterites", "Foothills", "High Hills",
                    "Palakkad Plain", "General (all zones)"}
 
+# ---- second, pre-expanded/factual CSV format (each row is already a real training
+# example -- e.g. an observed zone/season/soil/crop outcome -- no synthetic expansion
+# needed). Column names deliberately match data/grounded_training_dataset_v3.csv (the
+# OUTPUT of the rule-based pipeline's stage 3), since that's exactly the shape _train()
+# already consumes -- see _train() below, unchanged for this format. ----
+REQUIRED_PREEXPANDED_COLUMNS = [
+    "zone", "soil_type", "season", "crop_name", "crop_group",
+    "temperature_avg_C", "rainfall_mm", "humidity_pct", "soil_ph_mid", "is_suitable",
+]
+VALID_SERVICE_ZONES = {"coastal_zone", "southern_zone", "central_zone", "northern_zone", "high_ranges"}
+VALID_SEASONS = {"southwest_monsoon", "northeast_monsoon", "dry_season"}
+SOIL_PH_PLAUSIBLE_RANGE = (3.0, 10.0)
+
+# Header columns used to tell the two formats apart -- see _detect_dataset_format().
+RULE_BASED_FORMAT_MARKERS = {"temperature_range", "soil_ph_range", "agro_zone"}
+PRE_EXPANDED_FORMAT_MARKERS = {"temperature_avg_C", "soil_ph_mid", "zone", "is_suitable"}
+
+# Prefixes that mark a validate_*_csv() finding as BLOCKING (training cannot proceed).
+# Anything else returned by those functions is a non-blocking warning. Centralized here
+# so main.py's /validate-dataset/ and run_retrain() below apply the exact same rule
+# instead of duplicating (and risking drifting) the "starts with ..." check.
+BLOCKING_PREFIXES = (
+    "Missing required columns",
+    "The 'is_suitable' label column",
+    "Non-numeric value(s) found in column",
+)
+
+
+def is_blocking(problem: str) -> bool:
+    """True if a validate_*_csv() finding is blocking rather than a warning."""
+    return problem.startswith(BLOCKING_PREFIXES)
+
 CLIMATE_PATH = "data/zone_climate_real.csv"  # real climate per service zone/month -- not crop data, reused as-is
 
 KAU_TO_SERVICE_ZONE = {
@@ -124,6 +156,103 @@ def validate_source_csv(df: pd.DataFrame) -> list[str]:
         )
     if len(df) < 20:
         problems.append(f"Only {len(df)} rows -- suspiciously small for a full crop dataset, double check the file.")
+    return problems
+
+
+def _detect_dataset_format(df: pd.DataFrame) -> str:
+    """Returns "rule_based", "pre_expanded", or "unknown", based on which of the two
+    accepted CSV shapes the header looks like. Only a few marker columns are checked
+    here (not the full required-column list) -- that's what the per-format validators
+    are for; this just decides which validator to run."""
+    cols = set(df.columns)
+    looks_rule_based = bool(RULE_BASED_FORMAT_MARKERS & cols)
+    looks_pre_expanded = bool(PRE_EXPANDED_FORMAT_MARKERS & cols)
+    if looks_rule_based and not looks_pre_expanded:
+        return "rule_based"
+    if looks_pre_expanded and not looks_rule_based:
+        return "pre_expanded"
+    return "unknown"
+
+
+def _to01(v: str):
+    """Coerces a string label value to 0/1, or None if it doesn't resolve to either."""
+    vl = v.strip().lower()
+    if vl in ("0", "1"):
+        return int(vl)
+    if vl in ("0.0", "1.0"):
+        return int(float(vl))
+    if vl == "true":
+        return 1
+    if vl == "false":
+        return 0
+    return None
+
+
+def validate_preexpanded_csv(df: pd.DataFrame) -> list[str]:
+    """Returns a list of human-readable problems (empty list = OK to proceed), same
+    convention as validate_source_csv(): a "Missing required columns"-style entry (see
+    is_blocking()) is BLOCKING, everything else is a non-blocking warning.
+
+    Unlike validate_source_csv(), this format is already real training rows -- there's
+    no free-text to parse and no zone/soil/season expansion to check for silent drops --
+    so this checks data quality directly: is the label clean, are the numeric columns
+    actually numeric, and are the categorical columns using the values this service
+    knows about."""
+    problems = []
+    missing_cols = [c for c in REQUIRED_PREEXPANDED_COLUMNS if c not in df.columns]
+    if missing_cols:
+        problems.append(f"Missing required columns: {missing_cols}")
+        return problems  # can't check anything else meaningfully without these
+
+    bad_labels = sorted({v for v in df["is_suitable"].astype(str) if _to01(v) is None})
+    if bad_labels:
+        problems.append(
+            f"The 'is_suitable' label column contains value(s) other than 0/1: {bad_labels[:10]}. "
+            f"This is the training label -- every row must resolve to 0 or 1, training can't proceed with this column dirty."
+        )
+
+    numeric_cols = ["temperature_avg_C", "rainfall_mm", "humidity_pct", "soil_ph_mid"]
+    coerced = {}
+    for col in numeric_cols:
+        parsed = pd.to_numeric(df[col], errors="coerce")
+        coerced[col] = parsed
+        bad_mask = parsed.isna()
+        if bad_mask.any():
+            bad_values = sorted(df.loc[bad_mask, col].astype(str).unique())[:10]
+            problems.append(
+                f"Non-numeric value(s) found in column '{col}': {bad_values}. This column must be numeric for training."
+            )
+
+    unknown_zones = sorted(set(df["zone"].dropna().unique()) - VALID_SERVICE_ZONES)
+    if unknown_zones:
+        problems.append(
+            f"Unrecognized zone value(s): {unknown_zones}. Must be one of {sorted(VALID_SERVICE_ZONES)}. "
+            f"These rows will still be used for training, but double-check they aren't typos before uploading."
+        )
+
+    unknown_seasons = sorted(set(df["season"].dropna().unique()) - VALID_SEASONS)
+    if unknown_seasons:
+        problems.append(
+            f"Unrecognized season value(s): {unknown_seasons}. Expected one of {sorted(VALID_SEASONS)}. "
+            f"Training will still proceed (an unexpected season is just treated as its own category), "
+            f"but this usually means a typo -- double check before uploading."
+        )
+
+    if df["crop_name"].isna().any() or (df["crop_name"].astype(str).str.strip() == "").any():
+        problems.append("Some rows have a blank crop_name.")
+
+    if len(df) < 20:
+        problems.append(f"Only {len(df)} rows -- suspiciously small for a full crop dataset, double check the file.")
+
+    ph = coerced["soil_ph_mid"].dropna()
+    lo, hi = SOIL_PH_PLAUSIBLE_RANGE
+    out_of_range = sorted(ph[(ph < lo) | (ph > hi)].unique())
+    if out_of_range:
+        problems.append(
+            f"soil_ph_mid has value(s) outside the plausible {lo}-{hi} range: {out_of_range[:10]}. "
+            f"Could be a legitimate extreme value, but usually indicates a units/parsing mistake -- double check."
+        )
+
     return problems
 
 
@@ -336,12 +465,45 @@ def _train(df: pd.DataFrame):
 # ---------------- entry point ----------------
 
 def run_retrain(source_csv_path: str, climate_path: str = CLIMATE_PATH):
-    """Runs all 4 stages. Returns (fitted_pipeline, metrics_dict, training_df).
-    Raises DatasetValidationError if the input CSV fails structural checks --
-    callers should catch this and surface it as a 4xx, not a 500."""
+    """Runs the pipeline for whichever of the two accepted CSV formats the uploaded
+    file's header matches (see _detect_dataset_format()). Returns (fitted_pipeline,
+    metrics_dict, training_df). Raises DatasetValidationError if the input CSV fails
+    structural checks or its format can't be determined -- callers should catch this
+    and surface it as a 4xx, not a 500."""
     raw = pd.read_csv(source_csv_path, dtype=str, keep_default_na=False)
+    fmt = _detect_dataset_format(raw)
+
+    if fmt == "unknown":
+        raise DatasetValidationError(
+            "Could not tell which training CSV format this is from its header. This service accepts "
+            f"either the rule-based KAU knowledge-base format (columns: {REQUIRED_COLUMNS}) or the "
+            f"pre-expanded/factual format (columns: {REQUIRED_PREEXPANDED_COLUMNS}). "
+            f"Header found: {list(raw.columns)}."
+        )
+
+    if fmt == "pre_expanded":
+        problems = validate_preexpanded_csv(raw)
+        blocking = [p for p in problems if is_blocking(p)]
+        if blocking:
+            raise DatasetValidationError("; ".join(problems))
+
+        # raw was read with dtype=str (to preserve exact zone/season/soil text upstream in
+        # validation); _train()'s NUMERIC columns are fed to the model as "passthrough" and
+        # its class_weight="balanced" logic both require real numeric/int dtypes, not the
+        # string values validate_preexpanded_csv() only confirmed were PARSEABLE as such.
+        training_df = raw.copy()
+        for col in NUMERIC:
+            training_df[col] = pd.to_numeric(training_df[col])
+        training_df["is_suitable"] = training_df["is_suitable"].astype(str).map(_to01).astype(int)
+
+        pipe, metrics = _train(training_df)
+        metrics["validation_warnings"] = problems  # non-blocking issues, still worth surfacing
+        metrics["source_format"] = "pre_expanded"
+        return pipe, metrics, training_df
+
+    # fmt == "rule_based" -- existing 4-stage flow, unchanged.
     problems = validate_source_csv(raw)
-    blocking = [p for p in problems if p.startswith("Missing required columns")]
+    blocking = [p for p in problems if is_blocking(p)]
     if blocking:
         raise DatasetValidationError("; ".join(problems))
 
@@ -359,4 +521,5 @@ def run_retrain(source_csv_path: str, climate_path: str = CLIMATE_PATH):
 
     pipe, metrics = _train(training_df)
     metrics["validation_warnings"] = problems  # non-blocking issues, still worth surfacing
+    metrics["source_format"] = "rule_based"
     return pipe, metrics, training_df

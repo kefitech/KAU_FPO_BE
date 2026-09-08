@@ -14,7 +14,7 @@ Admin (staged upload + activate — apps/database/models/gis.py ZoneBoundaryVers
 import json as _json
 
 from django.contrib.gis.geos import Point, GEOSGeometry, MultiPolygon, Polygon
-from rest_framework import serializers, status
+from rest_framework import filters, serializers, status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -276,10 +276,15 @@ class ZoneBoundaryVersionListView(APIView):
     permission_classes = [IsAdmin]
     parser_classes = [MultiPartParser, FormParser]
     pagination_class = StandardPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['label']
+    ordering_fields = ['label', 'created_at', 'updated_at']
 
     @extend_schema(tags=["Admin - GIS"])
     def get(self, request, *args, **kwargs):
         versions = ZoneBoundaryVersion.objects.filter(is_deleted=False)
+        for backend in self.filter_backends:
+            versions = backend().filter_queryset(request, versions, self)
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(versions, request, view=self)
         serializer = ZoneBoundaryVersionSerializer(page, many=True)
