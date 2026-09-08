@@ -65,3 +65,6 @@ nginx/
 # SMS credentials and setup docs — contains tokens, never commit
 sms/
 cookies_*.txt
+
+# Local server backups (media dumps, SQL) — never commit
+backups/

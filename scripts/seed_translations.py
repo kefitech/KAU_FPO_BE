@@ -517,6 +517,22 @@ def seed_ui_translations(languages):
         ('register.account_btn_creating',       'Creating account…',                        'അക്കൗണ്ട് ഉണ്ടാക്കുന്നു…'),
         ('register.btn_back',                   '← Back',                                   '← തിരിച്ച്'),
 
+        #Arunima s 03 sep
+        ('register.email_label',              'Email Address',                            'ഇ-മെയിൽ വിലാസം'),
+        ('register.email_placeholder',        'you@example.com',                          'you@example.com'),
+        ('register.email_btn_send',           'Send OTP',                                 'OTP അയക്കുക'),
+        ('register.email_btn_resend',         'Resend',                                   'വീണ്ടും അയക്കുക'),
+        ('register.email_btn_sending',        'Sending…',                                 'അയക്കുന്നു…'),
+        ('register.email_otp_sent',           'OTP sent to',                              'OTP അയച്ചത്'),
+        ('register.email_otp_placeholder',    '6-digit OTP',                              '6 അക്ക OTP'),
+        ('register.email_btn_verify',         'Verify',                                   'സ്ഥിരീകരിക്കുക'),
+        ('register.email_btn_verifying',      'Verifying…',                               'സ്ഥിരീകരിക്കുന്നു…'),
+        ('register.email_verified_label',     'Email verified',                           'ഇമെയിൽ സ്ഥിരീകരിച്ചു'),
+        ('register.email_err_invalid',        'Enter a valid email address',              'സാധുവായ ഇമെയിൽ വിലാസം നൽകുക'),
+        ('register.email_err_send_failed',    'Failed to send OTP. Please try again.',    'OTP അയക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('register.email_err_invalid_otp',    'Invalid OTP. Please try again.',           'തെറ്റായ OTP. വീണ്ടും ശ്രമിക്കുക.'),
+        #----------------------------------------------------------------
+
         # ── wizard — FPO registration wizard (7 steps) ────────────────────
         # Common
         ('wizard.btn_back',                 '← Back',                               '← തിരിച്ച്'),
@@ -3608,6 +3624,11 @@ def seed_menu_translations(languages):
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
         ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
+        # arunima
+        ('cbbos',                  'CBBOs',                    'സി.ബി.ബി.ഒ-കൾ'),
+        ('market_linkage',         'Market Linkage',            'മാർക്കറ്റ് ലിങ്കേജ്'),
+        #04 sep arunima
+        ('fpo_buyer_directory',   'Buyer Directory',           'ക്രേതാവ് ഡയറക്ടറി'),
     ]
 
     count = 0
@@ -4139,7 +4160,59 @@ def seed_products_page_translations(languages):
 
     return count
 #---------------------------------------------------------------------------------------
- 
+#---------------------------------------------------------------------------------------
+#31th August 2026
+#Arunima S
+#Frontend UI labels for the Admin Market Linkage page — same "screen name +
+#common" pattern used elsewhere. Category doesn't need adding (ui already exists).
+
+def seed_market_linkage_translations(languages):
+    """Seed UI labels for the Admin Market Linkage screen (market_linkage_table.*)."""
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    market_linkage_keys = [
+        ('market_linkage_table.page_title',        'Market Linkage',
+         'മാർക്കറ്റ് ലിങ്കേജ്'),
+        ('market_linkage_table.page_description',  "Browse FPOs and the products they've listed for sale.",
+         'FPO-കളും അവർ വിൽപ്പനയ്ക്ക് പട്ടികപ്പെടുത്തിയ ഉൽപ്പന്നങ്ങളും ബ്രൗസ് ചെയ്യുക.'),
+        ('market_linkage_table.col_name',          'FPO Name',
+         'FPO പേര്'),
+        ('market_linkage_table.view_title',        'FPO Products',
+         'FPO ഉൽപ്പന്നങ്ങൾ'),
+        ('market_linkage_table.products_label',    'Products',
+         'ഉൽപ്പന്നങ്ങൾ'),
+        ('market_linkage_table.loading',           'Loading products...',
+         'ഉൽപ്പന്നങ്ങൾ ലോഡ് ചെയ്യുന്നു...'),
+        ('market_linkage_table.no_products',       'This FPO has no products listed yet.',
+         'ഈ FPO ഇതുവരെ ഉൽപ്പന്നങ്ങളൊന്നും പട്ടികപ്പെടുത്തിയിട്ടില്ല.'),
+        # Product status labels shown inside the ViewSheet product list
+        ('market_linkage_table.status_draft',      'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('market_linkage_table.status_active',     'Active',
+         'സജീവം'),
+        ('market_linkage_table.status_sold',       'Sold',
+         'വിറ്റു'),
+        ('market_linkage_table.status_expired',    'Expired',
+         'കാലഹരണപ്പെട്ടു'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in market_linkage_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#---------------------------------------------------------------------------------------
+
 
 def seed_translations():
     """Main seed function"""
@@ -4192,6 +4265,12 @@ def seed_translations():
     products_page_count = seed_products_page_translations(languages)
     print(f"✅ Seeded {products_page_count} FPO Products page translations")
     total_count += products_page_count
+
+    #31th August 2026
+    print("\nSeeding Admin Market Linkage page UI translations...")
+    market_linkage_page_count = seed_market_linkage_translations(languages)
+    print(f"✅ Seeded {market_linkage_page_count} Admin Market Linkage page translations")
+    total_count += market_linkage_page_count
     #--------------------------------------------------------------------------------
 
     

@@ -83,6 +83,25 @@ class DPRProject(BaseModel):
         help_text="Free-text 'Other' entry when a matching outcome is not in the master list.",
     )
 
+    # KAU RCD replies C.6 + C.7 (2026-09-02) — field-level provenance tracking.
+    # Shape: { "<section_key>": { "<field_name>": "<source>" } }
+    # source ∈ {"user_entered", "ai_inferred", "system_default", "user_overridden"}
+    # Absence of a key implies "user_entered" (the default).
+    #
+    # Storing this at project root (not per-section) so:
+    #   - one migration column vs 21 per-section columns
+    #   - Phase 3 can add source entries without any schema change
+    #   - queryable centrally for audit + PDF badge rendering
+    #
+    # Consumers should use the helpers in apps/fpo/services/dpr/field_sources.py
+    # rather than reading/writing this dict directly.
+    field_sources = models.JSONField(
+        default=dict, blank=True,
+        help_text='Per-field provenance map: {section_key: {field_name: source}}. '
+                  "source ∈ user_entered / ai_inferred / system_default / user_overridden. "
+                  'See apps/fpo/services/dpr/field_sources.py for accessor helpers.',
+    )
+
     class Meta:
         db_table = 'dpr_project'
         verbose_name = 'DPR — Project'

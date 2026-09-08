@@ -63,10 +63,20 @@ def validate_section(section) -> dict[str, Any]:
                 'geographic_market_required', f'{prefix}.geographic_market',
                 'Geographic Market shall be specified.',
             ))
-        if p.customer_categories.count() == 0:
+        cust_cats = list(p.customer_categories.all())
+        if not cust_cats:
             errors.append(_err(
                 'customer_category_required', f'{prefix}.customer_categories',
                 'At least one customer category shall be selected per product.',
+            ))
+        # "Others (Specify)" needs the companion text — same pattern as
+        # demand_basis_other, pricing_basis_other elsewhere. Only fires when
+        # the "other" master row is in the M2M AND the specify text is blank.
+        if any(cc.code == 'other' for cc in cust_cats) and not (p.customer_categories_other or '').strip():
+            errors.append(_err(
+                'customer_categories_other_required',
+                f'{prefix}.customer_categories_other',
+                'Please specify — "Others" was selected in customer categories but no description provided.',
             ))
 
         # ── Category E + H — Price ──

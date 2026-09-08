@@ -72,6 +72,14 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 4,
     )
+    #added for cbbo
+    seed_item(
+        label_key = 'menu.cbbos',
+        path      = '/admin/cbbos',
+        icon      = 'users-round',
+        roles     = [super_admin_group],
+        order     = 5,
+    )
     seed_item(
         label_key = 'menu.fpo_actions',
         path      = '/admin/fpo-permissions?tab=actions',
@@ -178,6 +186,20 @@ def seed_menu():
         order     = 19,
     )
     seed_item(
+        label_key = 'menu.dpr_knowledge',
+        path      = '/admin/dpr-knowledge',
+        icon      = 'book-open',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 19.5,
+    )
+    seed_item(
+        label_key = 'menu.dpr_applicability',
+        path      = '/admin/dpr-applicability',
+        icon      = 'grid-3x3',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 19.7,
+    )
+    seed_item(
         label_key = 'menu.ai_services',
         path      = '/admin/ai-services',
         icon      = 'bot',
@@ -192,6 +214,15 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 21,
     )
+    # arunima
+    seed_item(
+        label_key = 'menu.market_linkage',
+        path      = '/admin/market-linkage',
+        icon      = 'link',
+        roles     = [super_admin_group],
+        order     = 22,
+    )
+    #---------------------------------------
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
@@ -267,6 +298,15 @@ def seed_menu():
         roles     = fpo_roles,
         order     = 10,
     )
+    #arunima s 04 sep--------------------
+    seed_item(
+        label_key = 'menu.fpo_buyer_directory',
+        path      = '/fpo/buyer-directory',
+        icon      = 'shopping-cart',
+        roles     = [primary_group],
+        order     = 11,
+    )
+    #------------------------------------------
 
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")

@@ -3,7 +3,8 @@ Validation service for §2.3.18 Financial Information and Means of Finance.
 
 KAU-spec rules:
     - All cost / MoF / WC / opex fields shall be non-negative (nulls allowed = "not entered")
-    - Cat B: Total Means of Finance shall equal Total Project Cost (warning if mismatched)
+    - Cat B: Total Means of Finance shall equal Total Project Cost (warning if mismatched
+             beyond the admin-configurable threshold — KAU RCD B.4, default 10%)
     - Cat E: at least one product/service revenue assumption
     - Cat F: if loan_proposed → loan_amount required; loan_amount ≤ total project cost
     - Cat G: if subsidy_proposed → scheme_name required
@@ -11,6 +12,8 @@ KAU-spec rules:
 """
 from typing import Any
 from decimal import Decimal
+
+from apps.database.models import DPRConfig
 
 
 COST_FIELDS = [
@@ -72,15 +75,23 @@ def validate_section(section) -> dict[str, Any]:
         if v is not None and v < 0:
             errors.append(_err('negative_value', f, f'{f} shall be non-negative.'))
 
-    # Total project cost vs total means of finance (warning if not aligned when both entered)
+    # Total project cost vs total means of finance — per KAU RCD B.4, warn when
+    # variance exceeds the admin-configurable threshold (default 10%). Below
+    # threshold is treated as rounding / assumption noise and doesn't warrant a
+    # warning. Above threshold shows a percentage-based message so the user
+    # understands the magnitude, not just the rupee gap.
     total_cost = _sum(section, COST_FIELDS)
     total_mof = _sum(section, MOF_FIELDS)
-    if total_cost > 0 and total_mof > 0 and abs(total_cost - total_mof) > Decimal('1'):
-        warnings.append(_warn(
-            'mof_cost_mismatch', 'mof_total',
-            f'Total Means of Finance (₹{total_mof}) does not equal Total Project Cost (₹{total_cost}). '
-            'System will verify at DPR generation.',
-        ))
+    if total_cost > 0 and total_mof > 0:
+        variance_pct = (abs(total_cost - total_mof) / total_cost) * Decimal('100')
+        threshold_pct = DPRConfig.get_decimal('project_cost_variance_pct', Decimal('10'))
+        if variance_pct > threshold_pct:
+            warnings.append(_warn(
+                'mof_cost_mismatch', 'mof_total',
+                f'Total Means of Finance (₹{total_mof:,.0f}) differs from Total Project Cost '
+                f'(₹{total_cost:,.0f}) by {variance_pct:.2f}% — above the {threshold_pct}% threshold. '
+                'Please reconcile before DPR generation.',
+            ))
 
     # Cat E — at least one revenue assumption
     revenue_assumptions = list(section.revenue_assumptions.all())

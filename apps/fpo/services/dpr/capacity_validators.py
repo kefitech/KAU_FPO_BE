@@ -59,6 +59,31 @@ def validate_section(section) -> dict[str, Any]:
         if not _in_range(section.operating_months_per_year, 1, 12):
             errors.append(_err('months_range', 'operating_months_per_year', 'Operating Months per Year shall be between 1 and 12.'))
 
+    # Peak vs Lean overlap — a month is normally either high-production
+    # (peak) or low-production (lean), not both. Not spec-mandated, so we
+    # emit a WARNING (not error): the FE mutex already prevents accidental
+    # overlap, but API tampering / bulk import / legacy rows could still
+    # produce this shape. Doesn't block submission — surfaces in the
+    # readiness panel's suggestions list.
+    peak_set = set(section.peak_production_seasons or [])
+    lean_set = set(section.lean_production_seasons or [])
+    overlap = peak_set & lean_set
+    if overlap:
+        # Preserve calendar order for the user-facing message.
+        month_order = ('jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                       'jul', 'aug', 'sep', 'oct', 'nov', 'dec')
+        ordered_overlap = [m.title() for m in month_order if m in overlap]
+        warnings.append({
+            'code': 'peak_lean_overlap',
+            'field': 'peak_production_seasons',
+            'message': (
+                f'The following month(s) are marked as both peak and lean: '
+                f'{", ".join(ordered_overlap)}. '
+                'A month is normally either peak (high production) or lean '
+                '(low production), not both — review the seasonal breakdown.'
+            ),
+        })
+
     # ── C. Production Process ──
     desc = (section.process_description or '').strip()
     if not desc:
@@ -86,6 +111,25 @@ def validate_section(section) -> dict[str, Any]:
                 'loss_source_other_required', 'loss_source_other',
                 'Please specify — "Others" was selected in loss sources but no description provided.',
             ))
+
+        # Loss + Recovery > 100 is physically impossible — you can't
+        # recover more than you put in. Sum < 100 is fine (the rest is
+        # by-products / co-outputs which aren't captured on this field).
+        # Warning, not error — same tone as the peak/lean overlap check.
+        if (section.production_loss_pct is not None
+                and section.product_recovery_pct is not None):
+            total = section.production_loss_pct + section.product_recovery_pct
+            if total > 100:
+                warnings.append({
+                    'code': 'loss_recovery_over_100',
+                    'field': 'product_recovery_pct',
+                    'message': (
+                        f'Production Loss ({section.production_loss_pct}%) + '
+                        f'Product Recovery ({section.product_recovery_pct}%) = '
+                        f'{total}%, which exceeds 100%. You cannot recover more '
+                        'than the raw material input. Review both values.'
+                    ),
+                })
 
     # ── E. Future Expansion (only when has_future_expansion=True) ──
     if section.has_future_expansion:

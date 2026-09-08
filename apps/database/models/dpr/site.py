@@ -185,11 +185,31 @@ class DPRLandParcel(TimeStampedModel, AuditModel):
 
     total_land_available = models.DecimalField(max_digits=15, decimal_places=4, null=True, blank=True)
     land_proposed_for_project = models.DecimalField(max_digits=15, decimal_places=4, null=True, blank=True)
+    # Legacy FK to general-purpose capacity units (kg/mt/litres/etc.) — kept
+    # for back-compat only. New rows should populate `land_unit` below instead.
+    # TODO: deprecate + drop in a follow-up migration once no active rows use it.
     unit = models.ForeignKey(
         'database.DPRCapacityUnit',
         on_delete=models.PROTECT,
         null=True, blank=True,
         related_name='+',
+    )
+    # Per KAU RCD reply B.3 (2026-09-02): land area units are a fixed set of
+    # 5 choices. Storage is as-entered in the user's chosen unit (canonical
+    # acre conversion happens on demand via apps.core.utils.land_area).
+    class LandUnit(models.TextChoices):
+        ACRE    = 'acre',    'Acre'
+        CENT    = 'cent',    'Cent'
+        ARE     = 'are',     'Are'
+        HECTARE = 'hectare', 'Hectare'
+        SQM     = 'sqm',     'Square metre'
+
+    land_unit = models.CharField(
+        max_length=10,
+        choices=LandUnit.choices,
+        default=LandUnit.ACRE,
+        help_text='Unit for total_land_available + land_proposed_for_project. '
+                  'Per KAU RCD B.3 — 5 fixed choices; canonical acre for cross-parcel math.',
     )
     village = models.CharField(max_length=100, blank=True)
     taluk = models.CharField(max_length=100, blank=True)
@@ -208,6 +228,18 @@ class DPRLandParcel(TimeStampedModel, AuditModel):
     date_of_acquisition = models.DateField(null=True, blank=True)
     present_land_use = models.CharField(max_length=200, blank=True)
     previous_land_use = models.CharField(max_length=200, blank=True)
+
+    # Per KAU RCD reply B.8 (2026-09-02): every parcel is expected to declare
+    # which project component(s) will use it — the DPR reflects which activity
+    # happens on which piece of land. Django can't enforce "≥ 1 M2M row" at
+    # the model layer (join tables always allow empty), so the "at least one
+    # component per parcel" rule is enforced in `apps/fpo/services/dpr/
+    # site_validators.py`, not here.
+    components = models.ManyToManyField(
+        'database.DPRComponent',
+        related_name='land_parcels',
+        help_text='Project components mapped to this specific parcel (per KAU RCD B.8).',
+    )
 
     class Meta:
         db_table = 'dpr_land_parcel'

@@ -14,8 +14,12 @@ Section CRUD endpoints for the remaining 20 data elements follow the same patter
 
 from django.urls import path
 
+from . import ai_content as ai
+from . import applicability as appl
+from . import calculation as calc
 from . import master as m
 from . import projects as p
+from . import tranches as tr
 from . import raw_material as rm
 from . import market as mk
 from . import components as cp
@@ -97,6 +101,95 @@ project_patterns = [
         'projects/<uuid:project_uuid>/readiness/',
         p.DPRProjectIdentificationReadinessView.as_view(),
         name='dpr-project-identification-readiness',
+    ),
+    # Applicability (KAU RCD A.1 — rule engine surface for wizard sidebar)
+    path(
+        'projects/<uuid:project_uuid>/applicability/',
+        appl.DPRProjectApplicabilityView.as_view(),
+        name='dpr-project-applicability',
+    ),
+    # Phase 3 calc engine — full 10-year financials as JSON + PDF download
+    path(
+        'projects/<uuid:project_uuid>/calculation/',
+        calc.DPRCalculationView.as_view(),
+        name='dpr-project-calculation',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/pdf/',
+        calc.DPRPdfDownloadView.as_view(),
+        name='dpr-project-pdf',
+    ),
+    # Excel export of the full financials tree — KAU pre-UAT reply §6.3.
+    path(
+        'projects/<uuid:project_uuid>/financials/excel/',
+        calc.DPRFinancialsExcelView.as_view(),
+        name='dpr-project-financials-excel',
+    ),
+    # Versioned document endpoints — per KAU pre-UAT reply §7.1 + §7.2 (2026-09-08).
+    # POST to generate a new versioned DPRDocument (monotonic version_number, never resets).
+    # GET to list all versions for the project (excludes archived by default).
+    # GET download/ to stream a specific version's bytes.
+    path(
+        'projects/<uuid:project_uuid>/documents/',
+        calc.DPRDocumentListView.as_view(),
+        name='dpr-project-documents-list',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/documents/generate/',
+        calc.DPRDocumentGenerateView.as_view(),
+        name='dpr-project-documents-generate',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/documents/<int:version_number>/download/',
+        calc.DPRDocumentDownloadView.as_view(),
+        name='dpr-project-documents-download',
+    ),
+    # Capital tranches (KAU RCD A.3 / B.8 — dated inflows + outflows per project)
+    path(
+        'projects/<uuid:project_uuid>/tranches/',
+        tr.DPRCapitalTrancheListView.as_view(),
+        name='dpr-project-tranches-list',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/tranches/<int:pk>/',
+        tr.DPRCapitalTrancheDetailView.as_view(),
+        name='dpr-project-tranches-detail',
+    ),
+    # AI content (KAU RCD B.5 — regen writes to candidate; user chooses)
+    path(
+        'projects/<uuid:project_uuid>/ai-content/',
+        ai.AIContentListView.as_view(),
+        name='dpr-project-ai-content-list',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/ai-content/<str:chapter>/',
+        ai.AIContentDetailView.as_view(),
+        name='dpr-project-ai-content-detail',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/ai-content/<str:chapter>/generate/',
+        ai.AIContentGenerateView.as_view(),
+        name='dpr-project-ai-content-generate',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/ai-content/<str:chapter>/accept/',
+        ai.AIContentAcceptView.as_view(),
+        name='dpr-project-ai-content-accept',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/ai-content/<str:chapter>/keep/',
+        ai.AIContentKeepView.as_view(),
+        name='dpr-project-ai-content-keep',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/ai-content/<str:chapter>/merge/',
+        ai.AIContentMergeView.as_view(),
+        name='dpr-project-ai-content-merge',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/ai-content/<str:chapter>/kb-preview/',
+        ai.AIContentKBPreviewView.as_view(),
+        name='dpr-project-ai-content-kb-preview',
     ),
 ]
 

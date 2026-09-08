@@ -31,6 +31,16 @@ REPAYMENT_FREQUENCY_CHOICES = [
     ('yearly',      'Yearly'),
 ]
 
+# Per KAU pre-UAT reply §2.2 (2026-09-08): reducing-balance with equal
+# principal instalments is the DEFAULT (matches NABARD refinance convention);
+# EMI is opt-in per specific scheme/bank requirement. The system must NOT
+# apply EMI and equal-principal amortisation simultaneously — one or the
+# other per project.
+REPAYMENT_METHOD_CHOICES = [
+    ('reducing_balance', 'Reducing Balance (Equal Principal Instalments)'),
+    ('emi',              'EMI (Equated Monthly Instalments)'),
+]
+
 SUBSIDY_STATUS_CHOICES = [
     ('not_applied', 'Not Yet Applied'),
     ('applied',     'Applied'),
@@ -70,6 +80,20 @@ class DPRSectionFinance(TimeStampedModel, AuditModel):
     cost_technical_consultancy = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     cost_contingencies = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     cost_margin_for_working_capital = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    # Per KAU pre-UAT reply §2.6 (2026-09-08): IDC shall be CAPITALISED as
+    # part of the project cost and added to the depreciable asset base of
+    # the qualifying asset. It shall consequently be depreciated along
+    # with the related asset — NOT treated as an ordinary pre-operative
+    # expense. Where IDC relates to a common facility (typical FPO case),
+    # it is allocated pro-rata across depreciable asset classes by the
+    # calc engine (see _allocate_idc in calculation.py).
+    cost_interest_during_construction = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True,
+        help_text='Interest During Construction — capitalised into the '
+                  'depreciable asset base per KAU pre-UAT reply §2.6. '
+                  'Typically computed as loan_amount × rate × '
+                  'construction_period_months / (12 × 100).',
+    )
 
     # ── Cat B: Means of Finance ──
     mof_promoters_contribution = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
@@ -102,6 +126,30 @@ class DPRSectionFinance(TimeStampedModel, AuditModel):
     cash_requirement = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     working_capital_cycle_days = models.IntegerField(null=True, blank=True)
 
+    # ── Seasonal WC uplift (KAU pre-UAT reply §2.4, 2026-09-08) ──
+    # For agri/livestock projects the annual WC average understates the peak
+    # month cash need. KAU asked us to accept an optional peak-month uplift so
+    # the working-capital line item in the P&L / CF can flag it. Left null =
+    # no seasonality assumed (calc engine falls back to annual average).
+    wc_is_seasonal = models.BooleanField(
+        default=False,
+        help_text='True if the project has a seasonal working-capital pattern '
+                  '(agri harvest cycle, festival demand spike, etc.). Enables '
+                  'the peak-month WC uplift preview in the calc engine.',
+    )
+    wc_peak_amount = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True,
+        help_text='Peak-month working-capital requirement (₹). Only used when '
+                  'wc_is_seasonal is True. If provided, the calc engine '
+                  'surfaces both the annual-average WC and this peak value '
+                  'on the WC card + PDF for banker reference.',
+    )
+    wc_peak_period_notes = models.TextField(
+        blank=True, default='',
+        help_text='Free-text description of the peak period — e.g. '
+                  '"Oct-Dec harvest procurement cycle" or "Onam demand spike".',
+    )
+
     # ── Cat D: Operating Expenses (annual) ──
     op_raw_material = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     op_salaries_wages = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
@@ -127,6 +175,15 @@ class DPRSectionFinance(TimeStampedModel, AuditModel):
     moratorium_period_months = models.IntegerField(null=True, blank=True)
     repayment_period_years = models.IntegerField(null=True, blank=True)
     repayment_frequency = models.CharField(max_length=20, choices=REPAYMENT_FREQUENCY_CHOICES, blank=True)
+    # Per KAU pre-UAT reply §2.2 (2026-09-08): NABARD reducing-balance with
+    # equal principal instalments is the appraisal default; EMI is opt-in
+    # per specific scheme/bank requirement.
+    repayment_method = models.CharField(
+        max_length=20, choices=REPAYMENT_METHOD_CHOICES,
+        default='reducing_balance', blank=True,
+        help_text='Reducing-balance (default, NABARD convention) or EMI '
+                  '(opt-in when a specific financing scheme requires it).',
+    )
 
     # ── Cat G: Subsidy / Financial Assistance ──
     subsidy_proposed = models.BooleanField(default=False)

@@ -14,8 +14,23 @@ Author: Athul Gopan (Kefi Tech Solutions)
 from django.urls import path
 
 from . import master as m
+from .config import DPRConfigDetailView, DPRConfigListView, DPRConfigResetView
 from .project_detail import DPRProjectAdminDetailView
 from .projects import DPRProjectAdminListView
+from .risk_matrix import DPRRiskMatrixDetailView, DPRRiskMatrixListView
+from .tranches import DPRCapitalTrancheDetailView, DPRCapitalTrancheListView
+from .knowledge import (
+    KnowledgeDeactivateView,
+    KnowledgeDetailView,
+    KnowledgeListCreateView,
+    KnowledgeSupersedeView,
+)
+from .applicability import (
+    ApplicabilityDeleteView,
+    ApplicabilityMatrixView,
+    ApplicabilityUpsertView,
+)
+from .project_applicability import AdminProjectApplicabilityView
 
 
 master_patterns = []
@@ -86,6 +101,39 @@ urlpatterns = [
     # Projects
     path('projects/', DPRProjectAdminListView.as_view(), name='admin-dpr-projects-list'),
     path('projects/<uuid:project_uuid>/', DPRProjectAdminDetailView.as_view(), name='admin-dpr-projects-detail'),
+    # Config (KAU RCD B.6 — Central Admin-controlled parameters)
+    path('config/', DPRConfigListView.as_view(), name='admin-dpr-config-list'),
+    path('config/<int:pk>/', DPRConfigDetailView.as_view(), name='admin-dpr-config-detail'),
+    path('config/<int:pk>/reset/', DPRConfigResetView.as_view(), name='admin-dpr-config-reset'),
+    # Risk matrix (KAU RCD B.9 — configurable probability × impact grid)
+    path('risk-matrix/', DPRRiskMatrixListView.as_view(), name='admin-dpr-risk-matrix-list'),
+    path('risk-matrix/<int:pk>/', DPRRiskMatrixDetailView.as_view(), name='admin-dpr-risk-matrix-detail'),
+    # Capital tranches (KAU RCD A.3 / B.8 — dated inflows + outflows per project)
+    path(
+        'projects/<uuid:project_uuid>/tranches/',
+        DPRCapitalTrancheListView.as_view(),
+        name='admin-dpr-project-tranches-list',
+    ),
+    path(
+        'projects/<uuid:project_uuid>/tranches/<int:pk>/',
+        DPRCapitalTrancheDetailView.as_view(),
+        name='admin-dpr-project-tranches-detail',
+    ),
+    # Knowledge base (KAU RCD A.2 — sourced content that grounds AI narratives)
+    path('knowledge/', KnowledgeListCreateView.as_view(), name='admin-dpr-knowledge-list'),
+    path('knowledge/<int:pk>/', KnowledgeDetailView.as_view(), name='admin-dpr-knowledge-detail'),
+    path('knowledge/<int:pk>/deactivate/', KnowledgeDeactivateView.as_view(), name='admin-dpr-knowledge-deactivate'),
+    path('knowledge/<int:pk>/supersede/', KnowledgeSupersedeView.as_view(), name='admin-dpr-knowledge-supersede'),
+    # Applicability matrix (KAU RCD A.1 — dynamic questionnaire rules)
+    path('applicability/matrix/', ApplicabilityMatrixView.as_view(), name='admin-dpr-applicability-matrix'),
+    path('applicability/', ApplicabilityUpsertView.as_view(), name='admin-dpr-applicability-upsert'),
+    path('applicability/<int:pk>/', ApplicabilityDeleteView.as_view(), name='admin-dpr-applicability-delete'),
+    # Per-project applicability preview (Phase 6e — admin UAT tool)
+    path(
+        'projects/<uuid:project_uuid>/applicability/',
+        AdminProjectApplicabilityView.as_view(),
+        name='admin-dpr-project-applicability',
+    ),
     # Master data (33 categories, list-create + detail each)
     *master_patterns,
 ]

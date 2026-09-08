@@ -65,12 +65,15 @@ from apps.fpo.api.dpr.serializers import (
 from apps.fpo.services.dpr import (
     baseline_validators, capacity_validators, civil_validators,
     compliance_validators, components_validators, ess_validators,
-    finance_validators, hr_validators, implementation_validators,
+    finance_validators, hr_validators, identification_validators,
+    implementation_validators,
     investment_validators, location_validators, machinery_validators,
     market_validators, nature_of_business_validators, products_validators,
     rationale_validators, raw_material_validators, risk_validators,
     site_validators, technology_validators, utilities_validators,
 )
+
+from .enrichers import enrich_section_data
 
 
 # section_key → (Model, Serializer, validator_module)
@@ -99,6 +102,50 @@ SECTION_REGISTRY = {
 }
 
 
+def _build_identification_payload(project) -> dict:
+    """Flatten DPRProject §2.2 fields with human labels for admin oversight.
+
+    FK fields resolve to `{id, name}`; M2M lists resolve to `[{id, name}, ...]`.
+    Kept read-only + admin-only — avoids touching the FPO-facing serializer
+    which sends bare IDs on purpose (frontend caches master lists separately).
+    """
+    # MasterLookup names live in the Translation table (not a column) —
+    # `get_name()` resolves via translations, falls back to code.
+    primary = None
+    if project.primary_commodity_id:
+        m = project.primary_commodity
+        primary = {'id': m.id, 'name': m.get_name('en') or m.code}
+
+    secondary = [
+        {'id': m.id, 'name': m.get_name('en') or m.code}
+        for m in project.secondary_commodities.all()
+    ]
+    project_types = [
+        {'id': t.id, 'name': getattr(t, 'label_en', None) or getattr(t, 'code', str(t.id))}
+        for t in project.project_types.all()
+    ]
+    project_objectives = [
+        {'id': o.id, 'name': getattr(o, 'label_en', None) or getattr(o, 'code', str(o.id))}
+        for o in project.project_objectives.all()
+    ]
+    expected_outcomes = [
+        {'id': o.id, 'name': getattr(o, 'label_en', None) or getattr(o, 'code', str(o.id))}
+        for o in project.expected_outcomes.all()
+    ]
+
+    return {
+        'title':                    project.title,
+        'brief_description':        project.brief_description,
+        'primary_commodity':        primary,
+        'secondary_commodities':    secondary,
+        'project_types':            project_types,
+        'project_objectives':       project_objectives,
+        'project_objectives_other': project.project_objectives_other,
+        'expected_outcomes':        expected_outcomes,
+        'expected_outcomes_other':  project.expected_outcomes_other,
+    }
+
+
 @extend_schema(
     tags=['Admin - DPR Projects'],
     summary='Get one DPR project with all sections (read-only)',
@@ -119,6 +166,19 @@ class DPRProjectAdminDetailView(APIView):
 
         fpo = project.fpo
         sections_payload = {}
+
+        # §2.2 Project Identification lives on the DPRProject itself (not a
+        # separate DPRSection* table) — special-case it so the admin UI's
+        # `sections.identification` key is populated the same way as other
+        # sections. Enriches FK / M2M fields with human labels so the admin
+        # oversight view isn't showing raw IDs like "primary_commodity: 238".
+        ident_data = _build_identification_payload(project)
+        try:
+            ident_readiness = identification_validators.validate_project(project)
+        except Exception:
+            ident_readiness = None
+        sections_payload['identification'] = {'data': ident_data, 'readiness': ident_readiness}
+
         for key, (Model, Serializer, validator) in SECTION_REGISTRY.items():
             section = Model.objects.filter(project=project).first()
             if section is None:
@@ -126,6 +186,10 @@ class DPRProjectAdminDetailView(APIView):
                 continue
 
             data = Serializer(section, context={'request': request}).data
+            # Enrich FK / M2M IDs with human labels so the admin oversight
+            # UI renders "Grading" instead of "24". Safe no-op for sections
+            # without a registered enricher; safe fallback on any error.
+            data = enrich_section_data(key, data)
             try:
                 readiness = validator.validate_section(section)
             except Exception:

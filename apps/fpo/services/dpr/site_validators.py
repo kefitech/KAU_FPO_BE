@@ -48,6 +48,14 @@ def validate_section(section) -> dict[str, Any]:
                     'ownership_other_required', f'{prefix}.ownership_other',
                     'Please specify — "Others" was selected for ownership.',
                 ))
+        # Per KAU RCD reply B.8 (2026-09-02): every parcel is expected to
+        # declare which project component(s) will use it. Enforced here since
+        # Django can't enforce "≥ 1 M2M row" at the model layer.
+        if p.components.count() == 0:
+            errors.append(_err(
+                'parcel_components_required', f'{prefix}.components',
+                'At least one project component shall be mapped to this parcel.',
+            ))
 
     # Cat B — terrain
     if not section.terrain:

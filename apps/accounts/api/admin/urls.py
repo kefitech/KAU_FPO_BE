@@ -59,6 +59,12 @@ from .external_apis import (
 )
 from .page_access import RolePageAccessListView, RolePageAccessDetailView
 from .audit_logs import AuditLogListView
+from .ai_services import (
+    AIProvidersInfoView,
+    AIServiceDetailView,
+    AIServiceListView,
+    AIServiceResetUsageView,
+)
 from .dashboard import AdminDashboardStatsView
 from .ownership_claims import (
     OwnershipClaimListView,
@@ -181,6 +187,11 @@ urlpatterns = [
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
     # Audit Logs
     path('audit-logs/',                     AuditLogListView.as_view(),                  name='admin-audit-logs'),
+    # AI Services (KAU RCD B.5 — per-feature provider config + budget cap)
+    path('ai-services/',                    AIServiceListView.as_view(),                 name='admin-ai-services-list'),
+    path('ai-services/providers/',          AIProvidersInfoView.as_view(),               name='admin-ai-services-providers'),
+    path('ai-services/<int:pk>/',           AIServiceDetailView.as_view(),               name='admin-ai-services-detail'),
+    path('ai-services/<int:pk>/reset-usage/', AIServiceResetUsageView.as_view(),         name='admin-ai-services-reset-usage'),
     # Ownership Claims
     path('ownership-claims/',                           OwnershipClaimListView.as_view(),   name='admin-claims-list'),
     path('ownership-claims/<int:claim_id>/',            OwnershipClaimDetailView.as_view(), name='admin-claims-detail'),

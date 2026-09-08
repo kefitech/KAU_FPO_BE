@@ -29,12 +29,38 @@ class AIServiceConfig(BaseModel):
         MARKETING      = 'marketing',       'Marketing Strategy AI'
         TRANSLATE      = 'translate',       'Auto-Translate AI'
 
+    class Provider(models.TextChoices):
+        """Which LLM vendor this feature calls.
+
+        Switching provider is a config change — no code deploy needed.
+        `apps/fpo/services/dpr/llm_gateway.py` dispatches to the right SDK
+        by reading this field.
+        """
+        MOCK      = 'mock',      'Deterministic mock (no external API)'
+        ANTHROPIC = 'anthropic', 'Anthropic Claude'
+        OPENAI    = 'openai',    'OpenAI GPT'
+        GOOGLE    = 'google',    'Google Gemini'
+
     service = models.CharField(
         max_length=30, choices=Service.choices, unique=True
     )
     is_enabled = models.BooleanField(
         default=True,
         help_text='Admin toggle — when False the feature returns fallback/placeholder response'
+    )
+    provider = models.CharField(
+        max_length=20, choices=Provider.choices, default=Provider.MOCK,
+        help_text='Which LLM provider handles this feature. Change to switch '
+                  'vendors without a code deploy. Requires the matching API '
+                  'key + model name below.',
+    )
+    model_name = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='Provider-specific model ID. Examples: '
+                  'anthropic → "claude-sonnet-4-6"; '
+                  'openai → "gpt-4o-mini"; '
+                  'google → "gemini-2.5-flash". '
+                  'Blank uses the provider\'s current default (see llm_gateway.DEFAULT_MODELS).',
     )
 
     # Budget cap
@@ -170,6 +196,12 @@ class AIUsageLog(BaseModel):
     user = models.ForeignKey(
         User, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='ai_usage_logs'
+    )
+    provider = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='Which LLM vendor served this call — mirrors AIServiceConfig.provider '
+                  'at the time of the call. Useful for cost breakdown when a service '
+                  'switches provider mid-month.',
     )
     model_used = models.CharField(
         max_length=100, default='claude-sonnet-4-6',

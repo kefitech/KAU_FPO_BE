@@ -198,6 +198,12 @@ class DPRMarketingProduct(TimeStampedModel, AuditModel):
         blank=True,
         related_name='+',
     )
+    # Companion free-text for the "Others (Specify)" master row per Cat A
+    # spec. Same pattern as demand_basis_other / pricing_basis_other /
+    # channel_other / risk_type_other elsewhere on this model. Validator
+    # requires this to be non-blank when the "other" customer category is
+    # in the M2M.
+    customer_categories_other = models.CharField(max_length=200, blank=True)
 
     # ── Cat H: Sales projection ──
     # User fills Yr 1 (mandatory) + Yr 2-5 optional; Yr 6-10 will be AI-generated separately.

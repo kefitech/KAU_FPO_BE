@@ -1,0 +1,550 @@
+{% load dpr_filters %}{% comment %}
+DPR Report PDF template — landscape A4, 10-year projection tables.
+
+Rendered by apps/fpo/services/dpr/pdf.py using CalculationResult produced by
+apps/fpo/services/dpr/calculation.py compute().
+
+Layout order matches the IIFPT sample DPR reference (Documents/Dpr-rcd-response/
+Rice-based-Product-Dpr.pdf):
+  1. Cover page
+  2. Project at a glance
+  3. Fixed capital investment (cost breakdown)
+  4. Means of finance
+  5. Capital schedule (implementation-period tranches)
+  6. Depreciation schedule
+  7. Loan repayment schedule
+  8. Projected P&L (10-col)
+  9. Projected cash flow (10-col)
+  10. Projected balance sheet (10-col, A.3 A=E+L invariant enforced)
+  11. Financial appraisal (NPV / IRR / DSCR / payback / break-even)
+
+Author: Athul Gopan (Kefi Tech Solutions)
+{% endcomment %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>DPR — {{ project.title|default:"Untitled Project" }}</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 14mm 10mm 16mm 10mm;
+      /* Per KAU pre-UAT reply §7.2 + §9.7 (2026-09-08):
+         header shows FPO name (primary), footer carries version + date
+         (left), platform attribution (center), page counter (right). */
+      @top-left  { content: "{{ project.fpo.name|default:'—' }} — DPR {{ version_label }}"; font-size: 8pt; color: #444; font-weight: 600; }
+      @top-right { content: "{{ project.title|default:'Untitled Project' }}"; font-size: 8pt; color: #666; }
+      @bottom-left   { content: "{{ version_label }} · Generated {{ generated_at }}"; font-size: 7.5pt; color: #666; }
+      @bottom-center { content: "Prepared using the Kerala Agricultural University DPR platform"; font-size: 7.5pt; color: #999; font-style: italic; }
+      @bottom-right  { content: "Page " counter(page) " of " counter(pages); font-size: 7.5pt; color: #666; }
+    }
+    * { box-sizing: border-box; }
+    body { font-family: "Times New Roman", Times, serif; font-size: 9pt; color: #222; line-height: 1.35; }
+    h1 { font-size: 22pt; color: #1F3864; margin: 0 0 6mm 0; }
+    h2 { font-size: 14pt; color: #1F3864; margin: 6mm 0 3mm 0; border-bottom: 2px solid #E86C1A; padding-bottom: 2mm; page-break-after: avoid; }
+    h3 { font-size: 11pt; color: #1F3864; margin: 4mm 0 2mm 0; page-break-after: avoid; }
+    p, li { margin: 0 0 2mm 0; }
+    table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; font-size: 8pt; page-break-inside: auto; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    th, td { border: 1px solid #ccc; padding: 1.5mm 2mm; text-align: right; vertical-align: middle; }
+    th { background: #1F3864; color: #fff; font-weight: 600; text-align: center; }
+    td.label, th.label { text-align: left; }
+    tr.total td { background: #f2f2f2; font-weight: 700; }
+    tr.subtotal td { background: #fafafa; font-style: italic; }
+    .cover { padding: 15mm 0 0 0; text-align: center; }
+    .cover .fpo-name { font-size: 22pt; color: #1F3864; font-weight: 700; margin: 0 0 2mm 0; letter-spacing: 0.3pt; }
+    .cover .fpo-loc { font-size: 12pt; color: #666; margin: 0 0 12mm 0; font-style: italic; }
+    .cover .title { font-size: 32pt; color: #1F3864; font-weight: 700; margin: 0 0 4mm 0; }
+    .cover .subtitle { font-size: 13pt; color: #444; margin: 0 0 20mm 0; }
+    .cover .project-name { font-size: 15pt; color: #E86C1A; font-weight: 600; margin: 0 0 15mm 0; }
+    .cover .meta-block { display: inline-block; text-align: left; margin: 4mm auto; padding: 4mm 8mm; border: 1px solid #ddd; border-radius: 2mm; background: #fafafa; }
+    .cover .meta { font-size: 10.5pt; margin: 1.5mm 0; color: #333; }
+    .cover .meta strong { color: #1F3864; display: inline-block; min-width: 45mm; }
+    .cover .platform-attribution { margin-top: 12mm; font-size: 9pt; color: #999; font-style: italic; }
+    .cover .disclaimer-box { margin: 8mm 10mm 0 10mm; padding: 4mm; border: 1px solid #E86C1A; background: #fff7ed; border-radius: 2mm; font-size: 8.5pt; color: #78350f; text-align: left; }
+    .cover .disclaimer-box .disclaimer-title { font-weight: 700; color: #9a3412; margin-bottom: 1.5mm; text-transform: uppercase; letter-spacing: 0.5pt; font-size: 8pt; }
+    .glance { border: 2px solid #1F3864; padding: 4mm; }
+    .glance .row { display: flex; justify-content: space-between; padding: 1.5mm 0; border-bottom: 1px dotted #ccc; }
+    .glance .row:last-child { border-bottom: 0; }
+    .glance .k { font-weight: 600; color: #333; }
+    .glance .v { color: #1F3864; font-weight: 500; }
+    .badge-ok { background: #d1fae5; color: #065f46; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
+    .badge-warn { background: #fef3c7; color: #92400e; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
+    .badge-err { background: #fee2e2; color: #991b1b; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
+    .estimated-note { background: #fff7ed; border-left: 3px solid #E86C1A; padding: 2mm 3mm; font-size: 8pt; color: #78350f; margin: 2mm 0; }
+    .page-break { page-break-before: always; }
+    .footer-note { font-size: 7pt; color: #999; margin-top: 4mm; text-align: center; font-style: italic; }
+    .no-data { color: #999; font-style: italic; text-align: center; padding: 6mm; }
+  </style>
+</head>
+<body>
+
+  {# ── 1. Cover page ─────────────────────────────────────────────────── #}
+  {# Per KAU pre-UAT reply §9.7 (2026-09-08): DPR is presented as an
+     FPO-authored document prepared using the KAU platform. FPO name is
+     primary; KAU is platform attribution only. Mandatory disclaimer in
+     the boxed section — do not remove without KAU sign-off. FPO logo is
+     deferred to post-UAT (no logo field on FPO model yet). #}
+  <section class="cover">
+    <div class="fpo-name">{{ project.fpo.name|default:"—" }}</div>
+    {% if project.fpo.district %}
+      <div class="fpo-loc">{{ project.fpo.get_district_display|default:project.fpo.district }}, Kerala</div>
+    {% else %}
+      <div class="fpo-loc">Farmer Producer Organisation</div>
+    {% endif %}
+
+    <div class="title">Detailed Project Report</div>
+    <div class="subtitle">Prepared under the KAU-FPO Linkage Programme</div>
+
+    <div class="project-name">{{ project.title|default:"Untitled Project" }}</div>
+
+    <div class="meta-block">
+      <div class="meta"><strong>DPR Version:</strong> {{ version_label }}</div>
+      <div class="meta"><strong>Generated:</strong> {{ generated_at }}</div>
+      <div class="meta"><strong>Status:</strong> {{ project.get_status_display }}</div>
+      <div class="meta"><strong>Projection horizon:</strong> {{ r.projection_years }} years</div>
+      {% if project.primary_commodity %}
+      <div class="meta"><strong>Primary commodity:</strong> {{ project.primary_commodity }}</div>
+      {% endif %}
+    </div>
+
+    <div class="platform-attribution">
+      Prepared using the Kerala Agricultural University DPR platform
+    </div>
+
+    <div class="disclaimer-box">
+      <div class="disclaimer-title">Disclaimer</div>
+      This Detailed Project Report has been prepared by the above-named Farmer Producer
+      Organisation using the Kerala Agricultural University (KAU) DPR platform. Generation
+      of this report through the platform does not imply that KAU has approved, certified
+      or endorsed its contents. Its acceptance for bank submission, scheme application or
+      any other purpose is subject to the requirements of the concerned bank, implementing
+      agency or authority. Figures are rounded to the nearest rupee.
+    </div>
+  </section>
+
+  {# ── 2. Project at a glance ────────────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>1. Project at a Glance</h2>
+  <div class="glance">
+    <div class="row"><span class="k">Total Project Cost</span>
+      <span class="v">₹ {{ r.cost.total|money }}</span></div>
+    <div class="row"><span class="k">Means of Finance</span>
+      <span class="v">₹ {{ r.mof.total|money }}</span></div>
+    <div class="row"><span class="k">Cost / MoF Variance</span>
+      <span class="v">
+        {% if r.variance.exceeds_threshold %}
+          <span class="badge-err">{{ r.variance.pct|money }}% (exceeds {{ r.variance.threshold_pct|money }}%)</span>
+        {% elif r.variance.delta == 0 %}
+          <span class="badge-ok">Balanced ✓</span>
+        {% else %}
+          <span class="badge-warn">{{ r.variance.pct|money }}%</span>
+        {% endif %}
+      </span></div>
+    <div class="row"><span class="k">Implementation Period</span>
+      <span class="v">{{ r.capital_schedule.implementation_period_months }} months
+        {% if r.capital_schedule.is_estimated %}<span class="badge-warn">estimated</span>{% endif %}</span></div>
+    {% if r.ratios %}
+      <div class="row"><span class="k">Net Present Value ({{ r.ratios.discount_rate_pct|money }}%)</span>
+        <span class="v">₹ {{ r.ratios.npv|money }}</span></div>
+      <div class="row"><span class="k">Internal Rate of Return</span>
+        <span class="v">{% if r.ratios.irr_pct %}{{ r.ratios.irr_pct|money }}%{% else %}Not applicable — see §11{% endif %}</span></div>
+      <div class="row"><span class="k">Payback Period</span>
+        <span class="v">{% if r.ratios.payback_period_years %}{{ r.ratios.payback_period_years|money }} years{% else %}n/a{% endif %}</span></div>
+      <div class="row"><span class="k">Break-even Year</span>
+        <span class="v">{% if r.ratios.break_even_year %}Year {{ r.ratios.break_even_year }}{% else %}n/a{% endif %}</span></div>
+      <div class="row"><span class="k">Debt Service Coverage (min)</span>
+        <span class="v">{% if r.ratios.dscr_min %}{{ r.ratios.dscr_min|money }}x{% else %}n/a (no debt){% endif %}</span></div>
+    {% endif %}
+    {% if r.risk_assessment %}
+      <div class="row"><span class="k">Overall Project Risk</span>
+        <span class="v">
+          {% if r.risk_assessment.overall_class == 'high' %}
+            <span class="badge-err">High</span>
+          {% elif r.risk_assessment.overall_class == 'moderate' %}
+            <span class="badge-warn">Moderate</span>
+          {% else %}
+            <span class="badge-ok">Low</span>
+          {% endif %}
+          &nbsp;· {{ r.risk_assessment.total_risks_scored }}/{{ r.risk_assessment.total_risks_added }} scored
+        </span></div>
+    {% endif %}
+    <div class="row"><span class="k">Balance Sheet Invariant</span>
+      <span class="v">
+        {% if r.balance_sheet.all_years_balanced %}
+          <span class="badge-ok">A = E+L ✓ across all {{ r.projection_years|add:"1" }} years</span>
+        {% else %}
+          <span class="badge-err">Δ ₹{{ r.balance_sheet.max_invariant_delta }}</span>
+        {% endif %}
+      </span></div>
+  </div>
+
+  {# ── 3. Fixed capital investment ───────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>2. Fixed Capital Investment</h2>
+  <table>
+    <thead><tr><th class="label">Cost head</th><th>Amount (₹)</th></tr></thead>
+    <tbody>
+      {% for field, amount in r.cost.by_field.items %}
+        {% if amount %}
+          <tr><td class="label">{{ field|humanise_field }}</td><td>{{ amount|money }}</td></tr>
+        {% endif %}
+      {% endfor %}
+      <tr class="total"><td class="label">Total Project Cost</td><td>{{ r.cost.total|money }}</td></tr>
+    </tbody>
+  </table>
+
+  {# ── 4. Means of finance ───────────────────────────────────────────── #}
+  <h2>3. Means of Finance</h2>
+  <table>
+    <thead><tr><th class="label">Source</th><th>Amount (₹)</th></tr></thead>
+    <tbody>
+      {% for field, amount in r.mof.by_field.items %}
+        {% if amount %}
+          <tr><td class="label">{{ field|humanise_field }}</td><td>{{ amount|money }}</td></tr>
+        {% endif %}
+      {% endfor %}
+      <tr class="total"><td class="label">Total Means of Finance</td><td>{{ r.mof.total|money }}</td></tr>
+    </tbody>
+  </table>
+
+  {# ── 5. Capital schedule ───────────────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>4. Capital Investment Schedule (Implementation Period)</h2>
+  {% if r.capital_schedule.is_estimated %}
+    <div class="estimated-note">
+      <strong>Estimated:</strong> {{ r.capital_schedule.distribution_note }}
+    </div>
+  {% endif %}
+  <table>
+    <thead><tr>
+      <th>Month</th>
+      <th>Cost incurred</th>
+      <th>Funds received</th>
+      <th>Cumulative cost</th>
+      <th>Cumulative funds</th>
+      <th>Unfunded balance</th>
+    </tr></thead>
+    <tbody>
+      {% for row in r.capital_schedule.rows %}
+        <tr>
+          <td>{{ row.month }}</td>
+          <td>{{ row.cost_incurred|money }}</td>
+          <td>{{ row.mof_received|money }}</td>
+          <td>{{ row.cumulative_cost|money }}</td>
+          <td>{{ row.cumulative_mof|money }}</td>
+          <td>{{ row.unfunded_balance|money }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {# ── 6. Depreciation schedule ──────────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>5. Depreciation Schedule (SLM)</h2>
+  <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-bottom: 3mm;">
+    Depreciation is computed using the Straight-Line Method (SLM) at the rates configured for
+    the KAU DPR platform. Rates are used <strong>for project appraisal</strong> and are indicative
+    for banker / scheme review; they may differ from statutory / income-tax depreciation rates
+    (Companies Act Schedule II or Income Tax Act §32 WDV rates). Per KAU pre-UAT reply §2.1.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th class="label">Asset class</th>
+        <th>Rate %</th>
+        <th>Initial cost</th>
+        {% for y in years %}<th>Y{{ y }} depreciation</th>{% endfor %}
+        <th>Net block Y{{ r.projection_years }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cls in r.depreciation.classes %}
+        <tr>
+          <td class="label">{{ cls.label }}</td>
+          <td>{{ cls.rate_pct|money }}%</td>
+          <td>{{ cls.initial_cost|money }}</td>
+          {% for row in cls.rows %}<td>{{ row.depreciation|money }}</td>{% endfor %}
+          <td>{{ cls.rows|last_net_block|money }}</td>
+        </tr>
+      {% endfor %}
+      <tr class="total">
+        <td class="label">Total</td>
+        <td></td>
+        <td>{{ r.cost.total|money }}</td>
+        {% for y in years %}<td>{{ r.depreciation|year_total:y|money }}</td>{% endfor %}
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  {# ── 7. Loan repayment schedule ────────────────────────────────────── #}
+  {% if r.interest_schedule.loan_amount %}
+    <h2>6. Loan Repayment Schedule</h2>
+    <p style="font-size: 9pt; margin-bottom: 3mm;">
+      Loan: <strong>₹{{ r.interest_schedule.loan_amount|money }}</strong> @
+      <strong>{{ r.interest_schedule.interest_rate_pct|money }}%</strong> ·
+      Tenure: <strong>{{ r.interest_schedule.tenure_years }} years</strong> ·
+      Moratorium: <strong>{{ r.interest_schedule.moratorium_months }} months</strong>
+    </p>
+    <table>
+      <thead><tr>
+        <th>Year</th>
+        <th>Opening balance</th>
+        <th>Interest</th>
+        <th>Principal</th>
+        <th>Closing balance</th>
+      </tr></thead>
+      <tbody>
+        {% for row in r.interest_schedule.rows %}
+          <tr>
+            <td>Y{{ row.year }}</td>
+            <td>{{ row.opening_balance|money }}</td>
+            <td>{{ row.interest|money }}</td>
+            <td>{{ row.principal|money }}</td>
+            <td>{{ row.closing_balance|money }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {# ── 8. Projected P&L ──────────────────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>7. Projected Profit &amp; Loss (₹)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="label">Item</th>
+        {% for y in years %}<th>Y{{ y }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="label">Revenue</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.revenue|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Operating cost</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.operating_cost|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">EBITDA</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.ebitda|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Depreciation</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.depreciation|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">EBIT</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.ebit|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Interest</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.interest|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">PBT</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.pbt|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Tax</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.tax|money }}</td>{% endfor %}</tr>
+      <tr class="total"><td class="label">PAT</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.pat|money }}</td>{% endfor %}</tr>
+    </tbody>
+  </table>
+
+  {# ── 9. Projected cash flow ────────────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>8. Projected Cash Flow (₹)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="label">Item</th>
+        {% for row in r.cash_flow.rows %}<th>Y{{ row.year }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="label">PAT</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.pat|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Depreciation add-back</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.depreciation_addback|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">CF from Operations</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.cash_from_operations|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Capex</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.capex|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">CF from Investing</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.cash_from_investing|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">MoF inflow</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.mof_inflow|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Loan repayment</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.loan_principal_repayment|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">CF from Financing</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.cash_from_financing|money }}</td>{% endfor %}</tr>
+      <tr class="total"><td class="label">Net cash flow</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.net_cash_flow|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Closing cash</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.closing_cash|money }}</td>{% endfor %}</tr>
+    </tbody>
+  </table>
+
+  {# ── 10. Projected balance sheet ───────────────────────────────────── #}
+  <div class="page-break"></div>
+  <h2>9. Projected Balance Sheet (₹)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="label">Item</th>
+        {% for row in r.balance_sheet.rows %}<th>Y{{ row.year }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="label"><strong>Assets</strong></td>
+        {% for row in r.balance_sheet.rows %}<td></td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Land</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.land|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;CWIP</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.cwip|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Gross fixed assets</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.gross_fixed_assets|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Less: Accum. depreciation</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.accumulated_depreciation|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Net fixed assets</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.net_fixed_assets|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Working capital</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.working_capital|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Cash &amp; bank</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.cash_and_bank|money }}</td>{% endfor %}</tr>
+      <tr class="total"><td class="label">Total Assets</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.total_assets|money }}</td>{% endfor %}</tr>
+
+      <tr><td class="label"><strong>Equity &amp; Liabilities</strong></td>
+        {% for row in r.balance_sheet.rows %}<td></td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Promoter equity</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.promoter_equity|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Capital reserve (subsidy)</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.capital_reserve|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Retained earnings</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.retained_earnings|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">Total Equity</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.total_equity|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Term loan outstanding</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.term_loan_outstanding|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;Other liabilities</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.other_liabilities|money }}</td>{% endfor %}</tr>
+      <tr class="subtotal"><td class="label">Total Liabilities</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.total_liabilities|money }}</td>{% endfor %}</tr>
+      <tr class="total"><td class="label">Total Equity + Liabilities</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.total_equity_and_liabilities|money }}</td>{% endfor %}</tr>
+
+      <tr><td class="label">Invariant check (A − E−L)</td>
+        {% for row in r.balance_sheet.rows %}
+          <td>{% if row.invariant_ok %}<span class="badge-ok">✓</span>{% else %}<span class="badge-err">Δ {{ row.invariant_delta|money }}</span>{% endif %}</td>
+        {% endfor %}
+      </tr>
+    </tbody>
+  </table>
+
+  {# ── 11. Financial appraisal ratios ────────────────────────────────── #}
+  {% if r.ratios %}
+    <div class="page-break"></div>
+    <h2>10. Financial Appraisal</h2>
+    <table style="width: 60%;">
+      <thead><tr><th class="label">Ratio</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td class="label">Net Present Value @ {{ r.ratios.discount_rate_pct|money }}% discount rate</td>
+            <td>₹ {{ r.ratios.npv|money }}</td></tr>
+        <tr><td class="label">Internal Rate of Return (IRR)</td>
+            <td>{% if r.ratios.irr_pct %}{{ r.ratios.irr_pct|money }}%{% else %}Not determined — see note below{% endif %}</td></tr>
+        <tr><td class="label">Payback period</td>
+            <td>{% if r.ratios.payback_period_years %}{{ r.ratios.payback_period_years|money }} years{% else %}n/a{% endif %}</td></tr>
+        <tr><td class="label">Break-even year (cumulative PAT ≥ 0)</td>
+            <td>{% if r.ratios.break_even_year %}Year {{ r.ratios.break_even_year }}{% else %}n/a{% endif %}</td></tr>
+        <tr><td class="label">Minimum DSCR</td>
+            <td>{% if r.ratios.dscr_min %}{{ r.ratios.dscr_min|money }}x{% else %}n/a (no debt){% endif %}</td></tr>
+        <tr><td class="label">Average DSCR</td>
+            <td>{% if r.ratios.dscr_avg %}{{ r.ratios.dscr_avg|money }}x{% else %}n/a (no debt){% endif %}</td></tr>
+      </tbody>
+    </table>
+
+    {% if not r.ratios.irr_pct %}
+      <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-top: 3mm;">
+        <strong>Note on IRR:</strong> IRR could not be determined for the given cash-flow
+        pattern. This typically occurs when (a) all projected cash flows are of the same
+        sign (fully positive or fully negative — no sign change), or (b) the pattern admits
+        multiple IRR solutions (non-conventional cash flows). In such cases NPV at the
+        {{ r.ratios.discount_rate_pct|money }}% discount rate is the primary appraisal metric.
+        Per KAU pre-UAT reply §2.3.
+      </p>
+    {% endif %}
+
+    {% if r.ratios.dscr_min %}
+      <h3>DSCR by Year</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Year</th>
+            <th>Cash available for debt service</th>
+            <th>Debt service (int + principal)</th>
+            <th>DSCR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in r.ratios.dscr_rows %}
+            <tr>
+              <td>Y{{ row.year }}</td>
+              <td>{{ row.numerator|money }}</td>
+              <td>{{ row.denominator|money }}</td>
+              <td>{% if row.dscr %}{{ row.dscr|money }}x{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  {% endif %}
+
+  {# ── 12. Risk assessment (KAU RCD B.9) ────────────────────────────── #}
+  {% if r.risk_assessment %}
+    <div class="page-break"></div>
+    <h2>11. Risk Assessment</h2>
+    <p style="font-size: 9pt; margin-bottom: 3mm;">
+      Overall project risk:
+      <span class="{% if r.risk_assessment.overall_class == 'high' %}badge-err{% elif r.risk_assessment.overall_class == 'moderate' %}badge-warn{% else %}badge-ok{% endif %}">
+        {{ r.risk_assessment.overall_class|capfirst }}
+      </span>
+      &nbsp;·&nbsp; {{ r.risk_assessment.total_risks_scored }} of {{ r.risk_assessment.total_risks_added }} risks scored via matrix
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th class="label">Category</th>
+          <th>Risks entered</th>
+          <th>Scored</th>
+          <th>Low</th>
+          <th>Moderate</th>
+          <th>High</th>
+          <th>Category class</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in r.risk_assessment.categories %}
+          <tr>
+            <td class="label">{{ cat.category_label }}</td>
+            <td>{{ cat.risk_count }}</td>
+            <td>{{ cat.scored_count }}</td>
+            <td>{{ cat.class_counts.low }}</td>
+            <td>{{ cat.class_counts.moderate }}</td>
+            <td>{{ cat.class_counts.high }}</td>
+            <td>
+              <span class="{% if cat.category_class == 'high' %}badge-err{% elif cat.category_class == 'moderate' %}badge-warn{% else %}badge-ok{% endif %}">
+                {{ cat.category_class|capfirst }}
+              </span>
+            </td>
+          </tr>
+          {% if cat.unscored_note %}
+            <tr><td colspan="7" class="label estimated-note">{{ cat.unscored_note }}</td></tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <p style="font-size: 8pt; color: #888; margin-top: 2mm;">
+      Classification rule (RCD B.9): any category High → overall High; else any Moderate → overall Moderate; else Low.
+      Matrix cells are admin-configurable at <span style="font-family: monospace;">/api/admin/dpr/risk-matrix/</span>.
+    </p>
+  {% endif %}
+
+  <p class="footer-note">
+    Prepared using the KAU-FPO Platform DPR module.
+    All financial assumptions and defaults are controlled by the KAU Central Administrator (RCD B.6).
+  </p>
+
+</body>
+</html>

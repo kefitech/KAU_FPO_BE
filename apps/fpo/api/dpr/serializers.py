@@ -110,8 +110,11 @@ class DPRProjectDetailSerializer(serializers.ModelSerializer):
             'project_objectives_other',
             'expected_outcomes',           # 7 — Multi-select ids
             'expected_outcomes_other',
+            # KAU RCD C.6/C.7 — per-field provenance map. Read-only from FPO
+            # perspective (mutated by backend on AI inference + user overrides).
+            'field_sources',
         )
-        read_only_fields = ('uuid', 'status', 'created_at', 'updated_at')
+        read_only_fields = ('uuid', 'status', 'created_at', 'updated_at', 'field_sources')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -731,7 +734,13 @@ class DPRSectionTechnologySerializer(serializers.ModelSerializer):
 class DPRLandParcelSerializer(serializers.ModelSerializer):
     class Meta:
         model = DPRLandParcel
-        exclude = _CHILD_EXCLUDE
+        # `unit` FK is a legacy field pointing to `DPRCapacityUnit` (kg/mt/litres/etc)
+        # — never meaningful for land parcels and superseded by `land_unit`
+        # (CharField, 5 choices). Excluded from serialiser output so FE + admin
+        # never render it. Column stays in DB until a dedicated cleanup
+        # migration drops it (data-safe: 1 pre-existing test row may hold
+        # stale data; drop needs a backup + a data-migration pass first).
+        exclude = _CHILD_EXCLUDE + ('unit',)
 
 
 class DPRExistingInfrastructureSerializer(serializers.ModelSerializer):
@@ -789,7 +798,13 @@ class DPRSectionSiteSerializer(serializers.ModelSerializer):
         audit = self._audit(user)
         for item in items_data:
             item.pop('id', None)
-            DPRLandParcel.objects.create(section=section, **item, **audit)
+            # M2M fields can't be passed to create() — pop, create, then .set().
+            # `components` (per KAU RCD B.8) maps project components onto this
+            # parcel. May be an empty list when the FPO hasn't picked any yet.
+            components = item.pop('components', None) or []
+            parcel = DPRLandParcel.objects.create(section=section, **item, **audit)
+            if components:
+                parcel.components.set(components)
 
     def _replace_infra(self, section, items_data, user):
         section.existing_infrastructure.all().delete()

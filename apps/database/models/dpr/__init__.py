@@ -17,6 +17,13 @@ Context: context/phase2/Dpr/DPR_V2_CONTEXT.md
 """
 
 from .project import DPRProject
+from .config import DPRConfig
+from .tranche import DPRCapitalTranche
+from .risk_matrix import DPRRiskMatrixCell
+from .knowledge import DPRKnowledgeEntry
+from .ai_content import DPRAIContent
+from .document import DPRDocument
+from .applicability import DPRComponentApplicability, DPRFieldRule
 from .raw_material import (
     DPRSectionRawMaterial,
     DPRRawMaterial,

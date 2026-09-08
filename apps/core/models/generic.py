@@ -185,6 +185,24 @@ class AuditLog(TimeStampedModel):
         FPO_USER_INVITE    = 'fpo_user_invite',    'FPO User Invited'
         FPO_USER_ACTIVATE  = 'fpo_user_activate',  'FPO User Activated'
         FPO_USER_DEACTIVATE = 'fpo_user_deactivate', 'FPO User Deactivated'
+        # DPR config events (per KAU RCD reply B.6 — every mutation to a
+        # centrally-controlled DPR parameter is auditable)
+        DPR_CONFIG_CHANGE  = 'dpr_config_change',  'DPR Config Changed'
+        # DPR AI/system-value override events (per KAU RCD reply C.7 —
+        # when a user overrides an AI-derived or system-defaulted value,
+        # we log the transition + old→new value + source flip).
+        DPR_AI_VALUE_OVERRIDE = 'dpr_ai_value_override', 'DPR AI/System Value Overridden'
+        # DPR Knowledge Base changes (per KAU RCD reply A.2 — every KB entry
+        # add / edit / deactivate / supersede is auditable for traceability).
+        DPR_KB_CHANGE      = 'dpr_kb_change',      'DPR Knowledge Base Change'
+        # DPR AI narrative content decisions (per KAU RCD reply B.5 — every
+        # generate / accept / keep / merge is auditable so KAU can trace
+        # which version was chosen for any PDF).
+        DPR_AI_CONTENT_CHANGE = 'dpr_ai_content_change', 'DPR AI Content Change'
+        # DPR dynamic questionnaire applicability changes (per KAU RCD A.1 —
+        # every add / edit / delete of a component × section rule is audited
+        # so KAU can trace who changed what during UAT rule refinement).
+        DPR_APPLICABILITY_CHANGE = 'dpr_applicability_change', 'DPR Applicability Rule Change'
 
     # Who performed the action
     user = models.ForeignKey(
@@ -197,7 +215,7 @@ class AuditLog(TimeStampedModel):
 
     # What action was performed
     action = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=Action.choices,
         help_text="Type of action performed"
     )
