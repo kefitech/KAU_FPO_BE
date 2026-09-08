@@ -104,6 +104,18 @@ app.conf.beat_schedule = {
         'task': 'apps.core.tasks.clear_expired_cache',
         'schedule': crontab(hour=4, minute=30),
     },
+
+    # Expert Booking: send 24h reminder before confirmed appointments
+    'expert-booking-reminders': {
+        'task': 'apps.experts.tasks.send_booking_reminders',
+        'schedule': crontab(minute=0),  # Every hour
+    },
+
+    # Expert Booking: mark confirmed bookings completed after appointment time
+    'expert-booking-mark-completed': {
+        'task': 'apps.experts.tasks.mark_completed_bookings',
+        'schedule': crontab(minute=0),  # Every hour
+    },
 }
 
 # =============================================================================
