@@ -141,8 +141,11 @@ from apps.accounts.api.sub_admins import SubAdminViewSet
 from apps.recommendations.api.recommendations import (
     MLModelVersionAdminView,
     MLModelVersionActivateView,
+    MLModelRetrainView,
     RecommendationFeedbackAdminViewSet,
 )
+
+from apps.gis_module.api.zones import ZoneBoundaryVersionListView, ZoneBoundaryVersionActivateView, ZoneBoundaryVersionDetailView
 
 # Create DRF router
 router = DefaultRouter()
@@ -276,7 +279,12 @@ urlpatterns = [
     # ML Model Versions (P2-06)
     path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
     path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
+    path('ml-models/retrain/',             MLModelRetrainView.as_view(),         name='admin-ml-models-retrain'),
     path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),
+    # GIS Zone Boundary Versions (staged upload + activation)
+    path('gis/zone-versions/',                  ZoneBoundaryVersionListView.as_view(),     name='admin-gis-zone-versions'),
+    path('gis/zone-versions/<int:pk>/',         ZoneBoundaryVersionDetailView.as_view(),   name='admin-gis-zone-versions-detail'),
+    path('gis/zone-versions/<int:pk>/activate/', ZoneBoundaryVersionActivateView.as_view(), name='admin-gis-zone-versions-activate'),
 
     # DPR — Admin CRUD routes mounted at /api/admin/dpr/
     path('dpr/', include('apps.accounts.api.admin.dpr.urls')),

@@ -23,7 +23,7 @@ All models are in `apps/database/models/`. Your models are:
 
 ---
 
-## Step 1 — Enable PostGIS on Dev DB (Do This First)
+## Step 1 — Enable PostGIS on Dev DB (Do This First).
 
 ```bash
 # Connect to your local PostgreSQL

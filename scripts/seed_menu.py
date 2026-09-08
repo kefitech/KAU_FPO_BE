@@ -223,6 +223,14 @@ def seed_menu():
         order     = 22,
     )
     #---------------------------------------
+    # aravind — GIS zone-boundary admin
+    seed_item(
+        label_key = 'menu.gis_zones',
+        path      = '/admin/gis-zones',
+        icon      = 'map',
+        roles     = [super_admin_group],
+        order     = 23,
+    )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 

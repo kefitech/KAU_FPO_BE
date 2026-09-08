@@ -4,6 +4,7 @@ Requires PostGIS extension: CREATE EXTENSION IF NOT EXISTS postgis;
 Requires GeoDjango: django.contrib.gis in INSTALLED_APPS
 """
 from django.contrib.gis.db import models as gis_models
+from django.conf import settings
 from django.db import models
 from apps.core.models.base import BaseModel
 
@@ -156,3 +157,42 @@ class FPOWeatherSnapshot(BaseModel):
 
     def __str__(self):
         return f"Weather — {self.fpo} ({self.season})"
+
+class ZoneBoundaryVersion(BaseModel):
+    """
+    A staged, uploaded GeoJSON FeatureCollection for zone boundaries.
+    Uploading does NOT immediately affect live AgroClimaticZone data —
+    only activating a version does. Same proven pattern as
+    MLModelVersion (apps/database/models/recommendations.py):
+    activating one version automatically deactivates all others.
+    """
+    label = models.CharField(
+        max_length=150,
+        help_text='e.g. the uploaded filename, or a short description'
+    )
+    geojson_data = models.JSONField(
+        help_text='The raw uploaded FeatureCollection — validated at '
+                   'upload time but not yet applied to live zones'
+    )
+    is_active = models.BooleanField(
+        default=False,
+        help_text='Only ONE version can be active at a time — activating '
+                   'applies this data to the live AgroClimaticZone rows'
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='zone_boundary_uploads'
+    )
+
+    class Meta:
+        verbose_name = 'Zone Boundary Version'
+        verbose_name_plural = 'Zone Boundary Versions'
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if self.is_active:
+            ZoneBoundaryVersion.objects.exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.label} {'(active)' if self.is_active else ''}"

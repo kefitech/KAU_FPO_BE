@@ -1415,6 +1415,11 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
     def get_photo_count(self, obj):
         return obj.photo_count()
 
+    def validate_title(self, value):
+        if not isinstance(value, dict) or not value.get('en'):
+            raise serializers.ValidationError('title must be a JSON object with at least an "en" key.')
+        return value
+
 
 class GalleryAlbumListView(APIView):
 
@@ -1434,12 +1439,23 @@ class GalleryAlbumListView(APIView):
     def post(self, request):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-        serializer = GalleryAlbumSerializer(data=request.data, context={'request': request})
+
+        title_raw = request.data.get('title', {})
+        try:
+            title = json.loads(title_raw) if isinstance(title_raw, str) else title_raw
+        except ValueError:
+            return StandardResponse.error(
+                'title must be valid JSON e.g. {"en": "Opening Ceremony 2024"}',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = {**request.data, 'title': title}
+        serializer = GalleryAlbumSerializer(data=data, context={'request': request})
         if not serializer.is_valid():
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(created_by=request.user)
-        cache.delete('public:gallery_albums')
+        cache.delete_pattern('public:gallery_albums:*')
         return StandardResponse.created(
             data=GalleryAlbumSerializer(obj, context={'request': request}).data,
             message='Album created.',
@@ -1461,12 +1477,23 @@ class GalleryAlbumDetailView(APIView):
         obj = self._get(pk)
         if not obj:
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
-        serializer = GalleryAlbumSerializer(obj, data=request.data, partial=True, context={'request': request})
+
+        data = {k: v for k, v in request.data.items()}
+        if 'title' in data and isinstance(data['title'], str):
+            try:
+                data['title'] = json.loads(data['title'])
+            except ValueError:
+                return StandardResponse.error(
+                    'title must be valid JSON.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+        serializer = GalleryAlbumSerializer(obj, data=data, partial=True, context={'request': request})
         if not serializer.is_valid():
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(updated_by=request.user)
-        cache.delete('public:gallery_albums')
+        cache.delete_pattern('public:gallery_albums:*')
         return StandardResponse.success(
             data=GalleryAlbumSerializer(obj, context={'request': request}).data,
             message='Updated.',
@@ -1485,7 +1512,7 @@ class GalleryAlbumDetailView(APIView):
                 photo.photo.delete(save=False)
             photo.soft_delete(user=request.user)
         obj.soft_delete(user=request.user)
-        cache.delete('public:gallery_albums')
+        cache.delete_pattern('public:gallery_albums:*')
         cache.delete('public:gallery')
         return StandardResponse.success(message='Album and all its photos deleted.')
 
@@ -1503,7 +1530,7 @@ class GalleryAlbumActivateView(APIView):
         obj.is_active = True
         obj.save(update_fields=['is_active'])
         obj.photos.filter(is_deleted=False).update(is_active=True)
-        cache.delete('public:gallery_albums')
+        cache.delete_pattern('public:gallery_albums:*')
         cache.delete('public:gallery')
         return StandardResponse.success(message='Activated.')
 
@@ -1521,7 +1548,7 @@ class GalleryAlbumDeactivateView(APIView):
         obj.is_active = False
         obj.save(update_fields=['is_active'])
         obj.photos.filter(is_deleted=False).update(is_active=False)
-        cache.delete('public:gallery_albums')
+        cache.delete_pattern('public:gallery_albums:*')
         cache.delete('public:gallery')
         return StandardResponse.success(message='Deactivated.')
 
@@ -1629,7 +1656,7 @@ class GalleryListView(APIView):
                                               status_code=status.HTTP_400_BAD_REQUEST)
             obj = serializer.save(created_by=request.user)
             cache.delete('public:gallery')
-            cache.delete('public:gallery_albums')
+            cache.delete_pattern('public:gallery_albums:*')
             return StandardResponse.created(
                 data=GalleryPhotoSerializer(obj, context={'request': request}).data,
                 message='Photo uploaded.',
@@ -1664,7 +1691,7 @@ class GalleryListView(APIView):
                 errors.append({'file': f.name, 'error': serializer.errors})
 
         cache.delete('public:gallery')
-        cache.delete('public:gallery_albums')
+        cache.delete_pattern('public:gallery_albums:*')
         return StandardResponse.created(
             data={'uploaded': created, 'errors': errors},
             message=f'{len(created)} photo(s) uploaded.',
@@ -1731,7 +1758,7 @@ class GalleryDetailView(APIView):
             if not has_active_photos:
                 album.is_active = False
                 album.save(update_fields=['is_active'])
-                cache.delete('public:gallery_albums')
+                cache.delete_pattern('public:gallery_albums:*')
  
         cache.delete('public:gallery')
         return StandardResponse.success(message='Deleted.')
@@ -1754,7 +1781,7 @@ class GalleryActivateView(APIView):
         if not obj.album.is_active:
             obj.album.is_active = True
             obj.album.save(update_fields=['is_active'])
-            cache.delete('public:gallery_albums')
+            cache.delete_pattern('public:gallery_albums:*')
         cache.delete('public:gallery')
         return StandardResponse.success(message='Activated.')
 
@@ -1777,7 +1804,7 @@ class GalleryDeactivateView(APIView):
             if not has_active_photos:
                 obj.album.is_active = False
                 obj.album.save(update_fields=['is_active'])
-                cache.delete('public:gallery_albums')
+                cache.delete_pattern('public:gallery_albums:*')
 
 
         cache.delete('public:gallery')

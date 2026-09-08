@@ -42,6 +42,12 @@ from .tier_assessment import (
     TierAssessmentUploadView,
     TierAssessmentUploadDeleteView,
 )
+from .marketing import (
+    MarketingStrategyListView,
+    MarketingStrategyGenerateView,
+    MarketingStrategyDetailView,
+    MarketingStrategyDownloadView,
+)
 # DPR v1 imports removed 2026-08-24. v2 endpoints will live under /api/fpo/dpr/v2/
 # See context/phase2/Dpr/DPR_V2_CONTEXT.md
 
@@ -103,4 +109,10 @@ urlpatterns = [
 
     # DPR module — routes registered in apps/fpo/api/dpr/urls.py, mounted at /api/fpo/dpr/
     path('dpr/', include('apps.fpo.api.dpr.urls')),
+
+    # Marketing Strategy (P2-14)
+    path('me/marketing-strategies/',                          MarketingStrategyListView.as_view(),     name='fpo-marketing-strategy-list'),
+    path('me/marketing-strategies/generate/',                  MarketingStrategyGenerateView.as_view(), name='fpo-marketing-strategy-generate'),
+    path('me/marketing-strategies/<int:strategy_id>/',         MarketingStrategyDetailView.as_view(),   name='fpo-marketing-strategy-detail'),
+    path('me/marketing-strategies/<int:strategy_id>/download/', MarketingStrategyDownloadView.as_view(), name='fpo-marketing-strategy-download'),
 ]

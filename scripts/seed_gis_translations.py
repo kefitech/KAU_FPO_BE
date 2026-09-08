@@ -1,0 +1,152 @@
+"""
+Seed GIS Translation Keys — admin_gis_zones + fpo_gis screens
+================================================================
+Follows the exact same pattern as scripts/seed_ml_ui_translations.py:
+one shared TranslationCategory (code='ui'), screen name as a key
+prefix (e.g. 'admin_gis_zones.page_title'). Seeds BOTH English and
+Malayalam, since these are entirely new keys (not gap-filling
+existing ones).
+
+HONEST NOTE: Malayalam values below are a best-effort AI translation,
+not reviewed by a native speaker — worth a real review pass before
+treating as final, same caveat as anything else translated tonight.
+
+Usage:
+    python manage.py shell -c "
+    exec(open('scripts/seed_gis_translations.py').read())
+    seed_gis_translations()"
+"""
+
+import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+
+from apps.database.models import Language, TranslationCategory, Translation
+
+
+def seed_gis_translations():
+    lang_en = Language.objects.get(code='en')
+    lang_ml = Language.objects.get(code='ml')
+    category = TranslationCategory.objects.get(code='ui')
+
+    screens = {
+        # ── Admin: GIS zone boundary management ──
+        'admin_gis_zones': {
+            'page_title':              ('Agro-Climatic Zone Boundaries', 'അഗ്രോ-ക്ലൈമാറ്റിക് സോൺ അതിരുകൾ'),
+            'page_description':        ('Click a row below to preview it on the map — this does NOT make it live. Only "Activate" does that.', 'താഴെയുള്ള ഒരു വരി ക്ലിക്ക് ചെയ്ത് മാപ്പിൽ പ്രിവ്യൂ കാണുക — ഇത് തത്സമയമാക്കില്ല. "സജീവമാക്കുക" മാത്രമേ അത് ചെയ്യൂ.'),
+            'btn_upload':               ('Upload new version', 'പുതിയ പതിപ്പ് അപ്‌ലോഡ് ചെയ്യുക'),
+            'preview_banner':           ('Previewing {label} — not live, farmers still see the current active zones.', '{label} പ്രിവ്യൂ ചെയ്യുന്നു — തത്സമയമല്ല, കർഷകർ ഇപ്പോഴും നിലവിലെ സജീവ സോണുകൾ കാണുന്നു.'),
+            'btn_back_to_live':         ('Back to live view', 'തത്സമയ കാഴ്ചയിലേക്ക് മടങ്ങുക'),
+            'live_banner':              ('Showing the currently LIVE zones — what every farmer sees right now.', 'നിലവിൽ തത്സമയമായ സോണുകൾ കാണിക്കുന്നു — എല്ലാ കർഷകരും ഇപ്പോൾ കാണുന്നത്.'),
+            'versions_heading':         ('Uploaded Versions', 'അപ്‌ലോഡ് ചെയ്ത പതിപ്പുകൾ'),
+            'versions_description':    ('Click a row to preview it above. Use the ⋯ menu to Activate or Delete.', 'മുകളിൽ പ്രിവ്യൂ ചെയ്യാൻ ഒരു വരി ക്ലിക്ക് ചെയ്യുക. സജീവമാക്കാനോ ഇല്ലാതാക്കാനോ ⋯ മെനു ഉപയോഗിക്കുക.'),
+            'col_file':                 ('File', 'ഫയൽ'),
+            'col_uploaded':             ('Uploaded', 'അപ്‌ലോഡ് ചെയ്തത്'),
+            'badge_active':             ('Active', 'സജീവം'),
+            'badge_inactive':           ('Inactive', 'നിഷ്ക്രിയം'),
+            'action_activate':          ('Activate', 'സജീവമാക്കുക'),
+            'action_delete':            ('Delete', 'ഇല്ലാതാക്കുക'),
+            'delete_confirm_title':     ('Delete Zone Version', 'സോൺ പതിപ്പ് ഇല്ലാതാക്കുക'),
+            'delete_confirm_desc':      ('Are you sure you want to delete "{label}"? This cannot be undone.', '"{label}" ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഇത് പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+            'toast_uploaded':           ('Uploaded "{label}" — not yet live. Click a row to preview, or Activate when ready.', '"{label}" അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ തത്സമയമല്ല. പ്രിവ്യൂ ചെയ്യാൻ ഒരു വരി ക്ലിക്ക് ചെയ്യുക, തയ്യാറാകുമ്പോൾ സജീവമാക്കുക.'),
+            'toast_activated':         ('Zones updated: {zones}', 'സോണുകൾ അപ്ഡേറ്റ് ചെയ്തു: {zones}'),
+            'toast_deleted':            ('Deleted "{label}"', '"{label}" ഇല്ലാതാക്കി'),
+            'toast_upload_failed':      ('Failed to upload zone boundaries', 'സോൺ അതിരുകൾ അപ്‌ലോഡ് ചെയ്യുന്നത് പരാജയപ്പെട്ടു'),
+            'toast_activate_failed':    ('Failed to activate this version', 'ഈ പതിപ്പ് സജീവമാക്കുന്നത് പരാജയപ്പെട്ടു'),
+            'toast_delete_failed':      ('Failed to delete this version', 'ഈ പതിപ്പ് ഇല്ലാതാക്കുന്നത് പരാജയപ്പെട്ടു'),
+            'map_hide_zones':           ('Hide zones', 'സോണുകൾ മറയ്ക്കുക'),
+            'map_show_zones':           ('Show zones', 'സോണുകൾ കാണിക്കുക'),
+            'map_opacity':              ('Opacity', 'അതാര്യത'),
+            'map_satellite_tooltip':    ('Switch to satellite view', 'സാറ്റലൈറ്റ് വ്യൂവിലേക്ക് മാറുക'),
+            'map_street_tooltip':       ('Switch to street view', 'സ്ട്രീറ്റ് വ്യൂവിലേക്ക് മാറുക'),
+        },
+
+        # ── FPO: recommendations page chrome (title, tabs, section headings) ──
+        'fpo_recommendations': {
+            'page_title':                ('AI Recommendations', 'AI ശുപാർശകൾ'),
+            'page_description':          ('Get AI-powered crop recommendations, business plan guidance, and DPR generation.', 'AI പ്രവർത്തിത വിള ശുപാർശകൾ, ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശം, DPR നിർമ്മാണം എന്നിവ നേടുക.'),
+            'tab_crop_recommendation':   ('Crop Recommendation', 'വിള ശുപാർശ'),
+            'tab_business_plan':         ('Business Plan Guidance', 'ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശം'),
+            'tab_dpr_generation':        ('DPR Generation', 'DPR നിർമ്മാണം'),
+            'farm_boundary_heading':     ('Your Farm Boundary', 'നിങ്ങളുടെ കൃഷിയിടത്തിന്റെ അതിര്'),
+            'farm_boundary_description': ('Mark your cultivation area on the map — this helps us tailor crop recommendations to your farm.', 'മാപ്പിൽ നിങ്ങളുടെ കൃഷിസ്ഥലം അടയാളപ്പെടുത്തുക — ഇത് നിങ്ങളുടെ കൃഷിയിടത്തിന് അനുയോജ്യമായ വിള ശുപാർശകൾ നൽകാൻ സഹായിക്കുന്നു.'),
+            'business_plan_coming_soon': ('Business Plan Guidance — coming soon.', 'ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശം — ഉടൻ വരുന്നു.'),
+            'dpr_coming_soon':           ('DPR Generation — coming soon.', 'DPR നിർമ്മാണം — ഉടൻ വരുന്നു.'),
+        },
+
+        # ── FPO: cultivation area map / zone-related labels ──
+        'fpo_gis': {
+            'draw_prompt':              ("Draw your farm's boundary to help us give more accurate recommendations.", 'കൂടുതൽ കൃത്യമായ ശുപാർശകൾ നൽകാൻ നിങ്ങളുടെ കൃഷിയിടത്തിന്റെ അതിര് വരയ്ക്കുക.'),
+            'draw_saved':                ('This is your saved cultivation area.', 'ഇത് നിങ്ങൾ സേവ് ചെയ്ത കൃഷിസ്ഥലമാണ്.'),
+            'draw_instruction':          ('Click the map to place each corner of your farm boundary.', 'നിങ്ങളുടെ കൃഷിയിടത്തിന്റെ ഓരോ കോണും അടയാളപ്പെടുത്താൻ മാപ്പിൽ ക്ലിക്ക് ചെയ്യുക.'),
+            'btn_draw_boundary':         ('Draw boundary', 'അതിര് വരയ്ക്കുക'),
+            'btn_redraw_boundary':       ('Redraw boundary', 'അതിര് വീണ്ടും വരയ്ക്കുക'),
+            'btn_undo_point':            ('Undo point', 'പോയിന്റ് പിന്മടക്കുക'),
+            'btn_cancel':                ('Cancel', 'റദ്ദാക്കുക'),
+            'btn_save_boundary':         ('Save boundary', 'അതിര് സേവ് ചെയ്യുക'),
+            'btn_add_more_points':       ('Add {n} more point(s)', 'ഇനി {n} പോയിന്റ്(കൾ) ചേർക്കുക'),
+            'btn_delete':                ('Delete', 'ഇല്ലാതാക്കുക'),
+            'label_area':                ('Area', 'വിസ്തീർണ്ണം'),
+            'label_hectares':            ('hectares', 'ഹെക്ടർ'),
+            'label_region':              ('Region', 'പ്രദേശം'),
+            'label_soil':                ('Soil', 'മണ്ണ്'),
+            'error_load_area':           ('Could not load your saved cultivation area.', 'നിങ്ങളുടെ സേവ് ചെയ്ത കൃഷിസ്ഥലം ലോഡ് ചെയ്യാനായില്ല.'),
+            'error_save_area':           ('Could not save your cultivation area. Please try again.', 'നിങ്ങളുടെ കൃഷിസ്ഥലം സേവ് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.'),
+            'error_delete_area':         ('Could not delete your cultivation area. Please try again.', 'നിങ്ങളുടെ കൃഷിസ്ഥലം ഇല്ലാതാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.'),
+            'weather_title':             ('Weather & Season', 'കാലാവസ്ഥയും സീസണും'),
+            'weather_refresh':           ('Refresh', 'പുതുക്കുക'),
+            'weather_no_data':           ('No weather data yet.', 'ഇതുവരെ കാലാവസ്ഥാ വിവരങ്ങൾ ഇല്ല.'),
+            'weather_check_now':         ('Check now', 'ഇപ്പോൾ പരിശോധിക്കുക'),
+            'weather_simulated_note':    ('Estimated from seasonal patterns, not a live forecast.', 'സീസണൽ പാറ്റേണുകളിൽ നിന്ന് കണക്കാക്കിയത്, തത്സമയ പ്രവചനമല്ല.'),
+            'weather_error':             ('Could not fetch weather. Please try again.', 'കാലാവസ്ഥ ലഭിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.'),
+            'weather_error_load':        ('Could not load weather.', 'കാലാവസ്ഥ ലോഡ് ചെയ്യാനായില്ല.'),
+            'season_sw_monsoon':         ('South-West Monsoon', 'തെക്കുപടിഞ്ഞാറൻ മൺസൂൺ'),
+            'season_ne_monsoon':         ('North-East Monsoon', 'വടക്കുകിഴക്കൻ മൺസൂൺ'),
+            'season_dry':                ('Dry Season', 'വരണ്ട കാലം'),
+            'map_hide_zones':            ('Hide zones', 'സോണുകൾ മറയ്ക്കുക'),
+            'map_show_zones':            ('Show zones', 'സോണുകൾ കാണിക്കുക'),
+            'map_recenter_tooltip':      ('Recenter on my farm boundary', 'എന്റെ കൃഷിയിടത്തിന്റെ അതിരിലേക്ക് വീണ്ടും കേന്ദ്രീകരിക്കുക'),
+            'map_expand_tooltip':        ('Expand map', 'മാപ്പ് വലുതാക്കുക'),
+            'map_exit_fullscreen_tooltip': ('Exit fullscreen', 'ഫുൾസ്ക്രീനിൽ നിന്ന് പുറത്തുകടക്കുക'),
+            'map_satellite_tooltip':     ('Switch to satellite view', 'സാറ്റലൈറ്റ് വ്യൂവിലേക്ക് മാറുക'),
+            'map_street_tooltip':        ('Switch to street view', 'സ്ട്രീറ്റ് വ്യൂവിലേക്ക് മാറുക'),
+            'search_placeholder':        ('Search a place…', 'ഒരു സ്ഥലം തിരയുക…'),
+            'search_no_results':         ('No places found.', 'സ്ഥലങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
+            'search_searching':          ('Searching…', 'തിരയുന്നു…'),
+            'boundary_click_prompt':     ('Click on the map to start marking your boundary', 'നിങ്ങളുടെ അതിര് അടയാളപ്പെടുത്താൻ മാപ്പിൽ ക്ലിക്ക് ചെയ്യുക'),
+        },
+    }
+
+    count = 0
+    created = 0
+    updated = 0
+
+    for screen, entries in screens.items():
+        for key, (en_value, ml_value) in entries.items():
+            full_key = f'{screen}.{key}'
+
+            _, was_created_en = Translation.objects.update_or_create(
+                category=category, key=full_key, language=lang_en,
+                defaults={'value': en_value, 'context': 'Frontend UI label (GIS)', 'is_verified': True}
+            )
+            _, was_created_ml = Translation.objects.update_or_create(
+                category=category, key=full_key, language=lang_ml,
+                defaults={'value': ml_value, 'context': 'Frontend UI label (GIS)', 'is_verified': False}
+            )
+
+            count += 2
+            created += int(was_created_en) + int(was_created_ml)
+            updated += int(not was_created_en) + int(not was_created_ml)
+
+    print(f"\n✅ GIS translations seeded: {count} total ({created} created, {updated} updated)")
+    print(f"   Screens: {list(screens.keys())}")
+
+    try:
+        from django.core.cache import cache
+        cache.delete_pattern('translations:public:*') if hasattr(cache, 'delete_pattern') else None
+        print("✅ Redis cache cleared for translations")
+    except Exception:
+        print("ℹ️  Redis cache not cleared — restart server to apply")
+
+    return count
