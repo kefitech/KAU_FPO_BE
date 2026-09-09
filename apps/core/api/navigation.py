@@ -79,7 +79,7 @@ NAVIGATION_CONFIGS = {
                 "items": [
                     {"id": "fpos", "title": "FPO Directory", "translations": {"ml": "FPO ഡയറക്ടറി"}, "url": "/government/fpos", "icon": "Building2"},
                     {"id": "schemes", "title": "Scheme Linkage", "translations": {"ml": "സ്കീം ലിങ്കേജ്"}, "url": "/government/schemes", "icon": "FileText"},
-                    {"id": "training", "title": "Training Sessions", "translations": {"ml": "Training Sessions"}, "url": "/government/training", "icon": "GraduationCap"},
+                    {"id": "training", "title": "Training Sessions", "translations": {"ml": "പരിശീലന സെഷനുകൾ"}, "url": "/government/training", "icon": "GraduationCap"},
                 ],
             },
         ],

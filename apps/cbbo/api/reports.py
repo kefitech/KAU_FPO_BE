@@ -18,11 +18,14 @@ from apps.cbbo.api.assignments import is_cbbo_user, is_fpo_assigned, scope_fpo_q
 class _ReportListSerializer(serializers.ModelSerializer):
     fpo_name = serializers.CharField(source='fpo.name', read_only=True)
     district = serializers.CharField(source='fpo.district', read_only=True)
+    district_display = serializers.SerializerMethodField()
  
     class Meta:
         model  = CapacityBuildingReport
-        fields = ['id', 'fpo', 'fpo_name', 'district', 'date', 'status',
+        fields = ['id', 'fpo', 'fpo_name', 'district', 'district_display', 'date', 'status',
                   'participants_count', 'created_at']
+    def get_district_display(self, obj):
+        return obj.fpo.get_district_display()
  
  
 class _ReportDetailSerializer(serializers.ModelSerializer):
