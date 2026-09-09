@@ -3685,6 +3685,8 @@ def seed_menu_translations(languages):
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
         ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
+        ('gis_zones',              'GIS Zones',                'GIS സോണുകൾ'),
+        ('soil_regions',           'Soil Regions',             'മണ്ണ് പ്രദേശങ്ങൾ')
     ]
 
     count = 0
