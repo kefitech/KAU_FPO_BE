@@ -96,7 +96,10 @@ from .government import GovernmentOfficialProfile
 from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
 
 # Phase 2 — GIS (requires PostGIS + django.contrib.gis in INSTALLED_APPS)
-from .gis import AgroClimaticZone, DistrictBoundary, FPOZoneAssignment, FPOCultivationArea, FPOWeatherSnapshot, ZoneBoundaryVersion
+from .gis import (
+    AgroClimaticZone, DistrictBoundary, FPOZoneAssignment, FPOCultivationArea,
+    FPOWeatherSnapshot, ZoneBoundaryVersion, SoilRegion, SoilRegionVersion,
+)
 # Phase 2 — AI Crop Recommendations
 from .recommendations import MLModelVersion, CropRecommendation
 
@@ -286,6 +289,8 @@ __all__ = [
     'FPOCultivationArea',
     'FPOWeatherSnapshot',
     'ZoneBoundaryVersion',
+    'SoilRegion',
+    'SoilRegionVersion',
     # Phase 2 — AI Crop Recommendations
     'MLModelVersion',
     'CropRecommendation',

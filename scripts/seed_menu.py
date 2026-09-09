@@ -199,6 +199,13 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 22,
     )
+    seed_item(
+        label_key = 'menu.soil_regions',
+        path      = '/admin/soil-regions',
+        icon      = 'layers',
+        roles     = [super_admin_group],
+        order     = 23,
+    )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 

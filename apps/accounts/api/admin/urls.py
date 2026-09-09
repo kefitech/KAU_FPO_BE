@@ -140,6 +140,7 @@ from apps.recommendations.api.recommendations import (
 )
 
 from apps.gis_module.api.zones import ZoneBoundaryVersionListView, ZoneBoundaryVersionActivateView, ZoneBoundaryVersionDetailView
+from apps.gis_module.api.soil_regions import SoilRegionVersionListView, SoilRegionVersionActivateView, SoilRegionVersionDetailView
 
 # Create DRF router
 router = DefaultRouter()
@@ -273,6 +274,9 @@ urlpatterns = [
     path('gis/zone-versions/', ZoneBoundaryVersionListView.as_view(), name='admin-gis-zone-versions'),
     path('gis/zone-versions/<int:pk>/activate/', ZoneBoundaryVersionActivateView.as_view(), name='admin-gis-zone-versions-activate'),
     path('gis/zone-versions/<int:pk>/', ZoneBoundaryVersionDetailView.as_view(), name='admin-gis-zone-versions-detail'),
+    path('gis/soil-region-versions/', SoilRegionVersionListView.as_view(), name='admin-gis-soil-region-versions'),
+    path('gis/soil-region-versions/<int:pk>/activate/', SoilRegionVersionActivateView.as_view(), name='admin-gis-soil-region-versions-activate'),
+    path('gis/soil-region-versions/<int:pk>/', SoilRegionVersionDetailView.as_view(), name='admin-gis-soil-region-versions-detail'),
 
     # DPR — Admin CRUD routes mounted at /api/admin/dpr/
     path('dpr/', include('apps.accounts.api.admin.dpr.urls')),

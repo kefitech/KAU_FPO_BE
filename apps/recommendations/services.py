@@ -8,7 +8,7 @@ from datetime import date
 from django.conf import settings
 
 from apps.database.models import CropRecommendation
-from apps.gis_module.services import resolve_fpo_zone, get_current_season
+from apps.gis_module.services import resolve_fpo_zone, resolve_fpo_soil_region, get_current_season
 
 
 def get_current_financial_year() -> str:
@@ -35,16 +35,20 @@ def build_recommendation_payload(fpo, model_version, financial_year) -> dict:
     spec: fpo_id, district, agro_zone, soil_type, season, commodities,
     tier, model_version, financial_year.
 
-    agro_zone/soil_type come from resolve_fpo_zone() — a live spatial
-    lookup against WHERE THE FARM ACTUALLY IS (cultivation area centroid,
-    falling back to the FPO's own lat/lng), not the FPO's separate
+    agro_zone comes from resolve_fpo_zone() and soil_type from the
+    independent resolve_fpo_soil_region() — both live spatial lookups
+    against WHERE THE FARM ACTUALLY IS (cultivation area centroid, falling
+    back to the FPO's own lat/lng), not the FPO's separate
     FPOZoneAssignment cache. Same reasoning as cultivation_area.py's
     serializer: an FPO's registered address and their farmland can
-    legitimately be in different zones.
+    legitimately be in different zones. Zone and soil region are separate
+    polygon layers, so they're resolved independently and may not share a
+    code.
     """
     zone = resolve_fpo_zone(fpo)
     agro_zone_code = zone.code if zone else None
-    soil_type = zone.soil_type if zone else None
+    soil_region = resolve_fpo_soil_region(fpo)
+    soil_type = soil_region.soil_type if soil_region else None
 
     commodities = list(fpo.primary_commodities or []) + list(fpo.secondary_commodities or [])
 

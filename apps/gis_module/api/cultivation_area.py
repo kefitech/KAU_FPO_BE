@@ -25,7 +25,7 @@ from apps.core.services.translation import t
 from apps.database.models import FPOCultivationArea
 from apps.gis_module.api.zones import _get_fpo_or_404
 from apps.gis_module.api.mixins import GeoJSONFixMixin
-from apps.gis_module.services import find_zone_for_point
+from apps.gis_module.services import find_zone_for_point, find_soil_region_for_point
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +48,12 @@ class FPOCultivationAreaSerializer(GeoJSONFixMixin, GeoFeatureModelSerializer):
     registered address and their farmland don't have to be in the same
     zone, which is the whole reason this is a separate lookup rather
     than reusing fpo.zone_assignment.
+
+    soil_type comes from an INDEPENDENT lookup (find_soil_region_for_point,
+    against SoilRegion) rather than the AgroClimaticZone match above — soil
+    regions are their own polygon layer, not co-terminous with zone
+    boundaries, so this plot's zone and its soil region are resolved
+    separately and may legitimately not share a code.
     """
     geo_field_name = 'area_polygon'
     zone_code = serializers.SerializerMethodField()
@@ -86,8 +92,11 @@ class FPOCultivationAreaSerializer(GeoJSONFixMixin, GeoFeatureModelSerializer):
         return zone.name_ml if zone else None
 
     def get_soil_type(self, obj):
-        zone = self._get_zone(obj)
-        return zone.soil_type if zone else None
+        if not obj.area_polygon:
+            return None
+        centroid = obj.area_polygon.centroid
+        soil_region = find_soil_region_for_point(centroid.y, centroid.x)
+        return soil_region.soil_type if soil_region else None
 
 
 # ---------------------------------------------------------------------------
