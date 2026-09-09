@@ -21,6 +21,8 @@ services:
     restart: always
     # Mock crop recommendation FastAPI service (Aravind — P2-06).
     # Django (web) proxies /api/recommendations/ requests to this on port 8001.
+    volumes:
+      - ml_models:/ml_models
     depends_on:
       - redis
 
@@ -32,6 +34,9 @@ services:
       - media_files:/app/media
       - static_files:/app/staticfiles
       - logs:/app/logs
+      # Shared with celery + ml-service so retrain uploads (CSV + resulting
+      # .joblib) are visible across all three containers.
+      - ml_models:/ml_models
     env_file:
       - .env
     depends_on:
@@ -45,6 +50,7 @@ services:
     command: celery -A config worker --loglevel=info --concurrency=1
     volumes:
       - logs:/app/logs
+      - ml_models:/ml_models
     env_file:
       - .env
     depends_on:
@@ -57,6 +63,7 @@ services:
     command: celery -A config beat --loglevel=info
     volumes:
       - logs:/app/logs
+      - ml_models:/ml_models
     env_file:
       - .env
     depends_on:
@@ -87,3 +94,4 @@ volumes:
   media_files:
   static_files:
   logs:
+  ml_models:
