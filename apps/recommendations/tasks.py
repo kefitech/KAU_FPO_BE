@@ -46,6 +46,7 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     """
     from apps.database.models import FPO, MLModelVersion, CropRecommendation
     from apps.recommendations.services import get_crop_recommendation, build_recommendation_payload
+    from apps.gis_module.services import resolve_fpo_zone
     from apps.notifications.services import send_notification
 
     try:
@@ -59,6 +60,29 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     CropRecommendation.objects.filter(
         fpo=fpo, financial_year=financial_year
     ).update(status=CropRecommendation.Status.PROCESSING)
+
+    # This service only covers Kerala's agro-climatic zones. If the FPO's
+    # location (cultivation area centroid, falling back to lat/lng) doesn't
+    # fall inside ANY zone polygon, resolve_fpo_zone() returns None -- that
+    # means the point is outside Kerala (or otherwise unmapped). Skip the ML
+    # call entirely in that case: ml_service's predict_crops() treats an
+    # unresolved zone as "no candidates" and silently falls back to a
+    # DEFAULT_CROP_NAME="Rice" placeholder, which looks like a real
+    # recommendation but isn't one -- surfacing that as a normal result was
+    # the actual bug being fixed here, not something to route around.
+    if resolve_fpo_zone(fpo) is None:
+        input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+        CropRecommendation.objects.update_or_create(
+            fpo=fpo,
+            financial_year=financial_year,
+            defaults={
+                'model_version': model_version,
+                'input_snapshot': input_snapshot,
+                'recommendations': [],
+                'status': CropRecommendation.Status.FAILED,
+            },
+        )
+        return
 
     result = get_crop_recommendation(fpo, model_version, financial_year, season_override)
     input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)

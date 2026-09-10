@@ -38,6 +38,7 @@ from apps.recommendations.services import (
     get_current_financial_year,
     build_recommendation_payload,
 )
+from apps.gis_module.services import resolve_fpo_zone
 from apps.recommendations.tasks import (
     generate_crop_recommendation_task,
     retrain_model_task,
@@ -157,6 +158,19 @@ class RequestRecommendationView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
         season_override = ser.validated_data.get('season')
+
+        # Reject up front, synchronously, if the FPO's location doesn't fall
+        # inside any Kerala agro-climatic zone -- resolve_fpo_zone() is a
+        # cheap local PostGIS query (not an external call), so there's no
+        # reason to pay for a DB write + Celery round-trip + worker pickup
+        # just to discover this asynchronously, the way it used to. No
+        # CropRecommendation row is touched here, so a previously valid
+        # cached recommendation (if any) is left untouched too.
+        if resolve_fpo_zone(fpo) is None:
+            return StandardResponse.error(
+                t('recommendations.outside_kerala', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         active_model = MLModelVersion.objects.filter(is_active=True).first()
         if not active_model:
