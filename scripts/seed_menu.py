@@ -232,6 +232,112 @@ def seed_menu():
         order     = 9,
     )
 
+    # ── CBBO portal pages ─────────────────────────────────────────────────────
+
+    cbbo_group, _ = Group.objects.get_or_create(name='cbbo')
+
+    # Fix: earlier record pointed at the nonexistent /cbbo/settings path
+    MenuItem.objects.filter(label_key='menu.cbbo_settings').update(label_key='menu.cbbo_profile', path='/cbbo/profile')
+
+    seed_item(
+        label_key = 'menu.cbbo_dashboard',
+        path      = '/cbbo/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [cbbo_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'menu.cbbo_verifications',
+        path      = '/cbbo/verifications',
+        icon      = 'check-circle',
+        roles     = [cbbo_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'menu.cbbo_reports',
+        path      = '/cbbo/reports',
+        icon      = 'clipboard-list',
+        roles     = [cbbo_group],
+        order     = 3,
+    )
+    seed_item(
+        label_key = 'menu.cbbo_profile',
+        path      = '/cbbo/profile',
+        icon      = 'user',
+        roles     = [cbbo_group],
+        order     = 4,
+    )
+
+    # ── Government portal pages ───────────────────────────────────────────────
+
+    government_group, _ = Group.objects.get_or_create(name='government')
+
+    seed_item(
+        label_key = 'menu.government_dashboard',
+        path      = '/government/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [government_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'menu.government_profile',
+        path      = '/government/profile',
+        icon      = 'user',
+        roles     = [government_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'menu.government_schemes',
+        path      = '/government/schemes',
+        icon      = 'file-text',
+        roles     = [government_group],
+        order     = 4,
+    )
+    seed_item(
+        label_key = 'menu.government_training',
+        path      = '/government/training',
+        icon      = 'graduation-cap',
+        roles     = [government_group],
+        order     = 5,
+    )
+    seed_item(
+            label_key = 'menu.government_fpos',
+            path      = '/government/fpos',
+            icon      = 'building',
+            roles     = [government_group],
+            order     = 3,
+        )
+
+    # ── Expert portal pages ───────────────────────────────────────────────────
+
+    expert_group, _ = Group.objects.get_or_create(name='expert')
+
+    seed_item(
+        label_key = 'menu.expert_dashboard',
+        path      = '/expert/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [expert_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'menu.expert_availability',
+        path      = '/expert/availability',
+        icon      = 'calendar-days',
+        roles     = [expert_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'menu.expert_profile',
+        path      = '/expert/profile',
+        icon      = 'user',
+        roles     = [expert_group],
+        order     = 3,
+    )
+    
+ 
+
+    
+
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")
     print("=" * 60)
