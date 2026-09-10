@@ -50,6 +50,8 @@ from .applications import (
     ApplicationTierAssessmentView,
     ApplicationActivateView,
     ApplicationDeactivateView,
+    ApplicationAssignSubAdminView,
+    ApplicationUnassignSubAdminView
 )
 from .external_apis import (
     ExternalAPISettingsListView,
@@ -57,6 +59,8 @@ from .external_apis import (
     ExternalAPISettingsActivateView,
     ExternalAPISettingsDeactivateView,
 )
+
+
 from .page_access import RolePageAccessListView, RolePageAccessDetailView
 from .audit_logs import AuditLogListView
 from .dashboard import AdminDashboardStatsView
@@ -109,6 +113,7 @@ from .cms import (
     FeedbackListView,
     FeedbackDetailView,
 )
+from .organisations import OrganisationListView, OrganisationDetailView
 from .schemes import (
     SchemeListView,
     SchemeDetailView,
@@ -142,6 +147,8 @@ from apps.recommendations.api.recommendations import (
 from apps.gis_module.api.zones import ZoneBoundaryVersionListView, ZoneBoundaryVersionActivateView, ZoneBoundaryVersionDetailView
 from apps.gis_module.api.soil_regions import SoilRegionVersionListView, SoilRegionVersionActivateView, SoilRegionVersionDetailView
 
+from apps.accounts.api.cbbo_admin import CBBOViewSet
+from apps.accounts.api.government_admin import GovernmentViewSet
 # Create DRF router
 router = DefaultRouter()
 
@@ -151,6 +158,8 @@ router.register(r'translation-categories', TranslationCategoryViewSet, basename=
 router.register(r'translations', TranslationViewSet, basename='translation')
 router.register(r'menu', MenuItemViewSet, basename='menu')
 router.register(r'sub-admins', SubAdminViewSet, basename='sub-admin')
+router.register(r'cbbos', CBBOViewSet, basename='cbbo')
+router.register(r'government', GovernmentViewSet, basename='government')   # ADD THIS LINE
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
 
@@ -180,6 +189,8 @@ urlpatterns = [
     path('applications/<int:fpo_id>/tier-history/',                          ApplicationTierHistoryView.as_view(),     name='admin-applications-tier-history'),
     path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),
     path('applications/<int:fpo_id>/activate/',                              ApplicationActivateView.as_view(),        name='admin-applications-activate'),
+    path('applications/<int:fpo_id>/assign-subadmin/',                       ApplicationAssignSubAdminView.as_view(),  name='admin-applications-assign-subadmin'),
+    path('applications/<int:fpo_id>/unassign-subadmin/',                     ApplicationUnassignSubAdminView.as_view(), name='admin-applications-unassign-subadmin'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
@@ -250,6 +261,8 @@ urlpatterns = [
     path('documents/<int:pk>/activate/',       DocumentLibraryActivateView.as_view(),   name='admin-documents-activate'),
     path('documents/<int:pk>/deactivate/',     DocumentLibraryDeactivateView.as_view(), name='admin-documents-deactivate'),
     # Schemes & Subsidies
+    path('organisations/',                 OrganisationListView.as_view(),   name='admin-organisations-list'),
+    path('organisations/<int:pk>/',        OrganisationDetailView.as_view(), name='admin-organisations-detail'),
     path('schemes/',                       SchemeListView.as_view(),        name='admin-schemes-list'),
     path('schemes/<int:pk>/',              SchemeDetailView.as_view(),      name='admin-schemes-detail'),
     path('schemes/<int:pk>/activate/',     SchemeActivateView.as_view(),    name='admin-schemes-activate'),
@@ -281,3 +294,4 @@ urlpatterns = [
     # DPR — Admin CRUD routes mounted at /api/admin/dpr/
     path('dpr/', include('apps.accounts.api.admin.dpr.urls')),
 ]
+

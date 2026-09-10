@@ -91,6 +91,8 @@ from .fpo import (
 
 # Phase 2 — Government Portal
 from .government import GovernmentOfficialProfile
+from .organisation import Organisation
+from .cbbo_profile import CBBOOfficerProfile
 
 # Phase 2 — CBBO Portal
 from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
@@ -217,6 +219,7 @@ from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice
 
 # Phase 2 — AI Marketing
 from .marketing import MarketingStrategy
+from .subadmin import SubAdminFPOAssignment
 
 # Phase 2 — AI Service Control & Usage Tracking
 from .ai_config import AIServiceConfig, AIUsageLog
@@ -278,6 +281,8 @@ __all__ = [
     'FAQCategory',
     # Phase 2 — Government Portal
     'GovernmentOfficialProfile',
+    'Organisation',
+    'CBBOOfficerProfile',
     # Phase 2 — CBBO Portal
     'CapacityBuildingReport',
     'TrainingSession',
@@ -403,6 +408,7 @@ __all__ = [
     'MarketPrice',
     # Phase 2 — AI Marketing
     'MarketingStrategy',
+    'SubAdminFPOAssignment',
     # Phase 2 — AI Service Control & Usage Tracking
     'AIServiceConfig',
     'AIUsageLog',

@@ -48,6 +48,10 @@ class ExpertCategory(models.TextChoices):
 
 
 class Expert(BaseModel):
+    user                 = models.OneToOneField(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='expert_profile',
+        help_text='Login account for this expert. Null until admin creates credentials.'
+    )
     name_en             = models.CharField(max_length=255)
     name_ml             = models.CharField(max_length=255, blank=True)
     designation         = models.CharField(max_length=255)

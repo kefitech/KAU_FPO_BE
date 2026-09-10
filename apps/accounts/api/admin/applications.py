@@ -34,6 +34,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
 from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory, FPOTierHistory, FPOAssessment, AssessmentAnswer, AssessmentUpload
+from apps.database.models.subadmin import SubAdminFPOAssignment
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
@@ -1068,4 +1069,98 @@ class ApplicationTierAssessmentView(APIView):
         return StandardResponse.success(
             data={'fpo_id': fpo_id, 'assessments': data},
             message='Tier assessments retrieved.',
+        )
+
+
+class AssignSubAdminSerializer(serializers.Serializer):
+    subadmin_id = serializers.IntegerField(help_text="ID of the sub-admin to assign to this FPO")
+
+    def validate_subadmin_id(self, value):
+        if not User.objects.filter(id=value, groups__name=UserRole.SUB_ADMIN).exists():
+            raise serializers.ValidationError('Sub-admin not found.')
+        return value
+
+
+class UnassignSubAdminSerializer(serializers.Serializer):
+    pass
+
+
+class ApplicationAssignSubAdminView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Assign a sub-admin to this FPO application',
+        description=(
+            'Assigns (or reassigns) the sub-admin responsible for reviewing/managing this FPO. '
+            'Each FPO can have only one sub-admin assigned at a time — assigning a new one '
+            'replaces the existing assignment.'
+        ),
+        request=AssignSubAdminSerializer,
+        responses={200: None},
+    )
+    def post(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        ser = AssignSubAdminSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        subadmin = User.objects.get(id=ser.validated_data['subadmin_id'])
+
+        SubAdminFPOAssignment.objects.update_or_create(
+            fpo=fpo,
+            defaults={'subadmin': subadmin, 'assigned_by': request.user},
+        )
+
+        return StandardResponse.success(
+            data={'fpo_id': fpo.id, 'subadmin_id': subadmin.id},
+            message='Sub-admin assigned successfully.',
+        )
+
+
+class ApplicationUnassignSubAdminView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Remove the sub-admin assignment from this FPO application',
+        description='Removes the current sub-admin assignment for this FPO, if one exists.',
+        request=None,
+        responses={200: None, 400: None},
+    )
+    def post(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = _get_fpo(fpo_id)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        deleted, _ = SubAdminFPOAssignment.objects.filter(fpo=fpo).delete()
+
+        if not deleted:
+            return StandardResponse.error(
+                'This FPO has no sub-admin currently assigned.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return StandardResponse.success(
+            data={'fpo_id': fpo.id},
+            message='Sub-admin assignment removed.',
         )

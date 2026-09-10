@@ -105,7 +105,7 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=4, minute=30),
     },
     #------------------------------------------------------------------------------
-    #Arunima  
+    #Arunima
     #22/08/2026
     #P2-11 Marketplace — mark products past available_until as expired
     #expire_products will genuinely run automatically every day at 00:30, without anyone needing to trigger it manually.
@@ -114,7 +114,7 @@ app.conf.beat_schedule = {
         'task': 'apps.marketplace.tasks.expire_products',
         'schedule': crontab(hour=17, minute=35),  # 00:30 daily
     },
- 
+
     # P2-11 Marketplace — score newly active products against buyer requirements
     'run-buyer-seller-matching-daily': {
         'task': 'apps.marketplace.tasks.run_buyer_seller_matching',
@@ -123,6 +123,17 @@ app.conf.beat_schedule = {
 
     #-------------------------------------------------------------------------------
 
+    # Expert Booking: send 24h reminder before confirmed appointments
+    'expert-booking-reminders': {
+        'task': 'apps.experts.tasks.send_booking_reminders',
+        'schedule': crontab(minute=0),  # Every hour
+    },
+
+    # Expert Booking: mark confirmed bookings completed after appointment time
+    'expert-booking-mark-completed': {
+        'task': 'apps.experts.tasks.mark_completed_bookings',
+        'schedule': crontab(minute=0),  # Every hour
+    },
 }
 
 # =============================================================================
