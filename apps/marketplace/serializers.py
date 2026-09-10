@@ -63,3 +63,16 @@ class MarketPriceSerializer(serializers.ModelSerializer):
             'min_price', 'max_price', 'modal_price', 'source',
         ]
         read_only_fields = ['id']
+
+class BuyerProductSerializer(serializers.ModelSerializer):
+    fpo_name = serializers.CharField(source='fpo.name', read_only=True)
+    commodity_code = serializers.CharField(source='commodity.code', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'description', 'commodity_code',
+            'quantity', 'unit', 'price_per_unit', 'quality_certification',
+            'available_from', 'available_until', 'fpo_name',
+        ]
+        read_only_fields = fields

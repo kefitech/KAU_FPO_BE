@@ -113,7 +113,7 @@ def _get_buyer_row(user):
 
     fpo = getattr(user, 'fpo', None)
     if fpo is not None:
-        buyer = getattr(fpo, 'buyer_registration', None)
+        buyer = fpo.buyer_registration.first()
         if buyer is not None:
             return buyer
 
