@@ -28,12 +28,16 @@ logger = logging.getLogger(__name__)
     default_retry_delay=30,
     name='recommendations.generate',
 )
-def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year):
+def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year, season_override=None):
     """
     Args:
         fpo_id            : FPO.pk
         model_version_id  : MLModelVersion.pk (the active model at request time)
         financial_year    : e.g. '2026-27'
+        season_override   : optional manual season choice from the FPO
+                             (southwest_monsoon/northeast_monsoon/dry_season).
+                             None means auto-detect, same as before this
+                             param existed.
 
     Looks up the FPO and model, calls FastAPI (via the existing
     get_crop_recommendation), saves the result, and — on success —
@@ -56,8 +60,8 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
         fpo=fpo, financial_year=financial_year
     ).update(status=CropRecommendation.Status.PROCESSING)
 
-    result = get_crop_recommendation(fpo, model_version, financial_year)
-    input_snapshot = build_recommendation_payload(fpo, model_version, financial_year)
+    result = get_crop_recommendation(fpo, model_version, financial_year, season_override)
+    input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
     recommendations_list = result.get('recommendations', [])
 
     new_status = (

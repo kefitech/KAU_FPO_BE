@@ -20,11 +20,20 @@ def seed_menu():
     print("SEEDING MENU ITEMS")
     print("=" * 60)
 
+    # ── Retire stale FPO menu items ──────────────────────────────────────────
+    # These used to be seeded but aren't real portal sidebar routes (register/
+    # status are onboarding-wizard steps under (wizard)/, not portal nav; dpr
+    # doesn't exist as an FPO portal page).
+    stale_keys = ['menu.fpo_register', 'menu.fpo_status', 'menu.fpo_dpr']
+    deleted, _ = MenuItem.objects.filter(label_key__in=stale_keys).delete()
+    if deleted:
+        print(f"🗑️  Removed {deleted} stale menu item(s): {', '.join(stale_keys)}")
+
     # ── Groups ────────────────────────────────────────────────────────────────
     super_admin_group, _ = Group.objects.get_or_create(name='super_admin')
     sub_admin_group, _   = Group.objects.get_or_create(name='sub_admin')
-    primary_group, _     = Group.objects.get_or_create(name='primary')
-    secondary_group, _   = Group.objects.get_or_create(name='secondary')
+    government_group, _  = Group.objects.get_or_create(name='government')
+    cbbo_group, _        = Group.objects.get_or_create(name='cbbo')
 
     def seed_item(label_key, path, icon, roles, parent=None, order=0):
         item, created = MenuItem.objects.get_or_create(
@@ -209,7 +218,8 @@ def seed_menu():
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
-    fpo_roles = [primary_group, secondary_group]
+    fpo_manager_group, _ = Group.objects.get_or_create(name='fpo_manager')
+    fpo_roles = [fpo_manager_group]
 
     seed_item(
         label_key = 'menu.fpo_dashboard',
@@ -219,67 +229,101 @@ def seed_menu():
         order     = 1,
     )
     seed_item(
-        label_key = 'menu.fpo_register',
-        path      = '/fpo/register',
-        icon      = 'file-plus',
-        roles     = fpo_roles,
-        order     = 2,
-    )
-    seed_item(
-        label_key = 'menu.fpo_status',
-        path      = '/fpo/status',
-        icon      = 'activity',
-        roles     = fpo_roles,
-        order     = 3,
-    )
-    seed_item(
         label_key = 'menu.fpo_profile',
         path      = '/fpo/profile',
         icon      = 'building',
         roles     = fpo_roles,
-        order     = 4,
+        order     = 2,
     )
     seed_item(
         label_key = 'menu.fpo_applications',
         path      = '/fpo/applications',
         icon      = 'folder',
         roles     = fpo_roles,
-        order     = 5,
+        order     = 3,
     )
     seed_item(
         label_key = 'menu.fpo_recommendations',
         path      = '/fpo/recommendations',
         icon      = 'sparkles',
         roles     = fpo_roles,
-        order     = 6,
+        order     = 4,
     )
     seed_item(
         label_key = 'menu.fpo_products',
         path      = '/fpo/products',
         icon      = 'package',
         roles     = fpo_roles,
-        order     = 7,
+        order     = 5,
     )
     seed_item(
         label_key = 'menu.fpo_market',
         path      = '/fpo/market',
         icon      = 'trending-up',
         roles     = fpo_roles,
+        order     = 6,
+    )
+    seed_item(
+        label_key = 'menu.fpo_schemes',
+        path      = '/fpo/schemes',
+        icon      = 'book-open',
+        roles     = fpo_roles,
+        order     = 7,
+    )
+    seed_item(
+        label_key = 'menu.fpo_experts',
+        path      = '/fpo/experts',
+        icon      = 'user-check',
+        roles     = fpo_roles,
         order     = 8,
     )
     seed_item(
-        label_key = 'menu.fpo_dpr',
-        path      = '/fpo/dpr',
-        icon      = 'file-bar-chart',
+        label_key = 'menu.fpo_tier_assessment',
+        path      = '/fpo/tier-assessment',
+        icon      = 'bar-chart-2',
         roles     = fpo_roles,
         order     = 9,
+    )
+    seed_item(
+        label_key = 'menu.fpo_team',
+        path      = '/fpo/team',
+        icon      = 'users',
+        roles     = fpo_roles,
+        order     = 10,
+    )
+    seed_item(
+        label_key = 'menu.fpo_inbox',
+        path      = '/fpo/inbox',
+        icon      = 'inbox',
+        roles     = fpo_roles,
+        order     = 11,
     )
     seed_item(
         label_key = 'menu.fpo_settings',
         path      = '/fpo/settings',
         icon      = 'settings',
         roles     = fpo_roles,
-        order     = 10,
+        order     = 12,
+    )
+
+    # ── Government portal pages ───────────────────────────────────────────────
+
+    seed_item(
+        label_key = 'menu.government_dashboard',
+        path      = '/government/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [government_group],
+        order     = 1,
+    )
+
+    # ── CBBO/NGO portal pages ─────────────────────────────────────────────────
+
+    seed_item(
+        label_key = 'menu.cbbo_dashboard',
+        path      = '/cbbo/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [cbbo_group],
+        order     = 1,
     )
 
     print("\n" + "=" * 60)

@@ -29,7 +29,7 @@ def get_current_financial_year() -> str:
     return f"{start_year}-{end_year_short}"
 
 
-def build_recommendation_payload(fpo, model_version, financial_year) -> dict:
+def build_recommendation_payload(fpo, model_version, financial_year, season_override=None) -> dict:
     """
     Builds the FastAPI request payload matching the richer P2-06 module
     spec: fpo_id, district, agro_zone, soil_type, season, commodities,
@@ -44,6 +44,11 @@ def build_recommendation_payload(fpo, model_version, financial_year) -> dict:
     legitimately be in different zones. Zone and soil region are separate
     polygon layers, so they're resolved independently and may not share a
     code.
+
+    season_override: optional manual season choice from the FPO (one of
+    get_current_season()'s own vocabulary — southwest_monsoon/
+    northeast_monsoon/dry_season). Falls back to the auto-detected
+    current season when not given, same as before this param existed.
     """
     zone = resolve_fpo_zone(fpo)
     agro_zone_code = zone.code if zone else None
@@ -57,7 +62,7 @@ def build_recommendation_payload(fpo, model_version, financial_year) -> dict:
         "district": fpo.district,
         "agro_zone": agro_zone_code,
         "soil_type": soil_type,
-        "season": get_current_season(),
+        "season": season_override or get_current_season(),
         "commodities": commodities,
         "tier": fpo.current_tier,
         "model_version": model_version.version_code if model_version else None,
@@ -65,7 +70,7 @@ def build_recommendation_payload(fpo, model_version, financial_year) -> dict:
     }
 
 
-def get_crop_recommendation(fpo, model_version, financial_year):
+def get_crop_recommendation(fpo, model_version, financial_year, season_override=None):
     """
     Calls the FastAPI ML service for a crop recommendation.
 
@@ -73,7 +78,7 @@ def get_crop_recommendation(fpo, model_version, financial_year):
     the FPO's last cached recommendation, or an empty result with a
     warning if none exists.
     """
-    payload = build_recommendation_payload(fpo, model_version, financial_year)
+    payload = build_recommendation_payload(fpo, model_version, financial_year, season_override)
 
     try:
         response = httpx.post(

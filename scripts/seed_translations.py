@@ -3679,8 +3679,15 @@ def seed_menu_translations(languages):
         ('fpo_recommendations',    'AI Recommendations',       'AI ശുപാർശകൾ'),
         ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
         ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),
-        ('fpo_dpr',                'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('fpo_settings',           'Settings',                 'ക്രമീകരണങ്ങൾ'),
+        ('fpo_schemes',            'Schemes & Subsidies',      'പദ്ധതികളും സബ്‌സിഡികളും'),
+        ('fpo_experts',            'Experts',                  'വിദഗ്ധർ'),
+        ('fpo_tier_assessment',    'Tier Assessment',          'ടയർ മൂല്യനിർണ്ണയം'),
+        ('fpo_team',               'Team',                     'ടീം'),
+        ('fpo_inbox',              'Inbox',                    'ഇൻബോക്സ്'),
+        # Government / CBBO portal pages
+        ('government_dashboard',   'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('cbbo_dashboard',         'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
         # Admin DPR / AI menu items
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
