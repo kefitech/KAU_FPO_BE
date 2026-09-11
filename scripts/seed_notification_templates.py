@@ -84,6 +84,29 @@ TEMPLATES = [
         '{{otp}} is your OTP for verification on the KAU-FPO Platform. Valid for 10 minutes only. Do not share this with anyone. - Kerala Agricultural University',
         {'sms_dlt_template_id': '1477178419229543273'},
     ),
+
+    #Arunima S 03 rd september 2026------------------------------------------------------
+        (
+        'email_verification', 'email', 'en',
+        'Verify Your Email — KAU-FPO Platform',
+        (
+            '<p>Please use the OTP below to verify your email address.</p>'
+            '<p style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;'
+            'padding:16px;background:#f5f5f5;border-radius:4px;color:#2e7d32;">{{otp}}</p>'
+            '<p>This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.</p>'
+        ),
+    ),
+    (
+        'email_verification', 'email', 'ml',
+        'നിങ്ങളുടെ ഇമെയിൽ സ്ഥിരീകരിക്കുക — KAU-FPO പ്ലാറ്റ്‌ഫോം',
+        (
+            '<p>നിങ്ങളുടെ ഇമെയിൽ വിലാസം സ്ഥിരീകരിക്കാൻ ചുവടെയുള്ള OTP ഉപയോഗിക്കുക.</p>'
+            '<p style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;'
+            'padding:16px;background:#f5f5f5;border-radius:4px;color:#2e7d32;">{{otp}}</p>'
+            '<p>ഈ OTP <strong>10 മിനിറ്റ്</strong> സാധുവാണ്. ആരുമായും പങ്കിടരുത്.</p>'
+        ),
+    ),
+    #----------------------------------------------------------------------------------------------
     (
         'password_reset', 'email', 'en',
         'Reset Your KAU-FPO Password',

@@ -25,6 +25,9 @@ def seed_menu():
     sub_admin_group, _   = Group.objects.get_or_create(name='sub_admin')
     primary_group, _     = Group.objects.get_or_create(name='primary')
     secondary_group, _   = Group.objects.get_or_create(name='secondary')
+    #arunima 10 th sep
+    external_buyer_group, _ = Group.objects.get_or_create(name='external_buyer')
+    #-------------
 
     def seed_item(label_key, path, icon, roles, parent=None, order=0):
         item, created = MenuItem.objects.get_or_create(
@@ -192,7 +195,27 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 21,
     )
+    # arunima
+    seed_item(
+        label_key = 'menu.market_linkage',
+        path      = '/admin/market-linkage',
+        icon      = 'link',
+        roles     = [super_admin_group],
+        order     = 22,
+    )
+    #---------------------------------------
 
+    #arunima 05rd sep 2026-------------------------------
+
+    seed_item(
+        label_key = 'menu.buyer_directory',
+        path      = '/admin/buyers',
+        icon      = 'shopping-cart',
+        roles     = [super_admin_group],
+        order     = 23,
+    )
+    
+    #---------------------------------------------------
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
     fpo_roles = [primary_group, secondary_group]
@@ -269,5 +292,33 @@ def seed_menu():
     )
 
     print("\n" + "=" * 60)
+    #arunima s 04 sep--------------------
+    seed_item(
+        label_key = 'menu.fpo_buyer_directory',
+        path      = '/fpo/buyer-directory',
+        icon      = 'shopping-cart',
+        roles     = [primary_group],
+        order     = 11,
+    )
+    #arunima 10th sep 2026 — external buyer portal menu-------------------
+    seed_item(
+        label_key = 'menu.buyer_dashboard',
+        path      = '/buyer/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [external_buyer_group],
+        order     = 1,
+    )
+
+    seed_item(
+        label_key = 'menu.buyer_products',
+        path      = '/buyer/products',
+        icon      = 'package',
+        roles     = [external_buyer_group],
+        order     = 2,
+    )
+    #----------------------------------------------------------------------
+
+    print("\n" + "=" * 60)
+    #------------------------------------------
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")
     print("=" * 60)

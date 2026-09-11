@@ -97,6 +97,9 @@ LOCAL_APPS = [
     'apps.gis_module.apps.GisModuleConfig',
     'apps.government.apps.GovernmentConfig',
     'apps.cbbo.apps.CbboConfig',
+    #arunima
+    'apps.external_buyer.apps.ExternalBuyerConfig',
+    #---------
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

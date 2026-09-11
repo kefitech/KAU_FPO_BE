@@ -25,6 +25,17 @@ from .api.cms_public import (
     PublicVisitorTrackView,
 )
 
+#arunima 09 sep ======
+from apps.marketplace.api.public import (
+    PublicCommodityListView,
+    PublicOpportunitiesView,
+    PublicProductListView,
+    PublicProductDetailView,
+    PublicProductInquireView,
+)
+ 
+#================
+
 urlpatterns = [
     path('master-data/',              PublicMasterDataView.as_view(),       name='public-master-data'),
     path('languages/',                PublicLanguagesView.as_view(),        name='public-languages'),
@@ -43,4 +54,11 @@ urlpatterns = [
     path('documents/',                PublicDocumentLibraryView.as_view(),  name='public-documents'),
     path('feedback/',                 PublicFeedbackView.as_view(),         name='public-feedback'),
     path('visitor/',                  PublicVisitorTrackView.as_view(),     name='public-visitor'),
+    #arunima s 09 sep=======
+    path('market/commodities/',        PublicCommodityListView.as_view(),   name='public-market-commodities'),
+    path('market/opportunities/',      PublicOpportunitiesView.as_view(),   name='public-market-opportunities'),
+    path('market/products/',           PublicProductListView.as_view(),     name='public-market-products'),
+    path('market/products/<int:pk>/',  PublicProductDetailView.as_view(),   name='public-market-product-detail'),
+    path('market/products/<int:pk>/inquire/', PublicProductInquireView.as_view(), name='public-market-product-inquire'),
+    #==============================
 ]

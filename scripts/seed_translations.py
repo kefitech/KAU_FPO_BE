@@ -460,7 +460,10 @@ def seed_ui_translations(languages):
 
         # ── register — /register page ─────────────────────────────────────
         ('register.stage_eligibility',          'Eligibility',                              'യോഗ്യത'),
-        ('register.stage_phone',                'Verify Phone',                             'ഫോൺ സ്ഥിരീകരണം'),
+        
+#arunima 05rd sep 2026-------------------------------
+        ('register.stage_phone', 'Verification', 'സ്ഥിരീകരണം'),
+#----------------------------------------------------
         ('register.stage_account',              'Account',                                  'അക്കൗണ്ട്'),
 
         ('register.eligibility_heading',        'Eligibility Check',                        'യോഗ്യതാ പരിശോധന'),
@@ -489,9 +492,16 @@ def seed_ui_translations(languages):
         ('register.phone_otp_sent',             'OTP sent to',                              'OTP അയച്ചത്'),
         ('register.phone_otp_label',            'Enter OTP',                                'OTP നൽകുക'),
         ('register.phone_otp_placeholder',      '6-digit OTP',                             '6 അക്ക OTP'),
-        ('register.phone_btn_verify',           'Verify & Continue',                        'സ്ഥിരീകരിച്ച് തുടരുക'),
+        # ('register.phone_btn_verify',           'Verify & Continue',                        'സ്ഥിരീകരിച്ച് തുടരുക'),
+        ('register.phone_btn_verify',           'Verify',                                   'സ്ഥിരീകരിക്കുക'),
+        ('register.phone_btn_continue',         'Continue',                                 'തുടരുക'),
         ('register.phone_btn_verifying',        'Verifying…',                               'സ്ഥിരീകരിക്കുന്നു…'),
+        #arunima 05rd sep 2026-------------------------------
+        ('register.phone_heading_buyer',       'Verify Phone Number and Email',                                    'ഫോൺ നമ്പറും ഇമെയിലും സ്ഥിരീകരിക്കുക'),
+        ('register.phone_subheading_buyer',    "We'll send one-time passwords to confirm your mobile number and email address.", 'നിങ്ങളുടെ മൊബൈൽ നമ്പറും ഇമെയിൽ വിലാസവും സ്ഥിരീകരിക്കാൻ ഞങ്ങൾ ഒറ്റത്തവണ പാസ്‌വേഡുകൾ അയക്കും.'),
+        ('register.account_subheading_buyer',  'This account will be used to manage your buyer profile and purchase products from FPOs.', 'ഈ അക്കൗണ്ട് നിങ്ങളുടെ ക്രേതാവ് പ്രൊഫൈൽ കൈകാര്യം ചെയ്യാനും FPO-കളിൽ നിന്ന് ഉൽപ്പന്നങ്ങൾ വാങ്ങാനും ഉപയോഗിക്കും.'),
 
+        #----------------------------------------------------
         ('register.account_heading',            'Create Your Account',                      'നിങ്ങളുടെ അക്കൗണ്ട് ഉണ്ടാക്കുക'),
         ('register.account_subheading',         'This account will be used to manage your FPO profile.', 'ഈ അക്കൗണ്ട് നിങ്ങളുടെ FPO പ്രൊഫൈൽ മാനേജ് ചെയ്യാൻ ഉപയോഗിക്കും.'),
         ('register.account_first_name',         'First Name',                               'പേരിൻ്റെ ആദ്യ ഭാഗം'),
@@ -517,6 +527,21 @@ def seed_ui_translations(languages):
         ('register.account_btn_creating',       'Creating account…',                        'അക്കൗണ്ട് ഉണ്ടാക്കുന്നു…'),
         ('register.btn_back',                   '← Back',                                   '← തിരിച്ച്'),
 
+        #Arunima s 03 sep
+        ('register.email_label',              'Email Address',                            'ഇ-മെയിൽ വിലാസം'),
+        ('register.email_placeholder',        'you@example.com',                          'you@example.com'),
+        ('register.email_btn_send',           'Send OTP',                                 'OTP അയക്കുക'),
+        ('register.email_btn_resend',         'Resend',                                   'വീണ്ടും അയക്കുക'),
+        ('register.email_btn_sending',        'Sending…',                                 'അയക്കുന്നു…'),
+        ('register.email_otp_sent',           'OTP sent to',                              'OTP അയച്ചത്'),
+        ('register.email_otp_placeholder',    '6-digit OTP',                              '6 അക്ക OTP'),
+        ('register.email_btn_verify',         'Verify',                                   'സ്ഥിരീകരിക്കുക'),
+        ('register.email_btn_verifying',      'Verifying…',                               'സ്ഥിരീകരിക്കുന്നു…'),
+        ('register.email_verified_label',     'Email verified',                           'ഇമെയിൽ സ്ഥിരീകരിച്ചു'),
+        ('register.email_err_invalid',        'Enter a valid email address',              'സാധുവായ ഇമെയിൽ വിലാസം നൽകുക'),
+        ('register.email_err_send_failed',    'Failed to send OTP. Please try again.',    'OTP അയക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('register.email_err_invalid_otp',    'Invalid OTP. Please try again.',           'തെറ്റായ OTP. വീണ്ടും ശ്രമിക്കുക.'),
+        #----------------------------------------------------------------
         # ── wizard — FPO registration wizard (7 steps) ────────────────────
         # Common
         ('wizard.btn_back',                 '← Back',                               '← തിരിച്ച്'),
@@ -3593,6 +3618,18 @@ def seed_menu_translations(languages):
         ('audit_logs',             'Audit Logs',                'ഓഡിറ്റ് ലോഗുകൾ'),
         ('experts',                'Experts',                   'വിദഗ്ധർ'),
         ('schemes',                'Schemes & Subsidies',       'പദ്ധതികളും സബ്‌സിഡികളും'),
+#---------------------------------------------------------------
+# arunima
+        ('market_linkage',         'Market Linkage',            'മാർക്കറ്റ് ലിങ്കേജ്'),
+        #04 sep arunima
+        ('fpo_buyer_directory',   'Buyer Directory',           'ക്രേതാവ് ഡയറക്ടറി'),
+
+#----------------------------------------------------------------------
+
+        #arunima 05rd sep 2026-------------------------------
+        ('buyer_directory',        'Buyer Directory',           'ക്രേതാവ് ഡയറക്ടറി'),
+        #----------------------------------------------------
+
         # FPO portal pages
         ('fpo_dashboard',          'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
         ('fpo_register',           'Register FPO',             'FPO രജിസ്റ്റർ ചെയ്യുക'),
@@ -3906,7 +3943,10 @@ def seed_nav_translations(languages):
         ('nav.home',              'Home',                     'ഹോം'),
         ('nav.our_partners',      'Our Partners',             'ഞങ്ങളുടെ പങ്കാളികൾ'),
         ('nav.subscribe_thanks',  'Thanks For Subscribing!',  'സബ്‌സ്ക്രൈബ് ചെയ്തതിന് നന്ദി!'),
-        ('nav.kau_address',       'Directorate of Extension, Mannuthy P.O, Thrissur - 680651 ', 'എക്സ്റ്റൻഷൻ ഡയറക്ടറേറ്റ്, മണ്ണുത്തി പി.ഒ, തൃശൂർ - 680651.'),
+        ('nav.kau_address',       'Directorate of Extension,  Mannuthy P.O, Thrissur - 680651 ', 'എക്സ്റ്റൻഷൻ ഡയറക്ടറേറ്റ്, മണ്ണുത്തി പി.ഒ, തൃശൂർ - 680651.'),
+        #Arunima S 07 sep
+        ('nav.register_as_buyer', 'Buyer Registration',       'ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക'),
+        #------------------
     ]
 
     count = 0
@@ -3950,7 +3990,10 @@ def seed_marketplace_translations(languages):
         ('buyer_updated',             'Buyer updated successfully',                        'ക്രേതാവിനെ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
         ('buyer_deleted',             'Buyer deleted successfully',                        'ക്രേതാവിനെ വിജയകരമായി ഇല്ലാതാക്കി'),
         ('buyer_verified',            'Buyer verified successfully',                       'ക്രേതാവിനെ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
- 
+        # arunima 07rd sep 2026-------------------------------
+        ('buyer_dashboard_retrieved', 'Buyer dashboard retrieved successfully', 'ക്രേതാവിന്റെ ഡാഷ്ബോർഡ് വിജയകരമായി ലഭിച്ചു'),
+        ('buyer_profile_not_found',   'No buyer profile found for this account', 'ഈ അക്കൗണ്ടിന് ക്രേതാവ് പ്രൊഫൈൽ കണ്ടെത്തിയില്ല'),
+        #---------------------------------------------------
         # Matches
         ('matches_retrieved',         'Matches retrieved successfully',                    'പൊരുത്തങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
         ('match_accepted',            'Match accepted successfully',                       'പൊരുത്തം വിജയകരമായി അംഗീകരിച്ചു'),
@@ -3961,6 +4004,13 @@ def seed_marketplace_translations(languages):
         ('prices_retrieved',          'Prices retrieved successfully',                     'വിലകൾ വിജയകരമായി ലഭിച്ചു'),
         ('price_seeded',              'Price data added successfully',                     'വില വിവരം വിജയകരമായി ചേർത്തു'),
         ('opportunities_retrieved',   'Opportunities retrieved successfully',              'അവസരങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+
+
+        #29th August 2026
+         # Admin Market Linkage
+        ('linkage_fpos_retrieved',     'FPOs retrieved successfully',                      'FPO-കൾ വിജയകരമായി ലഭിച്ചു'),
+        ('linkage_fpo_not_found',      'FPO not found',                                    'FPO കണ്ടെത്തിയില്ല'),
+        ('linkage_products_retrieved', 'Products retrieved successfully',                  'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
     ]
  
     count = 0
@@ -4138,9 +4188,202 @@ def seed_products_page_translations(languages):
         count += 1
 
     return count
-#---------------------------------------------------------------------------------------
- 
 
+
+#---------------------------------------------------------------------------------------
+#31th August 2026
+#Arunima S
+#Frontend UI labels for the Admin Market Linkage page — same "screen name +
+#common" pattern used elsewhere. Category doesn't need adding (ui already exists).
+
+def seed_market_linkage_translations(languages):
+    """Seed UI labels for the Admin Market Linkage screen (market_linkage_table.*)."""
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    market_linkage_keys = [
+        ('market_linkage_table.page_title',        'Market Linkage',
+         'മാർക്കറ്റ് ലിങ്കേജ്'),
+        ('market_linkage_table.page_description',  "Browse FPOs and the products they've listed for sale.",
+         'FPO-കളും അവർ വിൽപ്പനയ്ക്ക് പട്ടികപ്പെടുത്തിയ ഉൽപ്പന്നങ്ങളും ബ്രൗസ് ചെയ്യുക.'),
+        ('market_linkage_table.col_name',          'FPO Name',
+         'FPO പേര്'),
+        ('market_linkage_table.view_title',        'FPO Products',
+         'FPO ഉൽപ്പന്നങ്ങൾ'),
+        ('market_linkage_table.products_label',    'Products',
+         'ഉൽപ്പന്നങ്ങൾ'),
+        ('market_linkage_table.loading',           'Loading products...',
+         'ഉൽപ്പന്നങ്ങൾ ലോഡ് ചെയ്യുന്നു...'),
+        ('market_linkage_table.no_products',       'This FPO has no products listed yet.',
+         'ഈ FPO ഇതുവരെ ഉൽപ്പന്നങ്ങളൊന്നും പട്ടികപ്പെടുത്തിയിട്ടില്ല.'),
+        # Product status labels shown inside the ViewSheet product list
+        ('market_linkage_table.status_draft',      'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('market_linkage_table.status_active',     'Active',
+         'സജീവം'),
+        ('market_linkage_table.status_sold',       'Sold',
+         'വിറ്റു'),
+        ('market_linkage_table.status_expired',    'Expired',
+         'കാലഹരണപ്പെട്ടു'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in market_linkage_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#---------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------
+
+#arunima sep 9 ------------
+def seed_market_hub_translations(languages):
+    """
+    Public Market Hub (P2-12, Task 16) — UI labels for the anonymous
+    product-browsing page and inquiry modal at /market-hub.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    market_hub_keys = [
+        ('market_hub.page_title',         'Market Hub',
+         'മാർക്കറ്റ് ഹബ്'),
+        ('market_hub.breadcrumb',         'Market Hub',
+         'മാർക്കറ്റ് ഹബ്'),
+        ('market_hub.search_placeholder', 'Search products...',
+         'ഉൽപ്പന്നങ്ങൾ തിരയുക...'),
+        ('market_hub.empty_state',        'No products found',
+         'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല'),
+        ('market_hub.label_quantity',     'Quantity',
+         'അളവ്'),
+        ('market_hub.label_price',        'Price',
+         'വില'),
+        ('market_hub.label_available',    'Available',
+         'ലഭ്യമാണ്'),
+        ('market_hub.btn_inquire',        'Inquire',
+         'അന്വേഷിക്കുക'),
+        ('market_hub.btn_loading',        'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+        ('market_hub.btn_load_more',      'Load More',
+         'കൂടുതൽ കാണിക്കുക'),
+        ('market_hub.inquiry_sent_title', 'Inquiry Sent!',
+         'അന്വേഷണം അയച്ചു!'),
+        ('market_hub.inquiry_sent_desc',  'Your inquiry about "{product}" has been sent. The FPO will contact you soon.',
+         '"{product}" സംബന്ധിച്ച നിങ്ങളുടെ അന്വേഷണം അയച്ചു. FPO ഉടൻ നിങ്ങളെ ബന്ധപ്പെടും.'),
+        ('market_hub.btn_close',          'Close',
+         'അടയ്ക്കുക'),
+        ('market_hub.modal_title',        'Inquire about',
+         'സംബന്ധിച്ച് അന്വേഷിക്കുക'),
+        ('market_hub.field_name',         'Your Name',
+         'നിങ്ങളുടെ പേര്'),
+        ('market_hub.field_email',        'Your Email',
+         'നിങ്ങളുടെ ഇ-മെയിൽ'),
+        ('market_hub.field_phone',        'Your Phone (optional)',
+         'നിങ്ങളുടെ ഫോൺ (ഐച്ഛികം)'),
+        ('market_hub.field_message',      'Message (optional)',
+         'സന്ദേശം (ഐച്ഛികം)'),
+        ('market_hub.error_submit',       'Failed to submit inquiry. Please try again.',
+         'അന്വേഷണം സമർപ്പിക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('market_hub.btn_submit',         'Submit Inquiry',
+         'അന്വേഷണം സമർപ്പിക്കുക'),
+        ('market_hub.btn_submitting',     'Submitting...',
+         'സമർപ്പിക്കുന്നു...'),
+        ('market_hub.btn_cancel',         'Cancel',
+         'റദ്ദാക്കുക'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in market_hub_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Public Market Hub page (P2-12)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Public Market Hub page (P2-12)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#-----------------------------------
+
+
+#10th sep arunima------
+def seed_buyer_portal_translations(languages):
+    """
+    External Buyer Portal — Dashboard + Products pages (buyer_dashboard.*, buyer_products.*)
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    buyer_portal_keys = [
+        # ── buyer_dashboard.* ──
+        ('buyer_dashboard.welcome_msg',        'Welcome, {name}',
+         'സ്വാഗതം, {name}'),
+        ('buyer_dashboard.buyer_type_fpo',     'FPO Buyer',
+         'FPO ക്രേതാവ്'),
+        ('buyer_dashboard.buyer_type_external','External Buyer',
+         'ബാഹ്യ ക്രേതാവ്'),
+        ('buyer_dashboard.badge_verified',     'Verified',
+         'സ്ഥിരീകരിച്ചു'),
+        ('buyer_dashboard.card_profile_title', 'Buyer Profile',
+         'ക്രേതാവിന്റെ പ്രൊഫൈൽ'),
+        ('buyer_dashboard.label_organisation', 'Organisation',
+         'സ്ഥാപനം'),
+        ('buyer_dashboard.label_email',        'Email',
+         'ഇ-മെയിൽ'),
+        ('buyer_dashboard.label_phone',        'Phone',
+         'ഫോൺ'),
+        ('buyer_dashboard.label_location',     'Location',
+         'സ്ഥലം'),
+        ('buyer_dashboard.label_commodities',  'Commodities Interested',
+         'താൽപ്പര്യമുള്ള ചരക്കുകൾ'),
+        ('buyer_dashboard.no_commodities',     'None specified yet.',
+         'ഇതുവരെ വ്യക്തമാക്കിയിട്ടില്ല.'),
+
+        # ── buyer_products.* ──
+        ('buyer_products.page_title',          'Explore Products',
+         'ഉൽപ്പന്നങ്ങൾ പര്യവേക്ഷണം ചെയ്യുക'),
+        ('buyer_products.page_description',    'Browse products listed by FPOs',
+         'FPO-കൾ ലിസ്റ്റ് ചെയ്ത ഉൽപ്പന്നങ്ങൾ ബ്രൗസ് ചെയ്യുക'),
+        ('buyer_products.search_placeholder',  'Search products…',
+         'ഉൽപ്പന്നങ്ങൾ തിരയുക…'),
+        ('buyer_products.filter_commodity',    'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('buyer_products.filter_all',          'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('buyer_products.empty_state',         'No products found.',
+         'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
+        ('buyer_products.label_quantity',      'Quantity',
+         'അളവ്'),
+        ('buyer_products.label_price',         'Price',
+         'വില'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in buyer_portal_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'External Buyer Portal (Dashboard + Products)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'External Buyer Portal (Dashboard + Products)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#------------------------
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -4192,6 +4435,12 @@ def seed_translations():
     products_page_count = seed_products_page_translations(languages)
     print(f"✅ Seeded {products_page_count} FPO Products page translations")
     total_count += products_page_count
+
+    #31th August 2026
+    print("\nSeeding Admin Market Linkage page UI translations...")
+    market_linkage_page_count = seed_market_linkage_translations(languages)
+    print(f"✅ Seeded {market_linkage_page_count} Admin Market Linkage page translations")
+    total_count += market_linkage_page_count
     #--------------------------------------------------------------------------------
 
     
@@ -4254,6 +4503,23 @@ def seed_translations():
     rec_count = seed_recommendations_translations(languages)
     print(f"✅ Seeded {rec_count} recommendation translations")
     total_count += rec_count
+
+    #arunima sep 10 2026
+    print("\nSeeding External Buyer Portal (Dashboard + Products) translations...")
+    buyer_portal_count = seed_buyer_portal_translations(languages)
+    print(f"✅ Seeded {buyer_portal_count} Buyer Portal translations")
+    total_count += buyer_portal_count
+    #-----------------------------------
+
+
+    
+    #arunima sep 9------
+    # Step 9g: Seed Public Market Hub translations (P2-12, Task 16)
+    print("\nSeeding Public Market Hub page UI translations...")
+    market_hub_count = seed_market_hub_translations(languages)
+    print(f"✅ Seeded {market_hub_count} Public Market Hub page translations")
+    total_count += market_hub_count
+    #------------------------
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
