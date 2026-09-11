@@ -215,6 +215,14 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 23,
     )
+    seed_item(
+        label_key = 'menu.cbbos',
+        path      = '/admin/cbbos',
+        icon      = 'users-round',
+        roles     = [super_admin_group],
+        order     = 24,  
+    )
+
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
