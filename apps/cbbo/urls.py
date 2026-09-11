@@ -9,7 +9,7 @@ from apps.cbbo.api.reports import ReportListCreateView, ReportDetailView, Report
 from apps.cbbo.api.training import (
     TrainingSessionListCreateView, TrainingSessionDetailView, TrainingAttendanceSetView,
 )
-from apps.cbbo.api.registration import CBBORegistrationView, PublicOrganisationListView
+from apps.cbbo.api.registration import CBBORegistrationView, PublicOrganisationListView, CBBORegistrationOTPSendView, CBBORegistrationOTPConfirmView, CBBORegistrationEmailOTPSendView, CBBORegistrationEmailOTPConfirmView
 
 urlpatterns = [
     # assignments.py
@@ -25,5 +25,9 @@ urlpatterns = [
     path('training/<int:session_id>/attendance/', TrainingAttendanceSetView.as_view(), name='cbbo-training-attendance-set'),
     # registration.py
     path('register/', CBBORegistrationView.as_view(), name='cbbo-register'),
+    path('register/otp/send/', CBBORegistrationOTPSendView.as_view(), name='cbbo-register-otp-send'),
+     path('register/otp/confirm/', CBBORegistrationOTPConfirmView.as_view(), name='cbbo-register-otp-confirm'),
+    path('register/otp/email/send/', CBBORegistrationEmailOTPSendView.as_view(), name='cbbo-register-otp-email-send'),
+    path('register/otp/email/confirm/', CBBORegistrationEmailOTPConfirmView.as_view(), name='cbbo-register-otp-email-confirm'),
     path('organisations/', PublicOrganisationListView.as_view(), name='cbbo-organisations-public'),
 ]

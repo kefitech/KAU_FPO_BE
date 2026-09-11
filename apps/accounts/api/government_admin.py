@@ -498,8 +498,17 @@ class GovernmentViewSet(TranslatedViewSet):
         profile.approved_at = timezone.now()
         profile.save(update_fields=['registration_status', 'approved_by', 'approved_at'])
 
+        # Set a fresh temporary password — the account was created with a random,
+        # unknown password during OTP-based self-registration, so the official
+        # needs a new one to log in for the first time.
+        temp_password = secrets.token_urlsafe(10)
+        user.set_password(temp_password)
         user.is_active = True
-        user.save(update_fields=['is_active'])
+        user.save(update_fields=['password', 'is_active'])
+
+        user_profile = user.profile
+        user_profile.must_change_password = True
+        user_profile.save(update_fields=['must_change_password'])
 
         try:
             frontend_url = getattr(django_settings, 'FRONTEND_URL', '')
@@ -510,6 +519,7 @@ class GovernmentViewSet(TranslatedViewSet):
                 context={
                     'user_name': user.first_name or user.username,
                     'email': user.email,
+                    'temp_password': temp_password,
                     'button_link': frontend_url,
                     'button_text': 'Login Now',
                 },
