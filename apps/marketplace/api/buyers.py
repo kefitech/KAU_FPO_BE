@@ -7,17 +7,52 @@ Admin-managed CRUD: /api/admin/buyers/
 FPO browse (verified only, read-only): /api/marketplace/buyers/
 """
 
+import secrets
+import string
+
+from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework import filters
+from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsAdmin, IsAuthenticated, IsFPOManager
+from apps.core.services.audit import AuditService as AuditLogService
 from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
+from apps.core.utils.validators import validate_password_strength
 from apps.core.views import TranslatedViewSet
 from apps.database.models import BuyerDirectory
 from apps.marketplace.serializers import BuyerDirectorySerializer
+from apps.notifications.services import send_notification
+
+User = get_user_model()
+
+
+def _resolve_buyer_user(buyer):
+    """
+    Returns the Django User linked to this buyer, or None if there isn't one
+    (e.g. an admin-added buyer with no login account).
+    External buyers → buyer.user
+    FPO-as-buyer     → buyer.fpo.primary_user
+    """
+    if buyer.user_id:
+        return buyer.user
+    if buyer.fpo_id and buyer.fpo.primary_user_id:
+        return buyer.fpo.primary_user
+    return None
+
+
+def _generate_temp_password():
+    chars = string.ascii_letters + string.digits + '!@#$%'
+    while True:
+        pwd = ''.join(secrets.choice(chars) for _ in range(12))
+        try:
+            validate_password_strength(pwd)
+            return pwd
+        except Exception:
+            continue
 
 
 @extend_schema_view(
@@ -49,12 +84,32 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     destroy_message = 'marketplace.buyer_deleted'
 
     def get_queryset(self):
+        from django.db.models import Q
+
         queryset = BuyerDirectory.objects.filter(is_deleted=False).order_by('-created_at')
         buyer_type = self.request.query_params.get('buyer_type')
         if buyer_type == 'fpo':
             queryset = queryset.filter(fpo__isnull=False)
         elif buyer_type == 'external':
             queryset = queryset.filter(user__isnull=False)
+
+        status = self.request.query_params.get('status')
+        if status == 'deactivated':
+            # Verified, but the linked account has been switched off.
+            queryset = queryset.filter(status='verified').filter(
+                Q(user__isnull=False, user__is_active=False) |
+                Q(fpo__isnull=False, fpo__primary_user__is_active=False)
+            )
+        elif status == 'verified':
+            # Verified AND active — deactivated buyers are excluded, they get
+            # their own filter option above instead.
+            queryset = queryset.filter(status='verified').exclude(
+                Q(user__isnull=False, user__is_active=False) |
+                Q(fpo__isnull=False, fpo__primary_user__is_active=False)
+            )
+        elif status in ('pending', 'rejected'):
+            queryset = queryset.filter(status=status)
+
         return queryset
 
     def perform_destroy(self, instance):
@@ -86,6 +141,94 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
             data=BuyerDirectorySerializer(buyer).data,
             message=t('marketplace.buyer_rejected', self.get_language())
         )
+
+    @extend_schema(tags=['Marketplace - Buyers'])
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        buyer = self.get_object()
+        user = _resolve_buyer_user(buyer)
+        if not user:
+            return StandardResponse.error(
+                'No linked account found for this buyer.',
+                status_code=404,
+            )
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=buyer,
+            request=request,
+            changes={'deactivated_buyer': user.email},
+        )
+        return StandardResponse.success(message='Buyer account deactivated.')
+
+    @extend_schema(tags=['Marketplace - Buyers'])
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        buyer = self.get_object()
+        user = _resolve_buyer_user(buyer)
+        if not user:
+            return StandardResponse.error(
+                'No linked account found for this buyer.',
+                status_code=404,
+            )
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=buyer,
+            request=request,
+            changes={'activated_buyer': user.email},
+        )
+        return StandardResponse.success(message='Buyer account activated.')
+
+    @extend_schema(
+        tags=['Marketplace - Buyers'],
+        summary='Reset a buyer account password',
+        description='Generates a temporary password, sets must_change_password=True, and notifies the buyer via email.',
+    )
+    @action(detail=True, methods=['post'], url_path='reset-password')
+    def reset_password(self, request, pk=None):
+        buyer = self.get_object()
+        user = _resolve_buyer_user(buyer)
+        if not user:
+            return StandardResponse.error(
+                'No linked account found for this buyer.',
+                status_code=404,
+            )
+
+        temp_password = _generate_temp_password()
+        user.set_password(temp_password)
+        user.save(update_fields=['password'])
+
+        profile = getattr(user, 'profile', None)
+        if profile:
+            profile.must_change_password = True
+            profile.save(update_fields=['must_change_password'])
+
+        context = {
+            'user_name':     f'{user.first_name} {user.last_name}'.strip() or user.email,
+            'temp_password': temp_password,
+            'button_link':   '',
+            'button_text':   'Login',
+        }
+        try:
+            send_notification(user=user, code='password_reset_by_admin', channel='email', context=context)
+        except Exception:
+            pass
+
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.PASSWORD_RESET,
+            instance=buyer,
+            request=request,
+            changes={'reset_password_for': user.email},
+        )
+        return StandardResponse.success(message='Password reset. Buyer will be prompted to change it on next login.')
 
 
 @extend_schema_view(

@@ -29,17 +29,32 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class BuyerDirectorySerializer(serializers.ModelSerializer):
+    account_active = serializers.SerializerMethodField()
+
     class Meta:
         model = BuyerDirectory
         fields = [
             'id', 'name', 'organisation', 'contact_email', 'contact_phone', 'location',
             'commodities_interested', 'min_quantity', 'max_quantity', 'unit', 'is_verified',
-            'fpo', 'user', 'status', 'created_at', 'updated_at',
+            'fpo', 'user', 'status', 'account_active', 'created_at', 'updated_at',
         ]
         # Admin manages this directly (ARUNIMA.md: "Buyer Directory (Admin only)"),
         # so is_verified is writable here — set explicitly via the /verify/ action instead
         # of raw PATCH, see BuyerDirectoryViewSet.
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_account_active(self, obj):
+        """
+        True/False if the buyer has a linked login account (external buyer.user,
+        or FPO-as-buyer's fpo.primary_user). None if there's no linked account
+        at all (e.g. admin-added buyer with no login) — frontend should hide
+        the Activate/Deactivate action entirely in that case.
+        """
+        if obj.user_id:
+            return obj.user.is_active
+        if obj.fpo_id and obj.fpo.primary_user_id:
+            return obj.fpo.primary_user.is_active
+        return None
 
 
 class BuyerSellerMatchSerializer(serializers.ModelSerializer):
