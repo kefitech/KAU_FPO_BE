@@ -46,7 +46,7 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     """
     from apps.database.models import FPO, MLModelVersion, CropRecommendation
     from apps.recommendations.services import get_crop_recommendation, build_recommendation_payload
-    from apps.gis_module.services import resolve_fpo_zone
+    from apps.gis_module.services import resolve_fpo_zone, build_location_snapshot
     from apps.notifications.services import send_notification
 
     try:
@@ -86,6 +86,11 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
 
     result = get_crop_recommendation(fpo, model_version, financial_year, season_override)
     input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+    # Not part of the ML payload contract (build_recommendation_payload's
+    # return is also literally the FastAPI request body) -- merged in only
+    # for display, so a later "stale" recommendation can still show the
+    # actual farm shape it was generated for, even after the FPO redraws it.
+    input_snapshot['location_snapshot'] = build_location_snapshot(fpo)
     recommendations_list = result.get('recommendations', [])
 
     new_status = (

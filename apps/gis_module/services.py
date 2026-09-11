@@ -105,6 +105,26 @@ def resolve_fpo_location(fpo):
     return None, None
 
 
+def build_location_snapshot(fpo) -> dict:
+    """
+    Snapshot of the FPO's location/boundary at a point in time, for
+    persisting alongside a CropRecommendation.input_snapshot -- lets a
+    later "stale" recommendation still show where it was actually
+    generated for, even after the FPO redraws their cultivation area.
+    Returns {'lat', 'lng', 'area_polygon'} -- area_polygon is a GeoJSON
+    dict (the FPO's drawn boundary) or None if they haven't drawn one
+    (falls back to their lat/lng only, same as resolve_fpo_location).
+    """
+    import json as _json
+
+    lat, lng = resolve_fpo_location(fpo)
+    cultivation_area = getattr(fpo, 'cultivation_area', None)
+    area_polygon = None
+    if cultivation_area and cultivation_area.area_polygon:
+        area_polygon = _json.loads(cultivation_area.area_polygon.geojson)
+    return {'lat': lat, 'lng': lng, 'area_polygon': area_polygon}
+
+
 def resolve_fpo_zone(fpo):
     """
     Convenience wrapper: resolve_fpo_location() + find_zone_for_point()
