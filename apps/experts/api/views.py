@@ -16,6 +16,8 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.schemes import Expert, ExpertEnquiry
 from apps.database.models.fpo import FPO, FPOUserMembership
+from django.db.models import Case, When, IntegerField
+from apps.core.utils.constants import DISTRICT_ZONE
 from apps.notifications.services import send_notification
 
 
@@ -64,7 +66,7 @@ class ExpertListView(APIView):
         ),
     )
     def get(self, request):
-        qs = Expert.objects.filter(is_deleted=False, is_active=True).order_by('order', 'name_en')
+        qs = Expert.objects.filter(is_deleted=False, is_active=True)
 
         category = request.query_params.get('category')
         if category:
@@ -83,6 +85,26 @@ class ExpertListView(APIView):
                 Q(secondary_expertise__icontains=search) |
                 Q(organisation__icontains=search)
             )
+
+        fpo_district = None
+        if request.user.is_authenticated:
+            membership = FPOUserMembership.objects.filter(user=request.user, is_active=True).first()
+            if membership and membership.fpo:
+                fpo_district = membership.fpo.district
+
+        if fpo_district:
+            fpo_zone = DISTRICT_ZONE.get(fpo_district)
+            same_zone_districts = [d for d, z in DISTRICT_ZONE.items() if z == fpo_zone]
+            qs = qs.annotate(
+                _priority=Case(
+                    When(district=fpo_district, then=0),
+                    When(district__in=same_zone_districts, then=1),
+                    default=2,
+                    output_field=IntegerField(),
+                )
+            ).order_by('_priority', 'order', 'name_en')
+        else:
+            qs = qs.order_by('order', 'name_en')
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)

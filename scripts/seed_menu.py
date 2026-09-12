@@ -72,14 +72,6 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 4,
     )
-    #added for cbbo
-    seed_item(
-        label_key = 'menu.cbbos',
-        path      = '/admin/cbbos',
-        icon      = 'users-round',
-        roles     = [super_admin_group],
-        order     = 5,
-    )
     seed_item(
         label_key = 'menu.fpo_actions',
         path      = '/admin/fpo-permissions?tab=actions',
@@ -171,66 +163,6 @@ def seed_menu():
         roles     = [super_admin_group, sub_admin_group],
         order     = 17,
     )
-    seed_item(
-        label_key = 'menu.dpr_projects',
-        path      = '/admin/dpr',
-        icon      = 'file-bar-chart',
-        roles     = [super_admin_group, sub_admin_group],
-        order     = 18,
-    )
-    seed_item(
-        label_key = 'menu.dpr_config',
-        path      = '/admin/dpr-config',
-        icon      = 'sliders-horizontal',
-        roles     = [super_admin_group],
-        order     = 19,
-    )
-    seed_item(
-        label_key = 'menu.dpr_knowledge',
-        path      = '/admin/dpr-knowledge',
-        icon      = 'book-open',
-        roles     = [super_admin_group, sub_admin_group],
-        order     = 19.5,
-    )
-    seed_item(
-        label_key = 'menu.dpr_applicability',
-        path      = '/admin/dpr-applicability',
-        icon      = 'grid-3x3',
-        roles     = [super_admin_group, sub_admin_group],
-        order     = 19.7,
-    )
-    seed_item(
-        label_key = 'menu.ai_services',
-        path      = '/admin/ai-services',
-        icon      = 'bot',
-        roles     = [super_admin_group],
-        order     = 20,
-    )
-
-    seed_item(
-        label_key = 'menu.ml_models',
-        path      = '/admin/ml-models',
-        icon      = 'brain-circuit',
-        roles     = [super_admin_group],
-        order     = 21,
-    )
-    # arunima
-    seed_item(
-        label_key = 'menu.market_linkage',
-        path      = '/admin/market-linkage',
-        icon      = 'link',
-        roles     = [super_admin_group],
-        order     = 22,
-    )
-    #---------------------------------------
-    # aravind — GIS zone-boundary admin
-    seed_item(
-        label_key = 'menu.gis_zones',
-        path      = '/admin/gis-zones',
-        icon      = 'map',
-        roles     = [super_admin_group],
-        order     = 23,
-    )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 
@@ -293,28 +225,118 @@ def seed_menu():
         order     = 8,
     )
     seed_item(
-        label_key = 'menu.fpo_dpr',
-        path      = '/fpo/dpr',
-        icon      = 'file-bar-chart',
-        roles     = fpo_roles,
-        order     = 9,
-    )
-    seed_item(
         label_key = 'menu.fpo_settings',
         path      = '/fpo/settings',
         icon      = 'settings',
         roles     = fpo_roles,
-        order     = 10,
+        order     = 9,
     )
-    #arunima s 04 sep--------------------
+
+    # ── CBBO portal pages ─────────────────────────────────────────────────────
+
+    cbbo_group, _ = Group.objects.get_or_create(name='cbbo')
+
+    # Fix: earlier record pointed at the nonexistent /cbbo/settings path
+    MenuItem.objects.filter(label_key='menu.cbbo_settings').update(label_key='menu.cbbo_profile', path='/cbbo/profile')
+
     seed_item(
-        label_key = 'menu.fpo_buyer_directory',
-        path      = '/fpo/buyer-directory',
-        icon      = 'shopping-cart',
-        roles     = [primary_group],
-        order     = 11,
+        label_key = 'menu.cbbo_dashboard',
+        path      = '/cbbo/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [cbbo_group],
+        order     = 1,
     )
-    #------------------------------------------
+    seed_item(
+        label_key = 'menu.cbbo_verifications',
+        path      = '/cbbo/verifications',
+        icon      = 'check-circle',
+        roles     = [cbbo_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'menu.cbbo_reports',
+        path      = '/cbbo/reports',
+        icon      = 'clipboard-list',
+        roles     = [cbbo_group],
+        order     = 3,
+    )
+    seed_item(
+        label_key = 'menu.cbbo_profile',
+        path      = '/cbbo/profile',
+        icon      = 'user',
+        roles     = [cbbo_group],
+        order     = 4,
+    )
+
+    # ── Government portal pages ───────────────────────────────────────────────
+
+    government_group, _ = Group.objects.get_or_create(name='government')
+
+    seed_item(
+        label_key = 'menu.government_dashboard',
+        path      = '/government/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [government_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'menu.government_profile',
+        path      = '/government/profile',
+        icon      = 'user',
+        roles     = [government_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'menu.government_schemes',
+        path      = '/government/schemes',
+        icon      = 'file-text',
+        roles     = [government_group],
+        order     = 4,
+    )
+    seed_item(
+        label_key = 'menu.government_training',
+        path      = '/government/training',
+        icon      = 'graduation-cap',
+        roles     = [government_group],
+        order     = 5,
+    )
+    seed_item(
+            label_key = 'menu.government_fpos',
+            path      = '/government/fpos',
+            icon      = 'building',
+            roles     = [government_group],
+            order     = 3,
+        )
+
+    # ── Expert portal pages ───────────────────────────────────────────────────
+
+    expert_group, _ = Group.objects.get_or_create(name='expert')
+
+    seed_item(
+        label_key = 'menu.expert_dashboard',
+        path      = '/expert/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [expert_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'menu.expert_availability',
+        path      = '/expert/availability',
+        icon      = 'calendar-days',
+        roles     = [expert_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'menu.expert_profile',
+        path      = '/expert/profile',
+        icon      = 'user',
+        roles     = [expert_group],
+        order     = 3,
+    )
+    
+ 
+
+    
 
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")

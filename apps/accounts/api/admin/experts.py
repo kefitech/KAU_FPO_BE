@@ -18,6 +18,10 @@ from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.schemes import Expert, ExpertCategory, ExpertEnquiry
+import secrets
+from django.contrib.auth.models import User, Group
+from django.conf import settings as django_settings
+from apps.notifications.services import send_notification
 
 
 def _is_admin(user):
@@ -134,6 +138,35 @@ class ExpertListView(APIView):
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
         expert = serializer.save()
+
+        if not expert.user and expert.email and not User.objects.filter(username=expert.email).exists():
+            temp_password = secrets.token_urlsafe(10)
+            new_user = User.objects.create_user(
+                username=expert.email,
+                email=expert.email,
+                password=temp_password,
+                first_name=expert.name_en,
+            )
+            expert_group, _ = Group.objects.get_or_create(name=UserRole.EXPERT)
+            new_user.groups.add(expert_group)
+            new_user.profile.must_change_password = True
+            new_user.profile.phone = expert.phone or ''
+            new_user.profile.save(update_fields=['must_change_password', 'phone'])
+            expert.user = new_user
+            expert.save(update_fields=['user'])
+
+            try:
+                frontend_url = getattr(django_settings, 'FRONTEND_URL', '')
+                send_notification(
+                    user=new_user, code='welcome', channel='email',
+                    context={
+                        'user_name': expert.name_en, 'email': expert.email,
+                        'temp_password': temp_password, 'button_link': frontend_url,
+                        'button_text': 'Login Now',
+                    },
+                )
+            except Exception:
+                pass
         return StandardResponse.success(
             data=ExpertSerializer(expert).data,
             message='Expert created.',

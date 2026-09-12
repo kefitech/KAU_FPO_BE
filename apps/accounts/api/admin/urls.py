@@ -18,9 +18,6 @@ Created: 28-04-2026
 """
 
 from django.urls import path, include
-# DPR admin (P2-07) removed 2026-08-24. v2 will rebuild admin API in Phase 4.
-# AI service admin endpoints also removed — will move to a dedicated ai_admin.py.
-# See context/phase2/Dpr/DPR_V2_CONTEXT.md
 from rest_framework.routers import DefaultRouter
 
 from .languages import LanguageViewSet
@@ -29,14 +26,6 @@ from .translations import TranslationViewSet
 from .fpo_roles import FPOMemberRoleViewSet
 from .fpo_actions import FPOActionViewSet
 from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
-#-----------------------------------------------------------------------------
-#aug21 import buyer
-#Arunima
-from apps.marketplace.api.buyers import BuyerDirectoryViewSet
-from apps.marketplace.api.matches import AdminMatchViewSet
-from apps.marketplace.api.market_prices import AdminMarketPriceViewSet
-#-------------------------------------------------------------------------------
-
 from .applications import (
     ApplicationListView,
     ApplicationDetailView,
@@ -50,6 +39,8 @@ from .applications import (
     ApplicationTierAssessmentView,
     ApplicationActivateView,
     ApplicationDeactivateView,
+    ApplicationAssignSubAdminView,
+    ApplicationUnassignSubAdminView
 )
 from .external_apis import (
     ExternalAPISettingsListView,
@@ -57,14 +48,10 @@ from .external_apis import (
     ExternalAPISettingsActivateView,
     ExternalAPISettingsDeactivateView,
 )
+
+
 from .page_access import RolePageAccessListView, RolePageAccessDetailView
 from .audit_logs import AuditLogListView
-from .ai_services import (
-    AIProvidersInfoView,
-    AIServiceDetailView,
-    AIServiceListView,
-    AIServiceResetUsageView,
-)
 from .dashboard import AdminDashboardStatsView
 from .ownership_claims import (
     OwnershipClaimListView,
@@ -115,6 +102,7 @@ from .cms import (
     FeedbackListView,
     FeedbackDetailView,
 )
+from .organisations import OrganisationListView, OrganisationDetailView
 from .schemes import (
     SchemeListView,
     SchemeDetailView,
@@ -138,15 +126,8 @@ from .fpo_users import (
 from .reports import FPOSummaryReportView
 from apps.accounts.api.menu import MenuItemViewSet
 from apps.accounts.api.sub_admins import SubAdminViewSet
-from apps.recommendations.api.recommendations import (
-    MLModelVersionAdminView,
-    MLModelVersionActivateView,
-    MLModelRetrainView,
-    RecommendationFeedbackAdminViewSet,
-)
-
-from apps.gis_module.api.zones import ZoneBoundaryVersionListView, ZoneBoundaryVersionActivateView, ZoneBoundaryVersionDetailView
-
+from apps.accounts.api.cbbo_admin import CBBOViewSet
+from apps.accounts.api.government_admin import GovernmentViewSet   
 # Create DRF router
 router = DefaultRouter()
 
@@ -156,17 +137,10 @@ router.register(r'translation-categories', TranslationCategoryViewSet, basename=
 router.register(r'translations', TranslationViewSet, basename='translation')
 router.register(r'menu', MenuItemViewSet, basename='menu')
 router.register(r'sub-admins', SubAdminViewSet, basename='sub-admin')
+router.register(r'cbbos', CBBOViewSet, basename='cbbo')
+router.register(r'government', GovernmentViewSet, basename='government')   # ADD THIS LINE
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
-
-#---------------------------------------------------------------------------
-#Arunima
-#aug21 for buyers.py in marketplace app
-router.register(r'buyers', BuyerDirectoryViewSet, basename='admin-buyer')
-router.register(r'matches', AdminMatchViewSet, basename='admin-match')
-router.register(r'prices', AdminMarketPriceViewSet, basename='admin-price')
-
- #------------------------------------------------------------------------------
 
 # URL patterns
 urlpatterns = [
@@ -185,16 +159,13 @@ urlpatterns = [
     path('applications/<int:fpo_id>/tier-history/',                          ApplicationTierHistoryView.as_view(),     name='admin-applications-tier-history'),
     path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),
     path('applications/<int:fpo_id>/activate/',                              ApplicationActivateView.as_view(),        name='admin-applications-activate'),
+    path('applications/<int:fpo_id>/assign-subadmin/',                       ApplicationAssignSubAdminView.as_view(),  name='admin-applications-assign-subadmin'),
+    path('applications/<int:fpo_id>/unassign-subadmin/',                     ApplicationUnassignSubAdminView.as_view(), name='admin-applications-unassign-subadmin'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
     # Audit Logs
     path('audit-logs/',                     AuditLogListView.as_view(),                  name='admin-audit-logs'),
-    # AI Services (KAU RCD B.5 — per-feature provider config + budget cap)
-    path('ai-services/',                    AIServiceListView.as_view(),                 name='admin-ai-services-list'),
-    path('ai-services/providers/',          AIProvidersInfoView.as_view(),               name='admin-ai-services-providers'),
-    path('ai-services/<int:pk>/',           AIServiceDetailView.as_view(),               name='admin-ai-services-detail'),
-    path('ai-services/<int:pk>/reset-usage/', AIServiceResetUsageView.as_view(),         name='admin-ai-services-reset-usage'),
     # Ownership Claims
     path('ownership-claims/',                           OwnershipClaimListView.as_view(),   name='admin-claims-list'),
     path('ownership-claims/<int:claim_id>/',            OwnershipClaimDetailView.as_view(), name='admin-claims-detail'),
@@ -260,6 +231,8 @@ urlpatterns = [
     path('documents/<int:pk>/activate/',       DocumentLibraryActivateView.as_view(),   name='admin-documents-activate'),
     path('documents/<int:pk>/deactivate/',     DocumentLibraryDeactivateView.as_view(), name='admin-documents-deactivate'),
     # Schemes & Subsidies
+    path('organisations/',                 OrganisationListView.as_view(),   name='admin-organisations-list'),
+    path('organisations/<int:pk>/',        OrganisationDetailView.as_view(), name='admin-organisations-detail'),
     path('schemes/',                       SchemeListView.as_view(),        name='admin-schemes-list'),
     path('schemes/<int:pk>/',              SchemeDetailView.as_view(),      name='admin-schemes-detail'),
     path('schemes/<int:pk>/activate/',     SchemeActivateView.as_view(),    name='admin-schemes-activate'),
@@ -276,16 +249,5 @@ urlpatterns = [
     path('experts/<int:pk>/activate/',     ExpertActivateView.as_view(),    name='admin-experts-activate'),
     path('experts/<int:pk>/deactivate/',   ExpertDeactivateView.as_view(),  name='admin-experts-deactivate'),
     path('experts/<int:pk>/enquiries/',    ExpertEnquiriesView.as_view(),   name='admin-experts-enquiries'),
-    # ML Model Versions (P2-06)
-    path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
-    path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
-    path('ml-models/retrain/',             MLModelRetrainView.as_view(),         name='admin-ml-models-retrain'),
-    path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),
-    # GIS Zone Boundary Versions (staged upload + activation)
-    path('gis/zone-versions/',                  ZoneBoundaryVersionListView.as_view(),     name='admin-gis-zone-versions'),
-    path('gis/zone-versions/<int:pk>/',         ZoneBoundaryVersionDetailView.as_view(),   name='admin-gis-zone-versions-detail'),
-    path('gis/zone-versions/<int:pk>/activate/', ZoneBoundaryVersionActivateView.as_view(), name='admin-gis-zone-versions-activate'),
-
-    # DPR — Admin CRUD routes mounted at /api/admin/dpr/
-    path('dpr/', include('apps.accounts.api.admin.dpr.urls')),
 ]
+

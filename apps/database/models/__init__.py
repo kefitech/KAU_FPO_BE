@@ -91,9 +91,14 @@ from .fpo import (
 
 # Phase 2 — Government Portal
 from .government import GovernmentOfficialProfile
+from .organisation import Organisation
+from .cbbo_profile import CBBOOfficerProfile
 
 # Phase 2 — CBBO Portal
 from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
+
+# Phase 2 — Sub-admin FPO assignment (Jobin)
+from .subadmin import SubAdminFPOAssignment
 
 # Phase 2 — GIS (requires PostGIS + django.contrib.gis in INSTALLED_APPS)
 from .gis import AgroClimaticZone, DistrictBoundary, FPOZoneAssignment, FPOCultivationArea, FPOWeatherSnapshot, ZoneBoundaryVersion
@@ -283,10 +288,13 @@ __all__ = [
     'FAQCategory',
     # Phase 2 — Government Portal
     'GovernmentOfficialProfile',
+    'Organisation',
+    'CBBOOfficerProfile',
     # Phase 2 — CBBO Portal
     'CapacityBuildingReport',
     'TrainingSession',
     'TrainingAttendance',
+    'SubAdminFPOAssignment',
     # Phase 2 — GIS
     'AgroClimaticZone',
     'DistrictBoundary',

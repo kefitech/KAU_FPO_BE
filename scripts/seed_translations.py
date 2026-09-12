@@ -75,15 +75,6 @@ def create_categories():
     print("\nCreating translation categories...")
 
     categories = [
-        #--------------------------------------------------------------------
-        #Arunima S
-        {
-            'code': 'marketplace',
-            'name': 'Marketplace',
-            'description': 'P2-11 Marketplace — products, buyers, matches, prices',
-            'display_order': 9,
-        },
-        #---------------------------------------------------------------------------
         {
             'code': 'auth',
             'name': 'Authentication & Authorization',
@@ -331,61 +322,6 @@ def seed_admin_translations(languages):
 
     return count
 
-#---------------------------------------------------------------------------------------
-#Arunima S 
-
-def seed_marketplace_translations(languages):
-    """Seed P2-11 Marketplace API response messages (marketplace.* keys)."""
-    category = TranslationCategory.objects.get(code='marketplace')
-    lang_en = languages['en']
-    lang_ml = languages['ml']
-
-    marketplace_messages = [
-        # Products
-        ('products_retrieved',        'Products retrieved successfully',                   'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
-        ('product_created',           'Product created successfully',                      'ഉൽപ്പന്നം വിജയകരമായി സൃഷ്ടിച്ചു'),
-        ('product_updated',           'Product updated successfully',                      'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
-        ('product_deleted',           'Product deleted successfully',                      'ഉൽപ്പന്നം വിജയകരമായി ഇല്ലാതാക്കി'),
-        ('product_not_editable',      'Product cannot be edited in its current status',    'നിലവിലെ സ്ഥിതിയിൽ ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല'),
-        ('only_draft_deletable',      'Only draft products can be deleted',                'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
-        ('only_draft_publishable',    'Only draft products can be published',              'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
-        ('product_published',         'Product published successfully',                    'ഉൽപ്പന്നം വിജയകരമായി പ്രസിദ്ധീകരിച്ചു'),
-        ('only_active_can_be_sold',   'Only active products can be marked as sold',        'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
-        ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
-
-        # Buyers
-        ('buyers_retrieved',          'Buyers retrieved successfully',                     'ക്രേതാക്കൾ വിജയകരമായി ലഭിച്ചു'),
-        ('buyer_created',             'Buyer created successfully',                        'ക്രേതാവിനെ വിജയകരമായി സൃഷ്ടിച്ചു'),
-        ('buyer_updated',             'Buyer updated successfully',                        'ക്രേതാവിനെ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
-        ('buyer_deleted',             'Buyer deleted successfully',                        'ക്രേതാവിനെ വിജയകരമായി ഇല്ലാതാക്കി'),
-        ('buyer_verified',            'Buyer verified successfully',                       'ക്രേതാവിനെ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
-
-        # Matches
-        ('matches_retrieved',         'Matches retrieved successfully',                    'പൊരുത്തങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
-        ('match_accepted',            'Match accepted successfully',                       'പൊരുത്തം വിജയകരമായി അംഗീകരിച്ചു'),
-        ('match_rejected',            'Match rejected successfully',                       'പൊരുത്തം വിജയകരമായി നിരസിച്ചു'),
-        ('match_not_actionable',      'This match has already been decided',               'ഈ പൊരുത്തം ഇതിനകം തീരുമാനിച്ചു'),
-
-        # Prices & Opportunities
-        ('prices_retrieved',          'Prices retrieved successfully',                     'വിലകൾ വിജയകരമായി ലഭിച്ചു'),
-        ('price_seeded',              'Price data added successfully',                     'വില വിവരം വിജയകരമായി ചേർത്തു'),
-        ('opportunities_retrieved',   'Opportunities retrieved successfully',              'അവസരങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
-    ]
-
-    count = 0
-    for key, en_value, ml_value in marketplace_messages:
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_en,
-            defaults={'value': en_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
-        )
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_ml,
-            defaults={'value': ml_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
-        )
-        count += 1
-
-    return count
-#--------------------------------------------------------------------------------------------
 
 def seed_ui_translations(languages):
     """
@@ -516,22 +452,6 @@ def seed_ui_translations(languages):
         ('register.account_btn_create',         'Create Account & Continue',                'അക്കൗണ്ട് ഉണ്ടാക്കി തുടരുക'),
         ('register.account_btn_creating',       'Creating account…',                        'അക്കൗണ്ട് ഉണ്ടാക്കുന്നു…'),
         ('register.btn_back',                   '← Back',                                   '← തിരിച്ച്'),
-
-        #Arunima s 03 sep
-        ('register.email_label',              'Email Address',                            'ഇ-മെയിൽ വിലാസം'),
-        ('register.email_placeholder',        'you@example.com',                          'you@example.com'),
-        ('register.email_btn_send',           'Send OTP',                                 'OTP അയക്കുക'),
-        ('register.email_btn_resend',         'Resend',                                   'വീണ്ടും അയക്കുക'),
-        ('register.email_btn_sending',        'Sending…',                                 'അയക്കുന്നു…'),
-        ('register.email_otp_sent',           'OTP sent to',                              'OTP അയച്ചത്'),
-        ('register.email_otp_placeholder',    '6-digit OTP',                              '6 അക്ക OTP'),
-        ('register.email_btn_verify',         'Verify',                                   'സ്ഥിരീകരിക്കുക'),
-        ('register.email_btn_verifying',      'Verifying…',                               'സ്ഥിരീകരിക്കുന്നു…'),
-        ('register.email_verified_label',     'Email verified',                           'ഇമെയിൽ സ്ഥിരീകരിച്ചു'),
-        ('register.email_err_invalid',        'Enter a valid email address',              'സാധുവായ ഇമെയിൽ വിലാസം നൽകുക'),
-        ('register.email_err_send_failed',    'Failed to send OTP. Please try again.',    'OTP അയക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
-        ('register.email_err_invalid_otp',    'Invalid OTP. Please try again.',           'തെറ്റായ OTP. വീണ്ടും ശ്രമിക്കുക.'),
-        #----------------------------------------------------------------
 
         # ── wizard — FPO registration wizard (7 steps) ────────────────────
         # Common
@@ -1384,83 +1304,6 @@ def seed_ui_translations(languages):
         ('external_apis_table.service_pan',         'PAN Verification',                                     'PAN പരിശോധന'),
         ('external_apis_table.service_gstin',       'GSTIN Verification',                                   'GSTIN പരിശോധന'),
         ('external_apis_table.service_cin',         'CIN Verification',                                     'CIN പരിശോധന'),
-
-        # ── ml_models — NewMlModelPage static UI text ──────────────────────
-        ('ml_models.page_title',               'Register Model Version',                                    'മോഡൽ പതിപ്പ് രജിസ്റ്റർ ചെയ്യുക'),
-        ('ml_models.page_description',         'Upload a trained model file and register it as a new version. Registering does not activate it — use "Activate" from the list afterward.', 'പരിശീലനം നൽകിയ ഒരു മോഡൽ ഫയൽ അപ്‌ലോഡ് ചെയ്ത് പുതിയ പതിപ്പായി രജിസ്റ്റർ ചെയ്യുക. രജിസ്റ്റർ ചെയ്യുന്നത് അത് സജീവമാക്കില്ല — പട്ടികയിൽ നിന്ന് പിന്നീട് "സജീവമാക്കുക" ഉപയോഗിക്കുക.'),
-        ('ml_models.model_details',            'Model Details',                                             'മോഡൽ വിശദാംശങ്ങൾ'),
-        ('ml_models.version_code_label',       'Version Code',                                              'പതിപ്പ് കോഡ്'),
-        ('ml_models.version_code_required',    'Version code is required',                                  'പതിപ്പ് കോഡ് ആവശ്യമാണ്'),
-        ('ml_models.description_label',        'Description',                                               'വിവരണം'),
-        ('ml_models.description_required',     'Description is required',                                   'വിവരണം ആവശ്യമാണ്'),
-        ('ml_models.deployment_date_label',    'Deployment Date',                                            'വിന്യാസ തീയതി'),
-        ('ml_models.deployment_date_required', 'Deployment date is required',                                'വിന്യാസ തീയതി ആവശ്യമാണ്'),
-        ('ml_models.model_file_label',         'Model File',                                                 'മോഡൽ ഫയൽ'),
-        ('ml_models.model_file_required',      'A model file is required.',                                  'ഒരു മോഡൽ ഫയൽ ആവശ്യമാണ്.'),
-        ('ml_models.model_file_helper',        "The file is checked by the ML service before it's registered: it must be a joblib classifier trained on this service's exact feature columns. Files that don't fit are rejected with the specific mismatch. This is a structural check only — it doesn't judge whether the model is any good.", 'ഫയൽ രജിസ്റ്റർ ചെയ്യുന്നതിന് മുമ്പ് ML സേവനം അത് പരിശോധിക്കുന്നു: ഇത് ഈ സേവനത്തിന്റെ കൃത്യമായ ഫീച്ചർ കോളങ്ങളിൽ പരിശീലിപ്പിച്ച ഒരു joblib ക്ലാസിഫയർ ആയിരിക്കണം. യോജിക്കാത്ത ഫയലുകൾ നിർദ്ദിഷ്ട പൊരുത്തക്കേടോടെ നിരസിക്കപ്പെടും. ഇത് ഒരു ഘടനാപരമായ പരിശോധന മാത്രമാണ് — മോഡൽ നല്ലതാണോ എന്ന് ഇത് വിലയിരുത്തുന്നില്ല.'),
-        ('ml_models.cancel',                   'Cancel',                                                     'റദ്ദാക്കുക'),
-        ('ml_models.register',                 'Register',                                                   'രജിസ്റ്റർ ചെയ്യുക'),
-        ('ml_models.registering',              'Registering…',                                               'രജിസ്റ്റർ ചെയ്യുന്നു…'),
-        ('ml_models.loading',                  'Loading…',                                                   'ലോഡ് ചെയ്യുന്നു…'),
-        ('ml_models.model_registered',         'Model version registered successfully',                      'മോഡൽ പതിപ്പ് വിജയകരമായി രജിസ്റ്റർ ചെയ്തു'),
-        ('ml_models.register_failed',          'Failed to register model version',                           'മോഡൽ പതിപ്പ് രജിസ്റ്റർ ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു'),
-
-        # ── ml_models_table — MlModelsPage (list view) static UI text ──────
-        ('ml_models_table.page_title',              'ML Model Versions',                                          'ML മോഡൽ പതിപ്പുകൾ'),
-        ('ml_models_table.page_description',        'Manage crop recommendation model versions. Only one version can be active at a time.', 'വിള ശുപാർശ മോഡൽ പതിപ്പുകൾ നിയന്ത്രിക്കുക. ഒരു സമയം ഒരു പതിപ്പ് മാത്രമേ സജീവമാകാൻ കഴിയൂ.'),
-        ('ml_models_table.btn_train',                'Train from CSV',                                            'CSV-ൽ നിന്ന് പരിശീലിപ്പിക്കുക'),
-        ('ml_models_table.btn_register',             'Register Model',                                            'മോഡൽ രജിസ്റ്റർ ചെയ്യുക'),
-        ('ml_models_table.training_banner_singular', '1 version is training',                                     '1 പതിപ്പ് പരിശീലനത്തിലാണ്'),
-        ('ml_models_table.training_banner_plural',   '{n} versions are training',                                 '{n} പതിപ്പുകൾ പരിശീലനത്തിലാണ്'),
-        ('ml_models_table.training_banner_suffix',   '— this list refreshes automatically.',                      '— ഈ പട്ടിക സ്വയമേവ പുതുക്കുന്നു.'),
-        ('ml_models_table.toast_still_training',     'Still training — stats will be available when it finishes.', 'ഇപ്പോഴും പരിശീലനത്തിലാണ് — പൂർത്തിയാകുമ്പോൾ സ്ഥിതിവിവരക്കണക്കുകൾ ലഭ്യമാകും.'),
-        ('ml_models_table.toast_no_training_stats',  'No training stats for this version (registered via file upload).', 'ഈ പതിപ്പിന് പരിശീലന സ്ഥിതിവിവരക്കണക്കുകൾ ഇല്ല (ഫയൽ അപ്‌ലോഡ് വഴി രജിസ്റ്റർ ചെയ്തത്).'),
-        ('ml_models_table.dialog_title_failed',      'Training failed',                                           'പരിശീലനം പരാജയപ്പെട്ടു'),
-        ('ml_models_table.dialog_title_stats',       'Training stats',                                            'പരിശീലന സ്ഥിതിവിവരക്കണക്കുകൾ'),
-        ('ml_models_table.failed_help',              'This version has no model file and cannot be activated. Fix the cause below and upload the dataset again as a new version.', 'ഈ പതിപ്പിന് മോഡൽ ഫയൽ ഇല്ല, സജീവമാക്കാൻ കഴിയില്ല. താഴെയുള്ള കാരണം പരിഹരിച്ച് ഡാറ്റാസെറ്റ് വീണ്ടും ഒരു പുതിയ പതിപ്പായി അപ്‌ലോഡ് ചെയ്യുക.'),
-        ('ml_models_table.no_error_details',         'No error details were recorded.',                           'പിശക് വിശദാംശങ്ങളൊന്നും രേഖപ്പെടുത്തിയിട്ടില്ല.'),
-        ('ml_models_table.col_version',              'Version',                                                   'പതിപ്പ്'),
-        ('ml_models_table.col_description',          'Description',                                               'വിവരണം'),
-        ('ml_models_table.col_deployed',             'Deployed',                                                  'വിന്യസിച്ചത്'),
-        ('ml_models_table.status_training',          'Training',                                                  'പരിശീലനത്തിൽ'),
-        ('ml_models_table.status_failed',            'Failed',                                                    'പരാജയപ്പെട്ടു'),
-        ('ml_models_table.status_active',            'Active',                                                    'സജീവം'),
-        ('ml_models_table.status_inactive',          'Inactive',                                                  'നിഷ്ക്രിയം'),
-        ('ml_models_table.toast_activated',          'Model version activated',                                   'മോഡൽ പതിപ്പ് സജീവമാക്കി'),
-        ('ml_models_table.toast_activate_failed',    'Failed to activate model version',                          'മോഡൽ പതിപ്പ് സജീവമാക്കൽ പരാജയപ്പെട്ടു'),
-        ('ml_models_table.action_view_error',        'View Error',                                                'പിശക് കാണുക'),
-        ('ml_models_table.action_view_stats',        'View Training Stats',                                       'പരിശീലന സ്ഥിതിവിവരക്കണക്കുകൾ കാണുക'),
-        ('ml_models_table.action_view_feedback',     'View Feedback',                                             'പ്രതികരണം കാണുക'),
-        ('ml_models_table.action_activate',          'Activate',                                                  'സജീവമാക്കുക'),
-
-        # ── admin_gis_zones — GisZonesPage (agro-climatic zone boundaries) ─
-        ('admin_gis_zones.page_title',                 'Agro-Climatic Zone Boundaries',                             'കാർഷിക-കാലാവസ്ഥാ മേഖലാ അതിരുകൾ'),
-        ('admin_gis_zones.page_description',           'Click a row below to preview it on the map — this does NOT make it live. Only "Activate" does that.', 'ഭൂപടത്തിൽ പ്രിവ്യൂ ചെയ്യാൻ താഴെയുള്ള ഒരു നിര ക്ലിക്ക് ചെയ്യുക — ഇത് ലൈവ് ആക്കില്ല. "സജീവമാക്കുക" മാത്രമേ അത് ചെയ്യൂ.'),
-        ('admin_gis_zones.btn_upload',                  'Upload new version',                                        'പുതിയ പതിപ്പ് അപ്‌ലോഡ് ചെയ്യുക'),
-        ('admin_gis_zones.toast_uploaded',              'Uploaded "{label}" — not yet live.',                        '"{label}" അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
-        ('admin_gis_zones.toast_upload_failed',         'Failed to upload zone boundaries',                          'മേഖലാ അതിരുകൾ അപ്‌ലോഡ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
-        ('admin_gis_zones.preview_banner',              'Previewing {label} — not live, farmers still see the current active zones.', '{label} പ്രിവ്യൂ ചെയ്യുന്നു — ലൈവ് അല്ല, കർഷകർ ഇപ്പോഴും നിലവിലെ സജീവ മേഖലകൾ കാണുന്നു.'),
-        ('admin_gis_zones.btn_back_to_live',            'Back to live view',                                         'ലൈവ് കാഴ്ചയിലേക്ക് മടങ്ങുക'),
-        ('admin_gis_zones.live_banner',                 'Showing the currently LIVE zones — what every farmer sees right now.', 'നിലവിൽ ലൈവ് ആയ മേഖലകൾ കാണിക്കുന്നു — ഓരോ കർഷകനും ഇപ്പോൾ കാണുന്നത്.'),
-        ('admin_gis_zones.versions_heading',            'Uploaded Versions',                                         'അപ്‌ലോഡ് ചെയ്ത പതിപ്പുകൾ'),
-        ('admin_gis_zones.versions_description',        'Click a row to preview it above. Use the ⋯ menu to Activate or Delete.', 'മുകളിൽ പ്രിവ്യൂ ചെയ്യാൻ ഒരു നിര ക്ലിക്ക് ചെയ്യുക. സജീവമാക്കാനോ ഇല്ലാതാക്കാനോ ⋯ മെനു ഉപയോഗിക്കുക.'),
-        ('admin_gis_zones.toast_activated',             'Zones updated: {zones}',                                    'മേഖലകൾ അപ്ഡേറ്റ് ചെയ്തു: {zones}'),
-        ('admin_gis_zones.toast_activate_failed',       'Failed to activate this version',                           'ഈ പതിപ്പ് സജീവമാക്കൽ പരാജയപ്പെട്ടു'),
-        ('admin_gis_zones.toast_deleted',               'Deleted "{label}"',                                         '"{label}" ഇല്ലാതാക്കി'),
-        ('admin_gis_zones.toast_delete_failed',         'Failed to delete this version',                             'ഈ പതിപ്പ് ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു'),
-        ('admin_gis_zones.delete_confirm_title',        'Delete Zone Version',                                       'മേഖലാ പതിപ്പ് ഇല്ലാതാക്കുക'),
-        ('admin_gis_zones.delete_confirm_desc',         'Are you sure you want to delete "{label}"? This cannot be undone.', '"{label}" ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഈ പ്രവർത്തനം പഴയപടിയാക്കാൻ കഴിയില്ല.'),
-        ('admin_gis_zones.action_activate',             'Activate',                                                  'സജീവമാക്കുക'),
-        ('admin_gis_zones.action_delete',               'Delete',                                                    'ഇല്ലാതാക്കുക'),
-        ('admin_gis_zones.badge_active',                'Active',                                                    'സജീവം'),
-        ('admin_gis_zones.badge_inactive',              'Inactive',                                                  'നിഷ്ക്രിയം'),
-        ('admin_gis_zones.col_file',                    'File',                                                      'ഫയൽ'),
-        ('admin_gis_zones.col_uploaded',                'Uploaded',                                                  'അപ്‌ലോഡ് ചെയ്തത്'),
-        ('admin_gis_zones.map_hide_zones',              'Hide zones',                                                'മേഖലകൾ മറയ്ക്കുക'),
-        ('admin_gis_zones.map_show_zones',              'Show zones',                                                'മേഖലകൾ കാണിക്കുക'),
-        ('admin_gis_zones.map_opacity',                 'Opacity',                                                   'അതാര്യത'),
-        ('admin_gis_zones.map_satellite_tooltip',       'Switch to satellite view',                                  'സാറ്റലൈറ്റ് കാഴ്ചയിലേക്ക് മാറുക'),
-        ('admin_gis_zones.map_street_tooltip',          'Switch to street view',                                     'തെരുവ് കാഴ്ചയിലേക്ക് മാറുക'),
     ]
 
     count = 0
@@ -2775,211 +2618,209 @@ def seed_frontend_ui_translations(languages):
             'toast_start_failed':          'Failed to start assessment',
             'toast_reopened':              'Assessment reopened. You can now edit your answers.',
             'toast_reopen_failed':         'Failed to reopen assessment. Please try again.',
+        },     
+        # cbbo/ngo dashboard
+        'cbbo_dashboard': {
+            'page_title':                    'CBBO/NGO Portal',
+            'page_description':              'Verify FPOs and track progress in your assigned districts',
+            'card_assigned_fpos':            'Assigned FPOs',
+            'card_assigned_fpos_desc':       'In your jurisdiction',
+            'card_draft_reports':            'Draft Reports',
+            'card_draft_reports_desc':       'Not yet submitted',
+            'card_submitted_reports':        'Submitted Reports',
+            'card_submitted_reports_desc':   'Locked & filed',
+            'card_total_reports':            'Total Reports',
+            'card_total_reports_desc':       'All statuses',
+            'section_assigned_fpos_title':   'Assigned FPOs',
+            'section_assigned_fpos_subtitle':'FPOs in your jurisdiction',
+            'empty_no_fpos':                 'No FPOs assigned yet.',
+            'section_status_title':          'FPOs by Status',
+            'section_status_subtitle':       'Breakdown across your jurisdiction',
+            'empty_no_data':                 'No data yet.',
+            'loading':                       'Loading dashboard...',
+            'error_load':                    "Couldn't load dashboard data. Please refresh or try again shortly.",
+            'status_draft':                  'Draft',
+            'status_submitted':              'Submitted',
+            'status_under_review':           'Under Review',
+            'status_info_required':          'Additional Info Required',
+            'status_approved':               'Approved',
+            'status_rejected':               'Rejected',
+            'status_suspended':              'Suspended',
+            'status_claimed':                'Claimed',
         },
-
-        'fpo_dpr': {
-            # Page header
-            'page_title':                  'DPR Projects',
-            'page_description':            'Detailed Project Reports for your FPO business plans',
-            # Empty state
-            'empty_title':                 'No DPR Projects Yet',
-            'empty_description':           'Create your first Detailed Project Report to plan and present your FPO business project.',
-            # New project dialog
-            'btn_new_project':             'New DPR Project',
-            'dialog_title':                'New DPR Project',
-            'label_project_title':         'Project Title',
-            'placeholder_project_title':   'e.g. Banana Processing Unit',
-            'label_financial_year':        'Financial Year',
-            'placeholder_financial_year':  '2025-26',
-            'btn_create':                  'Create & Open',
-            'btn_creating':                'Creating…',
-            'toast_create_failed':         'Failed to create DPR project. Please try again.',
-            # Project card
-            'label_readiness':             'Readiness',
-            'btn_continue':                'Continue Wizard',
-            'btn_download':                'Download PDF',
-            'btn_view_project':            'View',
-            # Status labels
-            'status_draft':                'Draft',
-            'status_data_complete':        'Data Complete',
-            'status_validated':            'Validated',
-            'status_generating':           'Generating…',
-            'status_generated':            'Generated',
-            'status_failed':               'Failed',
-            # Project detail page
-            'back_to_list':                'Back to DPR Projects',
-            'project_not_found':           'Project not found.',
-            'heading_sections':            'Project Sections',
-            'heading_readiness':           'Readiness',
-            'heading_documents':           'Generated Documents',
-            'label_version':               'Version',
-            'label_score':                 'Score',
-            'label_can_generate':          'Ready to Generate',
-            'label_errors':                'Blocking Issues',
-            'label_warnings':              'Warnings',
-            'label_suggestions':           'Suggestions',
-            'btn_generate':                'Generate PDF',
-            'btn_generating':              'Generating…',
-            'btn_validate':                'Run Validation',
-            'toast_generate_success':      'PDF generation started. This may take a few minutes.',
-            'toast_generate_failed':       'Failed to start PDF generation. Please try again.',
-            'no_documents':                'No PDFs generated yet.',
-            'no_errors':                   'No blocking issues.',
-            'no_warnings':                 'All checks passed.',
-            # Section names (21 wizard sections)
-            'section_project_basics':          'Project Basics',
-            'section_promoter_details':        'Promoter Details',
-            'section_project_location':        'Project Location',
-            'section_nature_of_business':      'Nature of Business',
-            'section_product_details':         'Product Details',
-            'section_raw_material':            'Raw Material',
-            'section_market_linkages':         'Market Linkages',
-            'section_land_details':            'Land Details',
-            'section_civil_works':             'Civil Works',
-            'section_machinery':               'Machinery & Equipment',
-            'section_utilities':               'Utilities',
-            'section_manpower':                'Manpower',
-            'section_working_capital':         'Working Capital',
-            'section_means_of_finance':        'Means of Finance',
-            'section_subsidy_details':         'Subsidy Details',
-            'section_revenue_projections':     'Revenue Projections',
-            'section_implementation_plan':     'Implementation Plan',
-            'section_risk_analysis':           'Risk Analysis',
-            'section_swot_analysis':           'SWOT Analysis',
-            'section_environmental_clearances':'Environmental Clearances',
-            'section_declaration':             'Declaration',
-            # Section status chips
-            'status_complete':             'Complete',
-            'status_incomplete':           'Incomplete',
-            'status_not_started':          'Not Started',
-            # Section fill page
-            'section_not_found':           'Section not found.',
-            'label_section_data':          'Section Data (JSON)',
-            'json_hint':                   'Edit the JSON data for this section. Guided forms will be added in a future update.',
-            'json_parse_error':            'Invalid JSON — fix before saving',
-            'btn_save':                    'Save',
-            'btn_saving':                  'Saving…',
-            'save_indicator_saving':       'Saving…',
-            'save_indicator_saved':        'Saved',
-            'toast_save_failed':           'Failed to save. Please try again.',
-            # Project Basics form fields
-            'label_project_type':          'Project Type',
-            'option_processing':           'Processing',
-            'option_storage':              'Storage',
-            'option_marketing':            'Marketing',
-            'option_aggregation':          'Aggregation',
-            'option_other':                'Other',
-            'label_key_components':        'Key Components',
-            'placeholder_key_components':  'Comma-separated list of main project components',
-            'hint_key_components':         'Comma-separated list of main project components',
-            'label_notes':                 'Project Notes',
-            'placeholder_notes':           'Any additional notes about this project…',
-            'option_select_type':          'Select project type',
-            'label_project':               'Project',
-            'label_complete':              'complete',
-            'label_last_saved':            'Last saved',
-            'btn_back':                    'Back to Project',
-            # project_location form
-            'label_district':              'District',
-            'placeholder_district':        'e.g. Thrissur',
-            'label_block':                 'Block / Taluk',
-            'option_select_block':         'Select block',
-            'label_village':               'Village / Town',
-            'placeholder_village':         'e.g. Irinjalakuda',
-            'label_pin_code':              'PIN Code',
-            'label_survey_number':         'Survey Number',
-            'placeholder_survey_number':   'e.g. 45/2A',
-            'label_nearest_town':          'Nearest Town / City',
-            'placeholder_nearest_town':    'e.g. Thrissur',
-            'label_distance_km':           'Distance (km)',
-            'label_project_site_location': 'Project Site Location',
-            'hint_map':                    'Search for the project site, click on the map to drop a pin, or drag the pin to adjust. You can also use your current GPS location.',
+        'cbbo_verifications': {
+            'page_title':                    'FPO Verifications',
+            'page_description':              'FPOs in your assigned districts',
+            'col_name':                      'FPO Name',
+            'col_application_id':            'Application ID',
+            'col_district':                  'District',
+            'col_status':                    'Status',
+            'col_members':                   'Members',
+            'col_updated':                   'Updated',
+            'view_default_title':            'FPO Details',
+            'action_submit_report':          'Submit Report',
+            'field_application_id':          'Application ID',
+            'field_district':                'District',
+            'field_status':                  'Status',
+            'field_total_members':           'Total Members',
+            'field_tier':                    'Tier',
+            'field_last_updated':            'Last Updated',
         },
-
-        'admin_dpr': {
-            'page_title':           'DPR Projects',
-            'page_description':     'All DPR projects across all FPOs',
-            'col_fpo':              'FPO',
-            'col_title':            'Project Title',
-            'col_year':             'Financial Year',
-            'col_status':           'Status',
-            'col_score':            'Score',
-            'col_created':          'Created',
-            'status_draft':         'Draft',
-            'status_data_complete': 'Data Complete',
-            'status_validated':     'Validated',
-            'status_generating':    'Generating',
-            'status_generated':     'Generated',
-            'status_failed':        'Failed',
-            'back_to_list':         'Back to DPR Projects',
-            'project_not_found':    'Project not found.',
-            'heading_sections':     'Section Completion',
-            'heading_financials':   'Financial Summary',
-            'heading_documents':    'Generated Documents',
-            'label_fpo':            'FPO',
-            'label_year':           'Financial Year',
-            'label_score':          'Score',
-            'label_version':        'Version',
-            'no_documents':         'No documents yet.',
-            'btn_download':         'Download',
-            'label_errors':         'Blocking Issues',
-            'label_warnings':       'Warnings',
+        'expert_dashboard': {
+            'page_title':                    'My Bookings',
+            'page_description':              'Manage your appointment requests',
+            'empty_no_bookings':             'No bookings yet.',
+            'section_pending':               'Pending Requests',
+            'section_past':                  'Past & Other Bookings',
+            'field_application_id':          'Application ID',
+            'field_contact':                 'Contact',
+            'field_email':                   'Email',
+            'field_phone':                   'Phone',
+            'field_topic':                   'Topic',
+            'field_notes':                   'Notes',
+            'field_location':                'Location',
+            'field_reason':                  'Reason',
+            'btn_confirm':                   'Confirm',
+            'btn_reject':                    'Reject',
+            'dialog_reject_title':           'Reason for rejecting this booking?',
+            'dialog_reject_placeholder':     'Let the FPO know why you cannot accept this appointment',
+            'btn_cancel':                    'Cancel',
+            'btn_rejecting':                 'Rejecting...',
+            'btn_reject_booking':            'Reject Booking',
+            'toast_confirmed':               'Booking confirmed',
+            'toast_confirm_failed':          'Failed to confirm booking',
+            'toast_rejected':                'Booking rejected',
+            'toast_reject_failed':           'Failed to reject booking',
+            'loading':                       'Loading your bookings...',
+            'status_pending':                'Pending',
+            'status_confirmed':              'Confirmed',
+            'status_rejected':               'Rejected',
+            'status_cancelled':              'Cancelled',
+            'status_completed':              'Completed',
         },
-
-        'admin_dpr_config': {
-            'page_title':              'DPR Configuration',
-            'page_description':        'Financial assumptions used for DPR generation',
-            'section_financial':       'Financial Assumptions',
-            'col_config_key':          'Config Key',
-            'col_value':               'Value',
-            'col_description':         'Description',
-            'col_updated':             'Last Updated',
-            'col_action':              'Action',
-            'dialog_title':            'Edit Configuration',
-            'label_value':             'Value',
-            'btn_save':                'Save',
-            'btn_saving':              'Saving…',
-            'btn_cancel':              'Cancel',
-            'toast_updated':           'Configuration updated.',
-            'toast_update_failed':     'Failed to update configuration.',
+        'expert_availability': {
+            'page_title':                    'Set Availability',
+            'page_description_1':            'Pick a date range, choose which days of the week to include, and set your time slots - all dates in range get saved at once.',
+            'page_description_2':            'Use "Mark Absent" to explicitly block dates you are unavailable, even if they were previously marked available.',
+            'step1_title':                   '1. Pick date(s)',
+            'btn_date_range':                'Date Range',
+            'btn_single_date':               'Single Date',
+            'btn_mark_absent':               'Mark Absent',
+            'step2_title':                   '2. Which days of the week?',
+            'step3_title':                   '3. Time slots for each date',
+            'label_to':                      'to',
+            'btn_add_slot':                  'Add time slot',
+            'preview_title':                 'Preview: dates that will be saved',
+            'loading':                       'Loading your profile...',
+            'error_duplicate_slot':          'This time slot duplicates another one. Please use a different time.',
+            'error_duplicate_slot_add':      'That time slot already exists. Adjust it before adding another.',
+            'summary_availability':          'This will set availability for {count} date(s), each with {slots} time slot(s).',
+            'summary_absent':                'This will mark {count} date(s) as absent.',
+            'btn_saving':                    'Saving...',
+            'btn_mark_absent_count':         'Mark {count} date(s) as Absent',
+            'btn_save_availability':         'Save Availability for {count} date(s)',
+            'toast_marked_absent':           'Marked {count} date(s) as absent',
+            'toast_saved':                   'Availability saved for {count} date(s)',
+            'toast_failed':                  'Failed to update availability. Make sure your account is linked to an expert profile.',
+            'weekday_sun':                   'Sun',
+            'weekday_mon':                   'Mon',
+            'weekday_tue':                   'Tue',
+            'weekday_wed':                   'Wed',
+            'weekday_thu':                   'Thu',
+            'weekday_fri':                   'Fri',
+            'weekday_sat':                   'Sat',
         },
-
-        'admin_ai_services': {
-            'page_title':                   'AI Services',
-            'page_description':             'Manage AI service availability, budget caps and monitor usage',
-            'section_services':             'Service Configuration',
-            'section_usage_log':            'Usage Log',
-            'stat_total_calls':             'Total Calls This Month',
-            'stat_total_cost':              'Total Cost This Month',
-            'stat_active_services':         'Active Services',
-            'stat_of':                      'of',
-            'stat_configured':              'configured',
-            'col_service':                  'Service',
-            'col_fpo':                      'FPO',
-            'col_tokens':                   'Tokens',
-            'col_cost':                     'Cost (₹)',
-            'col_status':                   'Status',
-            'col_date':                     'Date',
-            'status_success':               'Success',
-            'status_failed':                'Failed',
-            'label_calls_this_month':       'calls this month',
-            'label_spent':                  'spent',
-            'label_enabled':                'Enabled',
-            'label_disabled':               'Disabled',
-            'label_monthly_cap':            'Monthly cap (₹):',
-            'label_no_limit':               'No limit',
-            'btn_save':                     'Save',
-            'btn_cancel':                   'Cancel',
-            'toast_cap_updated':            'Budget cap updated.',
-            'toast_cap_failed':             'Failed to update budget cap.',
-            'toast_toggle_failed':          'Failed to update AI service.',
-            'search_placeholder':           'Search by FPO name…',
-            'service_dpr_generation':       'DPR Generation',
-            'service_dpr_risk':             'DPR Risk Analysis',
-            'service_dpr_swot':             'DPR SWOT Analysis',
-            'service_dpr_executive':        'DPR Executive Summary',
+        'government_schemes': {
+            'action_view':                   'View',
+            'col_created_by':                'Created By',
+            'badge_you':                     'You',
+            'badge_unknown':                 'Unknown',
+            'badge_active':                  'Active',
+            'badge_inactive':                'Inactive',
+            'btn_new_scheme':                'New Scheme',
+            'placeholder_search':            'Search schemes...',
+            'section_overview':              'Overview',
+            'section_details':               'Details',
+            'field_official_link':           'Official Link',
+            'field_last_updated':            'Last Updated',
+            'field_objective':               'Objective',
+        },
+        'government_training': {
+            'page_title':                    'Training Sessions',
+            'page_description':              'Sessions you have conducted for FPOs in your jurisdiction',
+            'btn_new_session':                'New Session',
+            'placeholder_filter_topic':      'Filter by topic...',
+            'loading':                       'Loading...',
+            'error_load':                    'Could not load training sessions.',
+            'empty_no_sessions':             'No training sessions yet.',
+            'badge_attended':                '{attended}/{total} attended',
+        },
+        'government_training_new': {
+            'create_title':                  'New Training Session',
+            'create_subtitle':               'Log a session you conducted for an FPO',
+            'section_details':               'Session Details',
+            'field_fpo_id':                  'FPO ID',
+            'placeholder_fpo_id':            'Enter FPO id',
+            'field_topic':                   'Topic',
+            'placeholder_topic':             'e.g. Organic Farming Practices',
+            'field_date':                    'Date',
+            'field_duration':                'Duration (hours)',
+            'field_participants':            'Participants',
+            'field_venue':                   'Venue',
+            'placeholder_venue':             'Optional',
+            'btn_cancel':                    'Cancel',
+            'btn_save':                      'Save Session',
+            'btn_saving':                    'Saving...',
+            'toast_created':                 'Training session recorded',
+            'validation_required':           'Fill in FPO ID, topic, and date',
+        },
+        'official_register': {
+            'header_already_registered':     'Already registered?',
+            'header_sign_in':                'Sign in',
+            'page_title':                    'Official Registration',
+            'page_description':              'Your account will be reviewed by a KAU Super Admin before activation.',
+            'mode_government':               'Government Official',
+            'mode_cbbo':                     'CBBO / NGO Officer',
+            'section_account':               'Account',
+            'field_first_name':              'First Name',
+            'field_last_name':               'Last Name',
+            'field_email':                   'Email',
+            'field_phone':                   'Phone',
+            'field_password':                'Password',
+            'field_designation':             'Designation',
+            'section_govt_details':          'Government Details',
+            'field_department':              'Department',
+            'placeholder_department':        'e.g. Department of Agriculture',
+            'field_user_category':           'User Category',
+            'field_id_number':               'ID Number',
+            'placeholder_id_number':         'Matching the format for your selected category',
+            'field_jurisdiction':            'Jurisdiction',
+            'option_district':               'District',
+            'option_state':                  'State',
+            'field_district':                'District',
+            'placeholder_select_district':   'Select a district',
+            'section_cbbo_details':          'CBBO / NGO Details',
+            'field_organisation':            'Organisation',
+            'placeholder_select_org':        'Select an organisation',
+            'field_level':                   'Level',
+            'field_district_code':           'District Code',
+            'btn_back_to_login':             '\u2190 Back to Login',
+            'btn_register':                  'Register',
+            'btn_registering':               'Registering...',
+            'toast_success':                 'Registration submitted. An administrator will review your account.',
+            'toast_failed':                  'Registration failed',
+            'val_first_name_required':       'First name is required.',
+            'val_email_invalid':             'Please enter a valid email address.',
+            'val_phone_invalid':             'Enter a valid 10-digit Indian mobile number.',
+            'val_password_min':              'Password must be at least 8 characters.',
+            'val_department_required':       'Department is required.',
+            'val_id_number_required':        'ID number is required.',
+            'val_district_required':         'District is required.',
+            'val_organisation_required':     'Organisation is required.',
+            'val_district_code_required':    'District code is required.',
         },
     }
+
 
     count = 0
     for screen, entries in screens.items():
@@ -3005,15 +2846,6 @@ def seed_fpo_portal_ml_translations(languages):
     lang_ml  = languages['ml']
 
     ml_keys = {
-        #-------------------------------------------------------------------------
-        #Arunima S --> 28 Aug 2026
-
-        # ── common — fix keys clobbered by seed_frontend_ui_translations's
-        # English-placeholder pass (Step 7 runs after seed_ui_translations
-        # and overwrote these with unverified English placeholders) ────────
-        'common.edit':                          'എഡിറ്റ് ചെയ്യുക',
-        'common.delete':                        'ഇല്ലാതാക്കുക',
-        #-------------------------------------------------------------------------
         # ── fpo_dashboard new keys ─────────────────────────────────────────
         'fpo_dashboard.label_docs_verified':    'പരിശോധിച്ചു',
         'fpo_dashboard.label_docs_pending':     'പരിശോധന ആവശ്യം',
@@ -3214,194 +3046,6 @@ def seed_fpo_portal_ml_translations(languages):
         'fpo_tier_assessment.toast_start_failed':       'മൂല്യനിർണ്ണയം ആരംഭിക്കൽ പരാജയപ്പെട്ടു',
         'fpo_tier_assessment.toast_reopened':           'മൂല്യനിർണ്ണയം വീണ്ടും തുറന്നു. ഉത്തരങ്ങൾ എഡിറ്റ് ചെയ്യാം.',
         'fpo_tier_assessment.toast_reopen_failed':      'മൂല്യനിർണ്ണയം വീണ്ടും തുറക്കൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.',
-
-        # ── fpo_dpr ────────────────────────────────────────────────────────────
-        'fpo_dpr.page_title':                  'DPR പ്രൊജക്ടുകൾ',
-        'fpo_dpr.page_description':            'നിങ്ങളുടെ FPO ബിസിനസ് പദ്ധതികൾക്കുള്ള വിശദ പദ്ധതി റിപ്പോർട്ടുകൾ',
-        'fpo_dpr.empty_title':                 'DPR പ്രൊജക്ടുകൾ ഒന്നുമില്ല',
-        'fpo_dpr.empty_description':           'നിങ്ങളുടെ ആദ്യ വിശദ പദ്ധതി റിപ്പോർട്ട് സൃഷ്ടിക്കുക',
-        'fpo_dpr.btn_new_project':             'പുതിയ DPR പ്രൊജക്ട്',
-        'fpo_dpr.dialog_title':                'പുതിയ DPR പ്രൊജക്ട്',
-        'fpo_dpr.label_project_title':         'പ്രൊജക്ട് ശീർഷകം',
-        'fpo_dpr.placeholder_project_title':   'ഉദാ: വാഴ സംസ്കരണ യൂണിറ്റ്',
-        'fpo_dpr.label_financial_year':        'സാമ്പത്തിക വർഷം',
-        'fpo_dpr.placeholder_financial_year':  '2025-26',
-        'fpo_dpr.btn_create':                  'സൃഷ്ടിക്കുക',
-        'fpo_dpr.btn_creating':                'സൃഷ്ടിക്കുന്നു…',
-        'fpo_dpr.toast_create_failed':         'DPR പ്രൊജക്ട് സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടു',
-        'fpo_dpr.label_readiness':             'തയ്യാറെടുപ്പ്',
-        'fpo_dpr.btn_continue':                'വിസാർഡ് തുടരുക',
-        'fpo_dpr.btn_download':                'PDF ഡൗൺലോഡ്',
-        'fpo_dpr.btn_view_project':            'കാണുക',
-        'fpo_dpr.status_draft':                'ഡ്രാഫ്റ്റ്',
-        'fpo_dpr.status_data_complete':        'ഡേറ്റ പൂർണ്ണം',
-        'fpo_dpr.status_validated':            'സ്ഥിരീകരിച്ചു',
-        'fpo_dpr.status_generating':           'ജനറേറ്റ് ചെയ്യുന്നു…',
-        'fpo_dpr.status_generated':            'ജനറേറ്റ് ചെയ്തു',
-        'fpo_dpr.status_failed':               'പരാജയം',
-        'fpo_dpr.back_to_list':                'DPR പ്രൊജക്ടുകളിലേക്ക് മടങ്ങുക',
-        'fpo_dpr.project_not_found':           'പ്രൊജക്ട് കണ്ടെത്തിയില്ല.',
-        'fpo_dpr.heading_sections':            'പ്രൊജക്ട് വിഭാഗങ്ങൾ',
-        'fpo_dpr.heading_readiness':           'തയ്യാറെടുപ്പ്',
-        'fpo_dpr.heading_documents':           'ജനറേറ്റ് ചെയ്ത ഡോക്യുമെന്റുകൾ',
-        'fpo_dpr.label_version':               'പതിപ്പ്',
-        'fpo_dpr.label_score':                 'സ്കോർ',
-        'fpo_dpr.label_can_generate':          'ജനറേറ്റ് ചെയ്യാൻ തയ്യാർ',
-        'fpo_dpr.label_errors':                'തടസ്സ പ്രശ്നങ്ങൾ',
-        'fpo_dpr.label_warnings':              'മുന്നറിയിപ്പുകൾ',
-        'fpo_dpr.label_suggestions':           'നിർദ്ദേശങ്ങൾ',
-        'fpo_dpr.btn_generate':                'PDF ജനറേറ്റ് ചെയ്യുക',
-        'fpo_dpr.btn_generating':              'ജനറേറ്റ് ചെയ്യുന്നു…',
-        'fpo_dpr.btn_validate':                'മൂല്യനിർണ്ണയം നടത്തുക',
-        'fpo_dpr.toast_generate_success':      'PDF ജനറേഷൻ ആരംഭിച്ചു. ഇത് കുറച്ച് മിനിറ്റ് എടുക്കും.',
-        'fpo_dpr.toast_generate_failed':       'PDF ജനറേഷൻ ആരംഭിക്കൽ പരാജയപ്പെട്ടു',
-        'fpo_dpr.no_documents':                'ഇതുവരെ PDF ജനറേറ്റ് ചെയ്തിട്ടില്ല.',
-        'fpo_dpr.no_errors':                   'തടസ്സ പ്രശ്നങ്ങൾ ഒന്നുമില്ല.',
-        'fpo_dpr.no_warnings':                 'എല്ലാ പരിശോധനകളും വിജയിച്ചു.',
-        'fpo_dpr.section_project_basics':          'പ്രൊജക്ട് അടിസ്ഥാനം',
-        'fpo_dpr.section_promoter_details':        'പ്രമോട്ടർ വിവരങ്ങൾ',
-        'fpo_dpr.section_project_location':        'പ്രൊജക്ട് സ്ഥലം',
-        'fpo_dpr.section_nature_of_business':      'ബിസിനസ് സ്വഭാവം',
-        'fpo_dpr.section_product_details':         'ഉൽപ്പന്ന വിവരങ്ങൾ',
-        'fpo_dpr.section_raw_material':            'അസംസ്കൃത വസ്തു',
-        'fpo_dpr.section_market_linkages':         'വിപണി ബന്ധം',
-        'fpo_dpr.section_land_details':            'ഭൂമി വിവരങ്ങൾ',
-        'fpo_dpr.section_civil_works':             'സിവിൽ ജോലികൾ',
-        'fpo_dpr.section_machinery':               'യന്ത്രങ്ങളും ഉപകരണങ്ങളും',
-        'fpo_dpr.section_utilities':               'യൂട്ടിലിറ്റികൾ',
-        'fpo_dpr.section_manpower':                'മാൻപവർ',
-        'fpo_dpr.section_working_capital':         'വർക്കിംഗ് ക്യാപിറ്റൽ',
-        'fpo_dpr.section_means_of_finance':        'ധനസമ്പാദന മാർഗ്ഗം',
-        'fpo_dpr.section_subsidy_details':         'സബ്‌സിഡി വിവരങ്ങൾ',
-        'fpo_dpr.section_revenue_projections':     'വരുമാന പ്രൊജക്ഷൻ',
-        'fpo_dpr.section_implementation_plan':     'നടപ്പാക്കൽ പദ്ധതി',
-        'fpo_dpr.section_risk_analysis':           'അപകട വിശകലനം',
-        'fpo_dpr.section_swot_analysis':           'SWOT വിശകലനം',
-        'fpo_dpr.section_environmental_clearances':'പരിസ്ഥിതി ക്ലിയറൻസ്',
-        'fpo_dpr.section_declaration':             'പ്രഖ്യാപനം',
-        'fpo_dpr.status_complete':             'പൂർണ്ണം',
-        'fpo_dpr.status_incomplete':           'അപൂർണ്ണം',
-        'fpo_dpr.status_not_started':          'ആരംഭിച്ചിട്ടില്ല',
-        'fpo_dpr.section_not_found':           'വിഭാഗം കണ്ടെത്തിയില്ല.',
-        'fpo_dpr.label_section_data':          'വിഭാഗ ഡേറ്റ (JSON)',
-        'fpo_dpr.json_hint':                   'ഈ വിഭാഗത്തിനുള്ള JSON ഡേറ്റ എഡിറ്റ് ചെയ്യുക.',
-        'fpo_dpr.json_parse_error':            'അസാധുവായ JSON — സംരക്ഷിക്കുന്നതിന് മുൻപ് ശരിയാക്കുക',
-        'fpo_dpr.btn_save':                    'സംരക്ഷിക്കുക',
-        'fpo_dpr.btn_saving':                  'സംരക്ഷിക്കുന്നു…',
-        'fpo_dpr.save_indicator_saving':       'സംരക്ഷിക്കുന്നു…',
-        'fpo_dpr.save_indicator_saved':        'സംരക്ഷിച്ചു',
-        'fpo_dpr.toast_save_failed':           'സംരക്ഷിക്കൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.',
-        'fpo_dpr.label_project_type':          'പ്രൊജക്ട് തരം',
-        'fpo_dpr.option_processing':           'സംസ്കരണം',
-        'fpo_dpr.option_storage':              'സംഭരണം',
-        'fpo_dpr.option_marketing':            'വിപണനം',
-        'fpo_dpr.option_aggregation':          'ശേഖരണം',
-        'fpo_dpr.option_other':                'മറ്റുള്ളവ',
-        'fpo_dpr.label_key_components':        'പ്രധാന ഘടകങ്ങൾ',
-        'fpo_dpr.placeholder_key_components':  'പദ്ധതിയുടെ പ്രധാന ഘടകങ്ങൾ',
-        'fpo_dpr.hint_key_components':         'പ്രധാന ഘടകങ്ങൾ കോമ ഉപയോഗിച്ച് വേർതിരിക്കുക',
-        'fpo_dpr.label_notes':                 'പ്രൊജക്ട് കുറിപ്പുകൾ',
-        'fpo_dpr.placeholder_notes':           'പദ്ധതിയെക്കുറിച്ചുള്ള അധിക കുറിപ്പുകൾ…',
-        'fpo_dpr.option_select_type':          'പ്രൊജക്ട് തരം തിരഞ്ഞെടുക്കുക',
-        'fpo_dpr.label_project':               'പ്രൊജക്ട്',
-        'fpo_dpr.label_complete':              'പൂർത്തിയായി',
-        'fpo_dpr.label_last_saved':            'അവസാനം സംരക്ഷിച്ചത്',
-        'fpo_dpr.btn_back':                    'പ്രൊജക്ടിലേക്ക് മടങ്ങുക',
-        'fpo_dpr.label_district':              'ജില്ല',
-        'fpo_dpr.placeholder_district':        'ഉദാ: തൃശ്ശൂർ',
-        'fpo_dpr.label_block':                 'ബ്ലോക്ക് / താലൂക്ക്',
-        'fpo_dpr.option_select_block':         'ബ്ലോക്ക് തിരഞ്ഞെടുക്കുക',
-        'fpo_dpr.label_village':               'ഗ്രാമം / നഗരം',
-        'fpo_dpr.placeholder_village':         'ഉദാ: ഇരിങ്ങാലക്കുട',
-        'fpo_dpr.label_pin_code':              'പിൻ കോഡ്',
-        'fpo_dpr.label_survey_number':         'സർവേ നമ്പർ',
-        'fpo_dpr.placeholder_survey_number':   'ഉദാ: 45/2A',
-        'fpo_dpr.label_nearest_town':          'അടുത്ത നഗരം / പട്ടണം',
-        'fpo_dpr.placeholder_nearest_town':    'ഉദാ: തൃശ്ശൂർ',
-        'fpo_dpr.label_distance_km':           'ദൂരം (കി.മീ)',
-        'fpo_dpr.label_project_site_location': 'പദ്ധതി സൈറ്റ് സ്ഥാനം',
-        'fpo_dpr.hint_map':                    'പദ്ധതി സൈറ്റ് തിരയുക, മാപ്പിൽ ക്ലിക്ക് ചെയ്ത് പിൻ ഇടുക, അല്ലെങ്കിൽ GPS ഉപയോഗിക്കുക.',
-
-        # ── admin_dpr_config ───────────────────────────────────────────────────
-        'admin_dpr_config.page_title':              'DPR കോൺഫിഗറേഷൻ',
-        'admin_dpr_config.page_description':        'DPR ജനറേഷനായുള്ള സാമ്പത്തിക അനുമാനങ്ങൾ',
-        'admin_dpr_config.section_financial':       'സാമ്പത്തിക അനുമാനങ്ങൾ',
-        'admin_dpr_config.col_config_key':          'കോൺഫിഗ് കീ',
-        'admin_dpr_config.col_value':               'മൂല്യം',
-        'admin_dpr_config.col_description':         'വിവരണം',
-        'admin_dpr_config.col_updated':             'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്',
-        'admin_dpr_config.col_action':              'ആക്ഷൻ',
-        'admin_dpr_config.dialog_title':            'കോൺഫിഗറേഷൻ എഡിറ്റ് ചെയ്യുക',
-        'admin_dpr_config.label_value':             'മൂല്യം',
-        'admin_dpr_config.btn_save':                'സംരക്ഷിക്കുക',
-        'admin_dpr_config.btn_saving':              'സംരക്ഷിക്കുന്നു…',
-        'admin_dpr_config.btn_cancel':              'റദ്ദാക്കുക',
-        'admin_dpr_config.toast_updated':           'കോൺഫിഗറേഷൻ അപ്ഡേറ്റ് ചെയ്തു.',
-        'admin_dpr_config.toast_update_failed':     'കോൺഫിഗറേഷൻ അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
-
-        # ── admin_ai_services ──────────────────────────────────────────────────
-        'admin_ai_services.page_title':                   'AI സേവനങ്ങൾ',
-        'admin_ai_services.page_description':             'AI സേവന ലഭ്യത, ബജറ്റ് പരിധി, ഉപയോഗം നിരീക്ഷിക്കുക',
-        'admin_ai_services.section_services':             'സേവന കോൺഫിഗറേഷൻ',
-        'admin_ai_services.section_usage_log':            'ഉപയോഗ ലോഗ്',
-        'admin_ai_services.stat_total_calls':             'ഈ മാസം മൊത്തം കോളുകൾ',
-        'admin_ai_services.stat_total_cost':              'ഈ മാസം മൊത്തം ചെലവ്',
-        'admin_ai_services.stat_active_services':         'സജീവ സേവനങ്ങൾ',
-        'admin_ai_services.stat_of':                      'ൽ',
-        'admin_ai_services.stat_configured':              'കോൺഫിഗർ ചെയ്തത്',
-        'admin_ai_services.col_service':                  'സേവനം',
-        'admin_ai_services.col_fpo':                      'FPO',
-        'admin_ai_services.col_tokens':                   'ടോക്കണുകൾ',
-        'admin_ai_services.col_cost':                     'ചെലവ് (₹)',
-        'admin_ai_services.col_status':                   'സ്ഥിതി',
-        'admin_ai_services.col_date':                     'തീയതി',
-        'admin_ai_services.status_success':               'വിജയം',
-        'admin_ai_services.status_failed':                'പരാജയം',
-        'admin_ai_services.label_calls_this_month':       'ഈ മാസം കോളുകൾ',
-        'admin_ai_services.label_spent':                  'ചെലവഴിച്ചു',
-        'admin_ai_services.label_enabled':                'പ്രവർത്തനക്ഷമം',
-        'admin_ai_services.label_disabled':               'നിഷ്ക്രിയം',
-        'admin_ai_services.label_monthly_cap':            'പ്രതിമാസ പരിധി (₹):',
-        'admin_ai_services.label_no_limit':               'പരിധിയില്ല',
-        'admin_ai_services.btn_save':                     'സംരക്ഷിക്കുക',
-        'admin_ai_services.btn_cancel':                   'റദ്ദാക്കുക',
-        'admin_ai_services.toast_cap_updated':            'ബജറ്റ് പരിധി അപ്ഡേറ്റ് ചെയ്തു.',
-        'admin_ai_services.toast_cap_failed':             'ബജറ്റ് പരിധി അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
-        'admin_ai_services.toast_toggle_failed':          'AI സേവനം അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു.',
-        'admin_ai_services.search_placeholder':           'FPO പേര് തിരയുക…',
-        'admin_ai_services.service_dpr_generation':       'DPR ജനറേഷൻ',
-        'admin_ai_services.service_dpr_risk':             'DPR അപകട വിശകലനം',
-        'admin_ai_services.service_dpr_swot':             'DPR SWOT വിശകലനം',
-        'admin_ai_services.service_dpr_executive':        'DPR എക്സിക്യൂട്ടീവ് സംഗ്രഹം',
-
-        # ── admin_dpr ──────────────────────────────────────────────────────────
-        'admin_dpr.page_title':           'DPR പ്രൊജക്ടുകൾ',
-        'admin_dpr.page_description':     'എല്ലാ FPO-കളിലെയും DPR പ്രൊജക്ടുകൾ',
-        'admin_dpr.col_fpo':              'FPO',
-        'admin_dpr.col_title':            'പ്രൊജക്ട് ശീർഷകം',
-        'admin_dpr.col_year':             'സാമ്പത്തിക വർഷം',
-        'admin_dpr.col_status':           'സ്ഥിതി',
-        'admin_dpr.col_score':            'സ്കോർ',
-        'admin_dpr.col_created':          'സൃഷ്ടിച്ചത്',
-        'admin_dpr.status_draft':         'ഡ്രാഫ്റ്റ്',
-        'admin_dpr.status_data_complete': 'ഡേറ്റ പൂർണ്ണം',
-        'admin_dpr.status_validated':     'സ്ഥിരീകരിച്ചു',
-        'admin_dpr.status_generating':    'ജനറേറ്റ് ചെയ്യുന്നു',
-        'admin_dpr.status_generated':     'ജനറേറ്റ് ചെയ്തു',
-        'admin_dpr.status_failed':        'പരാജയം',
-        'admin_dpr.back_to_list':         'DPR പ്രൊജക്ടുകളിലേക്ക് മടങ്ങുക',
-        'admin_dpr.project_not_found':    'പ്രൊജക്ട് കണ്ടെത്തിയില്ല.',
-        'admin_dpr.heading_sections':     'വിഭാഗ പൂർണ്ണത',
-        'admin_dpr.heading_financials':   'സാമ്പത്തിക സംഗ്രഹം',
-        'admin_dpr.heading_documents':    'ജനറേറ്റ് ചെയ്ത ഡോക്യുമെന്റുകൾ',
-        'admin_dpr.label_fpo':            'FPO',
-        'admin_dpr.label_year':           'സാമ്പത്തിക വർഷം',
-        'admin_dpr.label_score':          'സ്കോർ',
-        'admin_dpr.label_version':        'പതിപ്പ്',
-        'admin_dpr.no_documents':         'ഡോക്യുമെന്റുകൾ ഒന്നുമില്ല.',
-        'admin_dpr.btn_download':         'ഡൗൺലോഡ്',
-        'admin_dpr.label_errors':         'തടസ്സ പ്രശ്നങ്ങൾ',
-        'admin_dpr.label_warnings':       'മുന്നറിയിപ്പുകൾ',
 
         # ── admin_site_content ─────────────────────────────────────────────────
         'admin_site_content.field_order':                'പ്രദർശന ക്രമം',
@@ -3644,7 +3288,198 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.dialog_edit_partner':   'പങ്കാളിയെ എഡിറ്റ് ചെയ്യുക',
 
         'admin_site_content.btn_add_partner':      'പങ്കാളിയെ ചേർക്കുക',
+        # ── cbbo_dashboard ──────────────────────────────────────────────────
+        'cbbo_dashboard.page_title':                    'സിബിബിഒ/എൻജിഒ പോർട്ടൽ',
+        'cbbo_dashboard.page_description':              'നിങ്ങളുടെ നിയുക്ത ജില്ലകളിലെ എഫ്പിഒകൾ പരിശോധിക്കുകയും പുരോഗതി ട്രാക്ക് ചെയ്യുകയും ചെയ്യുക',
+        'cbbo_dashboard.card_assigned_fpos':            'നിയുക്ത എഫ്പിഒകൾ',
+        'cbbo_dashboard.card_assigned_fpos_desc':       'നിങ്ങളുടെ അധികാരപരിധിയിൽ',
+        'cbbo_dashboard.card_draft_reports':            'ഡ്രാഫ്റ്റ് റിപ്പോർട്ടുകൾ',
+        'cbbo_dashboard.card_draft_reports_desc':       'ഇതുവരെ സമർപ്പിച്ചിട്ടില്ല',
+        'cbbo_dashboard.card_submitted_reports':        'സമർപ്പിച്ച റിപ്പോർട്ടുകൾ',
+        'cbbo_dashboard.card_submitted_reports_desc':   'ലോക്ക് ചെയ്ത് ഫയൽ ചെയ്തു',
+        'cbbo_dashboard.card_total_reports':            'ആകെ റിപ്പോർട്ടുകൾ',
+        'cbbo_dashboard.card_total_reports_desc':       'എല്ലാ സ്റ്റാറ്റസുകളും',
+        'cbbo_dashboard.section_assigned_fpos_title':   'നിയുക്ത എഫ്പിഒകൾ',
+        'cbbo_dashboard.section_assigned_fpos_subtitle':'നിങ്ങളുടെ അധികാരപരിധിയിലെ എഫ്പിഒകൾ',
+        'cbbo_dashboard.empty_no_fpos':                 'ഇതുവരെ എഫ്പിഒകൾ നിയോഗിച്ചിട്ടില്ല.',
+        'cbbo_dashboard.section_status_title':          'സ്റ്റാറ്റസ് പ്രകാരം എഫ്പിഒകൾ',
+        'cbbo_dashboard.section_status_subtitle':       'നിങ്ങളുടെ അധികാരപരിധിയിലുടനീളമുള്ള വിഭജനം',
+        'cbbo_dashboard.empty_no_data':                 'ഇതുവരെ ഡാറ്റയില്ല.',
+        'cbbo_dashboard.loading':                       'ഡാഷ്ബോർഡ് ലോഡ് ചെയ്യുന്നു...',
+        'cbbo_dashboard.error_load':                    'ഡാഷ്ബോർഡ് ഡാറ്റ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. ദയവായി റിഫ്രഷ് ചെയ്യുക അല്ലെങ്കിൽ കുറച്ച് സമയത്തിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.',
+        'cbbo_dashboard.status_draft':                  'ഡ്രാഫ്റ്റ്',
+        'cbbo_dashboard.status_submitted':              'സമർപ്പിച്ചു',
+        'cbbo_dashboard.status_under_review':           'അവലോകനത്തിലാണ്',
+        'cbbo_dashboard.status_info_required':          'അധിക വിവരങ്ങൾ ആവശ്യമാണ്',
+        'cbbo_dashboard.status_approved':               'അംഗീകരിച്ചു',
+        'cbbo_dashboard.status_rejected':               'നിരസിച്ചു',
+        'cbbo_dashboard.status_suspended':              'സസ്പെൻഡ് ചെയ്തു',
+        'cbbo_dashboard.status_claimed':                'ക്ലെയിം ചെയ്തു',
         'admin_site_content.partner_title':         'പങ്കാളികൾ',
+        # ── cbbo_verifications ──────────────────────────────────────────────
+        'cbbo_verifications.page_title':                'എഫ്പിഒ വെരിഫിക്കേഷനുകൾ',
+        'cbbo_verifications.page_description':          'നിങ്ങളുടെ നിയുക്ത ജില്ലകളിലെ എഫ്പിഒകൾ',
+        'cbbo_verifications.col_name':                  'എഫ്പിഒ പേര്',
+        'cbbo_verifications.col_application_id':        'അപേക്ഷാ ഐഡി',
+        'cbbo_verifications.col_district':              'ജില്ല',
+        'cbbo_verifications.col_status':                'സ്റ്റാറ്റസ്',
+        'cbbo_verifications.col_members':               'അംഗങ്ങൾ',
+        'cbbo_verifications.col_updated':               'അപ്ഡേറ്റ് ചെയ്തു',
+        'cbbo_verifications.view_default_title':        'എഫ്പിഒ വിശദാംശങ്ങൾ',
+        'cbbo_verifications.action_submit_report':      'റിപ്പോർട്ട് സമർപ്പിക്കുക',
+        'cbbo_verifications.field_application_id':      'അപേക്ഷാ ഐഡി',
+        'cbbo_verifications.field_district':            'ജില്ല',
+        'cbbo_verifications.field_status':              'സ്റ്റാറ്റസ്',
+        'cbbo_verifications.field_total_members':       'ആകെ അംഗങ്ങൾ',
+        'cbbo_verifications.field_tier':                'ടയർ',
+        'cbbo_verifications.field_last_updated':        'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്',
+        # ── expert_dashboard ──────────────────────────────────────────────
+        'expert_dashboard.page_title':                    'എന്റെ ബുക്കിംഗുകൾ',
+        'expert_dashboard.page_description':              'നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് അഭ്യർത്ഥനകൾ നിയന്ത്രിക്കുക',
+        'expert_dashboard.empty_no_bookings':             'ഇതുവരെ ബുക്കിംഗുകൾ ഇല്ല.',
+        'expert_dashboard.section_pending':               'തീർപ്പാക്കാത്ത അഭ്യർത്ഥനകൾ',
+        'expert_dashboard.section_past':                  'മുൻകാല & മറ്റ് ബുക്കിംഗുകൾ',
+        'expert_dashboard.field_application_id':          'അപേക്ഷാ ഐഡി',
+        'expert_dashboard.field_contact':                 'ബന്ധപ്പെടേണ്ടയാൾ',
+        'expert_dashboard.field_email':                   'ഇ-മെയിൽ',
+        'expert_dashboard.field_phone':                   'ഫോൺ',
+        'expert_dashboard.field_topic':                   'വിഷയം',
+        'expert_dashboard.field_notes':                   'കുറിപ്പുകൾ',
+        'expert_dashboard.field_location':                'സ്ഥലം',
+        'expert_dashboard.field_reason':                  'കാരണം',
+        'expert_dashboard.btn_confirm':                   'സ്ഥിരീകരിക്കുക',
+        'expert_dashboard.btn_reject':                    'നിരസിക്കുക',
+        'expert_dashboard.dialog_reject_title':           'ഈ ബുക്കിംഗ് നിരസിക്കാനുള്ള കാരണം?',
+        'expert_dashboard.dialog_reject_placeholder':     'ഈ അപ്പോയിന്റ്മെന്റ് സ്വീകരിക്കാൻ കഴിയാത്തതിന്റെ കാരണം എഫ്പിഒയെ അറിയിക്കുക',
+        'expert_dashboard.btn_cancel':                    'റദ്ദാക്കുക',
+        'expert_dashboard.btn_rejecting':                 'നിരസിക്കുന്നു...',
+        'expert_dashboard.btn_reject_booking':            'ബുക്കിംഗ് നിരസിക്കുക',
+        'expert_dashboard.toast_confirmed':               'ബുക്കിംഗ് സ്ഥിരീകരിച്ചു',
+        'expert_dashboard.toast_confirm_failed':          'ബുക്കിംഗ് സ്ഥിരീകരിക്കുന്നതിൽ പരാജയപ്പെട്ടു',
+        'expert_dashboard.toast_rejected':                'ബുക്കിംഗ് നിരസിച്ചു',
+        'expert_dashboard.toast_reject_failed':           'ബുക്കിംഗ് നിരസിക്കുന്നതിൽ പരാജയപ്പെട്ടു',
+        'expert_dashboard.loading':                       'നിങ്ങളുടെ ബുക്കിംഗുകൾ ലോഡ് ചെയ്യുന്നു...',
+        'expert_dashboard.status_pending':                'തീർപ്പാക്കാത്തത്',
+        'expert_dashboard.status_confirmed':              'സ്ഥിരീകരിച്ചു',
+        'expert_dashboard.status_rejected':               'നിരസിച്ചു',
+        'expert_dashboard.status_cancelled':              'റദ്ദാക്കി',
+        'expert_dashboard.status_completed':              'പൂർത്തിയായി',
+        # ── expert_availability ─────────────────────────────────────────────
+        'expert_availability.page_title':                    'ലഭ്യത സജ്ജീകരിക്കുക',
+        'expert_availability.page_description_1':            'ഒരു തീയതി ശ്രേണി തിരഞ്ഞെടുക്കുക, ആഴ്ചയിലെ ഏതൊക്കെ ദിവസങ്ങൾ ഉൾപ്പെടുത്തണമെന്ന് തിരഞ്ഞെടുക്കുക, നിങ്ങളുടെ സമയ സ്ലോട്ടുകൾ സജ്ജീകരിക്കുക - ശ്രേണിയിലെ എല്ലാ തീയതികളും ഒരുമിച്ച് സേവ് ചെയ്യപ്പെടും.',
+        'expert_availability.page_description_2':            'നിങ്ങൾക്ക് ലഭ്യമല്ലാത്ത തീയതികൾ വ്യക്തമായി ബ്ലോക്ക് ചെയ്യാൻ "അസാന്നിധ്യം അടയാളപ്പെടുത്തുക" ഉപയോഗിക്കുക, മുൻപ് ലഭ്യമെന്ന് അടയാളപ്പെടുത്തിയിരുന്നാലും.',
+        'expert_availability.step1_title':                   '1. തീയതി(കൾ) തിരഞ്ഞെടുക്കുക',
+        'expert_availability.btn_date_range':                'തീയതി ശ്രേണി',
+        'expert_availability.btn_single_date':               'ഒറ്റ തീയതി',
+        'expert_availability.btn_mark_absent':               'അസാന്നിധ്യം അടയാളപ്പെടുത്തുക',
+        'expert_availability.step2_title':                   '2. ആഴ്ചയിലെ ഏതൊക്കെ ദിവസങ്ങൾ?',
+        'expert_availability.step3_title':                   '3. ഓരോ തീയതിക്കുമുള്ള സമയ സ്ലോട്ടുകൾ',
+        'expert_availability.label_to':                      'മുതൽ',
+        'expert_availability.btn_add_slot':                  'സമയ സ്ലോട്ട് ചേർക്കുക',
+        'expert_availability.preview_title':                 'പ്രിവ്യൂ: സേവ് ചെയ്യപ്പെടുന്ന തീയതികൾ',
+        'expert_availability.loading':                       'നിങ്ങളുടെ പ്രൊഫൈൽ ലോഡ് ചെയ്യുന്നു...',
+        'expert_availability.error_duplicate_slot':          'ഈ സമയ സ്ലോട്ട് മറ്റൊന്നിനെ ആവർത്തിക്കുന്നു. ദയവായി മറ്റൊരു സമയം ഉപയോഗിക്കുക.',
+        'expert_availability.error_duplicate_slot_add':      'ആ സമയ സ്ലോട്ട് ഇതിനകം നിലവിലുണ്ട്. മറ്റൊന്ന് ചേർക്കുന്നതിന് മുമ്പ് ക്രമീകരിക്കുക.',
+        'expert_availability.summary_availability':          'ഇത് {count} തീയതി(കൾ)ക്ക് ലഭ്യത സജ്ജീകരിക്കും, ഓരോന്നിനും {slots} സമയ സ്ലോട്ട്(കൾ).',
+        'expert_availability.summary_absent':                'ഇത് {count} തീയതി(കൾ) അസാന്നിധ്യമായി അടയാളപ്പെടുത്തും.',
+        'expert_availability.btn_saving':                    'സേവ് ചെയ്യുന്നു...',
+        'expert_availability.btn_mark_absent_count':         '{count} തീയതി(കൾ) അസാന്നിധ്യമായി അടയാളപ്പെടുത്തുക',
+        'expert_availability.btn_save_availability':         '{count} തീയതി(കൾ)ക്ക് ലഭ്യത സേവ് ചെയ്യുക',
+        'expert_availability.toast_marked_absent':           '{count} തീയതി(കൾ) അസാന്നിധ്യമായി അടയാളപ്പെടുത്തി',
+        'expert_availability.toast_saved':                   '{count} തീയതി(കൾ)ക്ക് ലഭ്യത സേവ് ചെയ്തു',
+        'expert_availability.toast_failed':                  'ലഭ്യത അപ്ഡേറ്റ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു. നിങ്ങളുടെ അക്കൗണ്ട് ഒരു വിദഗ്ധ പ്രൊഫൈലുമായി ലിങ്ക് ചെയ്തിട്ടുണ്ടെന്ന് ഉറപ്പാക്കുക.',
+        'expert_availability.weekday_sun':                   'ഞായർ',
+        'expert_availability.weekday_mon':                   'തിങ്കൾ',
+        'expert_availability.weekday_tue':                   'ചൊവ്വ',
+        'expert_availability.weekday_wed':                   'ബുധൻ',
+        'expert_availability.weekday_thu':                   'വ്യാഴം',
+        'expert_availability.weekday_fri':                   'വെള്ളി',
+        'expert_availability.weekday_sat':                   'ശനി',
+        # ── government_schemes ──────────────────────────────────────────────
+        'government_schemes.action_view':                   'കാണുക',
+        'government_schemes.col_created_by':                'സൃഷ്ടിച്ചത്',
+        'government_schemes.badge_you':                     'നിങ്ങൾ',
+        'government_schemes.badge_unknown':                 'അജ്ഞാതം',
+        'government_schemes.badge_active':                  'സജീവം',
+        'government_schemes.badge_inactive':                'നിർജ്ജീവം',
+        'government_schemes.btn_new_scheme':                'പുതിയ സ്കീം',
+        'government_schemes.placeholder_search':            'സ്കീമുകൾ തിരയുക...',
+        'government_schemes.section_overview':              'അവലോകനം',
+        'government_schemes.section_details':               'വിശദാംശങ്ങൾ',
+        'government_schemes.field_official_link':           'ഔദ്യോഗിക ലിങ്ക്',
+        'government_schemes.field_last_updated':            'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്',
+        'government_schemes.field_objective':               'ലക്ഷ്യം',
+        # ── government_training ─────────────────────────────────────────────
+        'government_training.page_title':                    'പരിശീലന സെഷനുകൾ',
+        'government_training.page_description':              'നിങ്ങളുടെ അധികാരപരിധിയിലെ എഫ്പിഒകൾക്കായി നിങ്ങൾ നടത്തിയ സെഷനുകൾ',
+        'government_training.btn_new_session':                'പുതിയ സെഷൻ',
+        'government_training.placeholder_filter_topic':      'വിഷയം അനുസരിച്ച് ഫിൽട്ടർ ചെയ്യുക...',
+        'government_training.loading':                       'ലോഡ് ചെയ്യുന്നു...',
+        'government_training.error_load':                    'പരിശീലന സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.',
+        'government_training.empty_no_sessions':             'ഇതുവരെ പരിശീലന സെഷനുകൾ ഇല്ല.',
+        'government_training.badge_attended':                '{attended}/{total} പങ്കെടുത്തു',
+        # ── government_training_new ─────────────────────────────────────────
+        'government_training_new.create_title':                  'പുതിയ പരിശീലന സെഷൻ',
+        'government_training_new.create_subtitle':               'ഒരു എഫ്പിഒയ്ക്കായി നിങ്ങൾ നടത്തിയ ഒരു സെഷൻ രേഖപ്പെടുത്തുക',
+        'government_training_new.section_details':               'സെഷൻ വിശദാംശങ്ങൾ',
+        'government_training_new.field_fpo_id':                  'എഫ്പിഒ ഐഡി',
+        'government_training_new.placeholder_fpo_id':            'എഫ്പിഒ ഐഡി നൽകുക',
+        'government_training_new.field_topic':                   'വിഷയം',
+        'government_training_new.placeholder_topic':             'ഉദാ. ജൈവകൃഷി രീതികൾ',
+        'government_training_new.field_date':                    'തീയതി',
+        'government_training_new.field_duration':                'ദൈർഘ്യം (മണിക്കൂർ)',
+        'government_training_new.field_participants':            'പങ്കാളികൾ',
+        'government_training_new.field_venue':                   'വേദി',
+        'government_training_new.placeholder_venue':             'ഐച്ഛികം',
+        'government_training_new.btn_cancel':                    'റദ്ദാക്കുക',
+        'government_training_new.btn_save':                      'സെഷൻ സേവ് ചെയ്യുക',
+        'government_training_new.btn_saving':                    'സേവ് ചെയ്യുന്നു...',
+        'government_training_new.toast_created':                 'പരിശീലന സെഷൻ രേഖപ്പെടുത്തി',
+        'government_training_new.validation_required':           'എഫ്പിഒ ഐഡി, വിഷയം, തീയതി എന്നിവ പൂരിപ്പിക്കുക',
+        # ── official_register ───────────────────────────────────────────────
+        'official_register.header_already_registered':     'ഇതിനകം രജിസ്റ്റർ ചെയ്തിട്ടുണ്ടോ?',
+        'official_register.header_sign_in':                'സൈൻ ഇൻ ചെയ്യുക',
+        'official_register.page_title':                    'ഔദ്യോഗിക രജിസ്ട്രേഷൻ',
+        'official_register.page_description':              'നിങ്ങളുടെ അക്കൗണ്ട് സജീവമാക്കുന്നതിന് മുമ്പ് ഒരു KAU സൂപ്പർ അഡ്മിൻ അവലോകനം ചെയ്യും.',
+        'official_register.mode_government':               'സർക്കാർ ഉദ്യോഗസ്ഥൻ',
+        'official_register.mode_cbbo':                      'CBBO / NGO ഓഫീസർ',
+        'official_register.section_account':                'അക്കൗണ്ട്',
+        'official_register.field_first_name':               'ആദ്യ നാമം',
+        'official_register.field_last_name':                'കുടുംബ നാമം',
+        'official_register.field_email':                    'ഇ-മെയിൽ',
+        'official_register.field_phone':                    'ഫോൺ',
+        'official_register.field_password':                 'പാസ്‌വേഡ്',
+        'official_register.field_designation':              'സ്ഥാനപ്പേര്',
+        'official_register.section_govt_details':           'സർക്കാർ വിശദാംശങ്ങൾ',
+        'official_register.field_department':               'വകുപ്പ്',
+        'official_register.placeholder_department':         'ഉദാ. കൃഷി വകുപ്പ്',
+        'official_register.field_user_category':            'ഉപയോക്തൃ വിഭാഗം',
+        'official_register.field_id_number':                'ഐഡി നമ്പർ',
+        'official_register.placeholder_id_number':          'നിങ്ങൾ തിരഞ്ഞെടുത്ത വിഭാഗത്തിന്റെ ഫോർമാറ്റുമായി പൊരുത്തപ്പെടുന്നത്',
+        'official_register.field_jurisdiction':             'അധികാരപരിധി',
+        'official_register.option_district':                'ജില്ല',
+        'official_register.option_state':                   'സംസ്ഥാനം',
+        'official_register.field_district':                 'ജില്ല',
+        'official_register.placeholder_select_district':    'ഒരു ജില്ല തിരഞ്ഞെടുക്കുക',
+        'official_register.section_cbbo_details':           'CBBO / NGO വിശദാംശങ്ങൾ',
+        'official_register.field_organisation':             'സ്ഥാപനം',
+        'official_register.placeholder_select_org':         'ഒരു സ്ഥാപനം തിരഞ്ഞെടുക്കുക',
+        'official_register.field_level':                    'തലം',
+        'official_register.field_district_code':            'ജില്ലാ കോഡ്',
+        'official_register.btn_back_to_login':              '\u2190 ലോഗിനിലേക്ക് മടങ്ങുക',
+        'official_register.btn_register':                   'രജിസ്റ്റർ ചെയ്യുക',
+        'official_register.btn_registering':                'രജിസ്റ്റർ ചെയ്യുന്നു...',
+        'official_register.toast_success':                  'രജിസ്ട്രേഷൻ സമർപ്പിച്ചു. ഒരു അഡ്മിനിസ്ട്രേറ്റർ നിങ്ങളുടെ അക്കൗണ്ട് അവലോകനം ചെയ്യും.',
+        'official_register.toast_failed':                   'രജിസ്ട്രേഷൻ പരാജയപ്പെട്ടു',
+        'official_register.val_first_name_required':        'ആദ്യ നാമം ആവശ്യമാണ്.',
+        'official_register.val_email_invalid':               'സാധുവായ ഒരു ഇ-മെയിൽ വിലാസം നൽകുക.',
+        'official_register.val_phone_invalid':              'സാധുവായ 10 അക്ക ഇന്ത്യൻ മൊബൈൽ നമ്പർ നൽകുക.',
+        'official_register.val_password_min':               'പാസ്‌വേഡ് കുറഞ്ഞത് 8 അക്ഷരങ്ങളെങ്കിലും ആയിരിക്കണം.',
+        'official_register.val_department_required':        'വകുപ്പ് ആവശ്യമാണ്.',
+        'official_register.val_id_number_required':         'ഐഡി നമ്പർ ആവശ്യമാണ്.',
+        'official_register.val_district_required':          'ജില്ല ആവശ്യമാണ്.',
+        'official_register.val_organisation_required':      'സ്ഥാപനം ആവശ്യമാണ്.',
+        'official_register.val_district_code_required':     'ജില്ലാ കോഡ് ആവശ്യമാണ്.',
     }
 
     count = 0
@@ -3695,19 +3530,7 @@ def seed_menu_translations(languages):
         ('fpo_recommendations',    'AI Recommendations',       'AI ശുപാർശകൾ'),
         ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
         ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),
-        ('fpo_dpr',                'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('fpo_settings',           'Settings',                 'ക്രമീകരണങ്ങൾ'),
-        # Admin DPR / AI menu items
-        ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
-        ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
-        ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
-        # arunima
-        ('cbbos',                  'CBBOs',                    'സി.ബി.ബി.ഒ-കൾ'),
-        ('market_linkage',         'Market Linkage',            'മാർക്കറ്റ് ലിങ്കേജ്'),
-        #04 sep arunima
-        ('fpo_buyer_directory',   'Buyer Directory',           'ക്രേതാവ് ഡയറക്ടറി'),
-        # aravind — GIS zones admin page
-        ('gis_zones',              'GIS Zones',                 'GIS മേഖലകൾ'),
     ]
 
     count = 0
@@ -3737,6 +3560,7 @@ def seed_fixes(languages):
     lang_en = languages['en']
     lang_ml = languages['ml']
 
+    category_ui = TranslationCategory.objects.get(code='ui')
     fixes = [
         # rate_limited was seeded with {seconds} (single brace) — must be {{seconds}}
         (category_common, 'rate_limited', lang_en,
@@ -3748,6 +3572,29 @@ def seed_fixes(languages):
          'Account locked due to too many failed attempts. Try after {{minutes}} minutes.'),
         (category_auth, 'account_locked', lang_ml,
          'നിരവധി പരാജയപ്പെട്ട ശ്രമങ്ങൾ കാരണം അക്കൗണ്ട് ലോക്ക് ചെയ്തു. {{minutes}} മിനിറ്റിന് ശേഷം ശ്രമിക്കുക.'),
+        # admin_schemes was auto-seeded with English placeholders for Malayalam - real translations below
+        (category_ui, 'admin_schemes.page_title', lang_ml, 'സ്കീമുകൾ'),
+        (category_ui, 'admin_schemes.page_description', lang_ml, 'സർക്കാർ സ്കീമുകളും സബ്സിഡികളും നിയന്ത്രിക്കുക'),
+        (category_ui, 'admin_schemes.col_name', lang_ml, 'സ്കീം പേര്'),
+        (category_ui, 'admin_schemes.col_category', lang_ml, 'വിഭാഗം'),
+        (category_ui, 'admin_schemes.col_administered_by', lang_ml, 'നടത്തുന്നത്'),
+        (category_ui, 'admin_schemes.col_status', lang_ml, 'സ്റ്റാറ്റസ്'),
+        (category_ui, 'admin_schemes.col_order', lang_ml, 'ക്രമം'),
+        (category_ui, 'admin_schemes.action_edit', lang_ml, 'എഡിറ്റ്'),
+        (category_ui, 'admin_schemes.action_activate', lang_ml, 'സജീവമാക്കുക'),
+        (category_ui, 'admin_schemes.action_deactivate', lang_ml, 'നിർജ്ജീവമാക്കുക'),
+        (category_ui, 'admin_schemes.action_delete', lang_ml, 'ഇല്ലാതാക്കുക'),
+        (category_ui, 'admin_schemes.cat_credit', lang_ml, 'ക്രെഡിറ്റും ധനകാര്യവും'),
+        (category_ui, 'admin_schemes.cat_insurance', lang_ml, 'ഇൻഷുറൻസ്'),
+        (category_ui, 'admin_schemes.cat_marketing', lang_ml, 'മാർക്കറ്റിംഗും വ്യാപാരവും'),
+        (category_ui, 'admin_schemes.cat_infrastructure', lang_ml, 'അടിസ്ഥാന സൗകര്യം'),
+        (category_ui, 'admin_schemes.cat_capacity_building', lang_ml, 'ശേഷി വർദ്ധിപ്പിക്കൽ'),
+        (category_ui, 'admin_schemes.field_eligibility', lang_ml, 'യോഗ്യത'),
+        (category_ui, 'admin_schemes.field_benefit_details', lang_ml, 'ആനുകൂല്യ വിശദാംശങ്ങൾ'),
+        (category_ui, 'admin_schemes.field_application_process', lang_ml, 'അപേക്ഷാ പ്രക്രിയ'),
+        (category_ui, 'admin_schemes.toast_activated', lang_ml, 'സ്കീം സജീവമാക്കി'),
+        (category_ui, 'admin_schemes.toast_deactivated', lang_ml, 'സ്കീം നിർജ്ജീവമാക്കി'),
+        (category_ui, 'admin_schemes.empty_state', lang_ml, 'സ്കീമുകളൊന്നും കണ്ടെത്തിയില്ല.'),
     ]
 
     # New OTP attempt tracking keys (seeded via messages.py with double-brace placeholders)
@@ -4022,275 +3869,6 @@ def seed_nav_translations(languages):
             if created:
                 count += 1
     return count
-#--------------------------------------------------------------------------------
-#arunima 
-
-def seed_marketplace_translations(languages):
-    """Seed P2-11 Marketplace API response messages (marketplace.* keys)."""
-    category = TranslationCategory.objects.get(code='marketplace')
-    lang_en = languages['en']
-    lang_ml = languages['ml']
- 
-    marketplace_messages = [
-        # Products
-        ('products_retrieved',        'Products retrieved successfully',                   'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
-        ('product_created',           'Product created successfully',                      'ഉൽപ്പന്നം വിജയകരമായി സൃഷ്ടിച്ചു'),
-        ('product_updated',           'Product updated successfully',                      'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
-        ('product_deleted',           'Product deleted successfully',                      'ഉൽപ്പന്നം വിജയകരമായി ഇല്ലാതാക്കി'),
-        ('product_not_editable',      'Product cannot be edited in its current status',    'നിലവിലെ സ്ഥിതിയിൽ ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല'),
-        ('only_draft_deletable',      'Only draft products can be deleted',                'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
-        ('only_draft_publishable',    'Only draft products can be published',              'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
-        ('product_published',         'Product published successfully',                    'ഉൽപ്പന്നം വിജയകരമായി പ്രസിദ്ധീകരിച്ചു'),
-        ('only_active_can_be_sold',   'Only active products can be marked as sold',        'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
-        ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
- 
-        # Buyers
-        ('buyers_retrieved',          'Buyers retrieved successfully',                     'ക്രേതാക്കൾ വിജയകരമായി ലഭിച്ചു'),
-        ('buyer_created',             'Buyer created successfully',                        'ക്രേതാവിനെ വിജയകരമായി സൃഷ്ടിച്ചു'),
-        ('buyer_updated',             'Buyer updated successfully',                        'ക്രേതാവിനെ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
-        ('buyer_deleted',             'Buyer deleted successfully',                        'ക്രേതാവിനെ വിജയകരമായി ഇല്ലാതാക്കി'),
-        ('buyer_verified',            'Buyer verified successfully',                       'ക്രേതാവിനെ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
- 
-        # Matches
-        ('matches_retrieved',         'Matches retrieved successfully',                    'പൊരുത്തങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
-        ('match_accepted',            'Match accepted successfully',                       'പൊരുത്തം വിജയകരമായി അംഗീകരിച്ചു'),
-        ('match_rejected',            'Match rejected successfully',                       'പൊരുത്തം വിജയകരമായി നിരസിച്ചു'),
-        ('match_not_actionable',      'This match has already been decided',               'ഈ പൊരുത്തം ഇതിനകം തീരുമാനിച്ചു'),
- 
-        # Prices & Opportunities
-        ('prices_retrieved',          'Prices retrieved successfully',                     'വിലകൾ വിജയകരമായി ലഭിച്ചു'),
-        ('price_seeded',              'Price data added successfully',                     'വില വിവരം വിജയകരമായി ചേർത്തു'),
-        ('opportunities_retrieved',   'Opportunities retrieved successfully',              'അവസരങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
-    ]
- 
-    count = 0
-    for key, en_value, ml_value in marketplace_messages:
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_en,
-            defaults={'value': en_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
-        )
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_ml,
-            defaults={'value': ml_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
-        )
-        count += 1
- 
-    return count
-
-#---------------------------------------------------------------------------------------
-#Arunima S — 28-08-2026
-#Frontend UI labels for the FPO Products page (list, table, form) — these were
-#never seeded, which is why only the sidebar translated to Malayalam and the
-#actual page content (titles, columns, buttons, form labels) stayed in English.
-
-def seed_products_page_translations(languages):
-    """
-    Seed UI labels for the FPO Products screens.
-
-    Covers three screen-name prefixes actually requested by the frontend:
-      - fpo_products.*  (products/page.tsx — page header)
-      - product_table.* (products/page.tsx + _components/columns.tsx — DataTable columns, ViewSheet, row actions)
-      - product_form.*  (new/page.tsx, [id]/edit/page.tsx, _components/product-form.tsx)
-
-    All live under category='ui' with a dot-prefixed key, matching the
-    house convention used by seed_ui_translations()/seed_frontend_ui_translations().
-    """
-    category = TranslationCategory.objects.get(code='ui')
-    lang_en = languages['en']
-    lang_ml = languages['ml']
-
-    products_ui_keys = [
-        # ── fpo_products — page.tsx header ──────────────────────────────
-        ('fpo_products.page_title',       'My Products',
-         'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
-        ('fpo_products.page_description', "List and manage your FPO's agricultural products for market linkage.",
-         'വിപണി ബന്ധത്തിനായി നിങ്ങളുടെ FPO-യുടെ കാർഷിക ഉൽപ്പന്നങ്ങൾ പട്ടികപ്പെടുത്തി നിയന്ത്രിക്കുക.'),
-        ('fpo_products.add_btn',          'Add Product',
-         'ഉൽപ്പന്നം ചേർക്കുക'),
-
-        # ── product_table — columns, ViewSheet, row actions ─────────────
-        ('product_table.view_title',            'Product Details',
-         'ഉൽപ്പന്ന വിശദാംശങ്ങൾ'),
-        ('product_table.col_name',               'Name',
-         'പേര്'),
-        ('product_table.col_commodity',          'Commodity ID',
-         'ചരക്ക് ഐഡി'),
-        ('product_table.col_quantity',           'Quantity',
-         'അളവ്'),
-        ('product_table.col_price',              'Price',
-         'വില'),
-        ('product_table.col_quality',            'Quality Certification',
-         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
-        ('product_table.col_available_from',     'Available From',
-         'ലഭ്യമായ തീയതി മുതൽ'),
-        ('product_table.col_available_until',    'Available Until',
-         'ലഭ്യമായ തീയതി വരെ'),
-        ('product_table.col_available',          'Available',
-         'ലഭ്യത'),
-        ('product_table.col_status',             'Status',
-         'സ്ഥിതി'),
-        ('product_table.col_public',             'Public',
-         'പൊതു'),
-        ('product_table.toast_published',        'Product published',
-         'ഉൽപ്പന്നം പ്രസിദ്ധീകരിച്ചു'),
-        ('product_table.err_publish_failed',     'Only draft products can be published',
-         'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
-        ('product_table.toast_marked_sold',      'Product marked as sold',
-         'ഉൽപ്പന്നം വിറ്റതായി അടയാളപ്പെടുത്തി'),
-        ('product_table.err_mark_sold_failed',   'Only active products can be marked sold',
-         'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
-        ('product_table.toast_deleted',          'Product deleted',
-         'ഉൽപ്പന്നം ഇല്ലാതാക്കി'),
-        ('product_table.err_delete_failed',      'Only draft products can be deleted',
-         'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
-        ('product_table.confirm_delete_title',   'Delete Product',
-         'ഉൽപ്പന്നം ഇല്ലാതാക്കുക'),
-        ('product_table.confirm_delete_description',
-         'Are you sure you want to delete this product? This action cannot be undone.',
-         'ഈ ഉൽപ്പന്നം ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഈ പ്രവർത്തി പഴയപടിയാക്കാൻ കഴിയില്ല.'),
-        ('product_table.action_publish',         'Publish',
-         'പ്രസിദ്ധീകരിക്കുക'),
-        ('product_table.action_mark_sold',       'Mark Sold',
-         'വിറ്റതായി അടയാളപ്പെടുത്തുക'),
-
-         #--------------------------------------------------------------------------
-         #Arunima S --> 28th August 2026
-
-        ('product_table.status_draft',           'Draft',
-         'ഡ്രാഫ്റ്റ്'),
-        ('product_table.status_active',          'Active',
-         'സജീവം'),
-        ('product_table.status_sold',             'Sold',
-         'വിറ്റു'),
-        ('product_table.status_expired',          'Expired',
-         'കാലഹരണപ്പെട്ടു'),
-         #--------------------------------------------------------------------------
-
-        # ── product_form — new/edit wrapper pages + ProductForm ─────────
-        ('product_form.add_title',               'Add Product',
-         'ഉൽപ്പന്നം ചേർക്കുക'),
-        ('product_form.add_description',         'List a new product for buyers to discover.',
-         'ക്രേതാക്കൾക്ക് കണ്ടെത്താൻ ഒരു പുതിയ ഉൽപ്പന്നം പട്ടികപ്പെടുത്തുക.'),
-        ('product_form.edit_title',               'Edit Product',
-         'ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യുക'),
-        ('product_form.section_details',          'Product Details',
-         'ഉൽപ്പന്ന വിശദാംശങ്ങൾ'),
-        ('product_form.name_en_label',            'Name (English)',
-         'പേര് (ഇംഗ്ലീഷ്)'),
-        ('product_form.name_en_placeholder',      'e.g. Organic Coconut',
-         'ഉദാ. ഓർഗാനിക് തേങ്ങ'),
-        ('product_form.name_ml_label',            'Name (Malayalam)',
-         'പേര് (മലയാളം)'),
-        ('product_form.name_ml_placeholder',      'Optional — falls back to English',
-         'ഐച്ഛികം — ഇംഗ്ലീഷിലേക്ക് തിരികെ പോകും'),
-        ('product_form.commodity_label',          'Commodity',
-         'ചരക്ക്'),
-        ('product_form.commodity_loading',        'Loading...',
-         'ലോഡ് ചെയ്യുന്നു...'),
-        ('product_form.commodity_placeholder',    'Select a commodity',
-         'ഒരു ചരക്ക് തിരഞ്ഞെടുക്കുക'),
-        ('product_form.description_en_label',     'Description (English)',
-         'വിവരണം (ഇംഗ്ലീഷ്)'),
-        ('product_form.description_ml_label',     'Description (Malayalam)',
-         'വിവരണം (മലയാളം)'),
-        ('product_form.quantity_label',           'Quantity',
-         'അളവ്'),
-        ('product_form.unit_label',               'Unit',
-         'യൂണിറ്റ്'),
-        ('product_form.price_label',              'Price per unit (₹)',
-         'യൂണിറ്റ് വില (₹)'),
-        ('product_form.quality_label',            'Quality certification',
-         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
-        ('product_form.quality_placeholder',      'e.g. FSSAI, NPOP Organic, ISO 22000',
-         'ഉദാ. FSSAI, NPOP ഓർഗാനിക്, ISO 22000'),
-        ('product_form.available_from_label',     'Available from',
-         'ലഭ്യമായ തീയതി മുതൽ'),
-        ('product_form.available_until_label',    'Available until',
-         'ലഭ്യമായ തീയതി വരെ'),
-        ('product_form.public_label',             'Visible on public Market Hub',
-         'പൊതു മാർക്കറ്റ് ഹബ്ബിൽ ദൃശ്യമാണ്'),
-        ('product_form.toast_updated',            'Product updated successfully',
-         'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
-        ('product_form.toast_created',            'Product added successfully',
-         'ഉൽപ്പന്നം വിജയകരമായി ചേർത്തു'),
-
-        # ── missing common.* keys used by columns.tsx / product-form.tsx ─
-        # (save_btn, cancel_btn, reset_btn, edit, delete etc. already exist —
-        # only these three were genuinely missing)
-        ('common.yes',            'Yes',
-         'അതെ'),
-        ('common.no',             'No',
-         'ഇല്ല'),
-        ('common.clear_filters',  'Clear filters',
-         'ഫിൽട്ടറുകൾ മായ്ക്കുക'),
-    ]
-
-    count = 0
-    for key, en_value, ml_value in products_ui_keys:
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_en,
-            defaults={'value': en_value, 'context': 'FPO Products page UI label', 'is_verified': True}
-        )
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_ml,
-            defaults={'value': ml_value, 'context': 'FPO Products page UI label', 'is_verified': True}
-        )
-        count += 1
-
-    return count
-#---------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------
-#31th August 2026
-#Arunima S
-#Frontend UI labels for the Admin Market Linkage page — same "screen name +
-#common" pattern used elsewhere. Category doesn't need adding (ui already exists).
-
-def seed_market_linkage_translations(languages):
-    """Seed UI labels for the Admin Market Linkage screen (market_linkage_table.*)."""
-    category = TranslationCategory.objects.get(code='ui')
-    lang_en = languages['en']
-    lang_ml = languages['ml']
-
-    market_linkage_keys = [
-        ('market_linkage_table.page_title',        'Market Linkage',
-         'മാർക്കറ്റ് ലിങ്കേജ്'),
-        ('market_linkage_table.page_description',  "Browse FPOs and the products they've listed for sale.",
-         'FPO-കളും അവർ വിൽപ്പനയ്ക്ക് പട്ടികപ്പെടുത്തിയ ഉൽപ്പന്നങ്ങളും ബ്രൗസ് ചെയ്യുക.'),
-        ('market_linkage_table.col_name',          'FPO Name',
-         'FPO പേര്'),
-        ('market_linkage_table.view_title',        'FPO Products',
-         'FPO ഉൽപ്പന്നങ്ങൾ'),
-        ('market_linkage_table.products_label',    'Products',
-         'ഉൽപ്പന്നങ്ങൾ'),
-        ('market_linkage_table.loading',           'Loading products...',
-         'ഉൽപ്പന്നങ്ങൾ ലോഡ് ചെയ്യുന്നു...'),
-        ('market_linkage_table.no_products',       'This FPO has no products listed yet.',
-         'ഈ FPO ഇതുവരെ ഉൽപ്പന്നങ്ങളൊന്നും പട്ടികപ്പെടുത്തിയിട്ടില്ല.'),
-        # Product status labels shown inside the ViewSheet product list
-        ('market_linkage_table.status_draft',      'Draft',
-         'ഡ്രാഫ്റ്റ്'),
-        ('market_linkage_table.status_active',     'Active',
-         'സജീവം'),
-        ('market_linkage_table.status_sold',       'Sold',
-         'വിറ്റു'),
-        ('market_linkage_table.status_expired',    'Expired',
-         'കാലഹരണപ്പെട്ടു'),
-    ]
-
-    count = 0
-    for key, en_value, ml_value in market_linkage_keys:
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_en,
-            defaults={'value': en_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
-        )
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_ml,
-            defaults={'value': ml_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
-        )
-        count += 1
-
-    return count
-#---------------------------------------------------------------------------------------
 
 
 def seed_translations():
@@ -4328,31 +3906,6 @@ def seed_translations():
     admin_count = seed_admin_translations(languages)
     print(f"✅ Seeded {admin_count} admin translations")
     total_count += admin_count
-
-    #-------------------------------------------------------------------------------
-    #Arunima S
-    # Step 4b: Seed marketplace messages (P2-11)
-    print("\nSeeding marketplace translations...")
-    marketplace_count = seed_marketplace_translations(languages)
-    print(f"✅ Seeded {marketplace_count} marketplace translations")
-    total_count += marketplace_count
-
-    
-    #Arunima S — 28-08-2026
-    # Step 4c: Seed FPO Products page frontend UI labels (list, table, form)
-    print("\nSeeding FPO Products page UI translations...")
-    products_page_count = seed_products_page_translations(languages)
-    print(f"✅ Seeded {products_page_count} FPO Products page translations")
-    total_count += products_page_count
-
-    #31th August 2026
-    print("\nSeeding Admin Market Linkage page UI translations...")
-    market_linkage_page_count = seed_market_linkage_translations(languages)
-    print(f"✅ Seeded {market_linkage_page_count} Admin Market Linkage page translations")
-    total_count += market_linkage_page_count
-    #--------------------------------------------------------------------------------
-
-    
 
     # Step 5: Seed UI labels (frontend field labels, buttons, page titles)
     print("\nSeeding UI label translations...")
@@ -4401,18 +3954,6 @@ def seed_translations():
     print(f"✅ Seeded {home_count} home section translations")
     total_count += home_count
 
-    # Step 9e: Seed GIS module translations (P2-05)
-    print("\nSeeding GIS module translations...")
-    gis_count = seed_gis_translations(languages)
-    print(f"✅ Seeded {gis_count} GIS translations")
-    total_count += gis_count
-
-    # Step 9f: Seed AI Recommendations translations (P2-06)
-    print("\nSeeding AI Recommendations translations...")
-    rec_count = seed_recommendations_translations(languages)
-    print(f"✅ Seeded {rec_count} recommendation translations")
-    total_count += rec_count
-
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
     seed_fixes(languages)
@@ -4432,110 +3973,6 @@ def seed_translations():
     print("\nSample translations (auth category):")
     for trans in Translation.objects.filter(category__code='auth')[:5]:
         print(f"  {trans.full_key} ({trans.language.code}): {trans.value[:50]}...")
-
-
-
-
-def seed_gis_translations(languages):
-    """
-    Seed GIS module messages (P2-05) — zones, districts, cultivation
-    area, weather. Malayalam values are best-effort (not from a native
-    speaker) — marked is_verified=False so they're flagged for review,
-    same as everything else in this GIS module that's a placeholder
-    pending real review/data.
-    """
-    category, _ = TranslationCategory.objects.get_or_create(
-        code='gis',
-        defaults={
-            'name': 'GIS Integration',
-            'description': 'Agro-climatic zones, districts, cultivation area, weather messages',
-            'display_order': 9,
-        }
-    )
-    lang_en = languages['en']
-    lang_ml = languages['ml']
-
-    gis_messages = [
-        ('zones_retrieved',            'Zones retrieved successfully',                       'മേഖലകൾ ലഭ്യമാക്കി'),
-        ('districts_retrieved',        'Districts retrieved successfully',                   'ജില്ലകൾ ലഭ്യമാക്കി'),
-        ('zone_detected',              'Zone detected successfully',                         'മേഖല കണ്ടെത്തി'),
-        ('zone_not_found',             'No zone found for the given location',               'ഈ സ്ഥലത്തിന് മേഖല കണ്ടെത്തിയില്ല'),
-        ('fpo_not_found',              'No FPO found for this user',                         'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
-        ('location_not_set',           'Location has not been set yet',                      'സ്ഥലം ഇതുവരെ സജ്ജമാക്കിയിട്ടില്ല'),
-        ('lat_lng_required',           'Latitude and longitude are required',                'അക്ഷാംശവും രേഖാംശവും ആവശ്യമാണ്'),
-        ('invalid_coordinates',        'Invalid coordinates provided',                       'അസാധുവായ കോർഡിനേറ്റുകൾ'),
-        ('cultivation_area_retrieved', 'Cultivation area retrieved successfully',            'കൃഷിഭൂമി വിവരങ്ങൾ ലഭ്യമാക്കി'),
-        ('cultivation_area_saved',     'Cultivation area saved successfully',                'കൃഷിഭൂമി വിജയകരമായി സംരക്ഷിച്ചു'),
-        ('cultivation_area_deleted',   'Cultivation area deleted successfully',              'കൃഷിഭൂമി വിജയകരമായി ഇല്ലാതാക്കി'),
-        ('cultivation_area_not_found', 'No cultivation area found',                          'കൃഷിഭൂമി കണ്ടെത്തിയില്ല'),
-        ('weather_retrieved',          'Weather data retrieved successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ ലഭ്യമാക്കി'),
-        ('weather_refreshed',          'Weather data refreshed successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ പുതുക്കി'),
-        ('weather_not_found',          'No weather data found. Please refresh to fetch it.', 'കാലാവസ്ഥാ വിവരങ്ങൾ കണ്ടെത്തിയില്ല. ദയവായി പുതുക്കുക.'),
-    ]
-
-    count = 0
-    for key, en_text, ml_text in gis_messages:
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_en,
-            defaults={'value': en_text, 'context': 'GIS module (P2-05)', 'is_verified': True}
-        )
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_ml,
-            defaults={'value': ml_text, 'context': 'GIS module (P2-05) — best-effort, needs native review', 'is_verified': False}
-        )
-        count += 1
-
-    return count
-
-
-def seed_recommendations_translations(languages):
-    """
-    Seed AI Crop Recommendations messages (P2-06). Malayalam values
-    are best-effort (not from a native speaker) — marked
-    is_verified=False so they're flagged for review.
-    """
-    category, _ = TranslationCategory.objects.get_or_create(
-        code='recommendations',
-        defaults={
-            'name': 'AI Crop Recommendations',
-            'description': 'Crop recommendation requests, feedback, and admin ML model management messages',
-            'display_order': 10,
-        }
-    )
-    lang_en = languages['en']
-    lang_ml = languages['ml']
-
-    recommendation_messages = [
-        ('retrieved',               'Recommendation retrieved successfully',                     'ശുപാർശ ലഭ്യമാക്കി'),
-        ('requested',                'Recommendation generated successfully',                     'ശുപാർശ വിജയകരമായി തയ്യാറാക്കി'),
-        ('feedback_saved',           'Feedback saved successfully',                               'പ്രതികരണം സംരക്ഷിച്ചു'),
-        ('not_found',                'No recommendation found for this financial year',           'ഈ സാമ്പത്തിക വർഷത്തിന് ശുപാർശ കണ്ടെത്തിയില്ല'),
-        ('fpo_not_found',            'No FPO found for this user',                                'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
-        ('invalid_rating',           'Rating must be between 1 and 5',                            'റേറ്റിംഗ് 1 നും 5 നും ഇടയിൽ ആയിരിക്കണം'),
-        ('no_active_model',          'No active AI model is currently configured',                'നിലവിൽ സജീവമായ AI മോഡൽ ഇല്ല'),
-        ('service_unavailable',      'AI service is temporarily unavailable',                     'AI സേവനം താൽക്കാലികമായി ലഭ്യമല്ല'),
-        ('models_retrieved',         'Model versions retrieved successfully',                     'മോഡൽ പതിപ്പുകൾ ലഭ്യമാക്കി'),
-        ('model_registered',         'Model version registered successfully',                     'മോഡൽ പതിപ്പ് രജിസ്റ്റർ ചെയ്തു'),
-        ('model_activated',          'Model version activated successfully',                      'മോഡൽ പതിപ്പ് സജീവമാക്കി'),
-        ('model_not_found',          'Model version not found',                                   'മോഡൽ പതിപ്പ് കണ്ടെത്തിയില്ല'),
-        ('model_reload_failed',      'Model activated, but the AI service could not be notified', 'മോഡൽ സജീവമാക്കി, പക്ഷേ AI സേവനത്തെ അറിയിക്കാൻ കഴിഞ്ഞില്ല'),
-        ('version_code_required',    'Version code is required',                                  'പതിപ്പ് കോഡ് ആവശ്യമാണ്'),
-        ('feedback_list_retrieved',  'Feedback list retrieved successfully',                      'പ്രതികരണ പട്ടിക ലഭ്യമാക്കി'),
-    ]
-
-    count = 0
-    for key, en_text, ml_text in recommendation_messages:
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_en,
-            defaults={'value': en_text, 'context': 'AI Recommendations (P2-06)', 'is_verified': True}
-        )
-        Translation.objects.update_or_create(
-            category=category, key=key, language=lang_ml,
-            defaults={'value': ml_text, 'context': 'AI Recommendations (P2-06) — best-effort, needs native review', 'is_verified': False}
-        )
-        count += 1
-
-    return count
 
 
 if __name__ == '__main__':
