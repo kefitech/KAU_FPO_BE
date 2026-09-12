@@ -368,6 +368,26 @@ class RiskCategoryScore:
 
 
 @dataclass
+class AutoPulledRisk:
+    """A risk captured in another wizard section (Raw Material / Market /
+    Technology / ESS climate) that the Risk Assessment section is auto-pulling
+    to close the KAU 2026-09-10 gap (risks in 5 different places).
+
+    Not scored via the probability x impact matrix yet — the FPO can promote
+    it to a full DPRRiskItem in §2.3.22 to add scoring, or the PDF renders
+    it in a dedicated "additional risks from other sections" subsection.
+    """
+    source: str                       # 'raw_material' / 'market' / 'technology' / 'ess_climate'
+    source_label: str                 # 'Raw Material' / 'Market' / 'Technology' / 'ESS (Climate)'
+    category: str                     # maps to one of the 6 canonical risk categories
+    category_label: str               # 'Production Risk' / 'Market Risk' / 'Environmental Risk'
+    risk_code: str                    # section-specific code (e.g. 'supply_variability')
+    risk_label: str                   # human-readable name of the risk
+    risk_description: str             # verbatim from the source section, if any
+    mitigation_strategy: str          # verbatim from the source section
+
+
+@dataclass
 class RiskAssessment:
     """Per-KAU-RCD-B.9 overall risk rating for the project.
 
@@ -383,6 +403,9 @@ class RiskAssessment:
     total_risks_added: int
     total_risks_scored: int               # subset with prob+impact set
     matrix_note: str                      # human-readable "5 cells configured, source: default 3x3"
+    # KAU 2026-09-10 gap-close: risks captured in Raw Material / Market /
+    # Technology / ESS sections auto-pulled into the risk register.
+    auto_pulled: list[AutoPulledRisk] = field(default_factory=list)
 
 
 @dataclass
@@ -1689,6 +1712,111 @@ _RISK_CATEGORIES: list[tuple[str, str]] = [
 ]
 
 
+def _pull_risks_from_other_sections(project) -> list[AutoPulledRisk]:
+    """Collect risks captured in Raw Material / Market / Technology / ESS
+    sections and shape them as `AutoPulledRisk` records. Called by
+    `build_risk_assessment` to close the KAU 2026-09-10 gap (risks in 5
+    different places without cross-linking).
+
+    Category mapping:
+      - Raw Material risks    -> production category
+      - Marketing risks       -> market category
+      - Technology risks      -> production category (tech-failure branch)
+      - ESS climate risks     -> environmental category
+
+    Returns [] gracefully when the source sections don't exist yet (fresh
+    projects) — the calc engine already tolerates missing sections.
+    """
+    from apps.database.models import (
+        DPRRawMaterialRisk, DPRMarketingRisk,
+        DPRTechnologyRisk, DPRClimateRiskSelection,
+    )
+    from apps.database.models.dpr.raw_material import RISK_TYPE_CHOICES as _RM_CHOICES
+    from apps.database.models.dpr.market import MARKETING_RISK_CHOICES as _MK_CHOICES
+    from apps.database.models.dpr.technology import TECH_RISK_CHOICES as _TECH_CHOICES
+
+    _rm_labels = dict(_RM_CHOICES)
+    _mk_labels = dict(_MK_CHOICES)
+    _tech_labels = dict(_TECH_CHOICES)
+
+    out: list[AutoPulledRisk] = []
+
+    # Raw Material section — §2.3.10 supply/procurement risks
+    rm_section = getattr(project, 'section_raw_material', None)
+    if rm_section:
+        for r in DPRRawMaterialRisk.objects.filter(section=rm_section):
+            code = r.risk_type
+            label = _rm_labels.get(code, code) if code != 'other' else (r.risk_type_other or 'Other')
+            out.append(AutoPulledRisk(
+                source='raw_material',
+                source_label='Raw Material',
+                category='production',
+                category_label='Production Risk',
+                risk_code=code,
+                risk_label=label,
+                risk_description=r.existing_practices or r.previous_experience or '',
+                mitigation_strategy=r.mitigation_strategy or '',
+            ))
+
+    # Market section — §2.3.11 marketing risks
+    mk_section = getattr(project, 'section_market', None)
+    if mk_section:
+        for r in DPRMarketingRisk.objects.filter(section=mk_section):
+            code = r.risk_type
+            label = _mk_labels.get(code, code) if code != 'other' else (r.risk_type_other or 'Other')
+            out.append(AutoPulledRisk(
+                source='market',
+                source_label='Market',
+                category='market',
+                category_label='Market Risk',
+                risk_code=code,
+                risk_label=label,
+                risk_description=r.existing_practices or '',
+                mitigation_strategy=r.mitigation_strategy or '',
+            ))
+
+    # Technology section — §2.3.12 tech-failure risks. Different shape:
+    # each risk is attached to a specific `DPRTechnology` (not directly to
+    # the section), so we walk the M2M.
+    tech_section = getattr(project, 'section_technology', None)
+    if tech_section:
+        for tech in tech_section.technologies.all():
+            for r in DPRTechnologyRisk.objects.filter(technology=tech):
+                code = r.risk_type
+                label = _tech_labels.get(code, code) if code != 'other' else (r.risk_type_other or 'Other')
+                out.append(AutoPulledRisk(
+                    source='technology',
+                    source_label='Technology',
+                    category='production',
+                    category_label='Production Risk',
+                    risk_code=code,
+                    risk_label=label,
+                    risk_description=r.existing_practice or '',
+                    mitigation_strategy=r.mitigation_measure or '',
+                ))
+
+    # ESS section — §2.3.20 Cat C climate risks. Different shape: FK to
+    # `DPRClimateRisk` master lookup (not a text choice).
+    ess_section = getattr(project, 'section_ess', None)
+    if ess_section:
+        for r in DPRClimateRiskSelection.objects.filter(section=ess_section).select_related('risk'):
+            label = getattr(r.risk, 'name', None) or getattr(r.risk, 'code', 'Climate risk')
+            if r.risk_other:
+                label = r.risk_other
+            out.append(AutoPulledRisk(
+                source='ess_climate',
+                source_label='ESS (Climate)',
+                category='environmental',
+                category_label='Environmental Risk',
+                risk_code=getattr(r.risk, 'code', 'other'),
+                risk_label=label,
+                risk_description=r.expected_impact or '',
+                mitigation_strategy=r.proposed_mitigation_strategy or '',
+            ))
+
+    return out
+
+
 def build_risk_assessment(project) -> RiskAssessment:
     """Read the project's risk items, look each up in the matrix, aggregate
     per category (worst-case), and derive overall project rating.
@@ -1697,11 +1825,22 @@ def build_risk_assessment(project) -> RiskAssessment:
     'All assessed categories are Low' → overall Low). Categories with risks
     but no probability/impact assessment carry an `unscored_note` so the PDF
     can flag them for user attention.
+
+    KAU 2026-09-10 gap-close: also pulls risks captured in Raw Material,
+    Market, Technology, and ESS (climate) sections. Auto-pulled risks are
+    counted in the per-category `risk_count` (not scored — no probability x
+    impact until the FPO promotes them to §2.3.22 items). Full list surfaces
+    on the FE as a read-only "risks from other sections" card and in the PDF
+    risk chapter as an additional subsection.
     """
     from apps.database.models import DPRRiskMatrixCell
 
     fin_section = getattr(project, 'section_risk', None)
     items = list(fin_section.items.all()) if fin_section else []
+
+    # Pull risks from Raw Material / Market / Technology / ESS. Kept as a
+    # list ordered by source so the FE can group + display consistently.
+    auto_pulled = _pull_risks_from_other_sections(project)
 
     # Bucket by category → list of (probability, impact)
     buckets: dict[str, list] = {code: [] for code, _ in _RISK_CATEGORIES}
@@ -1709,7 +1848,15 @@ def build_risk_assessment(project) -> RiskAssessment:
         if it.risk_category in buckets:
             buckets[it.risk_category].append(it)
 
-    total_added = len(items)
+    # Auto-pulled risks count towards per-category `risk_count` even though
+    # they don't have probability x impact scoring yet — the FPO still needs
+    # to know these risks exist against the category.
+    auto_bucket_counts: dict[str, int] = {code: 0 for code, _ in _RISK_CATEGORIES}
+    for ap in auto_pulled:
+        if ap.category in auto_bucket_counts:
+            auto_bucket_counts[ap.category] += 1
+
+    total_added = len(items) + len(auto_pulled)
     total_scored = 0
     categories: list[RiskCategoryScore] = []
     overall_rank = 0  # 0 = low, 1 = moderate, 2 = high
@@ -1738,10 +1885,13 @@ def build_risk_assessment(project) -> RiskAssessment:
                 'impact were left blank. Enter both to score.'
             )
 
+        # Include auto-pulled risks in the count for this category — the FPO
+        # gets an accurate picture of the total risk exposure without having
+        # to manually re-enter them in §2.3.22.
         categories.append(RiskCategoryScore(
             category=code,
             category_label=label,
-            risk_count=len(rows),
+            risk_count=len(rows) + auto_bucket_counts[code],
             scored_count=scored_count,
             class_counts=class_counts,
             category_class=cat_class,
@@ -1759,6 +1909,7 @@ def build_risk_assessment(project) -> RiskAssessment:
         total_risks_added=total_added,
         total_risks_scored=total_scored,
         matrix_note=matrix_note,
+        auto_pulled=auto_pulled,
     )
 
 

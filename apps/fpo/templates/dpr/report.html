@@ -539,6 +539,36 @@ Author: Athul Gopan (Kefi Tech Solutions)
       Classification rule (RCD B.9): any category High → overall High; else any Moderate → overall Moderate; else Low.
       Matrix cells are admin-configurable at <span style="font-family: monospace;">/api/admin/dpr/risk-matrix/</span>.
     </p>
+
+    {# ── Auto-pulled risks from other sections (KAU 2026-09-10) ─────── #}
+    {% if r.risk_assessment.auto_pulled %}
+      <h3 style="margin-top: 5mm;">Additional Risks — Aggregated from Other Sections</h3>
+      <p style="font-size: 9pt; margin-bottom: 3mm;">
+        The following risks were captured in the Raw Material, Market, Technology, and ESS (Climate) sections.
+        They are shown here for completeness of the risk register. Add them to the probability × impact matrix
+        above to include their category scoring.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th class="label">Source section</th>
+            <th class="label">Category</th>
+            <th class="label">Risk</th>
+            <th class="label">Mitigation strategy</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ap in r.risk_assessment.auto_pulled %}
+            <tr>
+              <td>{{ ap.source_label }}</td>
+              <td>{{ ap.category_label }}</td>
+              <td class="label">{{ ap.risk_label }}</td>
+              <td style="font-size: 9pt;">{{ ap.mitigation_strategy|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
   {% endif %}
 
   <p class="footer-note">

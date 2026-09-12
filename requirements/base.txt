@@ -132,3 +132,4 @@ numpy>=1.26,<3.0                    # IRR, NPV calculations in DPR financial eng
 # Wire later — install when KAU approves Claude API budget
 # -----------------------------------------------------------------------------
 anthropic>=0.25,<1.0                # Claude API SDK
+google-generativeai>=0.8,<2.0       # Gemini SDK (DPR narratives via Google AI Studio)

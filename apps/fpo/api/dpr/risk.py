@@ -4,8 +4,11 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from dataclasses import asdict
+
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import DPRSectionRisk
+from apps.fpo.services.dpr.calculation import _pull_risks_from_other_sections
 from apps.fpo.services.dpr.risk_validators import validate_section
 
 from .projects import get_project_or_error
@@ -20,6 +23,15 @@ def _get_or_create_section(project, user):
     return section
 
 
+def _attach_auto_pulled(data: dict, project) -> dict:
+    """Add auto-pulled risks (from Raw Material / Market / Technology / ESS
+    sections) to the section GET response. Closes the KAU 2026-09-10 gap
+    where risks captured elsewhere weren't visible on the Risk Assessment
+    page. Read-only on FE — FPO promotes to a full DPRRiskItem to score."""
+    data['auto_pulled_risks'] = [asdict(ap) for ap in _pull_risks_from_other_sections(project)]
+    return data
+
+
 @extend_schema(tags=['FPO - DPR §2.3.22 Risk Assessment'])
 class DPRRiskSectionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -31,6 +43,7 @@ class DPRRiskSectionView(APIView):
             return err
         section = _get_or_create_section(project, request.user)
         data = DPRSectionRiskSerializer(section, context={'request': request}).data
+        data = _attach_auto_pulled(data, project)
         return StandardResponse.success(data, 'Section retrieved')
 
     @extend_schema(
@@ -50,6 +63,7 @@ class DPRRiskSectionView(APIView):
         ser.save()
         section.refresh_from_db()
         data = DPRSectionRiskSerializer(section, context={'request': request}).data
+        data = _attach_auto_pulled(data, project)
         return StandardResponse.success(data, 'Section updated')
 
 

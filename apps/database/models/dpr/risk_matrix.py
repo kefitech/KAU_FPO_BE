@@ -17,9 +17,10 @@ Shape: one row per (probability, impact) cell. Admin edits cell.risk_class.
 Consumers use `get_risk_class(probability, impact)` to look up the class for a
 user's risk assessment.
 
-Levels match `LEVEL_CHOICES` on DPRRiskItem (Low / Medium / High) so a 3×3
-default grid = 9 cells. Admin can add more levels later — the matrix is
-level-agnostic; anything a risk item carries can be looked up.
+Levels match `LEVEL_CHOICES` on DPRRiskItem (Very Low / Low / Medium / High /
+Very High) so a full 5×5 default grid = 25 cells. Admin can seed a smaller
+subset (3×3 = 9 cells) — the matrix is level-agnostic; anything a risk item
+carries can be looked up, and unmapped combinations return None.
 
 Author: Athul Gopan (Kefi Tech Solutions)
 """
@@ -34,9 +35,11 @@ class DPRRiskMatrixCell(TimeStampedModel, AuditModel):
     """One (probability, impact) → risk_class mapping."""
 
     class Level(models.TextChoices):
-        LOW    = 'low',    'Low'
-        MEDIUM = 'medium', 'Medium'
-        HIGH   = 'high',   'High'
+        VERY_LOW  = 'very_low',  'Very Low'
+        LOW       = 'low',       'Low'
+        MEDIUM    = 'medium',    'Medium'
+        HIGH      = 'high',      'High'
+        VERY_HIGH = 'very_high', 'Very High'
 
     class RiskClass(models.TextChoices):
         LOW      = 'low',      'Low'
@@ -44,11 +47,11 @@ class DPRRiskMatrixCell(TimeStampedModel, AuditModel):
         HIGH     = 'high',     'High'
 
     probability = models.CharField(
-        max_length=10, choices=Level.choices,
+        max_length=12, choices=Level.choices,
         help_text="Probability level from the user's risk assessment.",
     )
     impact = models.CharField(
-        max_length=10, choices=Level.choices,
+        max_length=12, choices=Level.choices,
         help_text="Impact level from the user's risk assessment.",
     )
     risk_class = models.CharField(

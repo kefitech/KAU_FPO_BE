@@ -29,10 +29,11 @@ CONFIG_SEEDS = [
         '%', '5', '25',
     ),
     (
-        'inflation_rate_pct', 'financial', 'decimal', '6.00',
+        'inflation_rate_pct', 'financial', 'decimal', '5.00',
         'Inflation rate',
         'Annual inflation rate applied to operating costs and revenues in the '
-        '10-year projection.',
+        '10-year projection. KAU-confirmed default per DPR Config Parameters '
+        'review (2026-09-12).',
         '%', '0', '15',
     ),
     (
@@ -43,15 +44,17 @@ CONFIG_SEEDS = [
         '%', '0', '40',
     ),
     (
-        'depreciation_rate_building_pct', 'financial', 'decimal', '5.00',
+        'depreciation_rate_building_pct', 'financial', 'decimal', '10.00',
         'Depreciation — buildings',
-        'Straight-line depreciation rate for civil works / buildings.',
+        'Straight-line depreciation rate for civil works / buildings. '
+        'KAU-confirmed default per DPR Config Parameters review (2026-09-12).',
         '%', '1', '20',
     ),
     (
-        'depreciation_rate_machinery_pct', 'financial', 'decimal', '10.00',
+        'depreciation_rate_machinery_pct', 'financial', 'decimal', '15.00',
         'Depreciation — machinery',
-        'Straight-line depreciation rate for plant & machinery.',
+        'Straight-line depreciation rate for plant & machinery. '
+        'KAU-confirmed default per DPR Config Parameters review (2026-09-12).',
         '%', '5', '25',
     ),
     (
@@ -68,9 +71,10 @@ CONFIG_SEEDS = [
         '%', '5', '20',
     ),
     (
-        'loan_tenure_default_years', 'financial', 'int', 7,
+        'loan_tenure_default_years', 'financial', 'int', 5,
         'Loan tenure (default)',
-        'Default term-loan tenure in years, used when the user has not supplied one.',
+        'Default term-loan tenure in years, used when the user has not supplied one. '
+        'KAU-confirmed default per DPR Config Parameters review (2026-09-12).',
         'years', 1, 20,
     ),
     (

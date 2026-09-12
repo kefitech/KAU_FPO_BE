@@ -85,9 +85,11 @@ RISK_CODE_CHOICES = [
 ]
 
 LEVEL_CHOICES = [
-    ('low',     'Low'),
-    ('medium',  'Medium'),
-    ('high',    'High'),
+    ('very_low',  'Very Low'),
+    ('low',       'Low'),
+    ('medium',    'Medium'),
+    ('high',      'High'),
+    ('very_high', 'Very High'),
 ]
 
 OVERALL_RISK_CHOICES = [
@@ -148,8 +150,8 @@ class DPRRiskItem(TimeStampedModel, AuditModel):
     expected_outcome = models.TextField(blank=True)
 
     # Cat A-F additional info
-    probability = models.CharField(max_length=10, choices=LEVEL_CHOICES, blank=True)
-    impact = models.CharField(max_length=10, choices=LEVEL_CHOICES, blank=True)
+    probability = models.CharField(max_length=12, choices=LEVEL_CHOICES, blank=True)
+    impact = models.CharField(max_length=12, choices=LEVEL_CHOICES, blank=True)
     existing_measures = models.TextField(blank=True)
 
     class Meta:

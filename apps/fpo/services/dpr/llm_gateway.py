@@ -66,7 +66,7 @@ class LLMResponse:
 DEFAULT_MODELS: dict[str, str] = {
     'anthropic': 'claude-sonnet-4-6',
     'openai':    'gpt-4o-mini',
-    'google':    'gemini-2.5-flash',
+    'google':    'gemini-3.6-flash',
     'mock':      'mock-narrative-v1',
 }
 
@@ -84,6 +84,7 @@ PRICING_USD_PER_MTOKEN: dict[tuple[str, str], tuple[Decimal, Decimal]] = {
     # Google Gemini
     ('google', 'gemini-2.5-pro'):   (Decimal('1.25'), Decimal('10')),
     ('google', 'gemini-2.5-flash'): (Decimal('0.30'), Decimal('2.50')),
+    ('google', 'gemini-3.6-flash'): (Decimal('0.30'), Decimal('2.50')),
     # Mock is free
     ('mock', 'mock-narrative-v1'): (Decimal('0'), Decimal('0')),
 }
@@ -290,42 +291,33 @@ def _call_google(
     max_tokens: int,
     system: Optional[str],
 ) -> LLMResponse:
-    """Wire up when KAU provides a Google Gemini API key.
+    import google.generativeai as genai
+    from google.api_core.exceptions import GoogleAPIError
 
-    Drop-in implementation (uncomment + `pip install google-generativeai`):
-
-        import google.generativeai as genai
-        from google.api_core.exceptions import GoogleAPIError
-        key = config.get_api_key()
-        if not key:
-            raise LLMError('Google API key not configured on AIServiceConfig')
-        genai.configure(api_key=key)
-        gm = genai.GenerativeModel(
-            model,
-            system_instruction=system if system else None,
+    key = config.get_api_key()
+    if not key:
+        raise LLMError('Google API key not configured on AIServiceConfig')
+    genai.configure(api_key=key)
+    gm = genai.GenerativeModel(
+        model,
+        system_instruction=system if system else None,
+    )
+    try:
+        resp = gm.generate_content(
+            prompt,
+            generation_config={'max_output_tokens': max_tokens},
         )
-        try:
-            resp = gm.generate_content(
-                prompt,
-                generation_config={'max_output_tokens': max_tokens},
-            )
-        except GoogleAPIError as e:
-            raise LLMError(f'Google Gemini API failure: {e}') from e
-        text = resp.text
-        # Gemini returns usage under resp.usage_metadata (as of 2026-09)
-        usage = getattr(resp, 'usage_metadata', None)
-        input_tokens = getattr(usage, 'prompt_token_count', 0) if usage else 0
-        output_tokens = getattr(usage, 'candidates_token_count', 0) if usage else 0
-        return LLMResponse(
-            text=text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cost_usd=_compute_cost('google', model, input_tokens, output_tokens),
-            provider='google',
-            model=model,
-        )
-    """
-    raise LLMError(
-        'Google Gemini provider not yet wired. Configure API key in AIServiceConfig '
-        'and uncomment the implementation in llm_gateway._call_google.'
+    except GoogleAPIError as e:
+        raise LLMError(f'Google Gemini API failure: {e}') from e
+    text = resp.text
+    usage = getattr(resp, 'usage_metadata', None)
+    input_tokens = getattr(usage, 'prompt_token_count', 0) if usage else 0
+    output_tokens = getattr(usage, 'candidates_token_count', 0) if usage else 0
+    return LLMResponse(
+        text=text,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=_compute_cost('google', model, input_tokens, output_tokens),
+        provider='google',
+        model=model,
     )
