@@ -24,11 +24,6 @@ class AgroClimaticZone(BaseModel):
         default=list,
         help_text='List of MasterLookup commodity codes e.g. ["rice","banana","coconut"]'
     )
-    soil_type = models.CharField(
-        max_length=200, blank=True,
-        help_text='e.g. Laterite, Alluvial, Sandy loam — placeholder until '
-                   'real soil survey data is available'
-    )
 
     class Meta:
         verbose_name = 'Agro Climatic Zone'
@@ -192,6 +187,75 @@ class ZoneBoundaryVersion(BaseModel):
     def save(self, *args, **kwargs):
         if self.is_active:
             ZoneBoundaryVersion.objects.exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.label} {'(active)' if self.is_active else ''}"
+
+
+class SoilRegion(BaseModel):
+    """
+    Soil type by location, INDEPENDENT of AgroClimaticZone boundaries — a
+    zone can genuinely span several soil regions, so this is deliberately
+    its own polygon layer rather than a field on AgroClimaticZone (which
+    only ever supported one soil_type per zone). See
+    apps.gis_module.services.find_soil_region_for_point().
+    """
+    code = models.CharField(
+        max_length=30, unique=True,
+        help_text='e.g. laterite_central, alluvial_coastal'
+    )
+    name_en = models.CharField(max_length=200)
+    name_ml = models.CharField(max_length=200)
+    boundary = gis_models.MultiPolygonField(
+        srid=4326,
+        help_text='Soil region polygon — independent of AgroClimaticZone boundaries'
+    )
+    soil_type = models.CharField(
+        max_length=200,
+        help_text='e.g. Laterite, Alluvial, Sandy loam'
+    )
+
+    class Meta:
+        verbose_name = 'Soil Region'
+        verbose_name_plural = 'Soil Regions'
+
+    def __str__(self):
+        return f"{self.name_en} ({self.soil_type})"
+
+
+class SoilRegionVersion(BaseModel):
+    """
+    A staged, uploaded GeoJSON FeatureCollection for soil regions. Same
+    pattern as ZoneBoundaryVersion — uploading does NOT immediately affect
+    live SoilRegion data, only activating a version does.
+    """
+    label = models.CharField(
+        max_length=150,
+        help_text='e.g. the uploaded filename, or a short description'
+    )
+    geojson_data = models.JSONField(
+        help_text='The raw uploaded FeatureCollection — validated at '
+                   'upload time but not yet applied to live soil regions'
+    )
+    is_active = models.BooleanField(
+        default=False,
+        help_text='Only ONE version can be active at a time — activating '
+                   'replaces the live SoilRegion set with this data'
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='soil_region_uploads'
+    )
+
+    class Meta:
+        verbose_name = 'Soil Region Version'
+        verbose_name_plural = 'Soil Region Versions'
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if self.is_active:
+            SoilRegionVersion.objects.exclude(pk=self.pk).update(is_active=False)
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -582,7 +582,7 @@ class MeView(APIView):
                 'role':               role,
                 'permissions':        sorted(permissions) if '*' not in permissions else ['*'],
             },
-            'menu':     None if redirect else _build_menu(user, lang),
+            'menu':     None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
             'redirect': redirect,
         }
 

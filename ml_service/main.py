@@ -43,8 +43,10 @@ Run:
     uvicorn main:app --reload --port 8001
 """
 import json
+import logging
 import os
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -57,11 +59,15 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from data_access_v3 import CropKnowledgeBase, resolve_soil_category
+from logging_config import setup_logging
 from retrain_pipeline import (
     run_retrain, validate_source_csv, validate_preexpanded_csv,
     _detect_dataset_format, is_blocking, DatasetValidationError,
     REQUIRED_COLUMNS, REQUIRED_PREEXPANDED_COLUMNS,
 )
+
+setup_logging()
+logger = logging.getLogger("ml_service")
 
 # Load the SAME .env file Django reads (config('ML_MODELS_DIR', ...) in
 # config/settings/base.py), so both services agree on ML_MODELS_DIR from one
@@ -266,15 +272,17 @@ def load_artifacts():
     global _model, _kb
     pipe, problems, warns = load_model_checked(MODEL_PATH)
     for w in warns:
-        print(f"[startup] model warning: {w}")
+        logger.warning("startup model warning: %s", w)
     if problems:
         # Refuse to start rather than come up "healthy" and 500 on the first
         # real prediction. The message names the exact mismatch.
+        logger.error("startup failed: default model at %s is incompatible: %s", MODEL_PATH, " | ".join(problems))
         raise RuntimeError(
             f"Default model at {MODEL_PATH} is not compatible with this service: " + " | ".join(problems)
         )
     _model = pipe
     _kb = CropKnowledgeBase()
+    logger.info("startup complete: loaded %s as model_version=%s", MODEL_PATH, SERVED_MODEL_VERSION)
 
 
 def build_reasoning(crop_name: str, zone: str, season: str, climate: dict, confidence: float,
@@ -491,6 +499,7 @@ def reload_model(payload: ReloadModelRequest):
 
     if not file_exists:
         _active_model_state["loaded"] = False
+        logger.error("reload-model failed: file not found at %s (version_code=%s)", full_path, payload.version_code)
         raise HTTPException(status_code=422, detail={
             "note": ("File not found at the resolved shared-folder path. "
                      "Check ML_MODELS_DIR matches Django's settings.ML_MODELS_DIR."),
@@ -501,6 +510,7 @@ def reload_model(payload: ReloadModelRequest):
     pipe, problems, warns = load_model_checked(full_path)
     if problems:
         _active_model_state["loaded"] = False
+        logger.error("reload-model rejected version_code=%s: %s", payload.version_code, " | ".join(problems))
         raise HTTPException(status_code=422, detail={
             "note": "Model file rejected; previous model remains active.",
             "resolved_path": str(full_path),
@@ -508,9 +518,11 @@ def reload_model(payload: ReloadModelRequest):
             "warnings": warns,
         })
 
+    previous_version = SERVED_MODEL_VERSION
     _model = pipe
     SERVED_MODEL_VERSION = payload.version_code  # /health and predict responses now report the truth
     _active_model_state["loaded"] = True
+    logger.info("reload-model succeeded: %s -> %s (%s)", previous_version, payload.version_code, full_path)
 
     return {
         "status": "loaded",
@@ -653,6 +665,10 @@ async def validate_dataset(dataset_file: UploadFile = File(...)):
         tmp_path.unlink(missing_ok=True)
     problems = [f for f in findings if is_blocking(f)]
     warnings_ = [f for f in findings if f not in problems]
+    logger.info(
+        "validate-dataset: format=%s n_rows=%d valid=%s problems=%d warnings=%d",
+        fmt, len(raw), not problems, len(problems), len(warnings_),
+    )
     return DatasetValidationResponse(
         valid=not problems, problems=problems, warnings=warnings_, n_rows=len(raw), detected_format=fmt
     )
@@ -691,6 +707,8 @@ async def train_from_csv(
     if not version_code:
         version_code = f"v-retrain-{uuid.uuid4().hex[:8]}"
 
+    logger.info("train: starting run for version_code=%s", version_code)
+    start_time = time.monotonic()
     tmp_path = Path(tempfile.gettempdir()) / f"retrain_upload_{uuid.uuid4().hex}.csv"
     try:
         contents = await dataset_file.read()
@@ -704,6 +722,7 @@ async def train_from_csv(
             # other request for the whole duration of training.
             pipe, metrics, training_df = await run_in_threadpool(run_retrain, str(tmp_path))
         except DatasetValidationError as exc:
+            logger.error("train failed for version_code=%s: %s", version_code, exc)
             raise HTTPException(status_code=422, detail=str(exc))
 
         version_dir = ML_MODELS_DIR / version_code
@@ -712,6 +731,13 @@ async def train_from_csv(
         joblib.dump(pipe, version_dir / model_filename)
         with open(version_dir / "training_metrics.json", "w") as f:
             json.dump(metrics, f, indent=2, default=str)
+
+        duration_s = time.monotonic() - start_time
+        logger.info(
+            "train: completed version_code=%s in %.1fs (n_rows=%s, n_crops=%s, accuracy=%.1f%%, format=%s)",
+            version_code, duration_s, metrics.get("n_rows_total"), metrics.get("n_crops"),
+            metrics.get("random_80_20_split", {}).get("accuracy", 0) * 100, metrics.get("source_format"),
+        )
 
         return RetrainResponse(
             version_code=version_code,

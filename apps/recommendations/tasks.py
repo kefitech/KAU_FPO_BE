@@ -28,12 +28,16 @@ logger = logging.getLogger(__name__)
     default_retry_delay=30,
     name='recommendations.generate',
 )
-def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year):
+def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year, season_override=None):
     """
     Args:
         fpo_id            : FPO.pk
         model_version_id  : MLModelVersion.pk (the active model at request time)
         financial_year    : e.g. '2026-27'
+        season_override   : optional manual season choice from the FPO
+                             (southwest_monsoon/northeast_monsoon/dry_season).
+                             None means auto-detect, same as before this
+                             param existed.
 
     Looks up the FPO and model, calls FastAPI (via the existing
     get_crop_recommendation), saves the result, and — on success —
@@ -42,6 +46,7 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     """
     from apps.database.models import FPO, MLModelVersion, CropRecommendation
     from apps.recommendations.services import get_crop_recommendation, build_recommendation_payload
+    from apps.gis_module.services import resolve_fpo_zone, build_location_snapshot
     from apps.notifications.services import send_notification
 
     try:
@@ -56,8 +61,36 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
         fpo=fpo, financial_year=financial_year
     ).update(status=CropRecommendation.Status.PROCESSING)
 
-    result = get_crop_recommendation(fpo, model_version, financial_year)
-    input_snapshot = build_recommendation_payload(fpo, model_version, financial_year)
+    # This service only covers Kerala's agro-climatic zones. If the FPO's
+    # location (cultivation area centroid, falling back to lat/lng) doesn't
+    # fall inside ANY zone polygon, resolve_fpo_zone() returns None -- that
+    # means the point is outside Kerala (or otherwise unmapped). Skip the ML
+    # call entirely in that case: ml_service's predict_crops() treats an
+    # unresolved zone as "no candidates" and silently falls back to a
+    # DEFAULT_CROP_NAME="Rice" placeholder, which looks like a real
+    # recommendation but isn't one -- surfacing that as a normal result was
+    # the actual bug being fixed here, not something to route around.
+    if resolve_fpo_zone(fpo) is None:
+        input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+        CropRecommendation.objects.update_or_create(
+            fpo=fpo,
+            financial_year=financial_year,
+            defaults={
+                'model_version': model_version,
+                'input_snapshot': input_snapshot,
+                'recommendations': [],
+                'status': CropRecommendation.Status.FAILED,
+            },
+        )
+        return
+
+    result = get_crop_recommendation(fpo, model_version, financial_year, season_override)
+    input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+    # Not part of the ML payload contract (build_recommendation_payload's
+    # return is also literally the FastAPI request body) -- merged in only
+    # for display, so a later "stale" recommendation can still show the
+    # actual farm shape it was generated for, even after the FPO redraws it.
+    input_snapshot['location_snapshot'] = build_location_snapshot(fpo)
     recommendations_list = result.get('recommendations', [])
 
     new_status = (

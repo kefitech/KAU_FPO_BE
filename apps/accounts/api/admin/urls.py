@@ -127,7 +127,25 @@ from .reports import FPOSummaryReportView
 from apps.accounts.api.menu import MenuItemViewSet
 from apps.accounts.api.sub_admins import SubAdminViewSet
 from apps.accounts.api.cbbo_admin import CBBOViewSet
-from apps.accounts.api.government_admin import GovernmentViewSet   
+from apps.accounts.api.government_admin import GovernmentViewSet
+
+from apps.recommendations.api.recommendations import (
+    MLModelVersionAdminView,
+    MLModelVersionActivateView,
+    MLModelRetrainView,
+    RecommendationFeedbackAdminViewSet,
+)
+from apps.gis_module.api.zones import (
+    ZoneBoundaryVersionListView,
+    ZoneBoundaryVersionActivateView,
+    ZoneBoundaryVersionDetailView,
+)
+from apps.gis_module.api.soil_regions import (
+    SoilRegionVersionListView,
+    SoilRegionVersionActivateView,
+    SoilRegionVersionDetailView,
+)
+
 # Create DRF router
 router = DefaultRouter()
 
@@ -249,5 +267,17 @@ urlpatterns = [
     path('experts/<int:pk>/activate/',     ExpertActivateView.as_view(),    name='admin-experts-activate'),
     path('experts/<int:pk>/deactivate/',   ExpertDeactivateView.as_view(),  name='admin-experts-deactivate'),
     path('experts/<int:pk>/enquiries/',    ExpertEnquiriesView.as_view(),   name='admin-experts-enquiries'),
+    # ML Model Versions (P2-06)
+    path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
+    path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
+    path('ml-models/retrain/',             MLModelRetrainView.as_view(),         name='admin-ml-models-retrain'),
+    path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),
+    # GIS admin
+    path('gis/zone-versions/',                          ZoneBoundaryVersionListView.as_view(),     name='admin-gis-zone-versions'),
+    path('gis/zone-versions/<int:pk>/activate/',        ZoneBoundaryVersionActivateView.as_view(), name='admin-gis-zone-versions-activate'),
+    path('gis/zone-versions/<int:pk>/',                 ZoneBoundaryVersionDetailView.as_view(),   name='admin-gis-zone-versions-detail'),
+    path('gis/soil-region-versions/',                   SoilRegionVersionListView.as_view(),       name='admin-gis-soil-region-versions'),
+    path('gis/soil-region-versions/<int:pk>/activate/', SoilRegionVersionActivateView.as_view(),   name='admin-gis-soil-region-versions-activate'),
+    path('gis/soil-region-versions/<int:pk>/',          SoilRegionVersionDetailView.as_view(),     name='admin-gis-soil-region-versions-detail'),
 ]
 

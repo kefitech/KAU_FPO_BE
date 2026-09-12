@@ -21,9 +21,13 @@ from apps.gis_module.api.zones import (
 from apps.gis_module.api.districts import DistrictBoundaryViewSet
 from apps.gis_module.api.cultivation_area import CultivationAreaView
 from apps.gis_module.api.weather import FPOWeatherView
+from apps.gis_module.api.soil_regions import SoilRegionViewSet
 
 zone_list = AgroClimaticZoneViewSet.as_view({'get': 'list'})
 zone_detail = AgroClimaticZoneViewSet.as_view({'get': 'retrieve'})
+
+soil_region_list = SoilRegionViewSet.as_view({'get': 'list'})
+soil_region_detail = SoilRegionViewSet.as_view({'get': 'retrieve'})
 
 district_list = DistrictBoundaryViewSet.as_view({'get': 'list'})
 district_detail = DistrictBoundaryViewSet.as_view({'get': 'retrieve'})
@@ -36,6 +40,9 @@ urlpatterns = [
 
     path('districts/', district_list, name='district-list'),
     path('districts/<str:code>/', district_detail, name='district-detail'),
+
+    path('soil-regions/', soil_region_list, name='soil-region-list'),
+    path('soil-regions/<str:code>/', soil_region_detail, name='soil-region-detail'),
 
     path('fpo-location/', FPOLocationView.as_view(), name='fpo-location'),
     path('detect-zone/', DetectZoneView.as_view(), name='detect-zone'),

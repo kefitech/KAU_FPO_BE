@@ -38,6 +38,7 @@ from apps.recommendations.services import (
     get_current_financial_year,
     build_recommendation_payload,
 )
+from apps.gis_module.services import resolve_fpo_zone
 from apps.recommendations.tasks import (
     generate_crop_recommendation_task,
     retrain_model_task,
@@ -118,6 +119,22 @@ class MyRecommendationView(APIView):
         )
 
 
+class _RequestRecommendationSerializer(serializers.Serializer):
+    """
+    Optional manual season override for a recommendation request. Left
+    unset (or null), the task auto-detects the season the same way it
+    always has (apps.gis_module.services.get_current_season()) — this
+    is purely an opt-in override, not a required field.
+    """
+    season = serializers.ChoiceField(
+        choices=['southwest_monsoon', 'northeast_monsoon', 'dry_season'],
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text='Optional manual season override. Defaults to auto-detected season if omitted.',
+    )
+
+
 class RequestRecommendationView(APIView):
     """
     POST /api/recommendations/me/request/
@@ -136,6 +153,24 @@ class RequestRecommendationView(APIView):
         fpo, err = _get_fpo_or_404(request.user, lang)
         if err:
             return err
+
+        ser = _RequestRecommendationSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
+        season_override = ser.validated_data.get('season')
+
+        # Reject up front, synchronously, if the FPO's location doesn't fall
+        # inside any Kerala agro-climatic zone -- resolve_fpo_zone() is a
+        # cheap local PostGIS query (not an external call), so there's no
+        # reason to pay for a DB write + Celery round-trip + worker pickup
+        # just to discover this asynchronously, the way it used to. No
+        # CropRecommendation row is touched here, so a previously valid
+        # cached recommendation (if any) is left untouched too.
+        if resolve_fpo_zone(fpo) is None:
+            return StandardResponse.error(
+                t('recommendations.outside_kerala', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         active_model = MLModelVersion.objects.filter(is_active=True).first()
         if not active_model:
@@ -164,10 +199,10 @@ class RequestRecommendationView(APIView):
             action=AuditLog.Action.CREATE if _created else AuditLog.Action.UPDATE,
             instance=rec,
             request=request,
-            changes={'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code},
+            changes={'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code, 'season_override': season_override},
         )
 
-        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy)
+        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy, season_override)
 
         serializer = CropRecommendationSerializer(rec)
         return StandardResponse.success(

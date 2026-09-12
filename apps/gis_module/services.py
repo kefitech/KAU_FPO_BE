@@ -69,6 +69,20 @@ def find_zone_for_point(lat: float, lng: float):
     return AgroClimaticZone.objects.filter(boundary__contains=point).first()
 
 
+def find_soil_region_for_point(lat: float, lng: float):
+    """
+    Live spatial lookup — which SoilRegion contains this point. Deliberately
+    a separate polygon layer from AgroClimaticZone (soil regions need not be
+    co-terminous with agro-climatic zone boundaries — a single zone can span
+    multiple soil regions). Same "one implementation, not scattered copies"
+    reasoning as find_zone_for_point() above.
+    """
+    from apps.database.models import SoilRegion
+
+    point = Point(lng, lat, srid=4326)
+    return SoilRegion.objects.filter(boundary__contains=point).first()
+
+
 def resolve_fpo_location(fpo):
     """
     Returns (lat, lng) or (None, None) if the FPO has no usable location.
@@ -91,6 +105,26 @@ def resolve_fpo_location(fpo):
     return None, None
 
 
+def build_location_snapshot(fpo) -> dict:
+    """
+    Snapshot of the FPO's location/boundary at a point in time, for
+    persisting alongside a CropRecommendation.input_snapshot -- lets a
+    later "stale" recommendation still show where it was actually
+    generated for, even after the FPO redraws their cultivation area.
+    Returns {'lat', 'lng', 'area_polygon'} -- area_polygon is a GeoJSON
+    dict (the FPO's drawn boundary) or None if they haven't drawn one
+    (falls back to their lat/lng only, same as resolve_fpo_location).
+    """
+    import json as _json
+
+    lat, lng = resolve_fpo_location(fpo)
+    cultivation_area = getattr(fpo, 'cultivation_area', None)
+    area_polygon = None
+    if cultivation_area and cultivation_area.area_polygon:
+        area_polygon = _json.loads(cultivation_area.area_polygon.geojson)
+    return {'lat': lat, 'lng': lng, 'area_polygon': area_polygon}
+
+
 def resolve_fpo_zone(fpo):
     """
     Convenience wrapper: resolve_fpo_location() + find_zone_for_point()
@@ -100,6 +134,19 @@ def resolve_fpo_zone(fpo):
     if lat is None or lng is None:
         return None
     return find_zone_for_point(lat, lng)
+
+
+def resolve_fpo_soil_region(fpo):
+    """
+    Convenience wrapper: resolve_fpo_location() + find_soil_region_for_point()
+    in one call. Returns a SoilRegion or None. Deliberately independent of
+    resolve_fpo_zone() — an FPO's zone and soil region are separate lookups
+    against separate polygon layers and may not share a code.
+    """
+    lat, lng = resolve_fpo_location(fpo)
+    if lat is None or lng is None:
+        return None
+    return find_soil_region_for_point(lat, lng)
 
 
 # ── Season detection — Kerala's monsoon calendar ──

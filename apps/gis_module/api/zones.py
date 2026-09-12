@@ -30,6 +30,7 @@ from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
 from apps.database.models import AgroClimaticZone, FPO, ZoneBoundaryVersion
+from apps.gis_module.services import find_soil_region_for_point
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +50,7 @@ class AgroClimaticZoneSerializer(GeoJSONFixMixin, GeoFeatureModelSerializer):
     class Meta:
         model = AgroClimaticZone
         geo_field = 'boundary'
-        fields = ['id', 'code', 'name_en', 'name_ml', 'suitable_crops', 'soil_type']
+        fields = ['id', 'code', 'name_en', 'name_ml', 'suitable_crops']
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +133,7 @@ class FPOLocationView(APIView):
         zone = AgroClimaticZone.objects.filter(
             boundary__contains=fpo.location
         ).first()
+        soil_region = find_soil_region_for_point(fpo.location.y, fpo.location.x)
 
         data = {
             'location': {
@@ -141,7 +143,7 @@ class FPOLocationView(APIView):
             'zone_code': zone.code if zone else None,
             'zone_name_en': zone.name_en if zone else None,
             'zone_name_ml': zone.name_ml if zone else None,
-            'soil_type': zone.soil_type if zone else None,
+            'soil_type': soil_region.soil_type if soil_region else None,
         }
         return StandardResponse.success(
             data=data,
@@ -201,12 +203,14 @@ class DetectZoneView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        soil_region = find_soil_region_for_point(lat, lng)
+
         data = {
             'zone_code': zone.code,
             'zone_name_en': zone.name_en,
             'zone_name_ml': zone.name_ml,
             'suitable_crops': zone.suitable_crops,
-            'soil_type': zone.soil_type,
+            'soil_type': soil_region.soil_type if soil_region else None,
         }
         return StandardResponse.success(
             data=data,
