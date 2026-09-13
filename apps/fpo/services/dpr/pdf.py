@@ -30,6 +30,151 @@ from django.template.loader import render_to_string
 from apps.fpo.services.dpr.calculation import compute, CalculationResult
 
 
+# Human-readable labels for the ~19 cost fields + ~12 MoF fields on
+# DPRSectionFinance. Used to render the "Project at a Glance" breakdown
+# sub-rows in the PDF instead of raw model field names.
+# Keys mirror COST_FIELDS / MOF_FIELDS in calculation.py; if either list
+# changes, update this map in lock-step.
+COST_LABELS = {
+    'cost_land_purchase':               'Land purchase',
+    'cost_land_development':            'Land development',
+    'cost_civil_works':                 'Civil works',
+    'cost_buildings':                   'Buildings',
+    'cost_plant_machinery':             'Plant & machinery',
+    'cost_equipment':                   'Equipment',
+    'cost_utilities':                   'Utilities (power, water)',
+    'cost_other_capex':                 'Other capex',
+    'cost_site_development':            'Site development',
+    'cost_furniture_fixtures':          'Furniture & fixtures',
+    'cost_office_equipment':            'Office equipment',
+    'cost_vehicles':                    'Vehicles',
+    'cost_electrification':             'Electrification',
+    'cost_water_supply':                'Water supply',
+    'cost_pre_operative_expenses':      'Pre-operative expenses',
+    'cost_preliminary_expenses':        'Preliminary expenses',
+    'cost_technical_consultancy':       'Technical consultancy',
+    'cost_contingencies':               'Contingencies',
+    'cost_margin_for_working_capital':  'Margin for working capital',
+    'cost_interest_during_construction':'Interest during construction',
+}
+MOF_LABELS = {
+    'mof_promoters_contribution':       "Promoter's contribution",
+    'mof_bank_term_loan':               'Bank term loan',
+    'mof_government_grant':             'Government grant',
+    'mof_government_subsidy':           'Government subsidy',
+    'mof_other_sources':                'Other sources',
+    'mof_share_capital':                'Share capital',
+    'mof_internal_accruals':            'Internal accruals',
+    'mof_working_capital_loan':         'Working capital loan',
+    'mof_venture_capital':              'Venture capital',
+    'mof_csr_support':                  'CSR support',
+    'mof_nabard_assistance':            'NABARD assistance',
+    'mof_other_financial_assistance':   'Other financial assistance',
+}
+
+
+def _products_for_pdf(project) -> tuple[list[dict], str]:
+    """Return (products, hero_image_path) for the PDF template.
+
+    `products` is a list of {'name', 'category', 'quantity', 'unit',
+    'price', 'description', 'image_path', 'is_value_added'} dicts — one
+    per DPRProductItem, ordered by (order, id).
+
+    `hero_image_path` is the absolute file path of the first product with
+    an image, used as the cover hero image. Empty string if no product has
+    a photo. Absolute path (not URL) so WeasyPrint reads it directly from
+    disk — avoids HTTP overhead + works whether MEDIA_URL is set or not.
+    """
+    try:
+        from apps.database.models import DPRSectionProducts, DPRProductItem
+    except ImportError:
+        return [], ''
+    section = DPRSectionProducts.objects.filter(project=project).first()
+    if not section:
+        return [], ''
+    hero_path = ''
+    out: list[dict] = []
+    for item in DPRProductItem.objects.filter(section=section).order_by('order', 'id'):
+        img_path = ''
+        if item.image:
+            try:
+                img_path = item.image.path
+                if not hero_path:
+                    hero_path = img_path
+            except (ValueError, NotImplementedError):
+                # image.path raises for non-local storage backends (S3).
+                # In prod we'd swap to item.image.url with WeasyPrint's
+                # url_fetcher configured. For now, local storage only.
+                img_path = ''
+        out.append({
+            'name': item.name or '—',
+            'category': str(item.category) if item.category_id else '',
+            'product_type': str(item.product_type) if item.product_type_id else '',
+            'quantity': item.annual_quantity,
+            'unit': str(item.unit_of_measurement) if item.unit_of_measurement_id else '',
+            'price': item.selling_price_per_unit,
+            'selling_unit': str(item.selling_unit) if item.selling_unit_id else '',
+            'description': (item.description or '').strip(),
+            'image_path': img_path,
+            'is_value_added': item.is_value_added,
+            'primary_or_secondary': item.primary_or_secondary or '',
+        })
+    return out, hero_path
+
+
+def _technologies_with_flow(project) -> list[dict]:
+    """Return [{'name', 'description', 'steps'}, ...] for each DPRTechnology on
+    the project that has a non-empty `process_flow_sequence`.
+
+    Steps are parsed by splitting on newlines and stripping empties. Used by
+    the PDF template to render one vertical flowchart per technology in the
+    Manufacturing Process chapter. Returns [] when no technology has a
+    populated flow — the whole chapter is omitted in that case.
+    """
+    try:
+        from apps.database.models import DPRSectionTechnology, DPRTechnology
+    except ImportError:
+        return []
+    section = DPRSectionTechnology.objects.filter(project=project).first()
+    if not section:
+        return []
+    out: list[dict] = []
+    for tech in DPRTechnology.objects.filter(section=section).order_by('id'):
+        seq = (getattr(tech, 'process_flow_sequence', '') or '').strip()
+        if not seq:
+            continue
+        steps = [line.strip() for line in seq.splitlines() if line.strip()]
+        if not steps:
+            continue
+        out.append({
+            'name': (getattr(tech, 'name', '') or 'Process Flow').strip(),
+            'description': (getattr(tech, 'process_description', '') or '').strip(),
+            'steps': steps,
+        })
+    return out
+
+
+def _breakdown_rows(by_field: dict, labels: dict) -> list[tuple[str, object]]:
+    """Return [(label, value), ...] pairs for non-zero fields, in labels-dict order.
+
+    The label map dictates display order so the PDF reads consistently
+    regardless of how Python iterates the by_field dict. Fields not in
+    the label map are appended at the end using the raw field name.
+    """
+    from decimal import Decimal
+    rows: list[tuple[str, object]] = []
+    for key, label in labels.items():
+        val = by_field.get(key) or Decimal('0')
+        if val and val > 0:
+            rows.append((label, val))
+    # Include any unknown keys (defensive — surfaces if calculation.py adds
+    # a field but this map wasn't updated).
+    for key, val in by_field.items():
+        if key not in labels and val and val > 0:
+            rows.append((key, val))
+    return rows
+
+
 # ── Filename convention (KAU pre-UAT reply §7.2, 2026-09-08) ─────────────
 # Format: DPR_<FPO-slug>_v<version_number>.pdf
 # FPO slug: alphanumeric + underscore, whitespace → underscore, drop everything
@@ -69,6 +214,7 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
     Pass None for one-off previews (renders "Preview" instead of vN).
     """
     result: CalculationResult = compute(project)
+    pdf_products, pdf_hero_image = _products_for_pdf(project)
     return render_to_string('dpr/report.html', {
         'project': project,
         'r': result,
@@ -78,6 +224,17 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
         # rendered on cover + running footer.
         'version_number': version_number,
         'version_label': f'v{version_number}' if version_number else 'Preview',
+        # Project-at-Glance breakdown rows — pre-computed so the template
+        # renders human-readable labels without extra filter machinery.
+        'cost_breakdown_rows': _breakdown_rows(result.cost.by_field, COST_LABELS),
+        'mof_breakdown_rows':  _breakdown_rows(result.mof.by_field, MOF_LABELS),
+        # Per-technology process flowcharts. Empty list = section omitted.
+        'technologies_with_flow': _technologies_with_flow(project),
+        # Product list + cover hero image (first product with a photo).
+        # `pdf_hero_image` is an absolute file path — WeasyPrint reads
+        # from disk. Empty string when no product has a photo (hero omitted).
+        'pdf_products': pdf_products,
+        'pdf_hero_image': pdf_hero_image,
     })
 
 

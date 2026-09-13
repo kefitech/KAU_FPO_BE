@@ -477,7 +477,18 @@ class DPRSectionInvestmentSerializer(serializers.ModelSerializer):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DPRProductItemSerializer(serializers.ModelSerializer):
-    """One product/service row (10 KAU-spec columns)."""
+    """One product/service row (10 KAU-spec columns).
+
+    `id` is declared writable so the section update can match existing rows
+    by id — preserving uploaded images across re-saves (see _replace_items).
+    """
+
+    # DRF marks `id` read_only by default; making it optional-writable lets
+    # the section update path distinguish existing rows from new ones.
+    id = serializers.IntegerField(required=False, allow_null=True)
+    # Image is upload-only via a dedicated multipart endpoint; read exposes
+    # the URL for the FE to render a thumbnail preview.
+    image = serializers.ImageField(required=False, allow_null=True, use_url=True, read_only=True)
 
     class Meta:
         model = DPRProductItem
@@ -515,11 +526,36 @@ class DPRSectionProductsSerializer(serializers.ModelSerializer):
         return {}
 
     def _replace_items(self, section, items_data, user):
-        section.items.all().delete()
+        """Sync `items` against the payload while preserving image uploads.
+
+        Uploaded images live on DPRProductItem.image and would be lost if we
+        did a plain delete+recreate. So instead we match by id:
+          * item with id → update-in-place (image stays)
+          * item without id → create new
+          * existing item id NOT in payload → delete (dropped by user)
+        """
         audit = self._audit(user)
+        payload_ids = {item.get('id') for item in items_data if item.get('id')}
+        # Drop items the user removed from the list.
+        section.items.exclude(id__in=payload_ids).delete()
+
+        existing = {row.id: row for row in section.items.all()}
         for item in items_data:
-            item.pop('id', None)
-            DPRProductItem.objects.create(section=section, **item, **audit)
+            item_id = item.pop('id', None)
+            # Never accept an image via this JSON path — images are uploaded
+            # through the dedicated multipart endpoint. Guard against a
+            # buggy client accidentally clearing an existing image by
+            # sending image=null in the section payload.
+            item.pop('image', None)
+            if item_id and item_id in existing:
+                obj = existing[item_id]
+                for k, v in item.items():
+                    setattr(obj, k, v)
+                if user and user.is_authenticated:
+                    obj.updated_by = user
+                obj.save()
+            else:
+                DPRProductItem.objects.create(section=section, **item, **audit)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

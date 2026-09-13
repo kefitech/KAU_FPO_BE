@@ -260,6 +260,11 @@ section_patterns = [
         pd.DPRProductsSectionReadinessView.as_view(),
         name='dpr-section-products-readiness',
     ),
+    path(
+        'projects/<uuid:project_uuid>/sections/products/items/<int:item_id>/image/',
+        pd.DPRProductItemImageView.as_view(),
+        name='dpr-section-products-item-image',
+    ),
     # §2.3.6 Proposed Project Location
     path(
         'projects/<uuid:project_uuid>/sections/location/',

@@ -68,3 +68,5 @@ cookies_*.txt
 
 # Local server backups (media dumps, SQL) — never commit
 backups/
+tmp/
+dpr_glance_test.pdf

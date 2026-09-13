@@ -59,6 +59,17 @@ Author: Athul Gopan (Kefi Tech Solutions)
     .cover .subtitle { font-size: 13pt; color: #444; margin: 0 0 20mm 0; }
     .cover .project-name { font-size: 15pt; color: #E86C1A; font-weight: 600; margin: 0 0 15mm 0; }
     .cover .meta-block { display: inline-block; text-align: left; margin: 4mm auto; padding: 4mm 8mm; border: 1px solid #ddd; border-radius: 2mm; background: #fafafa; }
+    .cover .hero-image { display: block; margin: 4mm auto 10mm auto; max-width: 80mm; max-height: 55mm; border: 1.5px solid #1F3864; padding: 1.5mm; border-radius: 1.5mm; background: #fff; }
+    /* Products chapter cards */
+    .products-grid { margin-top: 4mm; }
+    .product-card { display: flex; gap: 5mm; padding: 4mm; margin-bottom: 4mm; border: 1px solid #ccc; border-radius: 2mm; background: #fcfcfc; page-break-inside: avoid; }
+    .product-card .prod-img { width: 55mm; height: 40mm; object-fit: cover; border: 1px solid #ddd; border-radius: 1mm; background: #f4f6f9; }
+    .product-card .prod-info { flex: 1; font-size: 9.5pt; }
+    .product-card .prod-name { font-size: 11pt; font-weight: 700; color: #1F3864; margin: 0 0 2mm 0; }
+    .product-card .prod-meta { color: #555; margin: 1mm 0; }
+    .product-card .prod-meta strong { color: #1F3864; }
+    .product-card .prod-desc { margin-top: 2mm; color: #333; font-style: italic; font-size: 9pt; }
+    .product-card .badge-va { background: #d1fae5; color: #065f46; padding: 0.5mm 2mm; border-radius: 1.5mm; font-size: 7.5pt; font-weight: 600; margin-left: 2mm; }
     .cover .meta { font-size: 10.5pt; margin: 1.5mm 0; color: #333; }
     .cover .meta strong { color: #1F3864; display: inline-block; min-width: 45mm; }
     .cover .platform-attribution { margin-top: 12mm; font-size: 9pt; color: #999; font-style: italic; }
@@ -69,6 +80,33 @@ Author: Athul Gopan (Kefi Tech Solutions)
     .glance .row:last-child { border-bottom: 0; }
     .glance .k { font-weight: 600; color: #333; }
     .glance .v { color: #1F3864; font-weight: 500; }
+    /* Project-at-Glance summary table (IIFPT reference layout) */
+    table.glance-table { width: 100%; border-collapse: collapse; margin: 3mm 0; font-size: 9pt; }
+    table.glance-table td, table.glance-table th { border: 1px solid #999; padding: 2mm 3mm; vertical-align: middle; }
+    table.glance-table th.section { background: #1F3864; color: #fff; text-align: left; font-weight: 700; font-size: 10pt; padding: 2mm 3mm; }
+    table.glance-table td.rownum { width: 8mm; text-align: center; background: #f2f2f2; font-weight: 600; color: #666; }
+    table.glance-table td.k { width: 65mm; font-weight: 600; color: #333; text-align: left; }
+    table.glance-table td.v { text-align: left; color: #1F3864; }
+    table.glance-table td.sub { padding-left: 8mm; color: #555; font-weight: 400; background: #fafafa; }
+    table.glance-table td.subv { background: #fafafa; text-align: right; }
+    table.glance-table tr.total td { background: #eef2ff; font-weight: 700; }
+    /* Table of Contents */
+    .toc { margin: 10mm 8mm; }
+    .toc h2 { border: 0; text-align: center; margin-bottom: 6mm; }
+    .toc ol { list-style: none; padding: 0; margin: 0; counter-reset: toc-item; }
+    .toc li { display: flex; align-items: baseline; padding: 1.8mm 0; border-bottom: 1px dotted #ccc; font-size: 10pt; }
+    .toc li a { text-decoration: none; color: #1F3864; font-weight: 500; }
+    .toc li a::after { content: leader('.') target-counter(attr(href url), page); color: #999; font-weight: 400; padding-left: 3mm; }
+    /* Process flowchart (steps in vertical boxes with arrows) */
+    .flowchart { margin: 4mm auto; text-align: center; page-break-inside: avoid; }
+    .flowchart .step { display: inline-block; min-width: 60mm; padding: 3mm 5mm; margin: 0 auto; background: #eef2ff; border: 1.5px solid #1F3864; border-radius: 2mm; color: #1F3864; font-weight: 600; font-size: 10pt; }
+    .flowchart .arrow { font-size: 12pt; color: #E86C1A; margin: 1.5mm 0; font-weight: 700; }
+    .flowchart .tech-title { font-size: 10.5pt; color: #1F3864; font-weight: 700; margin: 4mm 0 3mm 0; text-align: center; }
+    /* Limitations & Guidelines final section */
+    .guidelines { font-size: 9.5pt; line-height: 1.5; color: #333; }
+    .guidelines h3 { color: #1F3864; margin-top: 5mm; }
+    .guidelines ul { padding-left: 6mm; margin: 2mm 0; }
+    .guidelines li { margin: 1.5mm 0; }
     .badge-ok { background: #d1fae5; color: #065f46; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
     .badge-warn { background: #fef3c7; color: #92400e; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
     .badge-err { background: #fee2e2; color: #991b1b; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
@@ -99,6 +137,10 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
     <div class="project-name">{{ project.title|default:"Untitled Project" }}</div>
 
+    {% if pdf_hero_image %}
+      <img class="hero-image" src="file://{{ pdf_hero_image }}" alt="Product photo" />
+    {% endif %}
+
     <div class="meta-block">
       <div class="meta"><strong>DPR Version:</strong> {{ version_label }}</div>
       <div class="meta"><strong>Generated:</strong> {{ generated_at }}</div>
@@ -124,65 +166,93 @@ Author: Athul Gopan (Kefi Tech Solutions)
     </div>
   </section>
 
-  {# ── 2. Project at a glance ────────────────────────────────────────── #}
+  {# ── Table of Contents ────────────────────────────────────────────── #}
+  {# WeasyPrint fills the page numbers via target-counter(). Section IDs
+     are `sec-N` matching each numbered <h2>. If a section is added, add
+     a matching <li> here. Process flowchart entry only shows when at least
+     one DPRTechnology has a process_flow_sequence. #}
   <div class="page-break"></div>
-  <h2>1. Project at a Glance</h2>
-  <div class="glance">
-    <div class="row"><span class="k">Total Project Cost</span>
-      <span class="v">₹ {{ r.cost.total|money }}</span></div>
-    <div class="row"><span class="k">Means of Finance</span>
-      <span class="v">₹ {{ r.mof.total|money }}</span></div>
-    <div class="row"><span class="k">Cost / MoF Variance</span>
-      <span class="v">
-        {% if r.variance.exceeds_threshold %}
-          <span class="badge-err">{{ r.variance.pct|money }}% (exceeds {{ r.variance.threshold_pct|money }}%)</span>
-        {% elif r.variance.delta == 0 %}
-          <span class="badge-ok">Balanced ✓</span>
-        {% else %}
-          <span class="badge-warn">{{ r.variance.pct|money }}%</span>
-        {% endif %}
-      </span></div>
-    <div class="row"><span class="k">Implementation Period</span>
-      <span class="v">{{ r.capital_schedule.implementation_period_months }} months
-        {% if r.capital_schedule.is_estimated %}<span class="badge-warn">estimated</span>{% endif %}</span></div>
-    {% if r.ratios %}
-      <div class="row"><span class="k">Net Present Value ({{ r.ratios.discount_rate_pct|money }}%)</span>
-        <span class="v">₹ {{ r.ratios.npv|money }}</span></div>
-      <div class="row"><span class="k">Internal Rate of Return</span>
-        <span class="v">{% if r.ratios.irr_pct %}{{ r.ratios.irr_pct|money }}%{% else %}Not applicable — see §11{% endif %}</span></div>
-      <div class="row"><span class="k">Payback Period</span>
-        <span class="v">{% if r.ratios.payback_period_years %}{{ r.ratios.payback_period_years|money }} years{% else %}n/a{% endif %}</span></div>
-      <div class="row"><span class="k">Break-even Year</span>
-        <span class="v">{% if r.ratios.break_even_year %}Year {{ r.ratios.break_even_year }}{% else %}n/a{% endif %}</span></div>
-      <div class="row"><span class="k">Debt Service Coverage (min)</span>
-        <span class="v">{% if r.ratios.dscr_min %}{{ r.ratios.dscr_min|money }}x{% else %}n/a (no debt){% endif %}</span></div>
-    {% endif %}
-    {% if r.risk_assessment %}
-      <div class="row"><span class="k">Overall Project Risk</span>
-        <span class="v">
-          {% if r.risk_assessment.overall_class == 'high' %}
-            <span class="badge-err">High</span>
-          {% elif r.risk_assessment.overall_class == 'moderate' %}
-            <span class="badge-warn">Moderate</span>
-          {% else %}
-            <span class="badge-ok">Low</span>
-          {% endif %}
-          &nbsp;· {{ r.risk_assessment.total_risks_scored }}/{{ r.risk_assessment.total_risks_added }} scored
-        </span></div>
-    {% endif %}
-    <div class="row"><span class="k">Balance Sheet Invariant</span>
-      <span class="v">
-        {% if r.balance_sheet.all_years_balanced %}
-          <span class="badge-ok">A = E+L ✓ across all {{ r.projection_years|add:"1" }} years</span>
-        {% else %}
-          <span class="badge-err">Δ ₹{{ r.balance_sheet.max_invariant_delta }}</span>
-        {% endif %}
-      </span></div>
-  </div>
+  <section class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#sec-1">1.  Project at a Glance</a></li>
+      <li><a href="#sec-2">2.  Fixed Capital Investment</a></li>
+      <li><a href="#sec-3">3.  Means of Finance</a></li>
+      <li><a href="#sec-4">4.  Capital Investment Schedule</a></li>
+      <li><a href="#sec-5">5.  Depreciation Schedule (SLM)</a></li>
+      <li><a href="#sec-6">6.  Loan Repayment Schedule</a></li>
+      <li><a href="#sec-7">7.  Projected Profit &amp; Loss</a></li>
+      <li><a href="#sec-8">8.  Projected Cash Flow</a></li>
+      <li><a href="#sec-9">9.  Projected Balance Sheet</a></li>
+      <li><a href="#sec-10">10. Financial Appraisal</a></li>
+      <li><a href="#sec-11">11. Risk Assessment</a></li>
+      {% if pdf_products %}
+      <li><a href="#sec-products">Proposed Products &amp; Services</a></li>
+      {% endif %}
+      {% if technologies_with_flow %}
+      <li><a href="#sec-12">12. Manufacturing Process</a></li>
+      {% endif %}
+      <li><a href="#sec-guidelines">Limitations &amp; Guidelines for Entrepreneurs</a></li>
+    </ol>
+  </section>
+
+  {# ── 2. Project at a glance ────────────────────────────────────────── #}
+  {# IIFPT reference-style snapshot table. All fields verified to exist on
+     project / project.fpo / r.cost / r.mof / r.ratios / r.profit_loss.
+     Optional fields fall back to "—" so a partly-filled DPR still renders. #}
+  <div class="page-break"></div>
+  <h2 id="sec-1">1. Project at a Glance</h2>
+  <table class="glance-table">
+    <colgroup><col style="width:8mm"><col style="width:65mm"><col></colgroup>
+    <tbody>
+      <tr><td class="rownum">1</td>  <td class="k">Name of the proposed project</td>       <td class="v">{{ project.title|default:"—" }}</td></tr>
+      <tr><td class="rownum">2</td>  <td class="k">Name of the FPO</td>                    <td class="v">{{ project.fpo.name|default:"—" }}</td></tr>
+      <tr><td class="rownum">3</td>  <td class="k">Nature of proposed project</td>         <td class="v">
+        {% if project.primary_commodity %}{{ project.primary_commodity }}{% endif %}{% if project.project_types.all %}{% if project.primary_commodity %} — {% endif %}{% for pt in project.project_types.all %}{{ pt }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% if not project.primary_commodity and not project.project_types.all %}—{% endif %}
+      </td></tr>
+      <tr><td class="rownum">4</td>  <td class="k">District</td>                           <td class="v">{% if project.fpo.district %}{{ project.fpo.get_district_display }}, Kerala{% else %}—{% endif %}</td></tr>
+      <tr><td class="rownum">5</td>  <td class="k">Legal structure</td>                    <td class="v">{{ project.fpo.legal_structure|default:"—" }}</td></tr>
+      <tr><td class="rownum">6</td>  <td class="k">Number of members / shareholders</td>   <td class="v">{{ project.fpo.total_members|default_if_none:"—" }}</td></tr>
+      <tr><td class="rownum">7</td>  <td class="k">Promoting agency</td>                   <td class="v">{{ project.fpo.promoting_agency|default:"—" }}</td></tr>
+      <tr><td class="rownum">8</td>  <td class="k">Facilitating agency</td>                <td class="v">{{ project.fpo.facilitating_agency_name|default:"—" }}</td></tr>
+
+      <tr><td class="rownum">9</td>  <td class="k">Total project cost</td>                 <td class="v"><strong>₹ {{ r.cost.total|money }}</strong></td></tr>
+      {% for label, val in cost_breakdown_rows %}
+      <tr><td></td><td class="sub">· {{ label }}</td>                                      <td class="subv">₹ {{ val|money }}</td></tr>
+      {% endfor %}
+
+      <tr><td class="rownum">10</td> <td class="k">Means of finance</td>                   <td class="v"><strong>₹ {{ r.mof.total|money }}</strong></td></tr>
+      {% for label, val in mof_breakdown_rows %}
+      <tr><td></td><td class="sub">· {{ label }}</td>                                      <td class="subv">₹ {{ val|money }}</td></tr>
+      {% endfor %}
+
+      <tr><td class="rownum">11</td> <td class="k">Debt : Equity ratio</td>                <td class="v">
+        {% if r.mof.by_field.mof_promoters_contribution and r.mof.by_field.mof_promoters_contribution > 0 %}
+          ₹ {{ r.mof.by_field.mof_bank_term_loan|default_if_none:0|money }} : ₹ {{ r.mof.by_field.mof_promoters_contribution|money }}
+        {% else %}—{% endif %}
+      </td></tr>
+
+      <tr><td class="rownum">12</td> <td class="k">Profit after tax (PAT) — first 3 years</td>  <td class="v">
+        {% if r.profit_loss.rows %}{% for row in r.profit_loss.rows|slice:":3" %}Y{{ row.year }}: ₹ {{ row.pat|money }}{% if not forloop.last %} · {% endif %}{% endfor %}{% else %}—{% endif %}
+      </td></tr>
+
+      <tr><td class="rownum">13</td> <td class="k">Average DSCR</td>                       <td class="v">{% if r.ratios.dscr_avg %}{{ r.ratios.dscr_avg|money }}x{% else %}n/a (no debt){% endif %}</td></tr>
+      <tr><td class="rownum">14</td> <td class="k">Payback period</td>                     <td class="v">{% if r.ratios.payback_period_years %}{{ r.ratios.payback_period_years|money }} years{% else %}—{% endif %}</td></tr>
+      <tr><td class="rownum">15</td> <td class="k">Net Present Value ({{ r.ratios.discount_rate_pct|money }}%)</td> <td class="v">₹ {{ r.ratios.npv|money }}</td></tr>
+      <tr><td class="rownum">16</td> <td class="k">Internal Rate of Return (IRR)</td>      <td class="v">{% if r.ratios.irr_pct %}{{ r.ratios.irr_pct|money }}%{% else %}Not solvable — see §11{% endif %}</td></tr>
+      <tr><td class="rownum">17</td> <td class="k">Break-even year</td>                    <td class="v">{% if r.ratios.break_even_year %}Year {{ r.ratios.break_even_year }}{% else %}Not reached in projection{% endif %}</td></tr>
+    </tbody>
+  </table>
+
+  <p class="footer-note">
+    Implementation period: {{ r.capital_schedule.implementation_period_months|default:"—" }} months{% if r.capital_schedule.is_estimated %} (estimated){% endif %}
+    {% if r.risk_assessment %} · Overall project risk: <strong>{{ r.risk_assessment.overall_class|capfirst }}</strong>{% endif %}
+    {% if r.variance.exceeds_threshold %} · <span class="badge-err">Cost/MoF variance {{ r.variance.pct|money }}% exceeds threshold</span>{% elif r.variance.delta != 0 %} · Cost/MoF variance {{ r.variance.pct|money }}%{% else %} · <span class="badge-ok">Cost/MoF balanced ✓</span>{% endif %}
+  </p>
 
   {# ── 3. Fixed capital investment ───────────────────────────────────── #}
   <div class="page-break"></div>
-  <h2>2. Fixed Capital Investment</h2>
+  <h2 id="sec-2">2. Fixed Capital Investment</h2>
   <table>
     <thead><tr><th class="label">Cost head</th><th>Amount (₹)</th></tr></thead>
     <tbody>
@@ -196,7 +266,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   </table>
 
   {# ── 4. Means of finance ───────────────────────────────────────────── #}
-  <h2>3. Means of Finance</h2>
+  <h2 id="sec-3">3. Means of Finance</h2>
   <table>
     <thead><tr><th class="label">Source</th><th>Amount (₹)</th></tr></thead>
     <tbody>
@@ -211,7 +281,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 5. Capital schedule ───────────────────────────────────────────── #}
   <div class="page-break"></div>
-  <h2>4. Capital Investment Schedule (Implementation Period)</h2>
+  <h2 id="sec-4">4. Capital Investment Schedule (Implementation Period)</h2>
   {% if r.capital_schedule.is_estimated %}
     <div class="estimated-note">
       <strong>Estimated:</strong> {{ r.capital_schedule.distribution_note }}
@@ -242,7 +312,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 6. Depreciation schedule ──────────────────────────────────────── #}
   <div class="page-break"></div>
-  <h2>5. Depreciation Schedule (SLM)</h2>
+  <h2 id="sec-5">5. Depreciation Schedule (SLM)</h2>
   <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-bottom: 3mm;">
     Depreciation is computed using the Straight-Line Method (SLM) at the rates configured for
     the KAU DPR platform. Rates are used <strong>for project appraisal</strong> and are indicative
@@ -281,7 +351,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 7. Loan repayment schedule ────────────────────────────────────── #}
   {% if r.interest_schedule.loan_amount %}
-    <h2>6. Loan Repayment Schedule</h2>
+    <h2 id="sec-6">6. Loan Repayment Schedule</h2>
     <p style="font-size: 9pt; margin-bottom: 3mm;">
       Loan: <strong>₹{{ r.interest_schedule.loan_amount|money }}</strong> @
       <strong>{{ r.interest_schedule.interest_rate_pct|money }}%</strong> ·
@@ -312,7 +382,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 8. Projected P&L ──────────────────────────────────────────────── #}
   <div class="page-break"></div>
-  <h2>7. Projected Profit &amp; Loss (₹)</h2>
+  <h2 id="sec-7">7. Projected Profit &amp; Loss (₹)</h2>
   <table>
     <thead>
       <tr>
@@ -344,7 +414,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 9. Projected cash flow ────────────────────────────────────────── #}
   <div class="page-break"></div>
-  <h2>8. Projected Cash Flow (₹)</h2>
+  <h2 id="sec-8">8. Projected Cash Flow (₹)</h2>
   <table>
     <thead>
       <tr>
@@ -378,7 +448,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 10. Projected balance sheet ───────────────────────────────────── #}
   <div class="page-break"></div>
-  <h2>9. Projected Balance Sheet (₹)</h2>
+  <h2 id="sec-9">9. Projected Balance Sheet (₹)</h2>
   <table>
     <thead>
       <tr>
@@ -436,7 +506,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {# ── 11. Financial appraisal ratios ────────────────────────────────── #}
   {% if r.ratios %}
     <div class="page-break"></div>
-    <h2>10. Financial Appraisal</h2>
+    <h2 id="sec-10">10. Financial Appraisal</h2>
     <table style="width: 60%;">
       <thead><tr><th class="label">Ratio</th><th>Value</th></tr></thead>
       <tbody>
@@ -494,7 +564,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {# ── 12. Risk assessment (KAU RCD B.9) ────────────────────────────── #}
   {% if r.risk_assessment %}
     <div class="page-break"></div>
-    <h2>11. Risk Assessment</h2>
+    <h2 id="sec-11">11. Risk Assessment</h2>
     <p style="font-size: 9pt; margin-bottom: 3mm;">
       Overall project risk:
       <span class="{% if r.risk_assessment.overall_class == 'high' %}badge-err{% elif r.risk_assessment.overall_class == 'moderate' %}badge-warn{% else %}badge-ok{% endif %}">
@@ -570,6 +640,82 @@ Author: Athul Gopan (Kefi Tech Solutions)
       </table>
     {% endif %}
   {% endif %}
+
+  {# ── 12. Proposed Products & Services ───────────────────────────────── #}
+  {# Renders one card per DPRProductItem with photo (when uploaded),
+     name, category, capacity, price, description, value-added badge.
+     Section omitted when no products exist. #}
+  {% if pdf_products %}
+  <div class="page-break"></div>
+  <h2 id="sec-products">Proposed Products &amp; Services</h2>
+  <div class="products-grid">
+    {% for p in pdf_products %}
+      <div class="product-card">
+        {% if p.image_path %}
+          <img class="prod-img" src="file://{{ p.image_path }}" alt="{{ p.name }}" />
+        {% else %}
+          <div class="prod-img" style="display:flex;align-items:center;justify-content:center;color:#bbb;font-style:italic;font-size:8pt;">No photo</div>
+        {% endif %}
+        <div class="prod-info">
+          <div class="prod-name">
+            {{ p.name }}
+            {% if p.is_value_added %}<span class="badge-va">Value added</span>{% endif %}
+          </div>
+          {% if p.category %}<div class="prod-meta"><strong>Category:</strong> {{ p.category }}{% if p.product_type %} · {{ p.product_type }}{% endif %}</div>{% endif %}
+          {% if p.quantity %}<div class="prod-meta"><strong>Annual capacity:</strong> {{ p.quantity }} {{ p.unit }}</div>{% endif %}
+          {% if p.price %}<div class="prod-meta"><strong>Selling price:</strong> ₹ {{ p.price }} per {{ p.selling_unit|default:"unit" }}</div>{% endif %}
+          {% if p.primary_or_secondary %}<div class="prod-meta"><strong>Type:</strong> {{ p.primary_or_secondary|capfirst }}</div>{% endif %}
+          {% if p.description %}<div class="prod-desc">{{ p.description }}</div>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ── 13. Manufacturing process flowchart(s) ─────────────────────────── #}
+  {# Renders one vertical box-arrow flowchart per DPRTechnology that has a
+     non-empty process_flow_sequence. Steps are split on newlines. If no
+     technology has a flow sequence, the whole section is omitted. #}
+  {% if technologies_with_flow %}
+  <div class="page-break"></div>
+  <h2 id="sec-12">12. Manufacturing Process</h2>
+  {% for tech in technologies_with_flow %}
+    <div class="tech-title">{{ tech.name|default:"Process Flow" }}</div>
+    <div class="flowchart">
+      {% for step in tech.steps %}
+        <div class="step">{{ step }}</div>
+        {% if not forloop.last %}<div class="arrow">↓</div>{% endif %}
+      {% endfor %}
+    </div>
+    {% if tech.description %}
+      <p style="text-align: center; font-size: 8.5pt; color: #666; font-style: italic;">{{ tech.description }}</p>
+    {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {# ── Limitations & Guidelines for Entrepreneurs ─────────────────────── #}
+  <div class="page-break"></div>
+  <h2 id="sec-guidelines">Limitations &amp; Guidelines for Entrepreneurs</h2>
+  <div class="guidelines">
+    <h3>Limitations of this model DPR</h3>
+    <ul>
+      <li>Financial projections in this DPR are indicative. Actual costs may vary based on prevailing market rates, project location, technology choice and vendor selection.</li>
+      <li>Revenue, capacity utilisation and price assumptions have been provided by the promoter; assumptions must be revisited annually and adjusted for market conditions.</li>
+      <li>Interest rate, moratorium and repayment tenure follow current standard lending terms; the sanctioned terms from the lending bank supersede these figures.</li>
+      <li>Subsidy amounts and eligibility conditions are subject to the current scheme guidelines issued by the concerned Central / State Government agency.</li>
+      <li>The break-even analysis assumes steady-state operations. Actual break-even may shift due to trial runs, working capital availability, or seasonal demand variations.</li>
+    </ul>
+    <h3>Guidelines for entrepreneurs</h3>
+    <ul>
+      <li>Conduct a detailed market survey in the target catchment before commissioning the plant, and validate the demand-price assumptions used in this report.</li>
+      <li>Obtain firm quotations from at least three machinery suppliers and finalise vendor selection based on total cost of ownership (including installation, commissioning, spares and after-sales support), not landed cost alone.</li>
+      <li>Complete all statutory registrations (Udyam / MSME, FSSAI, GSTIN, PCB, Trade Licence, factory registration where applicable) before commencing operations.</li>
+      <li>Maintain a separate books-of-account for the project; monthly MIS review of production, sales, receivables and inventory is strongly recommended.</li>
+      <li>Insure the plant, machinery, stocks and work-in-progress; opt for a group insurance scheme for workers.</li>
+      <li>Adhere to KAU-recommended good manufacturing practices and quality standards; product traceability records help build brand credibility and unlock premium markets.</li>
+      <li>Reserve at least 3 months of working capital as a contingency buffer, especially during the first year of operations.</li>
+    </ul>
+  </div>
 
   <p class="footer-note">
     Prepared using the KAU-FPO Platform DPR module.

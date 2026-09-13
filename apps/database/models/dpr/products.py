@@ -86,6 +86,13 @@ class DPRProductItem(TimeStampedModel, AuditModel):
     selling_price_per_unit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     is_value_added = models.BooleanField(default=False)
     description = models.TextField(blank=True)
+    # Optional product photo — rendered in the DPR PDF's products chapter and
+    # (when set on the first product) as the cover hero image. Uploaded via
+    # the FPO product form; stored under MEDIA_ROOT locally, S3 in prod.
+    image = models.ImageField(
+        upload_to='dpr/products/%Y/%m/', null=True, blank=True,
+        help_text='Optional product photo shown on the DPR PDF.',
+    )
 
     class Meta:
         db_table = 'dpr_product_item'
