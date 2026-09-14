@@ -126,7 +126,7 @@ def _get_user_role(user):
     user reports back as role='fpo_manager', identical to the FPO's own
     primary/registering user.
     """
-    priority = ['super_admin', 'sub_admin', 'fpo_manager', 'government', 'cbbo', 'expert', 'viewer']
+    priority = ['super_admin', 'sub_admin', 'fpo_manager', 'government', 'cbbo', 'expert', 'external_buyer', 'viewer']
     user_groups = set(user.groups.values_list('name', flat=True))
 
     if 'fpo_manager' in user_groups:

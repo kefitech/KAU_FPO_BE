@@ -161,7 +161,14 @@ from apps.gis_module.api.zones import ZoneBoundaryVersionListView, ZoneBoundaryV
 from apps.gis_module.api.soil_regions import SoilRegionVersionListView, SoilRegionVersionActivateView, SoilRegionVersionDetailView
 
 from apps.accounts.api.cbbo_admin import CBBOViewSet
-from apps.accounts.api.government_admin import GovernmentViewSet   
+from apps.accounts.api.government_admin import GovernmentViewSet
+
+# Market Linkage (Arunima — P2-11)
+from .market_linkage import (
+    AdminMarketLinkageFPOListView,
+    AdminMarketLinkageFPOProductsView,
+)
+
 # Create DRF router
 router = DefaultRouter()
 
@@ -225,6 +232,9 @@ urlpatterns = [
     path('applications/<int:fpo_id>/assign-subadmin/',                       ApplicationAssignSubAdminView.as_view(),  name='admin-applications-assign-subadmin'),
     path('applications/<int:fpo_id>/unassign-subadmin/',                     ApplicationUnassignSubAdminView.as_view(), name='admin-applications-unassign-subadmin'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
+    # Market Linkage — admin browses FPOs with product listings (Arunima — P2-11)
+    path('market-linkage/fpos/',                                             AdminMarketLinkageFPOListView.as_view(),     name='admin-market-linkage-fpos'),
+    path('market-linkage/fpos/<int:fpo_id>/products/',                       AdminMarketLinkageFPOProductsView.as_view(), name='admin-market-linkage-fpo-products'),
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
     # Audit Logs

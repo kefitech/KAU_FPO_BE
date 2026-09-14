@@ -122,6 +122,8 @@ urlpatterns = [
     path('api/government/', include('apps.government.urls', namespace='government')),
     path('api/cbbo/', include('apps.cbbo.urls', namespace='cbbo')),
     path('api/notifications/', include('apps.notifications.urls', namespace='notifications')),
+    # External Buyer portal (Arunima — P2-11)
+    path('api/external-buyer/', include('apps.external_buyer.urls', namespace='external_buyer')),
 ]
 
 # =============================================================================
