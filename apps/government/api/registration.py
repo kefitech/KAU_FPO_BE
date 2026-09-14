@@ -63,7 +63,7 @@ def _send_registration_otp(contact: str, channel: str, lang: str = 'en') -> None
     logger.warning(f"[DEV] Government registration {channel} OTP for {contact}: {otp}")
     cache.set(f'gov_reg_otp:{channel}:{contact}', otp, _OTP_TTL)
     notif_channel = 'sms' if channel == 'phone' else 'email'
-    notif_code = 'government_registration_otp' if channel == 'phone' else 'government_registration_email_otp'
+    notif_code = 'mobile_verification' if channel == 'phone' else 'government_registration_email_otp'
     send_notification(
         user=None,
         code=notif_code,
