@@ -28,6 +28,11 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from apps.fpo.services.dpr.calculation import compute, CalculationResult
+from apps.fpo.services.dpr.chart_helpers import (
+    cost_breakdown_pie,
+    pnl_trend_bar,
+    repayment_schedule_bar,
+)
 
 
 # Human-readable labels for the ~19 cost fields + ~12 MoF fields on
@@ -71,6 +76,32 @@ MOF_LABELS = {
     'mof_nabard_assistance':            'NABARD assistance',
     'mof_other_financial_assistance':   'Other financial assistance',
 }
+
+
+def _ai_chapters_for_pdf(project) -> dict:
+    """Return {chapter_key: text} of all AI-generated narrative chapters
+    that have live `user_edited` content for this project.
+
+    The PDF template distributes chapters at logical spots — executive
+    summary before the Project-at-Glance table, financial analysis before
+    §7 P&L, risk_analysis inside §11 Risk Assessment, etc.
+
+    Returns an empty dict when nothing has been generated yet; the template
+    guards each render with `{% if pdf_ai.<key> %}` so an unfilled DPR
+    still renders cleanly (just without narratives).
+    """
+    try:
+        from apps.database.models import DPRAIContent
+    except ImportError:
+        return {}
+    out: dict = {}
+    for row in DPRAIContent.objects.filter(project=project):
+        # Prefer user_edited (live version); fall back to original_ai for
+        # a chapter that was generated once and never manually edited.
+        text = (row.user_edited or row.original_ai or '').strip()
+        if text:
+            out[row.chapter] = text
+    return out
 
 
 def _products_for_pdf(project) -> tuple[list[dict], str]:
@@ -235,6 +266,14 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
         # from disk. Empty string when no product has a photo (hero omitted).
         'pdf_products': pdf_products,
         'pdf_hero_image': pdf_hero_image,
+        # matplotlib-rendered charts (data-URLs). Empty string when there's
+        # no data to plot — template omits the <img> in that case.
+        'chart_cost_pie':     cost_breakdown_pie(result.cost.by_field),
+        'chart_pnl_bar':      pnl_trend_bar(result.profit_loss.rows) if result.profit_loss else '',
+        'chart_repayment_bar':repayment_schedule_bar(result.interest_schedule.rows) if result.interest_schedule and getattr(result.interest_schedule, 'rows', None) else '',
+        # AI narrative chapters (Gemini-generated). Dict of {chapter_key: text}.
+        # Empty when nothing has been generated — template guards each section.
+        'pdf_ai':             _ai_chapters_for_pdf(project),
     })
 
 

@@ -126,6 +126,7 @@ GDAL==3.10.3                        # Pinned to match Docker image's system libg
 # Numerical / Financial Calculations (P2-07 DPR)
 # -----------------------------------------------------------------------------
 numpy>=1.26,<3.0                    # IRR, NPV calculations in DPR financial engine
+matplotlib>=3.7,<4.0                # DPR PDF charts (cost pie, P&L bar, repayment bar)
 
 # -----------------------------------------------------------------------------
 # AI / Claude API (P2-07 DPR narratives, P2-10 Chatbot, P2-04 Auto-translate)

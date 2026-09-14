@@ -26,9 +26,12 @@ Author: Athul Gopan (Kefi Tech Solutions)
   <meta charset="utf-8">
   <title>DPR — {{ project.title|default:"Untitled Project" }}</title>
   <style>
+    /* Default: A4 portrait for narrative + summary pages (matches IIFPT reference).
+       The wide 10-year financial tables switch to landscape via named @page rules
+       + a helper class on those <table> elements. */
     @page {
-      size: A4 landscape;
-      margin: 14mm 10mm 16mm 10mm;
+      size: A4 portrait;
+      margin: 14mm 12mm 16mm 12mm;
       /* Per KAU pre-UAT reply §7.2 + §9.7 (2026-09-08):
          header shows FPO name (primary), footer carries version + date
          (left), platform attribution (center), page counter (right). */
@@ -38,6 +41,20 @@ Author: Athul Gopan (Kefi Tech Solutions)
       @bottom-center { content: "Prepared using the Kerala Agricultural University DPR platform"; font-size: 7.5pt; color: #999; font-style: italic; }
       @bottom-right  { content: "Page " counter(page) " of " counter(pages); font-size: 7.5pt; color: #666; }
     }
+    /* The 10-year projection tables (P&L, cash flow, balance sheet, depreciation,
+       capital schedule) opt into a landscape page via named @page rule + the
+       .wide-page marker div. Everything else stays portrait. Matches IIFPT
+       reference convention (narrative portrait, wide financial tables landscape). */
+    @page wide {
+      size: A4 landscape;
+      margin: 14mm 10mm 16mm 10mm;
+      @top-left  { content: "{{ project.fpo.name|default:'—' }} — DPR {{ version_label }}"; font-size: 8pt; color: #444; font-weight: 600; }
+      @top-right { content: "{{ project.title|default:'Untitled Project' }}"; font-size: 8pt; color: #666; }
+      @bottom-left   { content: "{{ version_label }} · Generated {{ generated_at }}"; font-size: 7.5pt; color: #666; }
+      @bottom-center { content: "Prepared using the Kerala Agricultural University DPR platform"; font-size: 7.5pt; color: #999; font-style: italic; }
+      @bottom-right  { content: "Page " counter(page) " of " counter(pages); font-size: 7.5pt; color: #666; }
+    }
+    .wide-page { page: wide; page-break-before: always; }
     * { box-sizing: border-box; }
     body { font-family: "Times New Roman", Times, serif; font-size: 9pt; color: #222; line-height: 1.35; }
     h1 { font-size: 22pt; color: #1F3864; margin: 0 0 6mm 0; }
@@ -70,6 +87,15 @@ Author: Athul Gopan (Kefi Tech Solutions)
     .product-card .prod-meta strong { color: #1F3864; }
     .product-card .prod-desc { margin-top: 2mm; color: #333; font-style: italic; font-size: 9pt; }
     .product-card .badge-va { background: #d1fae5; color: #065f46; padding: 0.5mm 2mm; border-radius: 1.5mm; font-size: 7.5pt; font-weight: 600; margin-left: 2mm; }
+    /* Matplotlib charts (base64 PNG embeds) */
+    .chart-block { margin: 4mm 0 6mm 0; text-align: center; page-break-inside: avoid; }
+    .chart-block img { max-width: 100%; height: auto; }
+    .chart-caption { font-size: 8pt; color: #666; font-style: italic; margin-top: 1.5mm; }
+    /* AI-generated narrative blocks (Gemini). Rendered as clean prose with
+       a small provenance marker so evaluators know it's AI-authored. */
+    .ai-narrative { margin: 3mm 0 5mm 0; font-size: 10pt; line-height: 1.5; color: #222; text-align: justify; }
+    .ai-narrative p { margin: 0 0 2.5mm 0; }
+    .ai-narrative-label { font-size: 7.5pt; color: #E86C1A; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 1.5mm; }
     .cover .meta { font-size: 10.5pt; margin: 1.5mm 0; color: #333; }
     .cover .meta strong { color: #1F3864; display: inline-block; min-width: 45mm; }
     .cover .platform-attribution { margin-top: 12mm; font-size: 9pt; color: #999; font-style: italic; }
@@ -119,11 +145,11 @@ Author: Athul Gopan (Kefi Tech Solutions)
 <body>
 
   {# ── 1. Cover page ─────────────────────────────────────────────────── #}
-  {# Per KAU pre-UAT reply §9.7 (2026-09-08): DPR is presented as an
+  {% comment %} Per KAU pre-UAT reply §9.7 (2026-09-08): DPR is presented as an
      FPO-authored document prepared using the KAU platform. FPO name is
      primary; KAU is platform attribution only. Mandatory disclaimer in
      the boxed section — do not remove without KAU sign-off. FPO logo is
-     deferred to post-UAT (no logo field on FPO model yet). #}
+     deferred to post-UAT (no logo field on FPO model yet). {% endcomment %}
   <section class="cover">
     <div class="fpo-name">{{ project.fpo.name|default:"—" }}</div>
     {% if project.fpo.district %}
@@ -167,14 +193,17 @@ Author: Athul Gopan (Kefi Tech Solutions)
   </section>
 
   {# ── Table of Contents ────────────────────────────────────────────── #}
-  {# WeasyPrint fills the page numbers via target-counter(). Section IDs
+  {% comment %} WeasyPrint fills the page numbers via target-counter(). Section IDs
      are `sec-N` matching each numbered <h2>. If a section is added, add
      a matching <li> here. Process flowchart entry only shows when at least
-     one DPRTechnology has a process_flow_sequence. #}
+     one DPRTechnology has a process_flow_sequence. {% endcomment %}
   <div class="page-break"></div>
   <section class="toc">
     <h2>Table of Contents</h2>
     <ol>
+      {% if pdf_ai.executive_summary %}<li><a href="#sec-exec">Executive Summary</a></li>{% endif %}
+      {% if pdf_ai.project_background %}<li><a href="#sec-background">Project Background</a></li>{% endif %}
+      {% if pdf_ai.promoter_profile %}<li><a href="#sec-promoter">Promoter Profile</a></li>{% endif %}
       <li><a href="#sec-1">1.  Project at a Glance</a></li>
       <li><a href="#sec-2">2.  Fixed Capital Investment</a></li>
       <li><a href="#sec-3">3.  Means of Finance</a></li>
@@ -192,14 +221,43 @@ Author: Athul Gopan (Kefi Tech Solutions)
       {% if technologies_with_flow %}
       <li><a href="#sec-12">12. Manufacturing Process</a></li>
       {% endif %}
+      {% if pdf_ai.market_analysis %}<li><a href="#sec-market-ai">Market Analysis (AI)</a></li>{% endif %}
+      {% if pdf_ai.technical_feasibility %}<li><a href="#sec-tech-ai">Technical Feasibility (AI)</a></li>{% endif %}
+      {% if pdf_ai.financial_analysis %}<li><a href="#sec-finance-ai">Financial Analysis (AI)</a></li>{% endif %}
+      {% if pdf_ai.implementation_plan %}<li><a href="#sec-impl-ai">Implementation Plan (AI)</a></li>{% endif %}
+      {% if pdf_ai.swot %}<li><a href="#sec-swot-ai">SWOT Analysis (AI)</a></li>{% endif %}
+      {% if pdf_ai.environmental_impact %}<li><a href="#sec-env-ai">Environmental Impact (AI)</a></li>{% endif %}
+      {% if pdf_ai.conclusion %}<li><a href="#sec-conclusion-ai">Conclusion</a></li>{% endif %}
       <li><a href="#sec-guidelines">Limitations &amp; Guidelines for Entrepreneurs</a></li>
     </ol>
   </section>
 
+  {% comment %} AI narrative chapters — Executive Summary + Project Background + Promoter Profile
+     inserted right after TOC, before the numbered data chapters. Each block is
+     guarded with {% if %} so a partly-generated DPR renders cleanly.
+     Text is stored as pre-formatted paragraphs; |linebreaks converts blank-line
+     separators into <p> tags. {% endcomment %}
+  {% if pdf_ai.executive_summary %}
+    <div class="page-break"></div>
+    <h2 id="sec-exec">Executive Summary</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.executive_summary|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.project_background %}
+    <h2 id="sec-background">Project Background</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.project_background|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.promoter_profile %}
+    <h2 id="sec-promoter">Promoter Profile</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.promoter_profile|linebreaks }}</div>
+  {% endif %}
+
   {# ── 2. Project at a glance ────────────────────────────────────────── #}
-  {# IIFPT reference-style snapshot table. All fields verified to exist on
+  {% comment %} IIFPT reference-style snapshot table. All fields verified to exist on
      project / project.fpo / r.cost / r.mof / r.ratios / r.profit_loss.
-     Optional fields fall back to "—" so a partly-filled DPR still renders. #}
+     Optional fields fall back to "—" so a partly-filled DPR still renders. {% endcomment %}
   <div class="page-break"></div>
   <h2 id="sec-1">1. Project at a Glance</h2>
   <table class="glance-table">
@@ -265,6 +323,13 @@ Author: Athul Gopan (Kefi Tech Solutions)
     </tbody>
   </table>
 
+  {% if chart_cost_pie %}
+  <div class="chart-block">
+    <img src="{{ chart_cost_pie }}" alt="Project Cost Breakdown" />
+    <div class="chart-caption">Figure — Distribution of project cost across cost heads</div>
+  </div>
+  {% endif %}
+
   {# ── 4. Means of finance ───────────────────────────────────────────── #}
   <h2 id="sec-3">3. Means of Finance</h2>
   <table>
@@ -280,7 +345,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   </table>
 
   {# ── 5. Capital schedule ───────────────────────────────────────────── #}
-  <div class="page-break"></div>
+  <div class="wide-page"></div>
   <h2 id="sec-4">4. Capital Investment Schedule (Implementation Period)</h2>
   {% if r.capital_schedule.is_estimated %}
     <div class="estimated-note">
@@ -311,7 +376,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   </table>
 
   {# ── 6. Depreciation schedule ──────────────────────────────────────── #}
-  <div class="page-break"></div>
+  <div class="wide-page"></div>
   <h2 id="sec-5">5. Depreciation Schedule (SLM)</h2>
   <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-bottom: 3mm;">
     Depreciation is computed using the Straight-Line Method (SLM) at the rates configured for
@@ -378,10 +443,17 @@ Author: Athul Gopan (Kefi Tech Solutions)
         {% endfor %}
       </tbody>
     </table>
+
+    {% if chart_repayment_bar %}
+    <div class="chart-block">
+      <img src="{{ chart_repayment_bar }}" alt="Loan Repayment Schedule" />
+      <div class="chart-caption">Figure — Principal + interest per year over the loan tenure</div>
+    </div>
+    {% endif %}
   {% endif %}
 
   {# ── 8. Projected P&L ──────────────────────────────────────────────── #}
-  <div class="page-break"></div>
+  <div class="wide-page"></div>
   <h2 id="sec-7">7. Projected Profit &amp; Loss (₹)</h2>
   <table>
     <thead>
@@ -412,8 +484,15 @@ Author: Athul Gopan (Kefi Tech Solutions)
     </tbody>
   </table>
 
+  {% if chart_pnl_bar %}
+  <div class="chart-block">
+    <img src="{{ chart_pnl_bar }}" alt="Revenue · Operating Cost · PAT by Year" />
+    <div class="chart-caption">Figure — Revenue, operating cost and profit-after-tax over the projection horizon</div>
+  </div>
+  {% endif %}
+
   {# ── 9. Projected cash flow ────────────────────────────────────────── #}
-  <div class="page-break"></div>
+  <div class="wide-page"></div>
   <h2 id="sec-8">8. Projected Cash Flow (₹)</h2>
   <table>
     <thead>
@@ -447,7 +526,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   </table>
 
   {# ── 10. Projected balance sheet ───────────────────────────────────── #}
-  <div class="page-break"></div>
+  <div class="wide-page"></div>
   <h2 id="sec-9">9. Projected Balance Sheet (₹)</h2>
   <table>
     <thead>
@@ -642,9 +721,9 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {% endif %}
 
   {# ── 12. Proposed Products & Services ───────────────────────────────── #}
-  {# Renders one card per DPRProductItem with photo (when uploaded),
+  {% comment %} Renders one card per DPRProductItem with photo (when uploaded),
      name, category, capacity, price, description, value-added badge.
-     Section omitted when no products exist. #}
+     Section omitted when no products exist. {% endcomment %}
   {% if pdf_products %}
   <div class="page-break"></div>
   <h2 id="sec-products">Proposed Products &amp; Services</h2>
@@ -673,9 +752,9 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {% endif %}
 
   {# ── 13. Manufacturing process flowchart(s) ─────────────────────────── #}
-  {# Renders one vertical box-arrow flowchart per DPRTechnology that has a
+  {% comment %} Renders one vertical box-arrow flowchart per DPRTechnology that has a
      non-empty process_flow_sequence. Steps are split on newlines. If no
-     technology has a flow sequence, the whole section is omitted. #}
+     technology has a flow sequence, the whole section is omitted. {% endcomment %}
   {% if technologies_with_flow %}
   <div class="page-break"></div>
   <h2 id="sec-12">12. Manufacturing Process</h2>
@@ -691,6 +770,45 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <p style="text-align: center; font-size: 8.5pt; color: #666; font-style: italic;">{{ tech.description }}</p>
     {% endif %}
   {% endfor %}
+  {% endif %}
+
+  {% comment %} Remaining AI narrative chapters — inserted at the end, after all
+     data chapters + products + process flowchart, before Limitations. Order
+     mirrors the TOC entries + the CHAPTER_KEYS tuple in ai_content.py. {% endcomment %}
+  {% if pdf_ai.market_analysis %}
+    <h2 id="sec-market-ai">Market Analysis</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.market_analysis|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.technical_feasibility %}
+    <h2 id="sec-tech-ai">Technical Feasibility</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.technical_feasibility|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.financial_analysis %}
+    <h2 id="sec-finance-ai">Financial Analysis</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.financial_analysis|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.implementation_plan %}
+    <h2 id="sec-impl-ai">Implementation Plan</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.implementation_plan|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.swot %}
+    <h2 id="sec-swot-ai">SWOT Analysis</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.swot|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.environmental_impact %}
+    <h2 id="sec-env-ai">Environmental Impact</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.environmental_impact|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.conclusion %}
+    <h2 id="sec-conclusion-ai">Conclusion</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    <div class="ai-narrative">{{ pdf_ai.conclusion|linebreaks }}</div>
   {% endif %}
 
   {# ── Limitations & Guidelines for Entrepreneurs ─────────────────────── #}
