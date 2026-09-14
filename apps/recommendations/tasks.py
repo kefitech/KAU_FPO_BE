@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
     default_retry_delay=30,
     name='recommendations.generate',
 )
-def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year, season_override=None):
+def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year, season_override=None, ph_override=None):
     """
     Args:
         fpo_id            : FPO.pk
@@ -38,6 +38,10 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
                              (southwest_monsoon/northeast_monsoon/dry_season).
                              None means auto-detect, same as before this
                              param existed.
+        ph_override        : optional manual soil pH value from the FPO
+                             (their actual measured value). None means fall
+                             back to the resolved soil type's estimated
+                             pH range, same as before this param existed.
 
     Looks up the FPO and model, calls FastAPI (via the existing
     get_crop_recommendation), saves the result, and — on success —
@@ -71,7 +75,7 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     # recommendation but isn't one -- surfacing that as a normal result was
     # the actual bug being fixed here, not something to route around.
     if resolve_fpo_zone(fpo) is None:
-        input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+        input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override, ph_override)
         CropRecommendation.objects.update_or_create(
             fpo=fpo,
             financial_year=financial_year,
@@ -84,14 +88,45 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
         )
         return
 
-    result = get_crop_recommendation(fpo, model_version, financial_year, season_override)
-    input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+    result = get_crop_recommendation(fpo, model_version, financial_year, season_override, ph_override)
+    recommendations_list = result.get('recommendations', [])
+
+    if result.get('cached'):
+        # ML service was unreachable -- get_crop_recommendation() already
+        # fell back to this same row's own last-saved recommendations
+        # (RequestRecommendationView deliberately leaves them in place while
+        # this task runs, see its comment). Since the row's existing
+        # input_snapshot/recommendations ARE that fallback data, just
+        # restore its status rather than rebuilding a fresh input_snapshot
+        # here -- pairing a brand-new snapshot (e.g. a boundary the FPO just
+        # redrew) with the OLD recommendations would show a farm shape that
+        # never actually produced them.
+        if recommendations_list:
+            CropRecommendation.objects.filter(
+                fpo=fpo, financial_year=financial_year
+            ).update(status=CropRecommendation.Status.COMPLETED)
+            return
+        # No prior recommendation exists at all -- nothing to fall back to.
+        input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override, ph_override)
+        input_snapshot['location_snapshot'] = build_location_snapshot(fpo)
+        CropRecommendation.objects.update_or_create(
+            fpo=fpo,
+            financial_year=financial_year,
+            defaults={
+                'model_version': model_version,
+                'input_snapshot': input_snapshot,
+                'recommendations': [],
+                'status': CropRecommendation.Status.FAILED,
+            },
+        )
+        return
+
+    input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override, ph_override)
     # Not part of the ML payload contract (build_recommendation_payload's
     # return is also literally the FastAPI request body) -- merged in only
     # for display, so a later "stale" recommendation can still show the
     # actual farm shape it was generated for, even after the FPO redraws it.
     input_snapshot['location_snapshot'] = build_location_snapshot(fpo)
-    recommendations_list = result.get('recommendations', [])
 
     new_status = (
         CropRecommendation.Status.COMPLETED if recommendations_list

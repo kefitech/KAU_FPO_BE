@@ -3692,8 +3692,13 @@ def seed_menu_translations(languages):
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
         ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
+        ('ml_models',              'ML Models',                'ML മോഡലുകൾ'),
+        ('crop_zone_profiles',     'Crop Zone Profiles',       'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
+        ('crop_package_of_practices', 'Crop Package of Practices', 'ക്രോപ്പ് പാക്കേജ് ഓഫ് പ്രാക്ടീസസ്'),
         ('gis_zones',              'GIS Zones',                'GIS സോണുകൾ'),
-        ('soil_regions',           'Soil Regions',             'മണ്ണ് പ്രദേശങ്ങൾ')
+        ('soil_regions',           'Soil Regions',             'മണ്ണ് പ്രദേശങ്ങൾ'),
+        ('government',             'Government Officials',     'സർക്കാർ ഉദ്യോഗസ്ഥർ'),
+        ('cbbos',                  'CBBO / NGO Officers',       'CBBO / NGO ഉദ്യോഗസ്ഥർ'),
     ]
 
     count = 0
@@ -4462,6 +4467,23 @@ def seed_recommendations_translations(languages):
         ('training_started',         'Dataset accepted — training has started in the background', 'ഡാറ്റാസെറ്റ് സ്വീകരിച്ചു — പരിശീലനം പശ്ചാത്തലത്തിൽ ആരംഭിച്ചു'),
         ('retrain_failed',           'Could not start training',                                  'പരിശീലനം ആരംഭിക്കാൻ കഴിഞ്ഞില്ല'),
         ('ml_service_unreachable',   'The AI service is currently unreachable. Please try again shortly.', 'AI സേവനം നിലവിൽ ലഭ്യമല്ല. ദയവായി അൽപനേരം കഴിഞ്ഞ് ശ്രമിക്കുക.'),
+        # Crop Package of Practices (KAU PoP 2024)
+        ('pop_list_retrieved',       'Package of Practices entries retrieved successfully',      'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രികൾ ലഭ്യമാക്കി'),
+        ('pop_created',              'Package of Practices entry created successfully',         'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി സൃഷ്ടിച്ചു'),
+        ('pop_updated',              'Package of Practices entry updated successfully',         'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി പുതുക്കി'),
+        ('pop_deleted',              'Package of Practices entry deleted successfully',         'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി നീക്കം ചെയ്തു'),
+        ('pop_activated',            'Package of Practices entry published',                    'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി പ്രസിദ്ധീകരിച്ചു'),
+        ('pop_deactivated',          'Package of Practices entry unpublished',                  'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി പ്രസിദ്ധീകരണം പിൻവലിച്ചു'),
+        ('pop_retrieved',            'Package of Practices retrieved successfully',             'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് ലഭ്യമാക്കി'),
+        ('pop_not_found',            'Detailed practices for this crop have not been added yet', 'ഈ വിളയുടെ വിശദമായ കൃഷിരീതികൾ ഇതുവരെ ചേർത്തിട്ടില്ല'),
+        ('pop_crop_name_required',   'crop_name is required',                                   'വിളയുടെ പേര് ആവശ്യമാണ്'),
+        # Crop Zone Profiles (ml_service's live crop-eligibility knowledge base)
+        ('zone_profile_list_retrieved', 'Crop zone profiles retrieved successfully',             'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ ലഭ്യമാക്കി'),
+        ('zone_profile_created',        'Crop zone profile created successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ സൃഷ്ടിച്ചു'),
+        ('zone_profile_updated',        'Crop zone profile updated successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പുതുക്കി'),
+        ('zone_profile_deleted',        'Crop zone profile deleted successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ നീക്കം ചെയ്തു'),
+        ('zone_profile_activated',      'Crop zone profile published',                           'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പ്രസിദ്ധീകരിച്ചു'),
+        ('zone_profile_deactivated',    'Crop zone profile unpublished',                         'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പ്രസിദ്ധീകരണം പിൻവലിച്ചു'),
     ]
 
     count = 0

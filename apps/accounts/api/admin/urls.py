@@ -131,6 +131,8 @@ from .fpo_users import (
 )
 from .reports import FPOSummaryReportView
 from apps.accounts.api.menu import MenuItemViewSet
+from apps.recommendations.api.pop_admin import CropPackageOfPracticesViewSet
+from apps.recommendations.api.crop_zone_profile_admin import CropZoneProfileViewSet
 from apps.accounts.api.sub_admins import SubAdminViewSet
 from apps.recommendations.api.recommendations import (
     MLModelVersionAdminView,
@@ -150,6 +152,8 @@ router.register(r'languages', LanguageViewSet, basename='language')
 router.register(r'translation-categories', TranslationCategoryViewSet, basename='translation-category')
 router.register(r'translations', TranslationViewSet, basename='translation')
 router.register(r'menu', MenuItemViewSet, basename='menu')
+router.register(r'crop-pop', CropPackageOfPracticesViewSet, basename='crop-pop')
+router.register(r'crop-zone-profiles', CropZoneProfileViewSet, basename='crop-zone-profile')
 router.register(r'sub-admins', SubAdminViewSet, basename='sub-admin')
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')

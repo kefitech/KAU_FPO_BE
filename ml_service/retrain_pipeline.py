@@ -9,10 +9,24 @@ endpoint needs all of that to run automatically end to end, so this module
 wraps each stage as an importable function and exposes ONE entry point,
 `run_retrain()`, that main.py's upload endpoint calls.
 
-Nothing about the MODEL or the LABEL RULE changed here -- this is a
-refactor of existing logic into reusable functions, not a new approach.
-See tailor_dataset_v3.py's and train_model_v3.py's docstrings for what the
-label rule and features actually are; the same rules are applied here.
+Stages 1-3 (free-text parsing -> per-crop-zone profiles -> service-zone
+expansion) are unchanged from v3 -- same label rule, same knowledge base.
+Stage 4 (_train) is a v4 REWRITE: the model is now a genuine multiclass
+crop-recommendation classifier -- FEATURES are environmental factors only
+(zone, soil_type, season, temperature_avg_C, rainfall_mm, humidity_pct,
+soil_ph_mid) and crop_name is the TARGET being predicted, never an input.
+
+Why: v3 fed crop_name IN as a feature to a binary is_suitable classifier.
+That let the model shortcut through crop identity instead of learning from
+environmental fit -- crop_name's feature importance came out to 30.8% (more
+than double any other feature), while soil_ph_mid -- a real signal -- got
+under 1%. In practice this meant a handful of crops the PoP book documents
+as broadly suitable (Rice, Cashew, Anthurium) dominated every zone's top
+recommendations almost regardless of actual conditions. Removing crop_name
+as an input makes that shortcut structurally impossible: every prediction
+is now forced through the environmental features, and pH/temperature/
+season/soil_type each get a real, comparable share of the model's decision
+weight instead of being drowned out by a 149-way identity column.
 
 REQUIRED INPUT CSV COLUMNS (same as data/crop_prediction_dataset_with_commodity_codes.csv):
     crop_name, crop_group, commodity_code, commodity_en, commodity_section,
@@ -33,8 +47,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
-                              roc_auc_score, confusion_matrix)
+from sklearn.metrics import accuracy_score
 
 REQUIRED_COLUMNS = [
     "crop_name", "crop_group", "commodity_code", "commodity_en", "commodity_section",
@@ -48,9 +61,16 @@ VALID_KAU_ZONES = {"Coastal Plain", "Midland Laterites", "Foothills", "High Hill
 # example -- e.g. an observed zone/season/soil/crop outcome -- no synthetic expansion
 # needed). Column names deliberately match data/grounded_training_dataset_v3.csv (the
 # OUTPUT of the rule-based pipeline's stage 3), since that's exactly the shape _train()
-# already consumes -- see _train() below, unchanged for this format. ----
+# already consumes -- see _train() below, unchanged for this format.
+#
+# crop_group is deliberately NOT required here (v3 required it -- it was a model
+# feature back then). v4's _train() never reads crop_group at all for this format
+# (see FEATURE_CATEGORICAL) -- it's only genuinely used by the OTHER format's own
+# pipeline (_stage1_parse_bounds's pH fallback, rule_based format only). A file may
+# still include a crop_group column (grounded_training_dataset_v3.csv does); it's
+# just not demanded, and ignored either way. ----
 REQUIRED_PREEXPANDED_COLUMNS = [
-    "zone", "soil_type", "season", "crop_name", "crop_group",
+    "zone", "soil_type", "season", "crop_name",
     "temperature_avg_C", "rainfall_mm", "humidity_pct", "soil_ph_mid", "is_suitable",
 ]
 VALID_SERVICE_ZONES = {"coastal_zone", "southern_zone", "central_zone", "northern_zone", "high_ranges"}
@@ -126,8 +146,12 @@ ZONE_TEMP_DEFAULTS = {  # only used when a row states no numeric temperature at 
 }
 GLOBAL_PH_DEFAULT = (5.0, 6.5)
 
-CATEGORICAL = ["zone", "soil_type", "season", "crop_name", "crop_group"]
 NUMERIC = ["temperature_avg_C", "rainfall_mm", "humidity_pct", "soil_ph_mid"]
+
+# Model FEATURES (environment only -- crop_name/crop_group are deliberately
+# excluded; crop_name is the TRAINING TARGET, see _train()'s docstring).
+FEATURE_CATEGORICAL = ["zone", "soil_type", "season"]
+FEATURE_NUMERIC = NUMERIC
 
 
 class DatasetValidationError(ValueError):
@@ -398,66 +422,107 @@ def _stage3_build_training_rows(profiles: pd.DataFrame, climate: pd.DataFrame) -
 
 def _build_pipeline():
     pre = ColumnTransformer([
-        ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL),
-        ("num", "passthrough", NUMERIC),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), FEATURE_CATEGORICAL),
+        ("num", "passthrough", FEATURE_NUMERIC),
     ])
     clf = RandomForestClassifier(n_estimators=300, max_depth=12, min_samples_leaf=3,
                                   class_weight="balanced", random_state=42, n_jobs=-1)
     return Pipeline([("pre", pre), ("clf", clf)])
 
 
-def _train(df: pd.DataFrame):
-    X = df[CATEGORICAL + NUMERIC]
-    y = df["is_suitable"]
+def _top_k_hit_rate(pipe, X, y_true, k=5) -> float:
+    """
+    Fraction of test rows where the true crop_name was among the model's own
+    top-k ranked guesses for that row's environment. This is the honest metric
+    for this model, unlike plain accuracy: many (zone, season, soil, climate)
+    rows have SEVERAL genuinely valid crops documented, but a random train/test
+    split keeps only one label per row -- so predicting a different, equally
+    valid crop for that exact row still counts as "wrong" under top-1 accuracy,
+    even though it's a real answer. top-k asks the more meaningful question:
+    did the model's ranking put the true answer near the top.
+    """
+    proba = pipe.predict_proba(X)
+    classes = pipe.classes_
+    k = min(k, proba.shape[1])
+    topk_idx = np.argpartition(-proba, kth=k - 1, axis=1)[:, :k]
+    topk_labels = classes[topk_idx]
+    y_true_arr = np.asarray(y_true)
+    hits = np.array([y_true_arr[i] in topk_labels[i] for i in range(len(y_true_arr))])
+    return float(hits.mean()) if len(hits) else 0.0
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+def _train(df: pd.DataFrame):
+    """
+    Trains the multiclass crop-recommendation model. See this module's
+    docstring for why crop_name is the TARGET here, never a feature.
+
+    `df` is the full rule-derived (zone, season, soil_type, crop) row set,
+    one row per candidate crop per environment combination, with an
+    is_suitable 0/1 label (unchanged from v3 -- see _stage3_build_training_rows
+    / validate_preexpanded_csv). Only the is_suitable == 1 rows are actual
+    positive (environment -> valid crop) training examples for this model;
+    a row with is_suitable == 0 says "this crop is NOT a good answer here",
+    which a multiclass classifier has no direct way to use (there's no
+    "not this" target), so those rows are excluded rather than mis-modeled.
+    """
+    positive = df[df["is_suitable"].astype(int) == 1].copy()
+    if positive.empty:
+        raise DatasetValidationError("No rows with is_suitable == 1 -- nothing to train a crop classifier on.")
+
+    X = positive[FEATURE_CATEGORICAL + FEATURE_NUMERIC]
+    y = positive["crop_name"]
+
+    # A handful of crops may have too few positive rows for a stratified split
+    # (need >= 2 per class) -- fall back to an unstratified split rather than
+    # let train_test_split crash on the whole run over one rare crop.
+    can_stratify = (y.value_counts() >= 2).all()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y if can_stratify else None,
+    )
     pipe = _build_pipeline()
     pipe.fit(X_train, y_train)
     y_pred = pipe.predict(X_test)
-    y_proba = pipe.predict_proba(X_test)[:, 1]
     random_split_metrics = {
-        "accuracy": accuracy_score(y_test, y_pred), "precision": precision_score(y_test, y_pred),
-        "recall": recall_score(y_test, y_pred), "f1": f1_score(y_test, y_pred),
-        "roc_auc": roc_auc_score(y_test, y_proba),
-        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-        "n_train": len(X_train), "n_test": len(X_test),
+        "accuracy": accuracy_score(y_test, y_pred),
+        "top_5_hit_rate": _top_k_hit_rate(pipe, X_test, y_test, k=5),
+        "n_train": len(X_train), "n_test": len(X_test), "n_classes": int(y.nunique()),
     }
 
     logo_scores = []
-    if df["zone"].nunique() > 1:
-        gkf = GroupKFold(n_splits=df["zone"].nunique())
-        for train_idx, test_idx in gkf.split(X, y, groups=df["zone"]):
+    if positive["zone"].nunique() > 1:
+        gkf = GroupKFold(n_splits=positive["zone"].nunique())
+        for train_idx, test_idx in gkf.split(X, y, groups=positive["zone"]):
             p = _build_pipeline()
             p.fit(X.iloc[train_idx], y.iloc[train_idx])
-            held_out = df["zone"].iloc[test_idx].iloc[0]
-            pred = p.predict(X.iloc[test_idx])
+            held_out = positive["zone"].iloc[test_idx].iloc[0]
             logo_scores.append({
                 "held_out_zone": str(held_out),
-                "accuracy": accuracy_score(y.iloc[test_idx], pred),
-                "f1": f1_score(y.iloc[test_idx], pred, zero_division=0),
+                "top_5_hit_rate": _top_k_hit_rate(p, X.iloc[test_idx], y.iloc[test_idx], k=5),
                 "n_test": len(test_idx),
             })
 
     final_pipe = _build_pipeline()
     final_pipe.fit(X, y)
     ohe = final_pipe.named_steps["pre"].named_transformers_["cat"]
-    cat_names = list(ohe.get_feature_names_out(CATEGORICAL))
+    cat_names = list(ohe.get_feature_names_out(FEATURE_CATEGORICAL))
     importances = final_pipe.named_steps["clf"].feature_importances_
     importance_by_field = {}
-    for name, imp in zip(cat_names + NUMERIC, importances):
-        field = name if name in NUMERIC else next((c for c in CATEGORICAL if name.startswith(c + "_")), name)
+    for name, imp in zip(cat_names + FEATURE_NUMERIC, importances):
+        field = name if name in FEATURE_NUMERIC else next((c for c in FEATURE_CATEGORICAL if name.startswith(c + "_")), name)
         importance_by_field[field] = importance_by_field.get(field, 0) + float(imp)
 
     metrics = {
         "random_80_20_split": random_split_metrics,
         "leave_one_zone_out_cv": logo_scores,
         "feature_importance_by_field": dict(sorted(importance_by_field.items(), key=lambda x: -x[1])),
-        "n_rows_total": len(df), "n_crops": df["crop_name"].nunique(),
+        "n_rows_total": len(positive), "n_crops": int(y.nunique()),
         "crops_with_no_positive_label": int(df.groupby("crop_name")["is_suitable"].max().eq(0).sum()),
-        "class_balance": {str(k): v for k, v in y.value_counts(normalize=True).to_dict().items()},
-        "caveat": ("Label is rule-derived (PoP crop requirements matched against real zone climate and a "
-                   "documented-approximation soil-type-per-zone mix); a crop is 'suitable' if temperature "
-                   "matches AND (season matches OR soil matches). Not an observed real-world outcome."),
+        "caveat": ("Multiclass model: features are environmental factors ONLY (zone, soil_type, season, "
+                   "temperature, rainfall, humidity, soil_ph) -- crop_name is the predicted target, never "
+                   "an input feature, so crop identity cannot be memorized as a suitability shortcut the "
+                   "way it could in the prior binary-classifier version. Training rows are still rule-"
+                   "derived from KAU's PoP book requirements matched against real zone climate (not an "
+                   "observed real-world outcome) -- see this module's docstring for the label rule."),
     }
     return final_pipe, metrics
 

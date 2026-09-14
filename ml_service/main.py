@@ -1,42 +1,50 @@
 """
-KAU-FPO Crop Recommendation Service -- trained-model version.
+KAU-FPO Crop Recommendation Service -- multiclass model version (v4).
 
-This is a DROP-IN REPLACEMENT for the mock `main.py` you shared: same
-Pydantic request/response contract, same `/predict/crops/` endpoint path,
-same `/health`, `/reload-model/`, `/model-status/` and `ML_MODELS_DIR`
-mechanism -- but `predict_crops()` now actually calls a trained
-RandomForestClassifier (see train_model.py) instead of the illustrative
-hand-authored scoring table.
+Same Pydantic request/response contract, same `/predict/crops/` endpoint
+path, same `/health`, `/reload-model/`, `/model-status/` and
+`ML_MODELS_DIR` mechanism as the earlier v2/v3 services -- but the model
+itself is now architecturally different from both.
 
-WHAT CHANGED FROM THE MOCK, CONCRETELY
----------------------------------------
-- The static `CROPS` list (10 crops, hand-authored zones/soil_keywords/
-  base_confidence) is replaced by:
-    (a) a real 149-crop knowledge base extracted from KAU's Package of
-        Practices 2024 book (data/crop_prediction_dataset_with_commodity_codes.csv),
-        used to resolve `commodities` -> crop names and to source
-        `estimated_yield` / variety-based reasoning text, and
-    (b) a RandomForestClassifier trained on real Kerala climate (6 towns,
-        IMD-sourced normals) matched against each crop's PoP-stated
-        temperature/pH/season requirements (see train_model.py,
-        model/training_metrics_v2.json). `confidence` is the model's
-        predict_proba(is_suitable) for that crop/zone/season combination.
-- Zone eligibility ("candidates") now comes from which crops the PoP book
-  actually documents as suited to that zone (via the KAU-AEZ -> this
-  service's zone crosswalk in build_v2.py), not a 10-crop hand list -- so
-  many more crops can appear, not just the mock's original 10. If a
-  request's zone/commodities don't resolve to anything the book documents,
-  behavior falls back the same way the mock did (DEFAULT_CROP).
+v4 CHANGE, CONCRETELY: crop_name is now the model's TARGET, never an
+input feature. v2/v3 both trained a BINARY is_suitable classifier with
+crop_name as one of the input features -- which let the model shortcut
+through crop identity ("if crop_name == Rice, predict suitable=1") instead
+of genuinely learning from environmental fit. That shortcut was real and
+measured: crop_name's feature importance came out to 30.8% (more than
+double any other feature) in the v3 model, while soil_ph_mid -- a real
+signal -- got under 1%. In practice it meant a handful of crops the PoP
+book documents as broadly/generically suitable (Rice, Cashew, Anthurium)
+dominated the top of every zone's recommendations almost regardless of
+actual conditions.
 
-HONESTY NOTE (carried over from the whole project): `is_suitable` in
-training was RULE-DERIVED (real climate checked against PoP-stated crop
-requirements, cross-walked from KAU's 5 physiographic zones onto this
-service's 5 geographic zones), not an observed real planting outcome.
-Treat `confidence` as "how well this crop's documented requirements match
-this zone/season's typical climate," not a market-validated success
-probability. See model/training_metrics_v2.json for accuracy figures,
-including the leave-one-zone-out cross-validation (the honest
-generalization estimate).
+v4 removes crop_name (and crop_group) from the FEATURES entirely --
+FEATURE_CATEGORICAL/FEATURE_NUMERIC below are purely environmental
+(zone, soil_type, season, temperature, rainfall, humidity, soil pH) -- and
+makes crop_name the multiclass TARGET instead. `predict_crops()` builds
+ONE feature row from the request's resolved environment and calls
+predict_proba() ONCE, getting a probability across all ~149 known crops
+directly, instead of the old per-candidate loop that scored each crop
+independently via its own binary "is this ONE crop suitable, yes/no" call.
+This is the standard way real crop-recommendation ML systems are built
+(features are the growing conditions; the crop is what's being predicted),
+and it makes crop-identity memorization structurally impossible: there is
+no crop_name column left for the model to shortcut through.
+
+See retrain_pipeline.py's module docstring and _train()'s docstring for
+the full rationale and the top_5_hit_rate metric (the honest evaluation
+metric for this framing -- see its own docstring for why plain accuracy
+understates quality here).
+
+HONESTY NOTE (carried over from the whole project, still true): the
+training label is still RULE-DERIVED (real climate checked against
+PoP-stated crop requirements, cross-walked from KAU's 5 physiographic
+zones onto this service's 5 geographic zones), not an observed real
+planting outcome. Treat `confidence` as "how well this crop's documented
+requirements match this zone/season's typical climate, relative to the
+other crops documented for this zone," not a market-validated success
+probability. See model/training_metrics_v4.json for the leave-one-zone-out
+cross-validation (the honest generalization estimate).
 
 Run:
     pip install -r requirements.txt
@@ -78,14 +86,14 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI(title="KAU-FPO Crop Recommendation Service")
 
-SERVED_MODEL_VERSION = "v3.3.0-rf-poc"  # updated at runtime by /reload-model/ on a successful swap
+SERVED_MODEL_VERSION = "v4.0.0-rf-multiclass"  # updated at runtime by /reload-model/ on a successful swap
 
-MODEL_PATH = "model/crop_suitability_rf_v3.joblib"
-# NOTE: elevation_m dropped vs v2 -- it was fully determined by zone (near-zero
-# importance, pure duplicate signal). soil_type is now a real categorical
-# resolved from the request, not a zone-average pH number. See README_v3.md.
-CATEGORICAL = ["zone", "soil_type", "season", "crop_name", "crop_group"]
-NUMERIC = ["temperature_avg_C", "rainfall_mm", "humidity_pct", "soil_ph_mid"]
+MODEL_PATH = "model/crop_suitability_rf_v4.joblib"
+# v4: FEATURES are environmental factors only -- crop_name/crop_group are
+# deliberately NOT features here, crop_name is the model's predicted TARGET.
+# See this module's docstring and retrain_pipeline.py's for why.
+FEATURE_CATEGORICAL = ["zone", "soil_type", "season"]
+FEATURE_NUMERIC = ["temperature_avg_C", "rainfall_mm", "humidity_pct", "soil_ph_mid"]
 
 VALID_ZONES = {"coastal_zone", "southern_zone", "central_zone", "northern_zone", "high_ranges"}
 VALID_SEASONS = {"southwest_monsoon", "northeast_monsoon", "dry_season"}
@@ -109,7 +117,7 @@ MAX_MODEL_UPLOAD_BYTES = 200 * 1024 * 1024
 # inside the file. This does.
 # ---------------------------------------------------------------------------
 
-EXPECTED_MODEL_COLUMNS = CATEGORICAL + NUMERIC
+EXPECTED_MODEL_COLUMNS = FEATURE_CATEGORICAL + FEATURE_NUMERIC
 
 
 def _detect_input_columns(pipe) -> Optional[list]:
@@ -169,25 +177,38 @@ def validate_model_pipeline(pipe) -> tuple[list[str], list[str]]:
             msg += f" Expected exactly: {EXPECTED_MODEL_COLUMNS}."
             problems.append(msg)
 
+    # v4: classes_ are crop names (a multiclass target), not [0, 1] -- just
+    # sanity-check there's more than one class and they're all real strings,
+    # rather than requiring an exact known set (a retrained model may
+    # legitimately have a different crop count than the one currently served).
     classes = getattr(pipe, "classes_", None)
-    if classes is not None and list(classes) != [0, 1]:
-        problems.append(
-            f"Model classes_ are {list(classes)}; this service reads predict_proba()[:, 1] as "
-            "P(suitable) and requires classes exactly [0, 1]."
-        )
+    if classes is not None:
+        if len(classes) < 2:
+            problems.append(
+                f"Model classes_ has only {len(classes)} class(es); this service expects a multiclass "
+                "crop-name classifier with many candidate crops."
+            )
+        elif not all(isinstance(c, str) and c.strip() for c in classes):
+            problems.append(
+                "Model classes_ contains non-string or blank values; this service expects classes_ to be "
+                "crop_name strings (a model trained with the old v2/v3 binary is_suitable target would "
+                "show classes_ == [0, 1] here)."
+            )
 
     # Smoke prediction with one plausible row -- catches anything the structural
     # checks above can't see (broken pickle internals, wrong step order, etc).
     if not problems:
         smoke = pd.DataFrame([{
             "zone": "coastal_zone", "soil_type": "Laterite", "season": "dry_season",
-            "crop_name": DEFAULT_CROP_NAME, "crop_group": "Cereals",
             "temperature_avg_C": 28.0, "rainfall_mm": 100.0, "humidity_pct": 75.0, "soil_ph_mid": 6.0,
         }])
         try:
             proba = pipe.predict_proba(smoke[EXPECTED_MODEL_COLUMNS])
-            if getattr(proba, "shape", None) != (1, 2):
-                problems.append(f"Smoke prediction returned shape {getattr(proba, 'shape', None)}, expected (1, 2).")
+            n_classes = len(classes) if classes is not None else proba.shape[1]
+            if getattr(proba, "shape", None) != (1, n_classes):
+                problems.append(
+                    f"Smoke prediction returned shape {getattr(proba, 'shape', None)}, expected (1, {n_classes})."
+                )
         except Exception as exc:  # noqa: BLE001 -- any failure here IS the finding
             problems.append(f"Smoke prediction failed: {type(exc).__name__}: {exc}")
 
@@ -240,6 +261,11 @@ class RecommendationRequest(BaseModel):
     agro_zone: Optional[str] = None
     soil_type: Optional[str] = None
     season: Optional[str] = None
+    # Optional manual override: the FPO's actual measured soil pH. When
+    # given, this replaces the soil_ph_mid estimate (the resolved soil
+    # category's book-documented pH range midpoint) with the real value,
+    # which is a more accurate model input than a category-wide estimate.
+    soil_ph: Optional[float] = None
     commodities: List[str] = []
     tier: Optional[str] = None
     model_version: Optional[str] = None
@@ -386,26 +412,53 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
         soil_note = (f"No soil type was resolved from the request, so this averages across {effective_zone}'s "
                      f"documented soil mix: {', '.join(soil_categories)}.")
 
-    crop_groups = {}
-    for name in candidates:
-        rows = _kb.crop_rows(name)
-        crop_groups[name] = rows.iloc[0]["crop_group"] if len(rows) else "Unknown"
+    # If the FPO gave their actual measured soil pH, use it directly instead
+    # of the resolved soil category's book-documented pH-range midpoint --
+    # a real measurement is a strictly better model input than a category
+    # estimate. Append this to soil_note (rather than replacing it) since
+    # soil_type still drives the categorical feature and reasoning text.
+    reported_ph = payload.soil_ph
+    if reported_ph is not None:
+        soil_note += f" Using your reported soil pH ({reported_ph:g})."
 
+    # v4: ONE feature row per soil category being considered (not one per
+    # candidate crop -- crop_name isn't a feature anymore, see this module's
+    # docstring), then ONE predict_proba() call returns a probability across
+    # ALL known crops at once for that environment.
     feature_rows = []
-    for name in candidates:
-        for soil_cat in soil_categories:
+    for soil_cat in soil_categories:
+        if reported_ph is not None:
+            soil_ph_mid = reported_ph
+        else:
             ph_lo, ph_hi = _kb.soil_ph_range(soil_cat)
-            feature_rows.append({
-                "crop_name": name, "soil_category": soil_cat,
-                "zone": effective_zone, "soil_type": soil_cat, "season": effective_season,
-                "crop_group": crop_groups[name],
-                "temperature_avg_C": climate["temperature_avg_C"], "rainfall_mm": climate["rainfall_mm"],
-                "humidity_pct": climate["humidity_pct"], "soil_ph_mid": (ph_lo + ph_hi) / 2,
-            })
+            soil_ph_mid = (ph_lo + ph_hi) / 2
+        feature_rows.append({
+            "zone": effective_zone, "soil_type": soil_cat, "season": effective_season,
+            "temperature_avg_C": climate["temperature_avg_C"], "rainfall_mm": climate["rainfall_mm"],
+            "humidity_pct": climate["humidity_pct"], "soil_ph_mid": soil_ph_mid,
+        })
     feat_df = pd.DataFrame(feature_rows)
-    feat_df["confidence"] = _model.predict_proba(feat_df[CATEGORICAL + NUMERIC])[:, 1]
-    # average across soil categories per crop (a no-op when only 1 category, i.e. soil was resolved)
-    per_crop_confidence = feat_df.groupby("crop_name")["confidence"].mean().to_dict()
+    proba_matrix = _model.predict_proba(feat_df[FEATURE_CATEGORICAL + FEATURE_NUMERIC])
+    # average across soil categories (a no-op when only 1 row, i.e. soil was resolved)
+    avg_proba = proba_matrix.mean(axis=0)
+    raw_confidence_by_crop = dict(zip(_model.classes_, avg_proba))
+
+    # The model's raw probabilities are a distribution over ALL ~149 known
+    # crops, most of which aren't even documented for this zone -- so a crop
+    # genuinely well suited here can still show a small-looking raw share
+    # (e.g. 0.06) just because probability mass is spread across many valid
+    # options for a generic environment. Restrict to this zone's documented
+    # candidates and rescale so the top candidate reads as 1.0 (100% match)
+    # and the rest are proportional to it -- an honest RELATIVE confidence
+    # ("how strong a match is this, compared to your best option here"),
+    # not a claim that the model is more or less certain in an absolute
+    # sense than it actually is.
+    candidate_mass = {name: raw_confidence_by_crop.get(name, 0.0) for name in candidates}
+    best_mass = max(candidate_mass.values()) if candidate_mass else 0.0
+    per_crop_confidence = (
+        {name: v / best_mass for name, v in candidate_mass.items()} if best_mass > 0
+        else dict.fromkeys(candidates, 0.0)
+    )
 
     COMMODITY_MATCH_BONUS = 0.07  # same magnitude as the mock's score_crop() bonus
 
@@ -413,13 +466,14 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
     for name in candidates:
         raw_confidence = per_crop_confidence[name]
         already_grown = name in resolved_requested
-        confidence = raw_confidence + COMMODITY_MATCH_BONUS if already_grown else raw_confidence
+        confidence = raw_confidence
+        if already_grown:
+            confidence += COMMODITY_MATCH_BONUS
         confidence = max(0.0, min(confidence, 1.0))
         reasoning = build_reasoning(name, effective_zone, effective_season, climate, confidence, _kb, soil_note)
         if already_grown:
             reasoning += f" You already handle {name}-related commodities -- a natural fit to expand on."
         scored.append((
-            _kb.is_zone_specific(name, effective_zone),
             confidence,
             CropRecommendationItem(
                 crop=name,
@@ -430,20 +484,10 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
             ),
         ))
 
-    # Rank crops the PoP book actually documents for THIS zone (via a real KAU-zone
-    # crosswalk, e.g. Coffee/Cardamom/Tea -> High Hills -> high_ranges) above crops
-    # that only appear here via the 'General (all zones)' catch-all (~78% of the
-    # 149-crop dataset, covering crops the book never localizes -- mostly common
-    # vegetables/spices). Without this, a middling-confidence generic crop like
-    # Cocoa can outrank a genuinely zone-documented specialty like Coffee or
-    # Cardamom just because 'General' crops tend to have wide temperature/season
-    # tolerances that clear the suitability bar easily. See data_access_v3.py's
-    # is_zone_specific() and README_v3.md. This now ALWAYS applies (previously it
-    # was skipped whenever commodities were named -- no longer needed, since
-    # commodities no longer redefine the candidate pool, they only nudge scores
-    # within it).
-    scored.sort(key=lambda t: (not t[0], -t[1]))
-    top_results = [item for _, _, item in scored[:3]]
+    # Full ranked list, purely by confidence descending -- no top-N cap. The FPO
+    # portal now renders the complete scrollable list rather than just a top-3.
+    scored.sort(key=lambda t: -t[0])
+    top_results = [item for _, item in scored]
 
     return RecommendationResponse(
         recommendations=top_results,
@@ -454,7 +498,7 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
 @app.get("/health")
 def health():
     """Simple liveness check -- useful for confirming the service is up during dev."""
-    return {"status": "ok", "service": "crop-recommendation-rf-v3", "model_version": SERVED_MODEL_VERSION}
+    return {"status": "ok", "service": "crop-recommendation-rf-v4", "model_version": SERVED_MODEL_VERSION}
 
 
 # ---------------------------------------------------------------------------
@@ -539,6 +583,40 @@ def reload_model(payload: ReloadModelRequest):
 def model_status():
     """Quick way to check what Django last told this service to activate."""
     return _active_model_state
+
+
+@app.post("/reload-knowledge-base/")
+def reload_knowledge_base():
+    """
+    Called by Django's CropZoneProfileViewSet after any create/update/delete/
+    activate/deactivate that changes which rows are active -- re-reads
+    crop_profiles_service_zones.csv (and the other CropKnowledgeBase files)
+    from disk so an admin's edit takes effect immediately, without needing a
+    full service restart (previously the only way -- see
+    apps/recommendations/api/crop_zone_profile_admin.py's export_and_notify()).
+
+    Best-effort from Django's side (it logs a warning and moves on if this
+    fails or is unreachable, since the DB write already succeeded) -- but this
+    endpoint itself still validates before swapping in: a malformed export
+    (this service crashing on reload) is worse than continuing to serve the
+    previous, working knowledge base.
+    """
+    global _kb
+    try:
+        new_kb = CropKnowledgeBase()
+    except Exception as exc:  # noqa: BLE001 -- any failure here IS the finding
+        logger.error("reload-knowledge-base failed: %s: %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=422, detail={
+            "note": "Could not load the knowledge base from disk; the previous one remains active.",
+            "problem": f"{type(exc).__name__}: {exc}",
+        })
+    _kb = new_kb
+    logger.info("reload-knowledge-base succeeded: %d crops known", len(_kb.known_crop_names()))
+    return {
+        "status": "loaded",
+        "n_crops": len(_kb.known_crop_names()),
+        "note": "Knowledge base reloaded from disk and now active for predict_crops().",
+    }
 
 
 class ModelValidationResponse(BaseModel):

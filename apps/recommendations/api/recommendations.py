@@ -32,7 +32,8 @@ from apps.core.permissions.rbac import IsAdmin
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
-from apps.database.models import FPO, MLModelVersion, CropRecommendation
+from apps.database.models import FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices
+from apps.recommendations.api.pop_admin import CropPackageOfPracticesSerializer
 from apps.recommendations.services import (
     get_crop_recommendation,
     get_current_financial_year,
@@ -119,12 +120,49 @@ class MyRecommendationView(APIView):
         )
 
 
+class CropPackageOfPracticesDetailView(APIView):
+    """
+    GET /api/recommendations/pop/?crop_name=Cashew — case-insensitive lookup.
+
+    Query param rather than a path param: several crop names contain spaces
+    ("French bean", "Green gram"), and this matches the ?search= / ?category=
+    filter convention used across the admin APIs.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["Recommendations"])
+    def get(self, request, *args, **kwargs):
+        lang = request.language
+        crop_name = (request.query_params.get('crop_name') or '').strip()
+        if not crop_name:
+            return StandardResponse.error(
+                t('recommendations.pop_crop_name_required', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pop = CropPackageOfPractices.objects.filter(
+            crop_name__iexact=crop_name, is_active=True, is_deleted=False
+        ).first()
+        if not pop:
+            return StandardResponse.error(
+                t('recommendations.pop_not_found', lang),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        return StandardResponse.success(
+            data=CropPackageOfPracticesSerializer(pop).data,
+            message=t('recommendations.pop_retrieved', lang),
+        )
+
+
 class _RequestRecommendationSerializer(serializers.Serializer):
     """
-    Optional manual season override for a recommendation request. Left
-    unset (or null), the task auto-detects the season the same way it
-    always has (apps.gis_module.services.get_current_season()) — this
-    is purely an opt-in override, not a required field.
+    Optional manual overrides for a recommendation request. Left unset (or
+    null), season auto-detects the same way it always has
+    (apps.gis_module.services.get_current_season()) and soil_ph falls back
+    to the resolved soil category's book-documented pH-range midpoint
+    (see ml_service/main.py) — both are purely opt-in overrides, not
+    required fields.
     """
     season = serializers.ChoiceField(
         choices=['southwest_monsoon', 'northeast_monsoon', 'dry_season'],
@@ -132,6 +170,15 @@ class _RequestRecommendationSerializer(serializers.Serializer):
         allow_null=True,
         default=None,
         help_text='Optional manual season override. Defaults to auto-detected season if omitted.',
+    )
+    soil_ph = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        default=None,
+        min_value=3.0,
+        max_value=10.0,
+        help_text='Optional manual soil pH override (the FPO\'s actual measured value). '
+                   'Defaults to an estimate from the resolved soil type if omitted.',
     )
 
 
@@ -158,6 +205,7 @@ class RequestRecommendationView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
         season_override = ser.validated_data.get('season')
+        ph_override = ser.validated_data.get('soil_ph')
 
         # Reject up front, synchronously, if the FPO's location doesn't fall
         # inside any Kerala agro-climatic zone -- resolve_fpo_zone() is a
@@ -181,28 +229,43 @@ class RequestRecommendationView(APIView):
 
         fy = get_current_financial_year()
 
-        # Create/reset the record as 'pending' immediately — the actual
-        # FastAPI call happens in the Celery task, not here.
-        rec, _created = CropRecommendation.objects.update_or_create(
-            fpo=fpo,
-            financial_year=fy,
-            defaults={
-                'model_version': active_model,
-                'input_snapshot': {},
-                'recommendations': [],
-                'status': CropRecommendation.Status.PENDING,
-            },
-        )
+        # Mark as 'pending' immediately — the actual FastAPI call happens in
+        # the Celery task, not here. Deliberately does NOT clear
+        # input_snapshot/recommendations on an existing row: if this refresh
+        # ends up falling back to a cached result (ML service unavailable —
+        # see get_crop_recommendation()), the task relies on this row still
+        # holding the last successfully generated recommendation + its
+        # location_snapshot to fall back to. Clearing it here would destroy
+        # that before the task ever runs, leaving nothing to show on failure.
+        existing = CropRecommendation.objects.filter(fpo=fpo, financial_year=fy).first()
+        if existing:
+            existing.model_version = active_model
+            existing.status = CropRecommendation.Status.PENDING
+            existing.save(update_fields=['model_version', 'status'])
+            rec, _created = existing, False
+        else:
+            rec = CropRecommendation.objects.create(
+                fpo=fpo,
+                financial_year=fy,
+                model_version=active_model,
+                input_snapshot={},
+                recommendations=[],
+                status=CropRecommendation.Status.PENDING,
+            )
+            _created = True
 
         AuditService.log(
             user=request.user,
             action=AuditLog.Action.CREATE if _created else AuditLog.Action.UPDATE,
             instance=rec,
             request=request,
-            changes={'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code, 'season_override': season_override},
+            changes={
+                'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code,
+                'season_override': season_override, 'ph_override': ph_override,
+            },
         )
 
-        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy, season_override)
+        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy, season_override, ph_override)
 
         serializer = CropRecommendationSerializer(rec)
         return StandardResponse.success(
@@ -388,7 +451,15 @@ class MLModelVersionAdminView(APIView):
     def post(self, request, *args, **kwargs):
         lang = request.language
 
-        data = request.data.copy()
+        # NOT request.data.copy(): for a multipart request that .copy() deep-copies
+        # everything in request.data, including the uploaded file object -- fine for
+        # a small file (Django keeps it as an in-memory InMemoryUploadedFile, which
+        # deepcopies cleanly), but a file over FILE_UPLOAD_MAX_MEMORY_SIZE (5MB) is
+        # spooled to disk as a TemporaryUploadedFile wrapping a real OS file handle,
+        # which deepcopy can't pickle -- "TypeError: cannot pickle 'BufferedRandom'
+        # instances". Only the non-file fields are ever needed here (model_file is
+        # already pulled out separately below), so build `data` without the file.
+        data = {k: v for k, v in request.data.items() if k != 'model_file'}
         uploaded_file = request.FILES.get('model_file')
         validation_warnings = []
 

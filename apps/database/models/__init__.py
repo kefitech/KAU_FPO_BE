@@ -101,7 +101,7 @@ from .gis import (
     FPOWeatherSnapshot, ZoneBoundaryVersion, SoilRegion, SoilRegionVersion,
 )
 # Phase 2 — AI Crop Recommendations
-from .recommendations import MLModelVersion, CropRecommendation
+from .recommendations import MLModelVersion, CropRecommendation, CropPackageOfPractices, CropZoneProfile
 
 # Phase 2 — AI DPR Generation
 # v1 removed 2026-08-24. Fresh rebuild in progress under `dpr/` package.
@@ -294,6 +294,8 @@ __all__ = [
     # Phase 2 — AI Crop Recommendations
     'MLModelVersion',
     'CropRecommendation',
+    'CropPackageOfPractices',
+    'CropZoneProfile',
     # Phase 2 — AI DPR Generation — Project + Sections
     'DPRProject',
     'DPRSectionRawMaterial',

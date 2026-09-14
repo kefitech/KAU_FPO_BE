@@ -3,6 +3,7 @@ AI Crop Recommendations Models — P2-06
 Django acts as proxy to FastAPI ML service on port 8001 (internal only).
 """
 from django.db import models
+from django.db.models.functions import Lower
 from apps.core.models.base import BaseModel
 
 
@@ -99,3 +100,140 @@ class CropRecommendation(BaseModel):
 
     def __str__(self):
         return f"{self.fpo} — {self.financial_year} ({self.status})"
+
+
+class CropPackageOfPractices(BaseModel):
+    """
+    Real cultivation guidance per crop, sourced from KAU's official
+    "Package of Practices Recommendations: Crops" publication.
+    Shown when an FPO taps a crop in their recommendation list.
+    """
+
+    crop_name = models.CharField(
+        max_length=150, unique=True, db_index=True,
+        help_text="Must match the `crop` string ml_service's predict_crops() "
+                   "returns (crop_name in "
+                   "ml_service/data/crop_prediction_dataset_with_commodity_codes.csv). "
+                   "Looked up case-insensitively."
+    )
+    crop_group = models.CharField(max_length=100, blank=True, default='')
+    season = models.TextField(blank=True, default='')
+    varieties = models.JSONField(
+        default=list, blank=True,
+        help_text='[{name, description?}]'
+    )
+    # TextField, not CharField: for some crops (e.g. rice) the book's spacing
+    # guidance is a season x duration table, not a single sentence.
+    spacing = models.TextField(blank=True, default='')
+    manuring_fertilizer = models.TextField(blank=True, default='')
+    plant_protection = models.TextField(blank=True, default='')
+    harvesting = models.TextField(blank=True, default='')
+    expected_yield = models.CharField(max_length=255, blank=True, default='')
+    sections = models.JSONField(
+        default=list, blank=True,
+        help_text='Ordered [{heading, body}] -- preserves book structure that '
+                   "doesn't fit the fixed fields above (e.g. a tree crop's "
+                   'named propagation/pruning/intercropping sub-sections).'
+    )
+    source_reference = models.CharField(
+        max_length=255, blank=True,
+        default='KAU Package of Practices Recommendations: Crops 2024 (16th ed.)'
+    )
+    source_page_range = models.CharField(
+        max_length=50, blank=True, default='',
+        help_text="PDF page range this entry was transcribed from, e.g. '15-57' -- for audit/spot-check."
+    )
+    is_active = models.BooleanField(
+        default=False, db_index=True,
+        help_text='Visible to FPOs only when True. Defaults False so a newly '
+                   'transcribed entry can be cross-checked against the source '
+                   'PDF before publishing.'
+    )
+
+    class Meta:
+        verbose_name = 'Crop Package of Practices'
+        verbose_name_plural = 'Crop Packages of Practices'
+        ordering = ['crop_name']
+        constraints = [
+            models.UniqueConstraint(Lower('crop_name'), name='croppop_crop_name_ci_unique'),
+        ]
+
+    def __str__(self):
+        return self.crop_name
+
+
+class CropZoneProfile(BaseModel):
+    """
+    The ML service's live crop-eligibility knowledge base -- NOT the same data
+    as CropPackageOfPractices above. This drives ml_service's predict_crops():
+    which crops are even CANDIDATES for a zone, and the documented temperature/
+    pH/season text shown in a recommendation's reasoning. CropPackageOfPractices
+    is the richer cultivation-guidance content an FPO sees after tapping a
+    recommended crop; this is upstream of that, and affects who gets
+    recommended in the first place.
+
+    One row per (crop, KAU book zone) -- matching the PoP book's own
+    granularity, e.g. Coffee has 3 rows here (Foothills / General (all zones)
+    / High Hills), NOT one row per service zone. A KAU zone crosswalks to
+    several of this service's 5 geographic service zones (e.g. Foothills ->
+    northern_zone, central_zone, southern_zone) -- entering the same profile
+    3-5 times per crop would be redundant and risks the copies drifting apart.
+    That expansion happens at export time (see CropZoneProfile's admin API),
+    mirroring ml_service/retrain_pipeline.py's own KAU_TO_SERVICE_ZONE table.
+
+    Published rows (is_active=True) are exported to a CSV ml_service reads at
+    startup (and can hot-reload without a restart) -- see
+    apps.recommendations.api.crop_zone_profile_admin's export_and_notify().
+    """
+
+    class KauZone(models.TextChoices):
+        COASTAL_PLAIN = 'Coastal Plain', 'Coastal Plain'
+        MIDLAND_LATERITES = 'Midland Laterites', 'Midland Laterites'
+        FOOTHILLS = 'Foothills', 'Foothills'
+        HIGH_HILLS = 'High Hills', 'High Hills'
+        PALAKKAD_PLAIN = 'Palakkad Plain', 'Palakkad Plain'
+        GENERAL = 'General (all zones)', 'General (all zones)'
+
+    crop_name = models.CharField(
+        max_length=150, db_index=True,
+        help_text="Should match the crop_name used elsewhere (CropPackageOfPractices, "
+                   "ml_service's commodity crosswalk) so a crop's data lines up across systems."
+    )
+    crop_group = models.CharField(max_length=100, blank=True, default='')
+    kau_zone = models.CharField(
+        max_length=30, choices=KauZone.choices,
+        help_text="The KAU book's own physiographic zone this profile documents -- "
+                   "expanded into 1-5 service zones at export time via a fixed crosswalk."
+    )
+    temp_lo = models.FloatField(help_text="Documented minimum temperature (°C) this crop tolerates.")
+    temp_hi = models.FloatField(help_text="Documented maximum temperature (°C) this crop tolerates.")
+    ph_lo = models.FloatField(help_text="Documented minimum soil pH this crop tolerates.")
+    ph_hi = models.FloatField(help_text="Documented maximum soil pH this crop tolerates.")
+    seasons_text = models.TextField(
+        blank=True, default='',
+        help_text="Free-text season/planting-window description shown in a recommendation's reasoning."
+    )
+    temp_is_real = models.BooleanField(
+        default=True,
+        help_text="False if temp_lo/hi is a zone-default fallback rather than the book's own stated range."
+    )
+    ph_is_real = models.BooleanField(
+        default=True,
+        help_text="False if ph_lo/hi is a crop-group-median fallback rather than the book's own stated range."
+    )
+    is_active = models.BooleanField(
+        default=False, db_index=True,
+        help_text="Only active rows are exported to ml_service. Defaults False so a new/edited entry can "
+                   "be reviewed before it affects live recommendations."
+    )
+
+    class Meta:
+        verbose_name = 'Crop Zone Profile'
+        verbose_name_plural = 'Crop Zone Profiles'
+        ordering = ['crop_name', 'kau_zone']
+        constraints = [
+            models.UniqueConstraint(Lower('crop_name'), 'kau_zone', name='cropzoneprofile_crop_zone_ci_unique'),
+        ]
+
+    def __str__(self):
+        return f"{self.crop_name} ({self.kau_zone})"

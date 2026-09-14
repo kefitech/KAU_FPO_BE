@@ -65,3 +65,7 @@ nginx/
 # SMS credentials and setup docs — contains tokens, never commit
 sms/
 cookies_*.txt
+
+# Django migrations — not committed from this workstation; see project convention
+apps/database/migrations/*.py
+!apps/database/migrations/__init__.py

@@ -202,18 +202,39 @@ def seed_menu():
         order     = 21,
     )
     seed_item(
+        label_key = 'menu.crop_zone_profiles',
+        path      = '/admin/crop-zone-profiles',
+        icon      = 'sprout',
+        roles     = [super_admin_group],
+        order     = 22,
+    )
+    seed_item(
+        label_key = 'menu.crop_package_of_practices',
+        path      = '/admin/crop-package-of-practices',
+        icon      = 'book-open',
+        roles     = [super_admin_group],
+        order     = 23,
+    )
+    seed_item(
         label_key = 'menu.gis_zones',
         path      = '/admin/gis-zones',
         icon      = 'map',
         roles     = [super_admin_group],
-        order     = 22,
+        order     = 24,
     )
     seed_item(
         label_key = 'menu.soil_regions',
         path      = '/admin/soil-regions',
         icon      = 'layers',
         roles     = [super_admin_group],
-        order     = 23,
+        order     = 25,
+    )
+    seed_item(
+        label_key = 'menu.government',
+        path      = '/admin/government',
+        icon      = 'landmark',
+        roles     = [super_admin_group],
+        order     = 26,
     )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
@@ -325,6 +346,7 @@ def seed_menu():
         roles     = [cbbo_group],
         order     = 1,
     )
+   
 
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")

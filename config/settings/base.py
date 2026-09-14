@@ -59,6 +59,12 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 ML_SERVICE_URL = config('ML_SERVICE_URL', default='http://localhost:8001')
 ML_MODELS_DIR = config('ML_MODELS_DIR', default=str(BASE_DIR.parent / 'ml_models'))
+# ml_service's own data/ folder -- NOT the same as ML_MODELS_DIR (trained model
+# artifacts). This is where CropZoneProfile's admin CRUD exports its active rows
+# to (crop_profiles_service_zones.csv), which ml_service reads at startup / on
+# /reload-knowledge-base/. Same-host layout only (ml_service/ sits directly
+# inside this Django project) -- adjust if that layout changes.
+ML_SERVICE_DATA_DIR = config('ML_SERVICE_DATA_DIR', default=str(BASE_DIR / 'ml_service' / 'data'))
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 ML_TRAIN_TIMEOUT_SECONDS = config('ML_TRAIN_TIMEOUT_SECONDS', default=900, cast=int)
 # =============================================================================
