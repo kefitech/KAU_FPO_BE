@@ -279,5 +279,7 @@ urlpatterns = [
     path('gis/soil-region-versions/',                   SoilRegionVersionListView.as_view(),       name='admin-gis-soil-region-versions'),
     path('gis/soil-region-versions/<int:pk>/activate/', SoilRegionVersionActivateView.as_view(),   name='admin-gis-soil-region-versions-activate'),
     path('gis/soil-region-versions/<int:pk>/',          SoilRegionVersionDetailView.as_view(),     name='admin-gis-soil-region-versions-detail'),
+    # DPR V2 admin (projects, master data, applicability matrix, risk matrix, knowledge, config, tranches)
+    path('dpr/', include('apps.accounts.api.admin.dpr.urls')),
 ]
 
