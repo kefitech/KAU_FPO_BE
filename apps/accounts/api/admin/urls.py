@@ -124,6 +124,12 @@ from .fpo_users import (
     FPOUserResetPasswordView,
 )
 from .reports import FPOSummaryReportView
+from .ai_services import (
+    AIServiceListView,
+    AIServiceDetailView,
+    AIServiceResetUsageView,
+    AIProvidersInfoView,
+)
 from apps.accounts.api.menu import MenuItemViewSet
 from apps.accounts.api.sub_admins import SubAdminViewSet
 from apps.accounts.api.cbbo_admin import CBBOViewSet
@@ -281,5 +287,10 @@ urlpatterns = [
     path('gis/soil-region-versions/<int:pk>/',          SoilRegionVersionDetailView.as_view(),     name='admin-gis-soil-region-versions-detail'),
     # DPR V2 admin (projects, master data, applicability matrix, risk matrix, knowledge, config, tranches)
     path('dpr/', include('apps.accounts.api.admin.dpr.urls')),
+    # AI Services admin (per-feature config, budget caps, provider selection)
+    path('ai-services/',                  AIServiceListView.as_view(),        name='admin-ai-services-list'),
+    path('ai-services/providers/',        AIProvidersInfoView.as_view(),      name='admin-ai-services-providers'),
+    path('ai-services/<int:pk>/',         AIServiceDetailView.as_view(),      name='admin-ai-services-detail'),
+    path('ai-services/<int:pk>/reset-usage/', AIServiceResetUsageView.as_view(), name='admin-ai-services-reset-usage'),
 ]
 
