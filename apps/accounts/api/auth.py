@@ -159,6 +159,12 @@ def _get_redirect(user, role):
     return get_fpo_redirect(user)
 
 
+def _get_buyer_redirect(user):
+    """Route buyer users (external or FPO-as-buyer) based on verification status."""
+    from apps.marketplace.services import get_buyer_redirect
+    return get_buyer_redirect(user)
+
+
 def _build_menu(user, lang):
     """Return translated menu items the user is allowed to see."""
     user_groups = user.groups.all()
@@ -650,8 +656,8 @@ class MeView(APIView):
         lang = getattr(request, 'language', 'en')
         user = request.user
 
-        role        = _get_user_role(user)
-        permissions = get_user_permissions(user)
+        role           = _get_user_role(user)
+        permissions    = get_user_permissions(user)
         if role == 'sub_admin':
             # per-user permissions the super admin ticked (SUB_ADMIN_PERMISSIONS);
             # role-level ROLE_PERMISSIONS don't cover these, so the FE couldn't hide actions
@@ -660,8 +666,9 @@ class MeView(APIView):
                 .filter(content_type__app_label='accounts', content_type__model='subadmin')
                 .values_list('codename', flat=True)
             )
-        redirect    = _get_redirect(user, role)
-        profile     = getattr(user, 'profile', None)
+        redirect       = _get_redirect(user, role)
+        buyer_redirect = _get_buyer_redirect(user)
+        profile        = getattr(user, 'profile', None)
 
         data = {
             'user': {
@@ -674,9 +681,10 @@ class MeView(APIView):
                 'role':               role,
                 'permissions':        sorted(permissions) if '*' not in permissions else ['*'],
             },
-            'menu':     None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
-            'redirect': redirect,
-            'fpo_access': _build_fpo_access(user),
+            'menu':           None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
+            'redirect':       redirect,
+            'buyer_redirect': buyer_redirect,
+            'fpo_access':     _build_fpo_access(user),
         }
 
         return StandardResponse.success(

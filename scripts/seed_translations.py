@@ -4464,6 +4464,9 @@ def seed_menu_translations(languages):
         # Government / CBBO portal pages
         ('government_dashboard',   'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
         ('cbbo_dashboard',         'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        # External Buyer portal pages (Arunima — P2-11)
+        ('buyer_dashboard',        'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('buyer_products',         'Products',                 'ഉൽപ്പന്നങ്ങൾ'),
         # Admin DPR / AI menu items
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),

@@ -347,6 +347,32 @@ def seed_menu():
         roles     = fpo_roles,
         order     = 10,
     )
+    # FPO-as-buyer entry (Arunima — P2-11)
+    seed_item(
+        label_key = 'menu.fpo_buyer_directory',
+        path      = '/fpo/buyer-directory',
+        icon      = 'shopping-cart',
+        roles     = fpo_roles,
+        order     = 13,
+    )
+
+    # ── External Buyer portal (Arunima — P2-11) ─────────────────────────────
+    buyer_roles = [external_buyer_group]
+
+    seed_item(
+        label_key = 'menu.buyer_dashboard',
+        path      = '/buyer/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = buyer_roles,
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'menu.buyer_products',
+        path      = '/buyer/products',
+        icon      = 'package',
+        roles     = buyer_roles,
+        order     = 2,
+    )
 
     # ── CBBO portal pages ─────────────────────────────────────────────────────
 
