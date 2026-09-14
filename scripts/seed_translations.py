@@ -3615,6 +3615,12 @@ def seed_menu_translations(languages):
         ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
         ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),
         ('fpo_settings',           'Settings',                 'ക്രമീകരണങ്ങൾ'),
+        # Marketplace / Buyer / Market Linkage (Arunima — P2-11)
+        ('market_linkage',          'Market Linkage',           'വിപണി ബന്ധം'),
+        ('buyer_directory',         'Buyer Directory',          'ക്രേതാവ് ഡയറക്ടറി'),
+        ('fpo_buyer_directory',     'Buyer Directory',          'ക്രേതാവ് ഡയറക്ടറി'),
+        ('buyer_dashboard',         'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('buyer_products',          'Products',                 'ഉൽപ്പന്നങ്ങൾ'),
         # Admin GIS/ML menu items (Aravind)
         ('gis_zones',              'GIS Zones',                'GIS സോണുകൾ'),
         ('soil_regions',           'Soil Regions',             'മണ്ണ് പ്രദേശങ്ങൾ'),

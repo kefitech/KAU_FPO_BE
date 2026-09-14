@@ -130,6 +130,12 @@ def _get_redirect(user, role):
     return get_fpo_redirect(user)
 
 
+def _get_buyer_redirect(user):
+    """Route buyer users (external or FPO-as-buyer) based on verification status."""
+    from apps.marketplace.services import get_buyer_redirect
+    return get_buyer_redirect(user)
+
+
 def _build_menu(user, lang):
     """Return translated menu items the user is allowed to see."""
     user_groups = user.groups.all()
@@ -566,10 +572,11 @@ class MeView(APIView):
         lang = getattr(request, 'language', 'en')
         user = request.user
 
-        role        = _get_user_role(user)
-        permissions = get_user_permissions(user)
-        redirect    = _get_redirect(user, role)
-        profile     = getattr(user, 'profile', None)
+        role           = _get_user_role(user)
+        permissions    = get_user_permissions(user)
+        redirect       = _get_redirect(user, role)
+        buyer_redirect = _get_buyer_redirect(user)
+        profile        = getattr(user, 'profile', None)
 
         data = {
             'user': {
@@ -582,8 +589,9 @@ class MeView(APIView):
                 'role':               role,
                 'permissions':        sorted(permissions) if '*' not in permissions else ['*'],
             },
-            'menu':     None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
-            'redirect': redirect,
+            'menu':           None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
+            'redirect':       redirect,
+            'buyer_redirect': buyer_redirect,
         }
 
         return StandardResponse.success(
