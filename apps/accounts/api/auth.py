@@ -117,7 +117,7 @@ def _clear_failed_login(user) -> None:
 
 def _get_user_role(user):
     """Return the highest-priority role name for a user."""
-    priority = ['super_admin', 'sub_admin', 'fpo_manager', 'government', 'cbbo', 'expert', 'viewer']
+    priority = ['super_admin', 'sub_admin', 'fpo_manager', 'government', 'cbbo', 'expert', 'external_buyer', 'viewer']
     user_groups = set(user.groups.values_list('name', flat=True))
     for role in priority:
         if role in user_groups:

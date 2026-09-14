@@ -64,6 +64,11 @@ class Product(BaseModel):
 
 
 class BuyerDirectory(BaseModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        VERIFIED = 'verified', 'Verified'
+        REJECTED = 'rejected', 'Rejected'
+
     name = models.CharField(max_length=300)
     organisation = models.CharField(max_length=300, blank=True)
     contact_email = models.EmailField()
@@ -82,6 +87,26 @@ class BuyerDirectory(BaseModel):
     is_verified = models.BooleanField(
         default=False,
         help_text='Verified by KAU Admin before showing to FPOs'
+    )
+    # FPO-to-FPO marketplace (RCD Phase 2, §2.10 Action Items 3 & 4)
+    fpo = models.ForeignKey(
+        'database.FPO', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='buyer_registration',
+        help_text='Set only when this row is an FPO registering itself to buy from '
+                  'other FPOs. Null for regular external buyers added by admin.'
+    )
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.VERIFIED,
+        help_text='pending = FPO self-registration awaiting KAU review; verified = '
+                  'approved / admin-added directly; rejected = denied.'
+    )
+    # External buyer self-registration (login account link)
+    user = models.OneToOneField(
+        'auth.User', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='buyer_profile',
+        help_text='Login account for this buyer, when they have one (external buyer '
+                  'self-registration). Null for FPO-linked buyer rows and for legacy '
+                  'admin-added external buyers with no login.'
     )
 
     class Meta:

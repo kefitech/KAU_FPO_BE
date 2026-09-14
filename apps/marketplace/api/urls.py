@@ -1,6 +1,8 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from apps.marketplace.api.buyer_dashboard import BuyerDashboardView
+from apps.marketplace.api.buyer_products import BuyerProductListView
 from apps.marketplace.api.buyers import FPOBuyerListViewSet
 from apps.marketplace.api.market_prices import MarketOpportunitiesView, MarketPriceViewSet
 from apps.marketplace.api.matches import BuyerSellerMatchViewSet
@@ -22,4 +24,7 @@ urlpatterns = [
     path('', include(router.urls)),
     # Plain APIView, not router-registered — no CRUD, just one GET.
     path('opportunities/', MarketOpportunitiesView.as_view(), name='marketplace-opportunities'),
+    # Buyer flow (Arunima — P2-11)
+    path('buyer/dashboard/', BuyerDashboardView.as_view(), name='buyer-dashboard'),
+    path('buyer/products/',  BuyerProductListView.as_view(), name='buyer-products'),
 ]

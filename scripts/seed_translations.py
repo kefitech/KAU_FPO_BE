@@ -75,6 +75,13 @@ def create_categories():
     print("\nCreating translation categories...")
 
     categories = [
+        # Marketplace (Arunima — P2-11)
+        {
+            'code': 'marketplace',
+            'name': 'Marketplace',
+            'description': 'P2-11 Marketplace — products, buyers, matches, prices',
+            'display_order': 9,
+        },
         {
             'code': 'auth',
             'name': 'Authentication & Authorization',
@@ -3954,6 +3961,431 @@ def seed_nav_translations(languages):
     return count
 
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Marketplace / Buyer / Market Hub translations (Arunima — P2-11, P2-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def seed_marketplace_translations(languages):
+    """Seed P2-11 Marketplace API response messages (marketplace.* keys)."""
+    category = TranslationCategory.objects.get(code='marketplace')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+ 
+    marketplace_messages = [
+        # Products
+        ('products_retrieved',        'Products retrieved successfully',                   'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+        ('product_created',           'Product created successfully',                      'ഉൽപ്പന്നം വിജയകരമായി സൃഷ്ടിച്ചു'),
+        ('product_updated',           'Product updated successfully',                      'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('product_deleted',           'Product deleted successfully',                      'ഉൽപ്പന്നം വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('product_not_editable',      'Product cannot be edited in its current status',    'നിലവിലെ സ്ഥിതിയിൽ ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല'),
+        ('only_draft_deletable',      'Only draft products can be deleted',                'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
+        ('only_draft_publishable',    'Only draft products can be published',              'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
+        ('product_published',         'Product published successfully',                    'ഉൽപ്പന്നം വിജയകരമായി പ്രസിദ്ധീകരിച്ചു'),
+        ('only_active_can_be_sold',   'Only active products can be marked as sold',        'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
+ 
+        # Buyers
+        ('buyers_retrieved',          'Buyers retrieved successfully',                     'ക്രേതാക്കൾ വിജയകരമായി ലഭിച്ചു'),
+        ('buyer_created',             'Buyer created successfully',                        'ക്രേതാവിനെ വിജയകരമായി സൃഷ്ടിച്ചു'),
+        ('buyer_updated',             'Buyer updated successfully',                        'ക്രേതാവിനെ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('buyer_deleted',             'Buyer deleted successfully',                        'ക്രേതാവിനെ വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('buyer_verified',            'Buyer verified successfully',                       'ക്രേതാവിനെ വിജയകരമായി സ്ഥിരീകരിച്ചു'),
+        # arunima 07rd sep 2026-------------------------------
+        ('buyer_dashboard_retrieved', 'Buyer dashboard retrieved successfully', 'ക്രേതാവിന്റെ ഡാഷ്ബോർഡ് വിജയകരമായി ലഭിച്ചു'),
+        ('buyer_profile_not_found',   'No buyer profile found for this account', 'ഈ അക്കൗണ്ടിന് ക്രേതാവ് പ്രൊഫൈൽ കണ്ടെത്തിയില്ല'),
+        #---------------------------------------------------
+        # Matches
+        ('matches_retrieved',         'Matches retrieved successfully',                    'പൊരുത്തങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+        ('match_accepted',            'Match accepted successfully',                       'പൊരുത്തം വിജയകരമായി അംഗീകരിച്ചു'),
+        ('match_rejected',            'Match rejected successfully',                       'പൊരുത്തം വിജയകരമായി നിരസിച്ചു'),
+        ('match_not_actionable',      'This match has already been decided',               'ഈ പൊരുത്തം ഇതിനകം തീരുമാനിച്ചു'),
+ 
+        # Prices & Opportunities
+        ('prices_retrieved',          'Prices retrieved successfully',                     'വിലകൾ വിജയകരമായി ലഭിച്ചു'),
+        ('price_seeded',              'Price data added successfully',                     'വില വിവരം വിജയകരമായി ചേർത്തു'),
+        ('opportunities_retrieved',   'Opportunities retrieved successfully',              'അവസരങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+
+
+        #29th August 2026
+         # Admin Market Linkage
+        ('linkage_fpos_retrieved',     'FPOs retrieved successfully',                      'FPO-കൾ വിജയകരമായി ലഭിച്ചു'),
+        ('linkage_fpo_not_found',      'FPO not found',                                    'FPO കണ്ടെത്തിയില്ല'),
+        ('linkage_products_retrieved', 'Products retrieved successfully',                  'ഉൽപ്പന്നങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
+    ]
+ 
+    count = 0
+    for key, en_value, ml_value in marketplace_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Marketplace (P2-11)', 'is_verified': True}
+        )
+        count += 1
+ 
+    return count
+
+#---------------------------------------------------------------------------------------
+#Arunima S — 28-08-2026
+#Frontend UI labels for the FPO Products page (list, table, form) — these were
+#never seeded, which is why only the sidebar translated to Malayalam and the
+#actual page content (titles, columns, buttons, form labels) stayed in English.
+
+def seed_products_page_translations(languages):
+    """
+    Seed UI labels for the FPO Products screens.
+
+    Covers three screen-name prefixes actually requested by the frontend:
+      - fpo_products.*  (products/page.tsx — page header)
+      - product_table.* (products/page.tsx + _components/columns.tsx — DataTable columns, ViewSheet, row actions)
+      - product_form.*  (new/page.tsx, [id]/edit/page.tsx, _components/product-form.tsx)
+
+    All live under category='ui' with a dot-prefixed key, matching the
+    house convention used by seed_ui_translations()/seed_frontend_ui_translations().
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    products_ui_keys = [
+        # ── fpo_products — page.tsx header ──────────────────────────────
+        ('fpo_products.page_title',       'My Products',
+         'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
+        ('fpo_products.page_description', "List and manage your FPO's agricultural products for market linkage.",
+         'വിപണി ബന്ധത്തിനായി നിങ്ങളുടെ FPO-യുടെ കാർഷിക ഉൽപ്പന്നങ്ങൾ പട്ടികപ്പെടുത്തി നിയന്ത്രിക്കുക.'),
+        ('fpo_products.add_btn',          'Add Product',
+         'ഉൽപ്പന്നം ചേർക്കുക'),
+
+        # ── product_table — columns, ViewSheet, row actions ─────────────
+        ('product_table.view_title',            'Product Details',
+         'ഉൽപ്പന്ന വിശദാംശങ്ങൾ'),
+        ('product_table.col_name',               'Name',
+         'പേര്'),
+        ('product_table.col_commodity',          'Commodity ID',
+         'ചരക്ക് ഐഡി'),
+        ('product_table.col_quantity',           'Quantity',
+         'അളവ്'),
+        ('product_table.col_price',              'Price',
+         'വില'),
+        ('product_table.col_quality',            'Quality Certification',
+         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
+        ('product_table.col_available_from',     'Available From',
+         'ലഭ്യമായ തീയതി മുതൽ'),
+        ('product_table.col_available_until',    'Available Until',
+         'ലഭ്യമായ തീയതി വരെ'),
+        ('product_table.col_available',          'Available',
+         'ലഭ്യത'),
+        ('product_table.col_status',             'Status',
+         'സ്ഥിതി'),
+        ('product_table.col_public',             'Public',
+         'പൊതു'),
+        ('product_table.toast_published',        'Product published',
+         'ഉൽപ്പന്നം പ്രസിദ്ധീകരിച്ചു'),
+        ('product_table.err_publish_failed',     'Only draft products can be published',
+         'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
+        ('product_table.toast_marked_sold',      'Product marked as sold',
+         'ഉൽപ്പന്നം വിറ്റതായി അടയാളപ്പെടുത്തി'),
+        ('product_table.err_mark_sold_failed',   'Only active products can be marked sold',
+         'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('product_table.toast_deleted',          'Product deleted',
+         'ഉൽപ്പന്നം ഇല്ലാതാക്കി'),
+        ('product_table.err_delete_failed',      'Only draft products can be deleted',
+         'ഡ്രാഫ്റ്റ് ഉൽപ്പന്നങ്ങൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
+        ('product_table.confirm_delete_title',   'Delete Product',
+         'ഉൽപ്പന്നം ഇല്ലാതാക്കുക'),
+        ('product_table.confirm_delete_description',
+         'Are you sure you want to delete this product? This action cannot be undone.',
+         'ഈ ഉൽപ്പന്നം ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഈ പ്രവർത്തി പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('product_table.action_publish',         'Publish',
+         'പ്രസിദ്ധീകരിക്കുക'),
+        ('product_table.action_mark_sold',       'Mark Sold',
+         'വിറ്റതായി അടയാളപ്പെടുത്തുക'),
+
+         #--------------------------------------------------------------------------
+         #Arunima S --> 28th August 2026
+
+        ('product_table.status_draft',           'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('product_table.status_active',          'Active',
+         'സജീവം'),
+        ('product_table.status_sold',             'Sold',
+         'വിറ്റു'),
+        ('product_table.status_expired',          'Expired',
+         'കാലഹരണപ്പെട്ടു'),
+         #--------------------------------------------------------------------------
+
+        # ── product_form — new/edit wrapper pages + ProductForm ─────────
+        ('product_form.add_title',               'Add Product',
+         'ഉൽപ്പന്നം ചേർക്കുക'),
+        ('product_form.add_description',         'List a new product for buyers to discover.',
+         'ക്രേതാക്കൾക്ക് കണ്ടെത്താൻ ഒരു പുതിയ ഉൽപ്പന്നം പട്ടികപ്പെടുത്തുക.'),
+        ('product_form.edit_title',               'Edit Product',
+         'ഉൽപ്പന്നം എഡിറ്റ് ചെയ്യുക'),
+        ('product_form.section_details',          'Product Details',
+         'ഉൽപ്പന്ന വിശദാംശങ്ങൾ'),
+        ('product_form.name_en_label',            'Name (English)',
+         'പേര് (ഇംഗ്ലീഷ്)'),
+        ('product_form.name_en_placeholder',      'e.g. Organic Coconut',
+         'ഉദാ. ഓർഗാനിക് തേങ്ങ'),
+        ('product_form.name_ml_label',            'Name (Malayalam)',
+         'പേര് (മലയാളം)'),
+        ('product_form.name_ml_placeholder',      'Optional — falls back to English',
+         'ഐച്ഛികം — ഇംഗ്ലീഷിലേക്ക് തിരികെ പോകും'),
+        ('product_form.commodity_label',          'Commodity',
+         'ചരക്ക്'),
+        ('product_form.commodity_loading',        'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+        ('product_form.commodity_placeholder',    'Select a commodity',
+         'ഒരു ചരക്ക് തിരഞ്ഞെടുക്കുക'),
+        ('product_form.description_en_label',     'Description (English)',
+         'വിവരണം (ഇംഗ്ലീഷ്)'),
+        ('product_form.description_ml_label',     'Description (Malayalam)',
+         'വിവരണം (മലയാളം)'),
+        ('product_form.quantity_label',           'Quantity',
+         'അളവ്'),
+        ('product_form.unit_label',               'Unit',
+         'യൂണിറ്റ്'),
+        ('product_form.price_label',              'Price per unit (₹)',
+         'യൂണിറ്റ് വില (₹)'),
+        ('product_form.quality_label',            'Quality certification',
+         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
+        ('product_form.quality_placeholder',      'e.g. FSSAI, NPOP Organic, ISO 22000',
+         'ഉദാ. FSSAI, NPOP ഓർഗാനിക്, ISO 22000'),
+        ('product_form.available_from_label',     'Available from',
+         'ലഭ്യമായ തീയതി മുതൽ'),
+        ('product_form.available_until_label',    'Available until',
+         'ലഭ്യമായ തീയതി വരെ'),
+        ('product_form.public_label',             'Visible on public Market Hub',
+         'പൊതു മാർക്കറ്റ് ഹബ്ബിൽ ദൃശ്യമാണ്'),
+        ('product_form.toast_updated',            'Product updated successfully',
+         'ഉൽപ്പന്നം വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('product_form.toast_created',            'Product added successfully',
+         'ഉൽപ്പന്നം വിജയകരമായി ചേർത്തു'),
+
+        # ── missing common.* keys used by columns.tsx / product-form.tsx ─
+        # (save_btn, cancel_btn, reset_btn, edit, delete etc. already exist —
+        # only these three were genuinely missing)
+        ('common.yes',            'Yes',
+         'അതെ'),
+        ('common.no',             'No',
+         'ഇല്ല'),
+        ('common.clear_filters',  'Clear filters',
+         'ഫിൽട്ടറുകൾ മായ്ക്കുക'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in products_ui_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'FPO Products page UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'FPO Products page UI label', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
+#---------------------------------------------------------------------------------------
+#31th August 2026
+#Arunima S
+#Frontend UI labels for the Admin Market Linkage page — same "screen name +
+#common" pattern used elsewhere. Category doesn't need adding (ui already exists).
+
+def seed_market_linkage_translations(languages):
+    """Seed UI labels for the Admin Market Linkage screen (market_linkage_table.*)."""
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    market_linkage_keys = [
+        ('market_linkage_table.page_title',        'Market Linkage',
+         'മാർക്കറ്റ് ലിങ്കേജ്'),
+        ('market_linkage_table.page_description',  "Browse FPOs and the products they've listed for sale.",
+         'FPO-കളും അവർ വിൽപ്പനയ്ക്ക് പട്ടികപ്പെടുത്തിയ ഉൽപ്പന്നങ്ങളും ബ്രൗസ് ചെയ്യുക.'),
+        ('market_linkage_table.col_name',          'FPO Name',
+         'FPO പേര്'),
+        ('market_linkage_table.view_title',        'FPO Products',
+         'FPO ഉൽപ്പന്നങ്ങൾ'),
+        ('market_linkage_table.products_label',    'Products',
+         'ഉൽപ്പന്നങ്ങൾ'),
+        ('market_linkage_table.loading',           'Loading products...',
+         'ഉൽപ്പന്നങ്ങൾ ലോഡ് ചെയ്യുന്നു...'),
+        ('market_linkage_table.no_products',       'This FPO has no products listed yet.',
+         'ഈ FPO ഇതുവരെ ഉൽപ്പന്നങ്ങളൊന്നും പട്ടികപ്പെടുത്തിയിട്ടില്ല.'),
+        # Product status labels shown inside the ViewSheet product list
+        ('market_linkage_table.status_draft',      'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('market_linkage_table.status_active',     'Active',
+         'സജീവം'),
+        ('market_linkage_table.status_sold',       'Sold',
+         'വിറ്റു'),
+        ('market_linkage_table.status_expired',    'Expired',
+         'കാലഹരണപ്പെട്ടു'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in market_linkage_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Admin Market Linkage page UI label', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#---------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------
+
+#arunima sep 9 ------------
+def seed_market_hub_translations(languages):
+    """
+    Public Market Hub (P2-12, Task 16) — UI labels for the anonymous
+    product-browsing page and inquiry modal at /market-hub.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    market_hub_keys = [
+        ('market_hub.page_title',         'Market Hub',
+         'മാർക്കറ്റ് ഹബ്'),
+        ('market_hub.breadcrumb',         'Market Hub',
+         'മാർക്കറ്റ് ഹബ്'),
+        ('market_hub.search_placeholder', 'Search products...',
+         'ഉൽപ്പന്നങ്ങൾ തിരയുക...'),
+        ('market_hub.empty_state',        'No products found',
+         'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല'),
+        ('market_hub.label_quantity',     'Quantity',
+         'അളവ്'),
+        ('market_hub.label_price',        'Price',
+         'വില'),
+        ('market_hub.label_available',    'Available',
+         'ലഭ്യമാണ്'),
+        ('market_hub.btn_inquire',        'Inquire',
+         'അന്വേഷിക്കുക'),
+        ('market_hub.btn_loading',        'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+        ('market_hub.btn_load_more',      'Load More',
+         'കൂടുതൽ കാണിക്കുക'),
+        ('market_hub.inquiry_sent_title', 'Inquiry Sent!',
+         'അന്വേഷണം അയച്ചു!'),
+        ('market_hub.inquiry_sent_desc',  'Your inquiry about "{product}" has been sent. The FPO will contact you soon.',
+         '"{product}" സംബന്ധിച്ച നിങ്ങളുടെ അന്വേഷണം അയച്ചു. FPO ഉടൻ നിങ്ങളെ ബന്ധപ്പെടും.'),
+        ('market_hub.btn_close',          'Close',
+         'അടയ്ക്കുക'),
+        ('market_hub.modal_title',        'Inquire about',
+         'സംബന്ധിച്ച് അന്വേഷിക്കുക'),
+        ('market_hub.field_name',         'Your Name',
+         'നിങ്ങളുടെ പേര്'),
+        ('market_hub.field_email',        'Your Email',
+         'നിങ്ങളുടെ ഇ-മെയിൽ'),
+        ('market_hub.field_phone',        'Your Phone (optional)',
+         'നിങ്ങളുടെ ഫോൺ (ഐച്ഛികം)'),
+        ('market_hub.field_message',      'Message (optional)',
+         'സന്ദേശം (ഐച്ഛികം)'),
+        ('market_hub.error_submit',       'Failed to submit inquiry. Please try again.',
+         'അന്വേഷണം സമർപ്പിക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+        ('market_hub.btn_submit',         'Submit Inquiry',
+         'അന്വേഷണം സമർപ്പിക്കുക'),
+        ('market_hub.btn_submitting',     'Submitting...',
+         'സമർപ്പിക്കുന്നു...'),
+        ('market_hub.btn_cancel',         'Cancel',
+         'റദ്ദാക്കുക'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in market_hub_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Public Market Hub page (P2-12)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Public Market Hub page (P2-12)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#-----------------------------------
+
+
+#10th sep arunima------
+def seed_buyer_portal_translations(languages):
+    """
+    External Buyer Portal — Dashboard + Products pages (buyer_dashboard.*, buyer_products.*)
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    buyer_portal_keys = [
+        # ── buyer_dashboard.* ──
+        ('buyer_dashboard.welcome_msg',        'Welcome, {name}',
+         'സ്വാഗതം, {name}'),
+        ('buyer_dashboard.buyer_type_fpo',     'FPO Buyer',
+         'FPO ക്രേതാവ്'),
+        ('buyer_dashboard.buyer_type_external','External Buyer',
+         'ബാഹ്യ ക്രേതാവ്'),
+        ('buyer_dashboard.badge_verified',     'Verified',
+         'സ്ഥിരീകരിച്ചു'),
+        ('buyer_dashboard.card_profile_title', 'Buyer Profile',
+         'ക്രേതാവിന്റെ പ്രൊഫൈൽ'),
+        ('buyer_dashboard.label_organisation', 'Organisation',
+         'സ്ഥാപനം'),
+        ('buyer_dashboard.label_email',        'Email',
+         'ഇ-മെയിൽ'),
+        ('buyer_dashboard.label_phone',        'Phone',
+         'ഫോൺ'),
+        ('buyer_dashboard.label_location',     'Location',
+         'സ്ഥലം'),
+        ('buyer_dashboard.label_commodities',  'Commodities Interested',
+         'താൽപ്പര്യമുള്ള ചരക്കുകൾ'),
+        ('buyer_dashboard.no_commodities',     'None specified yet.',
+         'ഇതുവരെ വ്യക്തമാക്കിയിട്ടില്ല.'),
+
+        # ── buyer_products.* ──
+        ('buyer_products.page_title',          'Explore Products',
+         'ഉൽപ്പന്നങ്ങൾ പര്യവേക്ഷണം ചെയ്യുക'),
+        ('buyer_products.page_description',    'Browse products listed by FPOs',
+         'FPO-കൾ ലിസ്റ്റ് ചെയ്ത ഉൽപ്പന്നങ്ങൾ ബ്രൗസ് ചെയ്യുക'),
+        ('buyer_products.search_placeholder',  'Search products…',
+         'ഉൽപ്പന്നങ്ങൾ തിരയുക…'),
+        ('buyer_products.filter_commodity',    'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('buyer_products.filter_all',          'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('buyer_products.empty_state',         'No products found.',
+         'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
+        ('buyer_products.label_quantity',      'Quantity',
+         'അളവ്'),
+        ('buyer_products.label_price',         'Price',
+         'വില'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in buyer_portal_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'External Buyer Portal (Dashboard + Products)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'External Buyer Portal (Dashboard + Products)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#------------------------
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -4036,6 +4468,32 @@ def seed_translations():
     home_count = seed_home_section_translations(languages)
     print(f"✅ Seeded {home_count} home section translations")
     total_count += home_count
+
+    # Step 9e: Marketplace / Buyer / Market Hub (Arunima — P2-11, P2-12)
+    print("\nSeeding marketplace translations...")
+    marketplace_count = seed_marketplace_translations(languages)
+    print(f"✅ Seeded {marketplace_count} marketplace translations")
+    total_count += marketplace_count
+
+    print("\nSeeding products page UI translations...")
+    products_page_count = seed_products_page_translations(languages)
+    print(f"✅ Seeded {products_page_count} products-page translations")
+    total_count += products_page_count
+
+    print("\nSeeding market linkage translations...")
+    market_linkage_count = seed_market_linkage_translations(languages)
+    print(f"✅ Seeded {market_linkage_count} market-linkage translations")
+    total_count += market_linkage_count
+
+    print("\nSeeding market hub translations...")
+    market_hub_count = seed_market_hub_translations(languages)
+    print(f"✅ Seeded {market_hub_count} market-hub translations")
+    total_count += market_hub_count
+
+    print("\nSeeding buyer portal translations...")
+    buyer_portal_count = seed_buyer_portal_translations(languages)
+    print(f"✅ Seeded {buyer_portal_count} buyer-portal translations")
+    total_count += buyer_portal_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")

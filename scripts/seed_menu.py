@@ -34,6 +34,7 @@ def seed_menu():
     sub_admin_group, _   = Group.objects.get_or_create(name='sub_admin')
     government_group, _  = Group.objects.get_or_create(name='government')
     cbbo_group, _        = Group.objects.get_or_create(name='cbbo')
+    external_buyer_group, _ = Group.objects.get_or_create(name='external_buyer')
 
     def seed_item(label_key, path, icon, roles, parent=None, order=0):
         item, created = MenuItem.objects.get_or_create(
@@ -214,6 +215,21 @@ def seed_menu():
         icon      = 'layers',
         roles     = [super_admin_group],
         order     = 23,
+    )
+    # Marketplace admin (Arunima — P2-11)
+    seed_item(
+        label_key = 'menu.market_linkage',
+        path      = '/admin/market-linkage',
+        icon      = 'link',
+        roles     = [super_admin_group],
+        order     = 24,
+    )
+    seed_item(
+        label_key = 'menu.buyer_directory',
+        path      = '/admin/buyers',
+        icon      = 'shopping-cart',
+        roles     = [super_admin_group],
+        order     = 25,
     )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────

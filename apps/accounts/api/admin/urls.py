@@ -152,6 +152,15 @@ from apps.gis_module.api.soil_regions import (
     SoilRegionVersionDetailView,
 )
 
+# Marketplace / Buyer Directory / Market Linkage (Arunima — P2-11)
+from apps.marketplace.api.buyers import BuyerDirectoryViewSet
+from apps.marketplace.api.matches import AdminMatchViewSet
+from apps.marketplace.api.market_prices import AdminMarketPriceViewSet
+from .market_linkage import (
+    AdminMarketLinkageFPOListView,
+    AdminMarketLinkageFPOProductsView,
+)
+
 # Create DRF router
 router = DefaultRouter()
 
@@ -165,6 +174,10 @@ router.register(r'cbbos', CBBOViewSet, basename='cbbo')
 router.register(r'government', GovernmentViewSet, basename='government')   # ADD THIS LINE
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
+# Marketplace admin (Arunima — P2-11)
+router.register(r'buyers', BuyerDirectoryViewSet, basename='admin-buyer')
+router.register(r'matches', AdminMatchViewSet, basename='admin-match')
+router.register(r'prices', AdminMarketPriceViewSet, basename='admin-price')
 
 # URL patterns
 urlpatterns = [
@@ -186,6 +199,9 @@ urlpatterns = [
     path('applications/<int:fpo_id>/assign-subadmin/',                       ApplicationAssignSubAdminView.as_view(),  name='admin-applications-assign-subadmin'),
     path('applications/<int:fpo_id>/unassign-subadmin/',                     ApplicationUnassignSubAdminView.as_view(), name='admin-applications-unassign-subadmin'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
+    # Market Linkage — admin browses FPOs with product listings (Arunima — P2-11)
+    path('market-linkage/fpos/',                                             AdminMarketLinkageFPOListView.as_view(),     name='admin-market-linkage-fpos'),
+    path('market-linkage/fpos/<int:fpo_id>/products/',                       AdminMarketLinkageFPOProductsView.as_view(), name='admin-market-linkage-fpo-products'),
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
     # Audit Logs

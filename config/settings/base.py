@@ -92,6 +92,7 @@ LOCAL_APPS = [
     'apps.notifications.apps.NotificationsConfig',
     'apps.experts.apps.ExpertsConfig',
     'apps.marketplace.apps.MarketplaceConfig',
+    'apps.external_buyer.apps.ExternalBuyerConfig',
     'apps.recommendations.apps.RecommendationsConfig',
     'apps.analytics.apps.AnalyticsConfig',
     'apps.gis_module.apps.GisModuleConfig',
