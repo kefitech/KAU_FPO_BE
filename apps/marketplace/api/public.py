@@ -126,6 +126,7 @@ class PublicProductListView(APIView):
                     'quality_certification': p.quality_certification,
                     'available_from': p.available_from,
                     'available_until': p.available_until,
+                    'image': p.image.url if p.image else None,
                     # NOTE: fpo_name intentionally omitted per Business Rule #2 —
                     # "FPO contact details not exposed in public listing."
                 }
@@ -162,6 +163,7 @@ class PublicProductDetailView(APIView):
             'quality_certification': p.quality_certification,
             'available_from': p.available_from,
             'available_until': p.available_until,
+            'image': p.image.url if p.image else None,
         }
         return StandardResponse.success(data=data, message='Product retrieved successfully')
 

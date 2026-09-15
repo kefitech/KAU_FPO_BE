@@ -1,11 +1,12 @@
 #Arunima S  
 from celery import shared_task
+from django.utils import timezone
+from apps.database.models import Product
 
 @shared_task
 def expire_products():
     """Daily — mark products past available_until as expired."""
-    from django.utils import timezone
-    from apps.database.models import Product
+
 
     Product.objects.filter(
         status=Product.Status.ACTIVE,

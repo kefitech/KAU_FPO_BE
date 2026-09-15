@@ -52,7 +52,8 @@ class Product(BaseModel):
         help_text='Visible on public Market Hub (P2-12)'
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
- 
+    image = models.ImageField(upload_to='products/', null=True, blank=True)
+
     class Meta:
         verbose_name = 'Product'
         verbose_name_plural = 'Products'
