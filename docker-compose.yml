@@ -58,7 +58,10 @@ services:
   celery:
     image: athulkefitech1123/kau-fpo-backend:testing
     restart: always
-    command: celery -A config worker --loglevel=info --concurrency=1
+    # concurrency=3 so a long ML retrain doesn't block email/SMS/notifications.
+    # Each fork adds ~50 MB RSS (150 MB total for 3). Bump if the test server
+    # can afford it, or split into queues (see docs) post-UAT.
+    command: celery -A config worker --loglevel=info --concurrency=3
     volumes:
       - logs:/app/logs
       - ml_models:/ml_models
