@@ -21,6 +21,23 @@ from apps.marketplace.serializers import ProductSerializer
 from apps.marketplace.services import run_matching
 
 
+def _clear_public_market_cache():
+    """
+    Wipe all cached Public Market Hub product-list responses.
+    Called whenever a product's status/public visibility could change,
+    so new/updated products show up immediately instead of waiting for
+    the 1-hour cache TTL to expire naturally.
+    """
+    from django.core.cache import cache
+    try:
+        cache.delete_pattern('public:market:products:*')
+        cache.delete_pattern('public:market:commodities:*')
+        cache.delete_pattern('public:market:opportunities')
+    except AttributeError:
+        # Cache backend doesn't support delete_pattern (e.g. LocMemCache in tests)
+        pass
+
+
 @extend_schema_view(
     list=extend_schema(tags=['Marketplace - Products']),
     create=extend_schema(tags=['Marketplace - Products']),
@@ -47,11 +64,24 @@ class ProductViewSet(TranslatedViewSet):
     destroy_message = 'marketplace.product_deleted'
 
     def get_queryset(self):
+        from django.db.models import Q
+
         # FPO only sees their own products; exclude soft-deleted rows
         fpo = self.request.user.fpo
-        return Product.objects.filter(fpo=fpo, is_deleted=False).select_related(
+        queryset = Product.objects.filter(fpo=fpo, is_deleted=False).select_related(
             'commodity', 'fpo'
         ).order_by('-created_at')
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(name__en__icontains=search) | Q(name__ml__icontains=search)
+            )
+
+        status = self.request.query_params.get('status')
+        if status in (Product.Status.DRAFT, Product.Status.ACTIVE, Product.Status.SOLD, Product.Status.EXPIRED):
+            queryset = queryset.filter(status=status)
+        return queryset
 
     # update()/destroy() are NOT overridden — per house convention, business
     # rule checks live in perform_update()/perform_destroy(), raising
@@ -67,6 +97,9 @@ class ProductViewSet(TranslatedViewSet):
     # version. 422 is arguably more correct for "valid request, wrong state"
     # (vs 400 "malformed request"), but flag this if the frontend specifically
     # expects 400 for these cases.
+    def perform_create(self, serializer):
+        serializer.save()
+        _clear_public_market_cache()
 
     def perform_update(self, serializer):
         product = serializer.instance
@@ -76,6 +109,7 @@ class ProductViewSet(TranslatedViewSet):
                 code='product_not_editable',
             )
         serializer.save()
+        _clear_public_market_cache()
 
     def perform_destroy(self, instance):
         # Soft delete — draft only. BaseModel provides .soft_delete(), which
@@ -86,6 +120,7 @@ class ProductViewSet(TranslatedViewSet):
                 code='only_draft_deletable',
             )
         instance.soft_delete(user=self.request.user)
+        _clear_public_market_cache()
 
     @extend_schema(tags=['Marketplace - Products'])
     @action(detail=True, methods=['post'])
@@ -101,6 +136,7 @@ class ProductViewSet(TranslatedViewSet):
         product.save()
 
         run_matching(product)
+        _clear_public_market_cache()
 
         return StandardResponse.success(
             data=ProductSerializer(product).data,
@@ -118,6 +154,7 @@ class ProductViewSet(TranslatedViewSet):
             )
         product.status = Product.Status.SOLD
         product.save()
+        _clear_public_market_cache()
         return StandardResponse.success(
             data=ProductSerializer(product).data,
             message=t('marketplace.product_sold', self.get_language())
