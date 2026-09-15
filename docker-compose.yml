@@ -58,10 +58,13 @@ services:
   celery:
     image: athulkefitech1123/kau-fpo-backend:testing
     restart: always
-    # concurrency=3 so a long ML retrain doesn't block email/SMS/notifications.
-    # Each fork adds ~50 MB RSS (150 MB total for 3). Bump if the test server
-    # can afford it, or split into queues (see docs) post-UAT.
-    command: celery -A config worker --loglevel=info --concurrency=3
+    # Kept at concurrency=1: the 2 GB test box is already at ~93% RAM with
+    # all containers running (postgres + redis + 4 python apps + chatbot's
+    # torch model + nginx + frontend). Bumping to 3 during UAT tipped the
+    # server over into memory-thrash (load avg > 17) and killed SSH access.
+    # Post-UAT: either scale up the test server to >= 4 GB, or split heavy
+    # tasks (retrain, DPR) onto their own dedicated worker container.
+    command: celery -A config worker --loglevel=info --concurrency=1
     volumes:
       - logs:/app/logs
       - ml_models:/ml_models
