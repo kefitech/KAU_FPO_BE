@@ -240,28 +240,28 @@ def seed_menu():
     MenuItem.objects.filter(label_key='menu.cbbo_settings').update(label_key='menu.cbbo_profile', path='/cbbo/profile')
 
     seed_item(
-        label_key = 'menu.cbbo_dashboard',
+        label_key = 'Dashboard',
         path      = '/cbbo/dashboard',
         icon      = 'layout-dashboard',
         roles     = [cbbo_group],
         order     = 1,
     )
     seed_item(
-        label_key = 'menu.cbbo_verifications',
+        label_key = 'Verifications',
         path      = '/cbbo/verifications',
         icon      = 'check-circle',
         roles     = [cbbo_group],
         order     = 2,
     )
     seed_item(
-        label_key = 'menu.cbbo_reports',
+        label_key = 'Reports',
         path      = '/cbbo/reports',
         icon      = 'clipboard-list',
         roles     = [cbbo_group],
         order     = 3,
     )
     seed_item(
-        label_key = 'menu.cbbo_profile',
+        label_key = 'Profile',
         path      = '/cbbo/profile',
         icon      = 'user',
         roles     = [cbbo_group],
@@ -273,35 +273,35 @@ def seed_menu():
     government_group, _ = Group.objects.get_or_create(name='government')
 
     seed_item(
-        label_key = 'menu.government_dashboard',
+        label_key = 'Dashboard',
         path      = '/government/dashboard',
         icon      = 'layout-dashboard',
         roles     = [government_group],
         order     = 1,
     )
     seed_item(
-        label_key = 'menu.government_profile',
+        label_key = 'Profile',
         path      = '/government/profile',
         icon      = 'user',
         roles     = [government_group],
         order     = 2,
     )
     seed_item(
-        label_key = 'menu.government_schemes',
+        label_key = 'Schemes',
         path      = '/government/schemes',
         icon      = 'file-text',
         roles     = [government_group],
         order     = 4,
     )
     seed_item(
-        label_key = 'menu.government_training',
+        label_key = 'Training',
         path      = '/government/training',
         icon      = 'graduation-cap',
         roles     = [government_group],
         order     = 5,
     )
     seed_item(
-            label_key = 'menu.government_fpos',
+            label_key = 'FPOs',
             path      = '/government/fpos',
             icon      = 'building',
             roles     = [government_group],
@@ -313,21 +313,21 @@ def seed_menu():
     expert_group, _ = Group.objects.get_or_create(name='expert')
 
     seed_item(
-        label_key = 'menu.expert_dashboard',
+        label_key = 'Dashboard',
         path      = '/expert/dashboard',
         icon      = 'layout-dashboard',
         roles     = [expert_group],
         order     = 1,
     )
     seed_item(
-        label_key = 'menu.expert_availability',
+        label_key = 'Availability',
         path      = '/expert/availability',
         icon      = 'calendar-days',
         roles     = [expert_group],
         order     = 2,
     )
     seed_item(
-        label_key = 'menu.expert_profile',
+        label_key = 'Profile',
         path      = '/expert/profile',
         icon      = 'user',
         roles     = [expert_group],
