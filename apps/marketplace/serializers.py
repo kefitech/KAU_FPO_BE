@@ -10,6 +10,54 @@ from apps.database.models import (
     Product,
 )
 
+_PRODUCT_IMAGE_MAX_SIZE  = 2 * 1024 * 1024  # 2 MB — hard limit before compression is even attempted
+_PRODUCT_IMAGE_MAX_DIM   = 1200             # resize to max 1200×1200 px
+_PRODUCT_IMAGE_QUALITY   = 85               # JPEG/PNG compression quality
+_PRODUCT_IMAGE_ALLOWED_MIME = {'image/jpeg', 'image/png', 'image/webp'}
+
+
+def _compress_product_image(file):
+    """
+    Resize and compress an uploaded product photo (JPG/PNG/WebP only, max 2 MB
+    on upload). Matches the pattern used for gallery photos — see
+    apps/accounts/api/admin/cms.py:_compress_photo().
+    """
+    import magic
+    import io
+    from PIL import Image
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+
+    if file.size > _PRODUCT_IMAGE_MAX_SIZE:
+        raise serializers.ValidationError('Image must not exceed 2 MB.')
+
+    mime = magic.from_buffer(file.read(2048), mime=True)
+    file.seek(0)
+
+    if mime not in _PRODUCT_IMAGE_ALLOWED_MIME:
+        raise serializers.ValidationError(
+            f'Only JPG, PNG, and WebP images are allowed. Got: {mime}'
+        )
+
+    img = Image.open(file)
+    if img.mode not in ('RGB', 'RGBA'):
+        img = img.convert('RGB')
+
+    img.thumbnail((_PRODUCT_IMAGE_MAX_DIM, _PRODUCT_IMAGE_MAX_DIM), Image.LANCZOS)
+
+    output = io.BytesIO()
+    save_format = 'PNG' if mime == 'image/png' else 'JPEG'
+    img.save(output, format=save_format, quality=_PRODUCT_IMAGE_QUALITY, optimize=True)
+    output.seek(0)
+
+    ext = '.png' if save_format == 'PNG' else '.jpg'
+    return InMemoryUploadedFile(
+        output, 'ImageField',
+        file.name.rsplit('.', 1)[0] + ext,
+        f'image/{"png" if save_format == "PNG" else "jpeg"}',
+        output.getbuffer().nbytes,
+        None,
+    )
+
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,11 +65,16 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'fpo', 'name', 'commodity', 'description', 'quantity', 'unit',
             'price_per_unit', 'quality_certification', 'available_from', 'available_until',
-            'is_ondc_listed', 'ondc_product_id', 'is_public', 'status',
+            'is_ondc_listed', 'ondc_product_id', 'is_public', 'status', 'image',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'fpo', 'is_ondc_listed', 'ondc_product_id', 'status',
                              'created_at', 'updated_at']
+
+    def validate_image(self, value):
+        if value is None:
+            return value
+        return _compress_product_image(value)
 
     def create(self, validated_data):
         validated_data['fpo'] = self.context['request'].user.fpo
@@ -88,6 +141,6 @@ class BuyerProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'commodity_code',
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
-            'available_from', 'available_until', 'fpo_name',
+            'available_from', 'available_until', 'fpo_name', 'image',
         ]
         read_only_fields = fields
