@@ -59,6 +59,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 ML_SERVICE_URL = config('ML_SERVICE_URL', default='http://localhost:8001')
 ML_MODELS_DIR = config('ML_MODELS_DIR', default=str(BASE_DIR.parent / 'ml_models'))
+ML_SERVICE_DATA_DIR = config('ML_SERVICE_DATA_DIR', default=str(BASE_DIR / 'ml_service' / 'data'))
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 ML_TRAIN_TIMEOUT_SECONDS = config('ML_TRAIN_TIMEOUT_SECONDS', default=900, cast=int)
 # =============================================================================

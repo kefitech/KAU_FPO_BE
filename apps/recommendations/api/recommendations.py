@@ -32,7 +32,7 @@ from apps.core.permissions.rbac import IsAdmin
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
-from apps.database.models import FPO, MLModelVersion, CropRecommendation
+from apps.database.models import FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices
 from apps.recommendations.services import (
     get_crop_recommendation,
     get_current_financial_year,
@@ -119,6 +119,44 @@ class MyRecommendationView(APIView):
         )
 
 
+class CropPackageOfPracticesDetailView(APIView):
+    """
+    GET /api/recommendations/pop/?crop_name=Cashew — case-insensitive lookup.
+
+    Query param rather than a path param: several crop names contain spaces
+    ("French bean", "Green gram"), and this matches the ?search= / ?category=
+    filter convention used across the admin APIs.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["Recommendations"])
+    def get(self, request, *args, **kwargs):
+        lang = request.language
+        crop_name = (request.query_params.get('crop_name') or '').strip()
+        if not crop_name:
+            return StandardResponse.error(
+                t('recommendations.pop_crop_name_required', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pop = CropPackageOfPractices.objects.filter(
+            crop_name__iexact=crop_name, is_active=True, is_deleted=False
+        ).first()
+        if not pop:
+            return StandardResponse.error(
+                t('recommendations.pop_not_found', lang),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Import inside the function to avoid a circular import
+        # (apps.recommendations.api.pop_admin imports from this module).
+        from apps.recommendations.api.pop_admin import CropPackageOfPracticesSerializer
+        return StandardResponse.success(
+            data=CropPackageOfPracticesSerializer(pop).data,
+            message=t('recommendations.pop_retrieved', lang),
+        )
+
+
 class _RequestRecommendationSerializer(serializers.Serializer):
     """
     Optional manual season override for a recommendation request. Left
@@ -132,6 +170,15 @@ class _RequestRecommendationSerializer(serializers.Serializer):
         allow_null=True,
         default=None,
         help_text='Optional manual season override. Defaults to auto-detected season if omitted.',
+    )
+    soil_ph = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        default=None,
+        min_value=3.0,
+        max_value=10.0,
+        help_text="Optional manual soil pH override (the FPO's actual measured value). "
+                  "Defaults to an estimate from the resolved soil type if omitted.",
     )
 
 
@@ -158,6 +205,7 @@ class RequestRecommendationView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(str(ser.errors), status_code=status.HTTP_400_BAD_REQUEST)
         season_override = ser.validated_data.get('season')
+        ph_override = ser.validated_data.get('soil_ph')
 
         # Reject up front, synchronously, if the FPO's location doesn't fall
         # inside any Kerala agro-climatic zone -- resolve_fpo_zone() is a
@@ -199,10 +247,13 @@ class RequestRecommendationView(APIView):
             action=AuditLog.Action.CREATE if _created else AuditLog.Action.UPDATE,
             instance=rec,
             request=request,
-            changes={'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code, 'season_override': season_override},
+            changes={
+                'fpo': fpo.name, 'financial_year': fy, 'model_version': active_model.version_code,
+                'season_override': season_override, 'ph_override': ph_override,
+            },
         )
 
-        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy, season_override)
+        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy, season_override, ph_override)
 
         serializer = CropRecommendationSerializer(rec)
         return StandardResponse.success(

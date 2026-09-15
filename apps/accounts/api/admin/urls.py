@@ -161,6 +161,10 @@ from .market_linkage import (
     AdminMarketLinkageFPOProductsView,
 )
 
+# Crop knowledge base admin (Aravind — P2-06)
+from apps.recommendations.api.pop_admin import CropPackageOfPracticesViewSet
+from apps.recommendations.api.crop_zone_profile_admin import CropZoneProfileViewSet
+
 # Create DRF router
 router = DefaultRouter()
 
@@ -178,6 +182,9 @@ router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
 router.register(r'buyers', BuyerDirectoryViewSet, basename='admin-buyer')
 router.register(r'matches', AdminMatchViewSet, basename='admin-match')
 router.register(r'prices', AdminMarketPriceViewSet, basename='admin-price')
+# Crop knowledge base admin (Aravind — P2-06)
+router.register(r'crop-pop', CropPackageOfPracticesViewSet, basename='crop-pop')
+router.register(r'crop-zone-profiles', CropZoneProfileViewSet, basename='crop-zone-profile')
 
 # URL patterns
 urlpatterns = [

@@ -231,6 +231,21 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 25,
     )
+    # Crop knowledge base admin (Aravind — P2-06)
+    seed_item(
+        label_key = 'menu.crop_zone_profiles',
+        path      = '/admin/crop-zone-profiles',
+        icon      = 'sprout',
+        roles     = [super_admin_group],
+        order     = 26,
+    )
+    seed_item(
+        label_key = 'menu.crop_package_of_practices',
+        path      = '/admin/crop-package-of-practices',
+        icon      = 'book-open',
+        roles     = [super_admin_group],
+        order     = 27,
+    )
 
     # ── FPO portal pages (all roles — adjustable via Page Access UI) ─────────
 

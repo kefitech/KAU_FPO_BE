@@ -29,7 +29,7 @@ def get_current_financial_year() -> str:
     return f"{start_year}-{end_year_short}"
 
 
-def build_recommendation_payload(fpo, model_version, financial_year, season_override=None) -> dict:
+def build_recommendation_payload(fpo, model_version, financial_year, season_override=None, ph_override=None) -> dict:
     """
     Builds the FastAPI request payload matching the richer P2-06 module
     spec: fpo_id, district, agro_zone, soil_type, season, commodities,
@@ -49,6 +49,11 @@ def build_recommendation_payload(fpo, model_version, financial_year, season_over
     get_current_season()'s own vocabulary — southwest_monsoon/
     northeast_monsoon/dry_season). Falls back to the auto-detected
     current season when not given, same as before this param existed.
+
+    ph_override: optional manual soil pH value from the FPO (their actual
+    measured value). Falls back to an estimate from the resolved soil
+    type's book-documented pH range when not given — see ml_service/
+    main.py's predict_crops().
     """
     zone = resolve_fpo_zone(fpo)
     agro_zone_code = zone.code if zone else None
@@ -63,6 +68,7 @@ def build_recommendation_payload(fpo, model_version, financial_year, season_over
         "agro_zone": agro_zone_code,
         "soil_type": soil_type,
         "season": season_override or get_current_season(),
+        "soil_ph": ph_override,
         "commodities": commodities,
         "tier": fpo.current_tier,
         "model_version": model_version.version_code if model_version else None,
@@ -70,7 +76,7 @@ def build_recommendation_payload(fpo, model_version, financial_year, season_over
     }
 
 
-def get_crop_recommendation(fpo, model_version, financial_year, season_override=None):
+def get_crop_recommendation(fpo, model_version, financial_year, season_override=None, ph_override=None):
     """
     Calls the FastAPI ML service for a crop recommendation.
 
@@ -78,7 +84,7 @@ def get_crop_recommendation(fpo, model_version, financial_year, season_override=
     the FPO's last cached recommendation, or an empty result with a
     warning if none exists.
     """
-    payload = build_recommendation_payload(fpo, model_version, financial_year, season_override)
+    payload = build_recommendation_payload(fpo, model_version, financial_year, season_override, ph_override)
 
     try:
         response = httpx.post(
