@@ -302,10 +302,19 @@ def _call_google(
         model,
         system_instruction=system if system else None,
     )
+    # DPR narratives are descriptive/summarization tasks, not reasoning
+    # tasks — thinking-mode models (gemini-2.5-pro, gemini-3.6-flash) waste
+    # 4-6× the cost on internal reasoning tokens the caller never sees.
+    # `thinking_budget=0` opts out. Non-thinking models silently ignore
+    # the key, so this is safe across all Google model tiers.
+    generation_config = {
+        'max_output_tokens': max_tokens,
+        'thinking_config': {'thinking_budget': 0},
+    }
     try:
         resp = gm.generate_content(
             prompt,
-            generation_config={'max_output_tokens': max_tokens},
+            generation_config=generation_config,
         )
     except GoogleAPIError as e:
         raise LLMError(f'Google Gemini API failure: {e}') from e
@@ -313,11 +322,16 @@ def _call_google(
     usage = getattr(resp, 'usage_metadata', None)
     input_tokens = getattr(usage, 'prompt_token_count', 0) if usage else 0
     output_tokens = getattr(usage, 'candidates_token_count', 0) if usage else 0
+    # Thinking-mode models bill for hidden reasoning tokens; when enabled
+    # we roll those into our output cost so admin usage matches Google's
+    # billing. When disabled (as configured above) this is 0.
+    thoughts_tokens = getattr(usage, 'thoughts_token_count', 0) if usage else 0
+    billed_output_tokens = output_tokens + (thoughts_tokens or 0)
     return LLMResponse(
         text=text,
         input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost_usd=_compute_cost('google', model, input_tokens, output_tokens),
+        output_tokens=billed_output_tokens,
+        cost_usd=_compute_cost('google', model, input_tokens, billed_output_tokens),
         provider='google',
         model=model,
     )
