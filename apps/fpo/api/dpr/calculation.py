@@ -192,6 +192,14 @@ class DPRDocumentGenerateView(APIView):
         if err:
             return err
         doc = save_pdf_to_document(project)
+        # Flip project status to GENERATED so admin dashboards and the FE
+        # list can distinguish "PDF already produced" from "still filling
+        # sections". Doesn't demote a re-generation on an already-generated
+        # project (idempotent) — stays at GENERATED.
+        from apps.database.models import DPRProject
+        if project.status != DPRProject.Status.GENERATED:
+            project.status = DPRProject.Status.GENERATED
+            project.save(update_fields=['status'])
         return StandardResponse.success(
             _serialise_document(doc),
             message=f'DPR v{doc.version_number} generated successfully.',

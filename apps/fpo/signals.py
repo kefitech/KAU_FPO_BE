@@ -93,6 +93,33 @@ def _mark_stale_receiver(section_key: str):
     return _handler
 
 
+def _project_progress_receiver(sender, instance, created, **kwargs):
+    """Flip DPRProject.status DRAFT -> IN_PROGRESS on any section write.
+
+    Runs for every DPRSection<X> model's post_save. Only writes if the
+    project is still in the draft state — a project that's already
+    IN_PROGRESS or GENERATED stays where it is, and a subsequent edit
+    after PDF generation doesn't demote it back to IN_PROGRESS
+    automatically (that's a KAU workflow decision, not a
+    "did-anything-get-saved" one).
+
+    Fires for both `created=True` and updates: an initial row create
+    (the get_or_create in each section view) still counts as user
+    intent to work on the DPR.
+    """
+    from apps.database.models import DPRProject
+    project = getattr(instance, 'project', None)
+    if project is None:
+        return
+    if project.status != DPRProject.Status.DRAFT:
+        return
+    # update_fields is faster and avoids triggering DPRProject signals
+    # (there aren't any today, but keep the write minimal on principle).
+    DPRProject.objects.filter(pk=project.pk, status=DPRProject.Status.DRAFT).update(
+        status=DPRProject.Status.IN_PROGRESS,
+    )
+
+
 def register_signals() -> None:
     """Wire the post_save receivers. Called from FpoConfig.ready()."""
     for model_cls, section_key in _get_section_model_map().items():
@@ -104,4 +131,12 @@ def register_signals() -> None:
             sender=model_cls,
             weak=False,
             dispatch_uid=f'dpr_ai_stale_{section_key}',
+        )
+        # Second receiver on the same model: transition project status
+        # DRAFT -> IN_PROGRESS. Separate dispatch_uid so both stay wired.
+        post_save.connect(
+            _project_progress_receiver,
+            sender=model_cls,
+            weak=False,
+            dispatch_uid=f'dpr_project_progress_{section_key}',
         )
