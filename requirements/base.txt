@@ -133,4 +133,7 @@ matplotlib>=3.7,<4.0                # DPR PDF charts (cost pie, P&L bar, repayme
 # Wire later — install when KAU approves Claude API budget
 # -----------------------------------------------------------------------------
 anthropic>=0.25,<1.0                # Claude API SDK
-google-generativeai>=0.8,<2.0       # Gemini SDK (DPR narratives via Google AI Studio)
+# google-generativeai is deprecated (Sep 2024) — replaced by google-genai.
+# google-genai exposes thoughts_token_count, thinking_config, and other
+# 3.x-family Gemini features the old package doesn't support.
+google-genai>=2.20,<3.0             # Gemini SDK (DPR narratives via Google AI Studio)

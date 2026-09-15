@@ -291,47 +291,60 @@ def _call_google(
     max_tokens: int,
     system: Optional[str],
 ) -> LLMResponse:
-    import google.generativeai as genai
-    from google.api_core.exceptions import GoogleAPIError
+    """Call the Google Gemini API using the new google-genai SDK.
+
+    We migrated off google-generativeai (deprecated Sep 2024) so we get:
+      1. `thoughts_token_count` in usage_metadata — the OLD SDK never
+         exposed it, so on thinking-capable models (gemini-2.5-pro,
+         gemini-3.6-flash) our admin-panel spend was 4-6x under Google's
+         real billing.
+      2. `ThinkingConfig(thinking_budget=0)` — explicit opt-out from
+         thinking for DPR narratives (they're descriptive tasks, not
+         reasoning tasks).
+
+    The old SDK is completely removed — no fallback path.
+    """
+    from google import genai
+    from google.genai import errors as genai_errors
+    from google.genai import types as genai_types
 
     key = config.get_api_key()
     if not key:
         raise LLMError('Google API key not configured on AIServiceConfig')
-    genai.configure(api_key=key)
-    gm = genai.GenerativeModel(
-        model,
+
+    client = genai.Client(api_key=key)
+
+    # Build config. Thinking is off by default for DPR narratives — models
+    # that don't support thinking ignore the field, so this is safe across
+    # all Gemini tiers.
+    gen_config = genai_types.GenerateContentConfig(
+        max_output_tokens=max_tokens,
         system_instruction=system if system else None,
+        thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
     )
-    # DPR narratives are descriptive/summarization tasks, not reasoning
-    # tasks — thinking-mode models (gemini-2.5-pro, gemini-3.6-flash) waste
-    # 4-6× the cost on internal reasoning tokens the caller never sees.
-    # `thinking_budget=0` opts out. Non-thinking models silently ignore
-    # the key, so this is safe across all Google model tiers.
-    generation_config = {
-        'max_output_tokens': max_tokens,
-        'thinking_config': {'thinking_budget': 0},
-    }
     try:
-        resp = gm.generate_content(
-            prompt,
-            generation_config=generation_config,
+        resp = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=gen_config,
         )
-    except GoogleAPIError as e:
+    except genai_errors.APIError as e:
         raise LLMError(f'Google Gemini API failure: {e}') from e
-    text = resp.text
+
+    text = getattr(resp, 'text', '') or ''
     usage = getattr(resp, 'usage_metadata', None)
     input_tokens = getattr(usage, 'prompt_token_count', 0) if usage else 0
     output_tokens = getattr(usage, 'candidates_token_count', 0) if usage else 0
-    # Thinking-mode models bill for hidden reasoning tokens; when enabled
-    # we roll those into our output cost so admin usage matches Google's
-    # billing. When disabled (as configured above) this is 0.
+    # Hidden reasoning tokens billed by Google — with the new SDK we can
+    # finally see this. Rolled into billed_output so admin usage matches
+    # Google's real spend. When thinking_budget=0 this is 0.
     thoughts_tokens = getattr(usage, 'thoughts_token_count', 0) if usage else 0
-    billed_output_tokens = output_tokens + (thoughts_tokens or 0)
+    billed_output_tokens = (output_tokens or 0) + (thoughts_tokens or 0)
     return LLMResponse(
         text=text,
-        input_tokens=input_tokens,
+        input_tokens=input_tokens or 0,
         output_tokens=billed_output_tokens,
-        cost_usd=_compute_cost('google', model, input_tokens, billed_output_tokens),
+        cost_usd=_compute_cost('google', model, input_tokens or 0, billed_output_tokens),
         provider='google',
         model=model,
     )
