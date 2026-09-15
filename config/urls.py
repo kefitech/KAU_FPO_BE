@@ -124,6 +124,8 @@ urlpatterns = [
     path('api/notifications/', include('apps.notifications.urls', namespace='notifications')),
     # External Buyer portal (Arunima — P2-11)
     path('api/external-buyer/', include('apps.external_buyer.urls', namespace='external_buyer')),
+    # Chatbot (Phase 1 — RAG + extractive QA)
+    path('api/chatbot/', include('apps.chatbot.urls', namespace='chatbot')),
 ]
 
 # =============================================================================

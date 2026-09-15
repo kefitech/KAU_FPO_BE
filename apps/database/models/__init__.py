@@ -113,6 +113,9 @@ from .recommendations import (
     CropZoneProfile,
 )
 
+# Chatbot RAG knowledge base
+from .chatbot import ChatKnowledgeEntry, AUDIENCE_PUBLIC, AUDIENCE_ALL, SPECIAL_AUDIENCES
+
 # Phase 2 — AI DPR Generation
 # v1 removed 2026-08-24. Fresh rebuild in progress under `dpr/` package.
 # See context/phase2/Dpr/DPR_V2_CONTEXT.md
@@ -317,6 +320,8 @@ __all__ = [
     'CropRecommendation',
     'CropPackageOfPractices',
     'CropZoneProfile',
+    # Chatbot RAG
+    'ChatKnowledgeEntry',
     # Phase 2 — AI DPR Generation — Project + Sections
     'DPRProject',
     'DPRConfig',

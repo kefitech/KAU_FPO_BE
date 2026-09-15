@@ -26,6 +26,16 @@ services:
     depends_on:
       - redis
 
+  chatbot-service:
+    image: athulkefitech1123/kau-fpo-chatbot-service:testing
+    restart: always
+    # Extractive-QA FastAPI service (chatbot — Phase 1).
+    # Django (apps.chatbot) proxies /api/chatbot/message/ retrieval hits here
+    # on port 8002. Kept separate from ml-service so QA workload doesn't
+    # contend for crop-recommendation model loads.
+    volumes:
+      - hf_cache:/hf_cache
+
   web:
     image: athulkefitech1123/kau-fpo-backend:testing
     restart: always
@@ -43,6 +53,7 @@ services:
       - db
       - redis
       - ml-service
+      - chatbot-service
 
   celery:
     image: athulkefitech1123/kau-fpo-backend:testing
@@ -95,3 +106,4 @@ volumes:
   static_files:
   logs:
   ml_models:
+  hf_cache:      # tinyroberta model cache for chatbot-service

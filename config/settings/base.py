@@ -58,6 +58,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 # Site URL for email links, etc.
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 ML_SERVICE_URL = config('ML_SERVICE_URL', default='http://localhost:8001')
+CHATBOT_SERVICE_URL = config('CHATBOT_SERVICE_URL', default='http://localhost:8002')
 ML_MODELS_DIR = config('ML_MODELS_DIR', default=str(BASE_DIR.parent / 'ml_models'))
 ML_SERVICE_DATA_DIR = config('ML_SERVICE_DATA_DIR', default=str(BASE_DIR / 'ml_service' / 'data'))
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
@@ -94,6 +95,7 @@ LOCAL_APPS = [
     'apps.experts.apps.ExpertsConfig',
     'apps.marketplace.apps.MarketplaceConfig',
     'apps.external_buyer.apps.ExternalBuyerConfig',
+    'apps.chatbot.apps.ChatbotConfig',
     'apps.recommendations.apps.RecommendationsConfig',
     'apps.analytics.apps.AnalyticsConfig',
     'apps.gis_module.apps.GisModuleConfig',
