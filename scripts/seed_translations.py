@@ -1416,6 +1416,11 @@ def seed_ui_translations(languages):
         ('ml_models_table.action_view_stats',        'View Training Stats',                                       'പരിശീലന സ്ഥിതിവിവരക്കണക്കുകൾ കാണുക'),
         ('ml_models_table.action_view_feedback',     'View Feedback',                                             'പ്രതികരണം കാണുക'),
         ('ml_models_table.action_activate',          'Activate',                                                  'സജീവമാക്കുക'),
+        ('ml_models_table.action_delete',            'Delete',                                                    'ഇല്ലാതാക്കുക'),
+        ('ml_models_table.delete_title',             'Delete model version',                                      'മോഡൽ പതിപ്പ് ഇല്ലാതാക്കുക'),
+        ('ml_models_table.delete_description',       "Are you sure you want to delete this model version? This can't be undone from the UI.", 'ഈ മോഡൽ പതിപ്പ് ഇല്ലാതാക്കണമെന്ന് തീർച്ചയാണോ? ഇത് യുഐയിൽ നിന്ന് പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('ml_models_table.toast_deleted',            'Model version deleted',                                     'മോഡൽ പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('ml_models_table.toast_delete_failed',      'Failed to delete model version',                            'മോഡൽ പതിപ്പ് ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു'),
 
         # ── admin_gis_zones — GisZonesPage (agro-climatic zone boundaries) ─
         ('admin_gis_zones.page_title',                 'Agro-Climatic Zone Boundaries',                             'കാർഷിക-കാലാവസ്ഥാ മേഖലാ അതിരുകൾ'),
@@ -4460,6 +4465,8 @@ def seed_recommendations_translations(languages):
         ('model_validation_failed',  'This model file does not match the required feature schema.', 'ഈ മോഡൽ ഫയൽ ആവശ്യമായ ഫീച്ചർ സ്കീമയുമായി പൊരുത്തപ്പെടുന്നില്ല.'),
         ('model_not_ready',          'Only a version with status "ready" can be activated',       '"ready" എന്ന നിലയിലുള്ള പതിപ്പ് മാത്രമേ സജീവമാക്കാൻ കഴിയൂ'),
         ('version_code_exists',      'A model version with this version code already exists',     'ഈ പതിപ്പ് കോഡുള്ള ഒരു മോഡൽ പതിപ്പ് ഇതിനകം നിലവിലുണ്ട്'),
+        ('model_deleted',            'Model version deleted successfully',                        'മോഡൽ പതിപ്പ് നീക്കം ചെയ്തു'),
+        ('model_delete_active_forbidden', 'The active model version cannot be deleted. Activate a different version first.', 'സജീവമായ മോഡൽ പതിപ്പ് നീക്കം ചെയ്യാൻ കഴിയില്ല. ആദ്യം മറ്റൊരു പതിപ്പ് സജീവമാക്കുക.'),
         # Async retraining (P2-06)
         ('dataset_file_required',    'A dataset file is required',                                'ഒരു ഡാറ്റാസെറ്റ് ഫയൽ ആവശ്യമാണ്'),
         ('dataset_file_invalid',     'Dataset file is invalid:',                                  'ഡാറ്റാസെറ്റ് ഫയൽ അസാധുവാണ്:'),

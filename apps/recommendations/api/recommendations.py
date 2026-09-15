@@ -84,8 +84,12 @@ class MLModelVersionSerializer(serializers.ModelSerializer):
             'status', 'training_error',
         ]
         # The retrain flow sets these itself; a client can't claim a
-        # version is ready or write its own error text.
-        read_only_fields = ['status', 'training_error', 'training_metrics']
+        # version is ready or write its own error text. deployed_at is
+        # always stamped by the server (timezone.now()) at creation time --
+        # see MLModelVersionAdminView.post() and MLModelRetrainView.post() --
+        # never taken from client input, so "deployment date" can't drift
+        # from when the version was actually registered/queued.
+        read_only_fields = ['status', 'training_error', 'training_metrics', 'deployed_at']
 
 
 # ---------------------------------------------------------------------------
@@ -459,7 +463,11 @@ class MLModelVersionAdminView(APIView):
         # which deepcopy can't pickle -- "TypeError: cannot pickle 'BufferedRandom'
         # instances". Only the non-file fields are ever needed here (model_file is
         # already pulled out separately below), so build `data` without the file.
-        data = {k: v for k, v in request.data.items() if k != 'model_file'}
+        # deployed_at is never taken from the client -- it's stamped below
+        # with the server's current time, same as the retrain flow already
+        # does, so "deployment date" always reflects when this was actually
+        # registered instead of a manually-typed date.
+        data = {k: v for k, v in request.data.items() if k not in ('model_file', 'deployed_at')}
         uploaded_file = request.FILES.get('model_file')
         validation_warnings = []
 
@@ -523,7 +531,7 @@ class MLModelVersionAdminView(APIView):
 
         serializer = MLModelVersionSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        version = serializer.save()
+        version = serializer.save(deployed_at=timezone.now())
 
         AuditService.log(
             user=request.user,
@@ -543,6 +551,57 @@ class MLModelVersionAdminView(APIView):
             data=response_data,
             message=t('recommendations.model_registered', lang),
             status_code=status.HTTP_201_CREATED,
+        )
+
+
+class MLModelVersionDetailView(APIView):
+    """
+    DELETE /api/admin/ml-models/{id}/
+
+    Soft-deletes an MLModelVersion row (MLModelVersion already inherits
+    BaseModel's is_deleted/deleted_at/soft_delete() -- this just exposes it
+    over the API, matching the perform_destroy pattern used everywhere else,
+    e.g. CropPackageOfPracticesViewSet). Nothing on disk (the model file) is
+    touched -- only Django's record is marked deleted, and the list view
+    already filters on is_deleted=False.
+
+    The currently active version can't be deleted -- deactivating it first
+    (by activating a different version) is required, so there's never a
+    moment where FastAPI is still serving predictions from a version Django
+    considers gone.
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin - ML Models"])
+    def delete(self, request, pk, *args, **kwargs):
+        lang = request.language
+        try:
+            version = MLModelVersion.objects.get(pk=pk, is_deleted=False)
+        except MLModelVersion.DoesNotExist:
+            return StandardResponse.error(
+                t('recommendations.model_not_found', lang),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if version.is_active:
+            return StandardResponse.error(
+                t('recommendations.model_delete_active_forbidden', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        version.soft_delete(user=request.user)
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.DELETE,
+            instance=version,
+            request=request,
+            changes={'version_code': version.version_code},
+        )
+
+        return StandardResponse.success(
+            data=None,
+            message=t('recommendations.model_deleted', lang),
         )
 
 

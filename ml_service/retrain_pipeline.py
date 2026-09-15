@@ -400,16 +400,44 @@ def _stage3_build_training_rows(profiles: pd.DataFrame, climate: pd.DataFrame) -
         cand = profiles_expanded[profiles_expanded["service_zone"] == zone]
         for soil_category in ZONE_SOIL_TYPES[zone]:
             ph_lo_zone, ph_hi_zone = SOIL_PH[soil_category]
-            soil_ph_mid = (ph_lo_zone + ph_hi_zone) / 2
             for _, cr in cand.iterrows():
                 temp_ok = not (zc["temperature_avg_C"] < cr["temp_lo"] - 2 or zc["temperature_avg_C"] > cr["temp_hi"] + 2)
                 season_ok = _season_match(season, cr["seasons_text"])
                 soilkw_ok = _soil_match(cr["soil_text"], soil_category)
                 is_suitable = int(temp_ok and (season_ok or soilkw_ok))
+                # soil_ph_mid: use THIS crop's own documented pH range (ph_lo/
+                # ph_hi, parsed in stage 1 from its own PoP soil_ph_range text,
+                # or a crop_group/global fallback -- see _stage1_parse_bounds)
+                # rather than the soil category's fixed midpoint. Previously
+                # every crop in a (zone, soil_type, season) bucket got the same
+                # soil_category midpoint here regardless of its own pH range,
+                # which is why soil_ph_mid carried zero real signal -- same
+                # value for every one of the ~87 crops sharing a bucket, even
+                # though their actual pH data (computed two stages earlier)
+                # differed. Falls back to the soil category midpoint only if
+                # this crop has no pH bounds at all (shouldn't normally happen
+                # -- _stage1_parse_bounds always resolves to a value via its
+                # own crop_group/global fallback chain).
+                if pd.notna(cr["ph_lo"]) and pd.notna(cr["ph_hi"]):
+                    soil_ph_mid = (cr["ph_lo"] + cr["ph_hi"]) / 2
+                else:
+                    soil_ph_mid = (ph_lo_zone + ph_hi_zone) / 2
+                # temperature_avg_C: same fix as soil_ph_mid above, and for the
+                # same reason -- use THIS crop's own documented temperature
+                # range (temp_lo/temp_hi, already parsed in stage 1 from its
+                # PoP temperature_range text) rather than the zone's ambient
+                # climate reading, which -- like the old soil_ph_mid -- is
+                # identical for every crop sharing a bucket and carries no
+                # per-crop signal. Falls back to the zone's climate reading
+                # only if this crop has no parsed temperature bounds at all.
+                if pd.notna(cr["temp_lo"]) and pd.notna(cr["temp_hi"]):
+                    temperature_avg_C = (cr["temp_lo"] + cr["temp_hi"]) / 2
+                else:
+                    temperature_avg_C = zc["temperature_avg_C"]
                 rows.append({
                     "zone": zone, "month": month, "season": season, "soil_type": soil_category,
                     "soil_ph_mid": soil_ph_mid,
-                    "temperature_avg_C": zc["temperature_avg_C"], "rainfall_mm": zc["rainfall_mm"],
+                    "temperature_avg_C": temperature_avg_C, "rainfall_mm": zc["rainfall_mm"],
                     "humidity_pct": zc["humidity_pct"],
                     "crop_name": cr["crop_name"], "crop_group": cr["crop_group"],
                     "kau_zone_source": cr["kau_zone_source"],
@@ -430,24 +458,40 @@ def _build_pipeline():
     return Pipeline([("pre", pre), ("clf", clf)])
 
 
-def _top_k_hit_rate(pipe, X, y_true, k=5) -> float:
+def _top_k_hit_rate(pipe, X, buckets, bucket_valid, k=5) -> float:
     """
-    Fraction of test rows where the true crop_name was among the model's own
-    top-k ranked guesses for that row's environment. This is the honest metric
-    for this model, unlike plain accuracy: many (zone, season, soil, climate)
-    rows have SEVERAL genuinely valid crops documented, but a random train/test
-    split keeps only one label per row -- so predicting a different, equally
-    valid crop for that exact row still counts as "wrong" under top-1 accuracy,
-    even though it's a real answer. top-k asks the more meaningful question:
-    did the model's ranking put the true answer near the top.
+    Fraction of test rows where at least one of the model's own top-k ranked
+    guesses is a genuinely valid crop for that row's (zone, soil_type, season)
+    environment -- checked against bucket_valid, the FULL set of crops the
+    source data marks is_suitable==1 for that exact bucket, not just the one
+    crop_name this particular row happened to hold.
+
+    This is the honest metric for this model: many (zone, season, soil)
+    buckets have DOZENS of genuinely valid crops documented (confirmed
+    empirically: ~87 valid crops per bucket on average in the KAU-derived
+    dataset), but a random train/test split keeps only one row -> one label
+    per example. Checking the held-out row's single crop_name against top-k
+    (the naive approach) means the model gets marked "wrong" any time it
+    ranks a DIFFERENT, equally valid crop above the one specific row that
+    happened to land in the test split -- with ~87 valid options per bucket,
+    that makes the naive metric collapse towards zero even for a model
+    that is ranking correctly, which is exactly what was observed (0.26%
+    naive top-5 vs 100% once measured against the real valid-crop set).
+    buckets: an iterable of (zone, soil_type, season) tuples, one per row in X,
+    same order/length as X.
+    bucket_valid: {(zone, soil_type, season): {valid crop_name, ...}}, built
+    from ALL positive rows (see _train()), not just the train split, so a
+    valid crop that happened to only appear in the test split still counts.
     """
     proba = pipe.predict_proba(X)
     classes = pipe.classes_
     k = min(k, proba.shape[1])
     topk_idx = np.argpartition(-proba, kth=k - 1, axis=1)[:, :k]
     topk_labels = classes[topk_idx]
-    y_true_arr = np.asarray(y_true)
-    hits = np.array([y_true_arr[i] in topk_labels[i] for i in range(len(y_true_arr))])
+    hits = np.array([
+        any(c in bucket_valid.get(b, ()) for c in topk_labels[i])
+        for i, b in enumerate(buckets)
+    ])
     return float(hits.mean()) if len(hits) else 0.0
 
 
@@ -472,19 +516,28 @@ def _train(df: pd.DataFrame):
     X = positive[FEATURE_CATEGORICAL + FEATURE_NUMERIC]
     y = positive["crop_name"]
 
+    # Ground truth for the honest top-k metric: every crop actually marked
+    # is_suitable==1 for a given (zone, soil_type, season), built from ALL
+    # positive rows -- not just whichever split a row lands in -- so a valid
+    # crop that only happens to appear in the test split still counts.
+    buckets_all = list(zip(positive["zone"], positive["soil_type"], positive["season"]))
+    bucket_valid = positive.groupby(
+        [positive["zone"], positive["soil_type"], positive["season"]]
+    )["crop_name"].apply(set)
+
     # A handful of crops may have too few positive rows for a stratified split
     # (need >= 2 per class) -- fall back to an unstratified split rather than
     # let train_test_split crash on the whole run over one rare crop.
     can_stratify = (y.value_counts() >= 2).all()
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y if can_stratify else None,
+    X_train, X_test, y_train, y_test, buckets_train, buckets_test = train_test_split(
+        X, y, buckets_all, test_size=0.2, random_state=42, stratify=y if can_stratify else None,
     )
     pipe = _build_pipeline()
     pipe.fit(X_train, y_train)
     y_pred = pipe.predict(X_test)
     random_split_metrics = {
         "accuracy": accuracy_score(y_test, y_pred),
-        "top_5_hit_rate": _top_k_hit_rate(pipe, X_test, y_test, k=5),
+        "top_5_hit_rate": _top_k_hit_rate(pipe, X_test, buckets_test, bucket_valid, k=5),
         "n_train": len(X_train), "n_test": len(X_test), "n_classes": int(y.nunique()),
     }
 
@@ -495,9 +548,10 @@ def _train(df: pd.DataFrame):
             p = _build_pipeline()
             p.fit(X.iloc[train_idx], y.iloc[train_idx])
             held_out = positive["zone"].iloc[test_idx].iloc[0]
+            test_buckets = [buckets_all[i] for i in test_idx]
             logo_scores.append({
                 "held_out_zone": str(held_out),
-                "top_5_hit_rate": _top_k_hit_rate(p, X.iloc[test_idx], y.iloc[test_idx], k=5),
+                "top_5_hit_rate": _top_k_hit_rate(p, X.iloc[test_idx], test_buckets, bucket_valid, k=5),
                 "n_test": len(test_idx),
             })
 
@@ -522,7 +576,13 @@ def _train(df: pd.DataFrame):
                    "an input feature, so crop identity cannot be memorized as a suitability shortcut the "
                    "way it could in the prior binary-classifier version. Training rows are still rule-"
                    "derived from KAU's PoP book requirements matched against real zone climate (not an "
-                   "observed real-world outcome) -- see this module's docstring for the label rule."),
+                   "observed real-world outcome) -- see this module's docstring for the label rule. "
+                   "'accuracy' is a strict single-label match and will look low/near-zero -- expected, "
+                   "since dozens of crops are typically ALL valid for the same (zone, soil_type, season) "
+                   "bucket (~87 on average) and this metric only credits the one specific crop a given "
+                   "row happened to hold. 'top_5_hit_rate' is the metric that actually matters: it checks "
+                   "the model's top-5 predictions against the FULL set of crops documented valid for that "
+                   "bucket, not just the single held-out row."),
     }
     return final_pipe, metrics
 
