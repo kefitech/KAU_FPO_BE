@@ -11,6 +11,10 @@ Query params:
     commodity   — MasterLookup commodity code, exact match
     price_min   — minimum price_per_unit
     price_max   — maximum price_per_unit
+    date_from   — availability window start (requires date_until to also be
+                  present; overlap filter — see below)
+    date_until  — availability window end (requires date_from to also be
+                  present)
     page        — page number (StandardPagination)
     page_size   — items per page (StandardPagination)
 """
@@ -32,7 +36,7 @@ class BuyerProductListView(APIView):
 
     Returns 403 if the requesting user isn't a verified buyer.
     Otherwise returns paginated, active + public products from all FPOs,
-    filterable by search/commodity/price range.
+    filterable by search/commodity/price range/date range.
     """
     permission_classes = [IsAuthenticated]
     pagination_class = StandardPagination
@@ -73,6 +77,23 @@ class BuyerProductListView(APIView):
         price_max = request.query_params.get('price_max')
         if price_max:
             queryset = queryset.filter(price_per_unit__lte=price_max)
+
+        # Date range filter — overlap logic. A product's availability window
+        # (available_from -> available_until) overlaps the requested range if:
+        #   product.available_from <= requested_until
+        #   AND (product.available_until IS NULL OR product.available_until >= requested_from)
+        # Both date_from and date_until must be present together — if only
+        # one is sent, the filter is skipped entirely (matches the frontend's
+        # "pick both dates before applying" rule).
+        date_from = request.query_params.get('date_from', '').strip()
+        date_until = request.query_params.get('date_until', '').strip()
+        if date_from and date_until:
+            from django.db.models import Q as DateQ
+            queryset = queryset.filter(
+                available_from__lte=date_until,
+            ).filter(
+                DateQ(available_until__isnull=True) | DateQ(available_until__gte=date_from)
+            )
 
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)

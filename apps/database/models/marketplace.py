@@ -6,9 +6,20 @@ BuyerDirectory  : verified buyers (admin-managed)
 BuyerSellerMatch: AI-matched buyer-product pairs
 MarketPrice     : daily prices from AGMARKNET
 """
+
+#arunima 15 sep
+import os
+import uuid
+#------------------
+
 from django.db import models
 from apps.core.models.base import BaseModel
 
+#arunima 15 sep
+def _product_image_path(instance, filename):
+    ext = os.path.splitext(filename)[1]
+    return f'marketplace/products/{uuid.uuid4()}{ext}'
+#====================
 
 class Product(BaseModel):
 
@@ -51,6 +62,14 @@ class Product(BaseModel):
         default=False,
         help_text='Visible on public Market Hub (P2-12)'
     )
+
+    #arunima 15 th sep
+    image = models.ImageField(
+        upload_to=_product_image_path, null=True, blank=True,
+        help_text='Product photo shown on FPO products page and public Market Hub'
+    )
+    #-----------------------------------
+
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
  
     class Meta:
@@ -153,6 +172,60 @@ class BuyerSellerMatch(BaseModel):
     def __str__(self):
         return f"{self.product} → {self.buyer} ({self.match_score})"
 
+#arunima 16 th sep 2026
+class Inquiry(BaseModel):
+    """
+    A verified buyer's structured purchase inquiry on a specific product.
+
+    Distinct from BuyerSellerMatch, which represents algorithmic/system-
+    suggested matches (has match_score, status=suggested, etc.) — this
+    model represents an explicit, buyer-initiated request.
+
+    Works for both buyer types (FPO-as-buyer and external buyer) via the
+    `buyer` FK to BuyerDirectory, which already distinguishes the two
+    (fpo set = FPO-as-buyer, user set = external buyer).
+
+    contact_user is NOT a snapshot — it's a live link to whichever account
+    submitted the inquiry (buyer.fpo.primary_user for FPO-as-buyer, or
+    buyer.user for external buyer), so the seller always sees this
+    contact's CURRENT phone/email. If that account is later deleted,
+    contact_user becomes null and the seller UI shows "Contact no longer
+    available" (SET_NULL, not CASCADE — deleting a user must not delete
+    the inquiry record itself).
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        CONTACTED = 'contacted', 'Contacted'
+        RESOLVED = 'resolved', 'Resolved'
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='inquiries'
+    )
+    buyer = models.ForeignKey(
+        BuyerDirectory, on_delete=models.CASCADE, related_name='inquiries'
+    )
+    contact_user = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='product_inquiries',
+        help_text='The buyer account that submitted this inquiry, at time of '
+                   'submission. Resolved from buyer.fpo.primary_user (FPO-as-buyer) '
+                   'or buyer.user (external buyer). NOT a snapshot — contact info is '
+                   'always read live from this account. Null if that account was '
+                   'later deleted.'
+    )
+    quantity_requested = models.DecimalField(max_digits=12, decimal_places=2)
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+
+    class Meta:
+        verbose_name = 'Inquiry'
+        verbose_name_plural = 'Inquiries'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.buyer} → {self.product} ({self.status})"
+#---------------------
 
 class MarketPrice(BaseModel):
     commodity = models.ForeignKey(
