@@ -132,7 +132,7 @@ def seed_gis_translations():
             'ph_placeholder':            ('Soil pH', 'മണ്ണിന്റെ pH'),
             'ph_validation':             ('Enter a pH value between 3 and 10, or leave blank.', '3 നും 10 നും ഇടയിലുള്ള pH മൂല്യം നൽകുക, അല്ലെങ്കിൽ ശൂന്യമായി വിടുക.'),
             'btn_get':                   ('Get recommendations', 'ശുപാർശകൾ നേടുക'),
-            'btn_refresh':               ('Refresh recommendations', 'ശുപാർശകൾ പുതുക്കുക'),
+            'btn_refresh':               ('Generate recommendations', 'ശുപാർശകൾ സൃഷ്ടിക്കുക'),
             'error_load':                ('Could not load your recommendation.', 'നിങ്ങളുടെ ശുപാർശ ലോഡ് ചെയ്യാനായില്ല.'),
             'error_generic':             ('Could not get a recommendation right now. Please try again.', 'ഇപ്പോൾ ശുപാർശ ലഭിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.'),
             'error_outside_kerala':      ('Crop recommendations are only available for locations within Kerala. Check your cultivation area boundary above.', 'വിള ശുപാർശകൾ കേരളത്തിനുള്ളിലെ സ്ഥലങ്ങൾക്ക് മാത്രമേ ലഭ്യമാകൂ. മുകളിലുള്ള നിങ്ങളുടെ കൃഷിസ്ഥല അതിര് പരിശോധിക്കുക.'),

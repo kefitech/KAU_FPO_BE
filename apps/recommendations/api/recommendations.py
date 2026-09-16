@@ -245,7 +245,17 @@ class RequestRecommendationView(APIView):
         if existing:
             existing.model_version = active_model
             existing.status = CropRecommendation.Status.PENDING
-            existing.save(update_fields=['model_version', 'status'])
+            # This is a NEW generation request -- any feedback the FPO gave
+            # on the PREVIOUS recommendation no longer applies to whatever
+            # comes back this time, so it must not carry over. Without this,
+            # the frontend (which shows "Thanks for your feedback" purely
+            # from feedback_rating being set, see crop-recommendation-
+            # display.tsx) kept showing that state for a recommendation the
+            # FPO hadn't actually rated yet, since this row is reused
+            # (unique_together fpo+financial_year) rather than replaced.
+            existing.feedback_rating = None
+            existing.feedback_comment = ''
+            existing.save(update_fields=['model_version', 'status', 'feedback_rating', 'feedback_comment'])
             rec, _created = existing, False
         else:
             rec = CropRecommendation.objects.create(

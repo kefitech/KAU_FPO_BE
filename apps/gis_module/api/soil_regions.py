@@ -110,6 +110,15 @@ def _validate_soil_geojson(data: dict) -> list[str]:
         props = feature.get('properties') or {}
         code = props.get('code')
         soil_type = props.get('soil_type')
+        # Leaflet's GeoJSON parser is spec-strict: a feature missing (or
+        # with an empty) "type": "Feature" makes it throw "Invalid GeoJSON
+        # object." at render time on the frontend, well after this upload
+        # was accepted -- catch it here instead, at the only point where
+        # there's a clear error to show whoever's uploading the file.
+        if feature.get('type') != 'Feature':
+            label = code or '(unknown code)'
+            errors.append(f"Feature {label!r} has type {feature.get('type')!r}, expected 'Feature'.")
+            continue
         if not code:
             errors.append("Feature is missing a 'code' property.")
             continue

@@ -252,6 +252,14 @@ def _validate_zone_geojson(data: dict) -> list[str]:
     errors = []
     for feature in data['features']:
         code = (feature.get('properties') or {}).get('code')
+        # Leaflet's GeoJSON parser is spec-strict: a feature missing (or
+        # with an empty) "type": "Feature" makes it throw "Invalid GeoJSON
+        # object." at render time on the frontend, well after this upload
+        # was accepted -- catch it here instead, at the only point where
+        # there's a clear error to show whoever's uploading the file.
+        if feature.get('type') != 'Feature':
+            errors.append(f"Feature {code or '(unknown code)'!r} has type {feature.get('type')!r}, expected 'Feature'.")
+            continue
         if code not in valid_codes:
             errors.append(f"Unknown or missing zone code: {code!r}")
             continue
