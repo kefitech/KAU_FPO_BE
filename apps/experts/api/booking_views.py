@@ -20,20 +20,43 @@ from rest_framework.views import APIView
 from apps.core.utils.constants import UserRole, FPOStatus
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.schemes import Expert
-from apps.database.models.expert_booking import ExpertAvailability, ExpertBooking
+from apps.database.models.expert_booking import ExpertAvailability, ExpertTimeSlot, ExpertBooking, ExpertWeeklyDefault
 from apps.database.models.fpo import FPO, FPOUserMembership
 from apps.notifications.services import send_notification
 
 
+class ExpertTimeSlotSerializer(serializers.ModelSerializer):
+    start = serializers.TimeField(source='start_time', format='%H:%M')
+    end = serializers.TimeField(source='end_time', format='%H:%M')
+    confirmed_count = serializers.ReadOnlyField()
+    is_booked = serializers.BooleanField(source='is_full', read_only=True)
+
+    class Meta:
+        model = ExpertTimeSlot
+        fields = ['id', 'start', 'end', 'max_bookings', 'confirmed_count', 'is_booked']
+
+
 class ExpertAvailabilitySerializer(serializers.ModelSerializer):
+    time_slots = serializers.SerializerMethodField()
+
     class Meta:
         model = ExpertAvailability
         fields = ['id', 'date', 'time_slots']
 
+    def get_time_slots(self, obj):
+        qs = obj.time_slots.filter(is_deleted=False).order_by('start_time')
+        return ExpertTimeSlotSerializer(qs, many=True).data
+
+
+class TimeSlotInputSerializer(serializers.Serializer):
+    start = serializers.CharField(max_length=10)
+    end = serializers.CharField(max_length=10)
+    max_bookings = serializers.IntegerField(min_value=1, default=1)
+
 
 class SetAvailabilitySerializer(serializers.Serializer):
     date = serializers.DateField()
-    time_slots = serializers.ListField(child=serializers.DictField())
+    time_slots = TimeSlotInputSerializer(many=True)
 
 
 class BulkAvailabilitySerializer(serializers.Serializer):
@@ -94,6 +117,7 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
 class CreateBookingSerializer(serializers.Serializer):
     requested_date = serializers.DateField()
     requested_time = serializers.CharField(max_length=10)
+    time_slot_id = serializers.IntegerField(required=False, allow_null=True, default=None)
     topic = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
     notes = serializers.CharField(required=False, allow_blank=True, default='')
 def _get_fpo(user):
@@ -167,14 +191,21 @@ class CreateBookingView(APIView):
         if not avail:
             return StandardResponse.error('No availability found for that date.', status_code=status.HTTP_400_BAD_REQUEST)
 
-        slot = next((s for s in avail.time_slots if s.get('start') == data['requested_time']), None)
+        if data.get('time_slot_id'):
+            slot = ExpertTimeSlot.objects.filter(
+                id=data['time_slot_id'], availability=avail, is_deleted=False
+            ).first()
+        else:
+            slot = ExpertTimeSlot.objects.filter(
+                availability=avail, start_time=data['requested_time'], is_deleted=False
+            ).first()
         if not slot:
             return StandardResponse.error('That time slot does not exist.', status_code=status.HTTP_400_BAD_REQUEST)
-        if slot.get('is_booked'):
-            return StandardResponse.error('That slot is already booked.', status_code=status.HTTP_400_BAD_REQUEST)
+        if slot.is_full:
+            return StandardResponse.error('That slot is already fully booked.', status_code=status.HTTP_400_BAD_REQUEST)
 
         booking = ExpertBooking.objects.create(
-            expert=expert, fpo=fpo,
+            expert=expert, fpo=fpo, time_slot=slot,
             requested_date=data['requested_date'], requested_time=data['requested_time'],
             topic=data.get('topic', ''), notes=data.get('notes', ''),
         )
@@ -243,16 +274,100 @@ class AdminSetAvailabilityView(APIView):
 
         results = []
         for slot_group in serializer.validated_data['slots']:
-            obj, _ = ExpertAvailability.objects.update_or_create(
+            avail, _ = ExpertAvailability.objects.get_or_create(
                 expert=expert, date=slot_group['date'],
-                defaults={'time_slots': slot_group['time_slots']},
             )
-            results.append(obj)
+            submitted = {(s['start'], s['end']) for s in slot_group['time_slots']}
+
+            # Remove slots the expert has un-chosen, as long as they have no confirmed bookings
+            candidates = avail.time_slots.filter(is_deleted=False).exclude(
+                start_time__in=[s[0] for s in submitted]
+            )
+            for old_slot in candidates:
+                if old_slot.confirmed_count == 0:
+                    old_slot.soft_delete(user=request.user)
+
+            for s in slot_group['time_slots']:
+                ExpertTimeSlot.objects.update_or_create(
+                    availability=avail, start_time=s['start'], end_time=s['end'],
+                    defaults={'max_bookings': s.get('max_bookings', 1)},
+                )
+            results.append(avail)
 
         return StandardResponse.success(
             data=ExpertAvailabilitySerializer(results, many=True).data,
             message='Availability updated.',
         )
+
+
+class WeeklyDefaultSlotSerializer(serializers.Serializer):
+    weekday = serializers.IntegerField(min_value=0, max_value=6)
+    start = serializers.CharField(max_length=10)
+    end = serializers.CharField(max_length=10)
+    max_bookings = serializers.IntegerField(min_value=1, default=1)
+
+
+class BulkWeeklyDefaultsSerializer(serializers.Serializer):
+    slots = WeeklyDefaultSlotSerializer(many=True)
+
+
+class ExpertWeeklyDefaultsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Expert Booking - Admin'], summary="Get an expert's weekly default schedule")
+    def get(self, request, pk):
+        try:
+            expert = Expert.objects.get(pk=pk, is_deleted=False)
+        except Expert.DoesNotExist:
+            return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_expert(request.user, expert):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        defaults = ExpertWeeklyDefault.objects.filter(expert=expert, is_deleted=False)
+        data = [
+            {
+                'weekday': d.weekday,
+                'start': d.start_time.strftime('%H:%M'),
+                'end': d.end_time.strftime('%H:%M'),
+                'max_bookings': d.max_bookings,
+            }
+            for d in defaults
+        ]
+        return StandardResponse.success(data=data)
+
+    @extend_schema(tags=['Expert Booking - Admin'], summary="Set an expert's weekly default schedule (bulk)", request=BulkWeeklyDefaultsSerializer)
+    def post(self, request, pk):
+        try:
+            expert = Expert.objects.get(pk=pk, is_deleted=False)
+        except Expert.DoesNotExist:
+            return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_expert(request.user, expert):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        serializer = BulkWeeklyDefaultsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        submitted = serializer.validated_data['slots']
+        submitted_keys = {
+            (s['weekday'], s['start'].strftime('%H:%M') if hasattr(s['start'], 'strftime') else s['start'], s['end'].strftime('%H:%M') if hasattr(s['end'], 'strftime') else s['end'])
+            for s in submitted
+        }
+
+        existing = ExpertWeeklyDefault.objects.filter(expert=expert, is_deleted=False)
+        for d in existing:
+            key = (d.weekday, d.start_time.strftime('%H:%M'), d.end_time.strftime('%H:%M'))
+            if key not in submitted_keys:
+                d.soft_delete(user=request.user)
+
+        for s in submitted:
+            ExpertWeeklyDefault.objects.update_or_create(
+                expert=expert, weekday=s['weekday'], start_time=s['start'], end_time=s['end'],
+                defaults={'max_bookings': s.get('max_bookings', 1)},
+            )
+
+        return StandardResponse.success(message='Weekly schedule updated.')
+
 
 
 
@@ -296,13 +411,8 @@ class AdminConfirmBookingView(APIView):
         if booking.status != ExpertBooking.Status.PENDING:
             return StandardResponse.error('Only pending bookings can be confirmed.', status_code=status.HTTP_400_BAD_REQUEST)
 
-        avail = ExpertAvailability.objects.filter(expert=booking.expert, date=booking.requested_date, is_deleted=False).first()
-        if avail:
-            for slot in avail.time_slots:
-                if slot.get('start') == booking.requested_time:
-                    slot['is_booked'] = True
-            avail.save(update_fields=['time_slots'])
-
+        # No manual slot update needed — is_full is computed from confirmed bookings,
+        # and this booking's time_slot was already set when the FPO requested it.
         booking.status = ExpertBooking.Status.CONFIRMED
         booking.save(update_fields=['status'])
         notify_context = {'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time}
