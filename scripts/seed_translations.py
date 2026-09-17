@@ -3991,7 +3991,7 @@ def seed_nav_translations(languages):
         ('nav.faqs',              'FAQs',                     'പതിവ് ചോദ്യങ്ങൾ'),
         ('nav.contact_us',        'Contact Us',               'ഞങ്ങളെ ബന്ധപ്പെടുക'),
         ('nav.events_updates',    'Events & Updates',         'ഇവന്റുകളും അദ്ധ്യതനങ്ങളും'),
-        ('nav.more_info',         'More Info',                'കൂടുതൽ വിവരങ്ങൾ'),
+        ('nav.more_info',         'AITS',                     'AITS'),
         ('nav.tagline',           'Smart & Empowered Farmers','സ്മാർട്ടും ശക്തരുമായ കർഷകർ'),
         ('nav.explore',           'Explore',                  'പര്യവേക്ഷണം'),
         ('nav.meet_our_team',     'Meet Our Team',            'ഞങ്ങളുടെ ടീമിനെ കാണുക'),
@@ -4409,6 +4409,33 @@ def seed_gis_translations(languages):
         ('weather_retrieved',          'Weather data retrieved successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ ലഭ്യമാക്കി'),
         ('weather_refreshed',          'Weather data refreshed successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ പുതുക്കി'),
         ('weather_not_found',          'No weather data found. Please refresh to fetch it.', 'കാലാവസ്ഥാ വിവരങ്ങൾ കണ്ടെത്തിയില്ല. ദയവായി പുതുക്കുക.'),
+
+        # Zone boundary upload/versioning (added with the admin GIS zones
+        # upload feature; were never seeded here, so t() fell back to
+        # returning the raw key itself — e.g. a toast literally reading
+        # "gis.zone_file_too_large" instead of a real message).
+        ('zone_file_required',                   'Please choose a GeoJSON file to upload.',                          'അപ്‌ലോഡ് ചെയ്യാൻ ഒരു GeoJSON ഫയൽ തിരഞ്ഞെടുക്കുക.'),
+        ('zone_file_too_large',                  'File is too large. Maximum allowed size is 5MB.',                  'ഫയൽ വളരെ വലുതാണ്. പരമാവധി അനുവദനീയമായ വലിപ്പം 5MB ആണ്.'),
+        ('zone_file_invalid_json',               'File is not valid JSON.',                                          'ഫയൽ സാധുവായ JSON അല്ല.'),
+        ('zone_upload_failed',                   'Zone boundary validation failed. See details below.',             'സോൺ അതിർത്തി പരിശോധന പരാജയപ്പെട്ടു. താഴെയുള്ള വിശദാംശങ്ങൾ കാണുക.'),
+        ('zone_version_uploaded',                'Zone boundary version uploaded — not yet live.',                   'സോൺ അതിർത്തി പതിപ്പ് അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
+        ('zone_version_retrieved',               'Zone boundary version retrieved successfully',                    'സോൺ അതിർത്തി പതിപ്പ് ലഭ്യമാക്കി'),
+        ('zone_version_deleted',                 'Zone boundary version deleted successfully',                       'സോൺ അതിർത്തി പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('zone_version_cannot_delete_active',    'Cannot delete the currently active zone boundary version.',       'നിലവിൽ സജീവമായ സോൺ അതിർത്തി പതിപ്പ് ഇല്ലാതാക്കാൻ കഴിയില്ല.'),
+        ('zone_version_activated',               'Zone boundary version activated — now live.',                     'സോൺ അതിർത്തി പതിപ്പ് സജീവമാക്കി — ഇപ്പോൾ ലൈവ് ആണ്.'),
+        ('zone_version_not_found',               'Zone boundary version not found',                                  'സോൺ അതിർത്തി പതിപ്പ് കണ്ടെത്തിയില്ല'),
+
+        # Soil region upload/versioning — same pattern as zones above.
+        ('soil_region_file_required',                'Please choose a GeoJSON file to upload.',                          'അപ്‌ലോഡ് ചെയ്യാൻ ഒരു GeoJSON ഫയൽ തിരഞ്ഞെടുക്കുക.'),
+        ('soil_region_file_too_large',               'File is too large. Maximum allowed size is 5MB.',                  'ഫയൽ വളരെ വലുതാണ്. പരമാവധി അനുവദനീയമായ വലിപ്പം 5MB ആണ്.'),
+        ('soil_region_file_invalid_json',            'File is not valid JSON.',                                          'ഫയൽ സാധുവായ JSON അല്ല.'),
+        ('soil_region_upload_failed',                'Soil region validation failed. See details below.',               'മണ്ണ് മേഖല പരിശോധന പരാജയപ്പെട്ടു. താഴെയുള്ള വിശദാംശങ്ങൾ കാണുക.'),
+        ('soil_region_version_uploaded',             'Soil region version uploaded — not yet live.',                     'മണ്ണ് മേഖല പതിപ്പ് അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
+        ('soil_region_version_retrieved',            'Soil region version retrieved successfully',                      'മണ്ണ് മേഖല പതിപ്പ് ലഭ്യമാക്കി'),
+        ('soil_region_version_deleted',              'Soil region version deleted successfully',                         'മണ്ണ് മേഖല പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('soil_region_version_cannot_delete_active', 'Cannot delete the currently active soil region version.',        'നിലവിൽ സജീവമായ മണ്ണ് മേഖല പതിപ്പ് ഇല്ലാതാക്കാൻ കഴിയില്ല.'),
+        ('soil_region_version_activated',            'Soil region version activated — now live.',                       'മണ്ണ് മേഖല പതിപ്പ് സജീവമാക്കി — ഇപ്പോൾ ലൈവ് ആണ്.'),
+        ('soil_region_version_not_found',            'Soil region version not found',                                    'മണ്ണ് മേഖല പതിപ്പ് കണ്ടെത്തിയില്ല'),
     ]
 
     count = 0
