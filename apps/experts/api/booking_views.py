@@ -71,6 +71,9 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
     fpo_contact_name = serializers.SerializerMethodField()
     fpo_application_id = serializers.SerializerMethodField()
     fpo_location = serializers.SerializerMethodField()
+    fpo_district = serializers.SerializerMethodField()
+    fpo_registration_number = serializers.SerializerMethodField()
+    fpo_total_members = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -78,6 +81,7 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'expert', 'expert_name', 'fpo', 'fpo_name', 'fpo_email', 'fpo_phone',
             'fpo_contact_name', 'fpo_application_id', 'fpo_location',
+            'fpo_district', 'fpo_registration_number', 'fpo_total_members',
             'requested_date', 'requested_time',
             'topic', 'notes', 'status', 'status_display', 'cancellation_reason',
             'created_at', 'updated_at',
@@ -109,6 +113,15 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
     def get_fpo_location(self, obj):
         parts = [p for p in [obj.fpo.block_taluk, obj.fpo.get_district_display() if obj.fpo.district else None] if p]
         return ', '.join(parts) if parts else None
+
+    def get_fpo_district(self, obj):
+        return obj.fpo.get_district_display() if obj.fpo.district else None
+
+    def get_fpo_registration_number(self, obj):
+        return obj.fpo.registration_number or None
+
+    def get_fpo_total_members(self, obj):
+        return obj.fpo.total_members
 
     def get_status_display(self, obj):
         return obj.get_status_display()
@@ -273,30 +286,50 @@ class AdminSetAvailabilityView(APIView):
         serializer.is_valid(raise_exception=True)
 
         results = []
+        blocked_dates = []
         for slot_group in serializer.validated_data['slots']:
             avail, _ = ExpertAvailability.objects.get_or_create(
                 expert=expert, date=slot_group['date'],
             )
             submitted = {(s['start'], s['end']) for s in slot_group['time_slots']}
 
-            # Remove slots the expert has un-chosen, as long as they have no confirmed bookings
-            candidates = avail.time_slots.filter(is_deleted=False).exclude(
-                start_time__in=[s[0] for s in submitted]
-            )
+            # Remove slots the expert has un-chosen, as long as they have no confirmed
+            # bookings. Slots with confirmed bookings are intentionally kept so we never
+            # silently cancel a live booking -- we report those dates back instead.
+            candidates = avail.time_slots.filter(is_deleted=False)
+            date_has_blocked_slot = False
             for old_slot in candidates:
-                if old_slot.confirmed_count == 0:
-                    old_slot.soft_delete(user=request.user)
+                key = (old_slot.start_time.strftime('%H:%M'), old_slot.end_time.strftime('%H:%M'))
+                if key not in submitted:
+                    if old_slot.confirmed_count == 0:
+                        old_slot.soft_delete(user=request.user)
+                    else:
+                        date_has_blocked_slot = True
+            if date_has_blocked_slot:
+                blocked_dates.append(str(slot_group['date']))
 
             for s in slot_group['time_slots']:
                 ExpertTimeSlot.objects.update_or_create(
                     availability=avail, start_time=s['start'], end_time=s['end'],
-                    defaults={'max_bookings': s.get('max_bookings', 1)},
+                    defaults={
+                        'max_bookings': s.get('max_bookings', 1),
+                        'is_deleted': False,
+                        'deleted_at': None,
+                    },
                 )
             results.append(avail)
 
+        message = 'Availability updated.'
+        if blocked_dates:
+            message = (
+                'Availability updated. Some slots on '
+                f"{', '.join(blocked_dates)} could not be removed because they already "
+                'have confirmed bookings.'
+            )
+
         return StandardResponse.success(
             data=ExpertAvailabilitySerializer(results, many=True).data,
-            message='Availability updated.',
+            message=message,
         )
 
 
@@ -366,7 +399,60 @@ class ExpertWeeklyDefaultsView(APIView):
                 defaults={'max_bookings': s.get('max_bookings', 1)},
             )
 
-        return StandardResponse.success(message='Weekly schedule updated.')
+        # Cascade the updated weekly template onto every already-saved (today or
+        # future) date that falls on one of the edited weekdays, so existing
+        # calendar entries actually reflect the new schedule instead of only
+        # affecting brand-new dates picked after this save.
+        from datetime import date as date_cls
+        affected_weekdays = {s['weekday'] for s in submitted}
+        blocked_dates = []
+        for weekday in affected_weekdays:
+            weekday_slot_specs = [s for s in submitted if s['weekday'] == weekday]
+            weekday_submitted_keys = {
+                (
+                    s['start'].strftime('%H:%M') if hasattr(s['start'], 'strftime') else s['start'],
+                    s['end'].strftime('%H:%M') if hasattr(s['end'], 'strftime') else s['end'],
+                )
+                for s in weekday_slot_specs
+            }
+            future_avails = ExpertAvailability.objects.filter(
+                expert=expert, is_deleted=False, date__gte=date_cls.today()
+            )
+            for avail in future_avails:
+                # Python's date.weekday() is Monday=0..Sunday=6; convert to this
+                # project's 0=Sunday..6=Saturday convention.
+                if (avail.date.weekday() + 1) % 7 != weekday:
+                    continue
+                date_has_blocked_slot = False
+                for old_slot in avail.time_slots.filter(is_deleted=False):
+                    key = (old_slot.start_time.strftime('%H:%M'), old_slot.end_time.strftime('%H:%M'))
+                    if key not in weekday_submitted_keys:
+                        if old_slot.confirmed_count == 0:
+                            old_slot.soft_delete(user=request.user)
+                        else:
+                            date_has_blocked_slot = True
+                for s in weekday_slot_specs:
+                    ExpertTimeSlot.objects.update_or_create(
+                        availability=avail,
+                        start_time=s['start'], end_time=s['end'],
+                        defaults={
+                            'max_bookings': s.get('max_bookings', 1),
+                            'is_deleted': False,
+                            'deleted_at': None,
+                        },
+                    )
+                if date_has_blocked_slot:
+                    blocked_dates.append(str(avail.date))
+
+        message = 'Weekly schedule updated.'
+        if blocked_dates:
+            message = (
+                'Weekly schedule updated, and applied to matching upcoming dates. '
+                f"Some slots on {', '.join(sorted(set(blocked_dates)))} could not be "
+                'removed because they already have confirmed bookings.'
+            )
+
+        return StandardResponse.success(message=message)
 
 
 
