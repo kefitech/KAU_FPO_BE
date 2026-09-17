@@ -7,17 +7,23 @@ Routes:
     GET   /projects/<uuid>/sections/products/readiness/
 """
 
+from django.core.files.base import ContentFile
 from drf_spectacular.utils import extend_schema, OpenApiTypes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
-from apps.database.models import DPRSectionProducts, DPRProductItem
+from apps.database.models import (
+    DPRCapacityUnit,
+    DPRProductItem,
+    DPRSectionProducts,
+    Product,
+)
 from apps.fpo.services.dpr.products_validators import validate_section
 
 from .projects import get_project_or_error
-from .serializers import DPRSectionProductsSerializer
+from .serializers import DPRProductItemSerializer, DPRSectionProductsSerializer
 
 # Guardrails for the product image upload — kept in sync with the FE
 # `<input type="file" accept="…">`. Server-side check is authoritative.
@@ -77,6 +83,99 @@ class DPRProductsSectionReadinessView(APIView):
         section = _get_or_create_section(project, request.user)
         result = validate_section(section)
         return StandardResponse.success(result, 'Readiness computed')
+
+
+@extend_schema(
+    tags=['FPO - DPR §2.3.5 Products & Services'],
+    summary='Import a product row from the FPO marketplace',
+    description=(
+        'Creates a new DPRProductItem on the section, pre-filled with the '
+        'name, unit, description, and selling price from the picked '
+        'marketplace product. If the marketplace product has an image, its '
+        'file is COPIED to the DPR item so subsequent changes on the '
+        'marketplace listing do not affect the DPR PDF. Returns the newly '
+        'created row so the FE can open its edit modal for the DPR-specific '
+        'fields (Primary/Secondary, Product Type, etc.).'
+    ),
+    request={'application/json': {
+        'type': 'object',
+        'properties': {'marketplace_product_id': {'type': 'integer'}},
+        'required': ['marketplace_product_id'],
+    }},
+)
+class DPRProductsImportFromMarketplaceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, project_uuid):
+        project, err = get_project_or_error(request.user, project_uuid)
+        if err:
+            return err
+        section = _get_or_create_section(project, request.user)
+
+        mp_id = request.data.get('marketplace_product_id')
+        if not mp_id:
+            return StandardResponse.error(
+                'marketplace_product_id is required.', status_code=400,
+            )
+
+        # Scoped to the same FPO — never let an FPO import someone else's product.
+        marketplace = (
+            Product.objects
+            .filter(pk=mp_id, fpo=project.fpo, is_deleted=False)
+            .first()
+        )
+        if not marketplace:
+            return StandardResponse.error(
+                'Marketplace product not found for this FPO.', status_code=404,
+            )
+
+        # Best-effort unit mapping — marketplace uses the same codes as
+        # DPRCapacityUnit master (kg / quintal / mt / litre / piece).
+        unit = DPRCapacityUnit.objects.filter(code=marketplace.unit).first()
+
+        # Name / description are multilang JSON on the marketplace side.
+        # DPR uses plain text — take EN and fall back to ML.
+        def _pick_lang(field):
+            v = field or {}
+            if isinstance(v, dict):
+                return (v.get('en') or v.get('ml') or '').strip()
+            return str(v).strip()
+
+        # Assign a stable order — after any existing rows.
+        next_order = (
+            (section.items.order_by('-order').values_list('order', flat=True).first() or 0)
+            + 1
+        )
+
+        item = DPRProductItem.objects.create(
+            section=section,
+            order=next_order,
+            name=_pick_lang(marketplace.name)[:200],
+            description=_pick_lang(marketplace.description),
+            selling_price_per_unit=marketplace.price_per_unit,
+            unit_of_measurement=unit,
+            selling_unit=unit,
+            created_by=request.user if request.user.is_authenticated else None,
+            updated_by=request.user if request.user.is_authenticated else None,
+        )
+
+        # Copy the marketplace image to the DPR item — decouples lifecycles.
+        # If the FPO later deletes the marketplace listing, the DPR PDF still
+        # renders the photo.
+        if marketplace.image:
+            try:
+                marketplace.image.open('rb')
+                data = marketplace.image.read()
+                filename = marketplace.image.name.rsplit('/', 1)[-1]
+                item.image.save(filename, ContentFile(data), save=True)
+            finally:
+                try:
+                    marketplace.image.close()
+                except Exception:
+                    pass
+
+        data = DPRProductItemSerializer(item, context={'request': request}).data
+        return StandardResponse.success(data, 'Product imported from marketplace.')
 
 
 @extend_schema(tags=['FPO - DPR §2.3.5 Products & Services'])

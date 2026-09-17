@@ -29,10 +29,15 @@ def validate_section(section) -> dict[str, Any]:
         errors.append(_err('state_required', 'state', 'State is required.'))
     if not (section.district or '').strip():
         errors.append(_err('district_required', 'district', 'District is required.'))
-    if not (section.local_body_type or '').strip() or not (section.local_body_name or '').strip():
+    if not (section.local_body_type or '').strip():
         errors.append(_err(
-            'local_body_required', 'local_body_name',
-            'Local Body (Grama Panchayat / Municipality / Corporation) is required.',
+            'local_body_type_required', 'local_body_type',
+            'Local Body type (Grama Panchayat / Municipality / Corporation) is required.',
+        ))
+    if not (section.local_body_name or '').strip():
+        errors.append(_err(
+            'local_body_name_required', 'local_body_name',
+            'Local Body name is required.',
         ))
 
     # B. Location — address OR GPS coords

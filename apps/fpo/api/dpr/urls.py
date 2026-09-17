@@ -265,6 +265,11 @@ section_patterns = [
         pd.DPRProductItemImageView.as_view(),
         name='dpr-section-products-item-image',
     ),
+    path(
+        'projects/<uuid:project_uuid>/sections/products/import-from-marketplace/',
+        pd.DPRProductsImportFromMarketplaceView.as_view(),
+        name='dpr-section-products-import-from-marketplace',
+    ),
     # §2.3.6 Proposed Project Location
     path(
         'projects/<uuid:project_uuid>/sections/location/',

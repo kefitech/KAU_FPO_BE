@@ -228,6 +228,13 @@ class DPRRevenueAssumption(TimeStampedModel, AuditModel):
     order = models.IntegerField(default=0)
     product_name = models.CharField(max_length=200)
     year1_sales_quantity = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    year1_sales_unit = models.ForeignKey(
+        'database.DPRCapacityUnit',
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='+',
+        help_text='Unit of measurement for the sales quantity (kg / quintal / MT / etc.).',
+    )
     expected_selling_price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     annual_sales_revenue = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     expected_annual_growth_rate_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)

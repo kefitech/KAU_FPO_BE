@@ -40,6 +40,14 @@ def validate_section(section) -> dict[str, Any]:
     errors: list[dict] = []
     warnings: list[dict] = []
 
+    # Optional section — track whether the user has actually entered anything so
+    # the readiness panel can distinguish "complete" from "empty & untouched".
+    has_data = (
+        section.estimated_project_cost is not None
+        or bool((getattr(section, 'basis_of_estimate', '') or '').strip())
+        or bool((getattr(section, 'remarks', '') or '').strip())
+    )
+
     if section.estimated_project_cost is not None:
         if section.estimated_project_cost <= 0:
             errors.append(_err(
@@ -73,4 +81,5 @@ def validate_section(section) -> dict[str, Any]:
         'errors': errors,
         'warnings': warnings,
         'is_complete': len(errors) == 0,
+        'has_data': has_data,
     }

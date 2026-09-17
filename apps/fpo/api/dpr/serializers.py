@@ -9,8 +9,67 @@ pattern all future sections will follow.
 M2M (`quality_parameters`) is popped before the model create and set via `.set()`.
 """
 
+import re
+
 from django.db import transaction
 from rest_framework import serializers
+
+
+def _validate_project_title(value):
+    if value is None:
+        return value
+    stripped = value.strip()
+    if not stripped:
+        raise serializers.ValidationError('Please enter a valid project title.')
+    # Must contain at least 3 letters/digits — rejects titles made purely of
+    # special characters or too-short inputs like "!!" or "AB".
+    if len(re.findall(r'[\w]', stripped, flags=re.UNICODE)) < 3:
+        raise serializers.ValidationError(
+            'Please enter a valid project title (at least 3 letters or digits).'
+        )
+    return stripped
+
+
+# Letters (Latin + Malayalam block) + spaces + . ' ( ) - only.
+# Rejects digits and special characters like @#$%^&*.
+_NAME_ONLY_RE = re.compile(r"^[A-Za-zഀ-ൿ\s.'()\-]+$")
+
+
+def _validate_place_name(field_label):
+    """Return a DRF field validator for admin place names (district, taluk etc.)."""
+    def _validator(value):
+        if value in (None, ''):
+            return value
+        stripped = value.strip()
+        if not stripped:
+            return ''
+        if not _NAME_ONLY_RE.match(stripped):
+            raise serializers.ValidationError(
+                f'{field_label} may only contain letters, spaces, and . \' ( ) -'
+            )
+        return stripped
+    return _validator
+
+
+def _validate_specify_text(field_label):
+    """
+    Return a DRF field validator for free-text "Please specify (Others)" inputs
+    across DPR sections. Blank OK (saving partial data is allowed); if the user
+    types something, it must contain at least 3 letters/digits — rejects
+    strings made purely of special characters like "#$@%".
+    """
+    def _validator(value):
+        if value in (None, ''):
+            return value
+        stripped = value.strip()
+        if not stripped:
+            return ''
+        if len(re.findall(r'[\w]', stripped, flags=re.UNICODE)) < 3:
+            raise serializers.ValidationError(
+                f'Please enter a valid {field_label} (at least 3 letters or digits).'
+            )
+        return stripped
+    return _validator
 
 from apps.database.models import (
     DPRProject,
@@ -89,6 +148,9 @@ class DPRProjectSerializer(serializers.ModelSerializer):
         fields = ('uuid', 'title', 'status', 'created_at', 'updated_at')
         read_only_fields = ('uuid', 'status', 'created_at', 'updated_at')
 
+    def validate_title(self, value):
+        return _validate_project_title(value)
+
 
 class DPRProjectDetailSerializer(serializers.ModelSerializer):
     """
@@ -115,6 +177,9 @@ class DPRProjectDetailSerializer(serializers.ModelSerializer):
             'field_sources',
         )
         read_only_fields = ('uuid', 'status', 'created_at', 'updated_at', 'field_sources')
+
+    def validate_title(self, value):
+        return _validate_project_title(value)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -434,6 +499,8 @@ class DPRSectionNatureOfBusinessSerializer(serializers.ModelSerializer):
         model = DPRSectionNatureOfBusiness
         exclude = ('project', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
+    validate_nature_other = staticmethod(_validate_specify_text('business description'))
+
     @transaction.atomic
     def update(self, instance, validated_data):
         natures = validated_data.pop('natures', None)
@@ -568,6 +635,13 @@ class DPRSectionLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = DPRSectionLocation
         exclude = ('project', 'created_at', 'updated_at', 'created_by', 'updated_by')
+
+    validate_district        = staticmethod(_validate_place_name('District'))
+    validate_taluk           = staticmethod(_validate_place_name('Taluk'))
+    validate_block_panchayat = staticmethod(_validate_place_name('Block Panchayat'))
+    validate_local_body_name = staticmethod(_validate_place_name('Local Body Name'))
+    validate_village         = staticmethod(_validate_place_name('Village'))
+    validate_landmark        = staticmethod(_validate_place_name('Landmark'))
 
     @transaction.atomic
     def update(self, instance, validated_data):
@@ -802,6 +876,11 @@ class DPRSectionSiteSerializer(serializers.ModelSerializer):
         model = DPRSectionSite
         exclude = ('project', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
+    validate_additional_land_available    = staticmethod(_validate_specify_text('Additional land available'))
+    validate_area_reserved_for_expansion  = staticmethod(_validate_specify_text('Area reserved for expansion'))
+    validate_future_buildings_planned     = staticmethod(_validate_specify_text('Future buildings planned'))
+    validate_utility_expansion_feasibility = staticmethod(_validate_specify_text('Utility expansion feasibility'))
+
     @transaction.atomic
     def update(self, instance, validated_data):
         parcels_data = validated_data.pop('parcels', None)
@@ -934,11 +1013,20 @@ class DPRFuelUsageSerializer(serializers.ModelSerializer):
         model = DPRFuelUsage
         exclude = _CHILD_EXCLUDE
 
+    validate_fuel_other         = staticmethod(_validate_specify_text('fuel name'))
+    validate_purpose            = staticmethod(_validate_specify_text('purpose'))
+    validate_daily_consumption  = staticmethod(_validate_specify_text('daily consumption'))
+    validate_annual_consumption = staticmethod(_validate_specify_text('annual consumption'))
+
 
 class DPRProcessUtilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = DPRProcessUtility
         exclude = _CHILD_EXCLUDE
+
+    validate_purpose  = staticmethod(_validate_specify_text('purpose'))
+    validate_capacity = staticmethod(_validate_specify_text('capacity'))
+    validate_source   = staticmethod(_validate_specify_text('source'))
 
 
 class DPRWasteManagementSerializer(serializers.ModelSerializer):
@@ -951,6 +1039,9 @@ class DPRRenewableInitiativeSelectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = DPRRenewableInitiativeSelection
         exclude = _CHILD_EXCLUDE
+
+    validate_initiative_other = staticmethod(_validate_specify_text('description'))
+    validate_capacity         = staticmethod(_validate_specify_text('capacity'))
 
 
 class DPRSectionUtilitiesSerializer(serializers.ModelSerializer):

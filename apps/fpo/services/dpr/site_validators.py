@@ -66,6 +66,37 @@ def validate_section(section) -> dict[str, Any]:
             'Please specify — "Others" was selected for terrain.',
         ))
 
+    # Cat E — utilities: if "Others" is ticked under Water Sources, the
+    # companion specify text is required.
+    water_sources = list(section.water_sources or [])
+    if 'other' in water_sources and not (section.water_source_other or '').strip():
+        errors.append(_err(
+            'water_source_other_required', 'water_source_other',
+            'Please specify — "Others" was selected under water sources.',
+        ))
+
+    # Cat F — statutory approvals: same "Others → specify" rule.
+    approvals = list(section.approvals_available or [])
+    if 'other' in approvals and not (section.approvals_other or '').strip():
+        errors.append(_err(
+            'approvals_other_required', 'approvals_other',
+            'Please specify — "Others" was selected under statutory approvals.',
+        ))
+
+    # Cat C — existing infrastructure: type required per row, "Others" → specify.
+    for i, infra in enumerate(section.existing_infrastructure.all()):
+        prefix = f'existing_infrastructure[{i}]'
+        if not (infra.infrastructure_type or '').strip():
+            errors.append(_err(
+                'infra_type_required', f'{prefix}.infrastructure_type',
+                'Infrastructure type is required.',
+            ))
+        if infra.infrastructure_type == 'other' and not (infra.infrastructure_type_other or '').strip():
+            errors.append(_err(
+                'infra_type_other_required', f'{prefix}.infrastructure_type_other',
+                'Please specify — "Others" was selected in infrastructure type.',
+            ))
+
     # Cat H — constraints with mitigation
     for i, c in enumerate(constraints):
         prefix = f'constraints[{i}]'

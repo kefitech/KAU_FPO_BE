@@ -46,22 +46,37 @@ def validate_project(project) -> dict[str, Any]:
     if project.primary_commodity_id is None:
         errors.append(_err('primary_commodity_required', 'primary_commodity', 'Primary Commodity is required.'))
 
-    # 6. Project objectives — at least one M2M row OR non-blank "other"
+    # 6. Project objectives — at least one M2M row OR non-blank "other".
+    # If the "Other" master option is selected, the companion text is required.
     if project.pk:
-        has_obj = project.project_objectives.exists() or bool((project.project_objectives_other or '').strip())
+        objectives = list(project.project_objectives.all())
+        other_obj_text = (project.project_objectives_other or '').strip()
+        has_obj = bool(objectives) or bool(other_obj_text)
         if not has_obj:
             errors.append(_err(
                 'objective_required', 'project_objectives',
                 'At least one Project Objective shall be specified.',
             ))
+        if any(o.code == 'other' for o in objectives) and not other_obj_text:
+            errors.append(_err(
+                'objective_other_required', 'project_objectives_other',
+                '"Other" objective selected — please specify.',
+            ))
 
-    # 7. Expected outcomes — at least one M2M row OR non-blank "other"
+    # 7. Expected outcomes — same rules as objectives.
     if project.pk:
-        has_out = project.expected_outcomes.exists() or bool((project.expected_outcomes_other or '').strip())
+        outcomes = list(project.expected_outcomes.all())
+        other_out_text = (project.expected_outcomes_other or '').strip()
+        has_out = bool(outcomes) or bool(other_out_text)
         if not has_out:
             errors.append(_err(
                 'outcome_required', 'expected_outcomes',
                 'At least one Expected Outcome shall be specified.',
+            ))
+        if any(o.code == 'other' for o in outcomes) and not other_out_text:
+            errors.append(_err(
+                'outcome_other_required', 'expected_outcomes_other',
+                '"Other" outcome selected — please specify.',
             ))
 
     is_complete = len(errors) == 0

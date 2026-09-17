@@ -48,6 +48,35 @@ def validate_section(section) -> dict[str, Any]:
                 'Please specify — "Others" was selected for department.',
             ))
 
+    # Cat D — existing employees: each subgroup (technical / admin / marketing
+    # / skilled operators) must be ≤ the reported total, AND the SUM of all
+    # four subgroups must be ≤ the reported total.
+    if section.has_existing_employees:
+        total = section.existing_employees_total
+        if total is not None:
+            subs = (
+                ('existing_technical_staff', 'Technical Staff'),
+                ('existing_administrative_staff', 'Admin Staff'),
+                ('existing_marketing_staff', 'Marketing Staff'),
+                ('existing_skilled_operators', 'Skilled Operators'),
+            )
+            for key, label in subs:
+                val = getattr(section, key, None)
+                if val is not None and val > total:
+                    errors.append(_err(
+                        'subgroup_exceeds_total', key,
+                        f'{label} cannot be greater than Existing Employees ({total}).',
+                    ))
+            sub_sum = sum((getattr(section, k, None) or 0) for k, _ in subs)
+            if sub_sum > total:
+                errors.append(_err(
+                    'subgroup_sum_exceeds_total', 'existing_employees_total',
+                    (
+                        f'The total number of employees in all sub-categories '
+                        f'({sub_sum:,}) cannot exceed Existing Employees ({total:,}).'
+                    ),
+                ))
+
     # Cat G/H "Others" specify text
     if 'other' in (section.welfare_items or []) and not (section.welfare_other or '').strip():
         errors.append(_err('welfare_other_required', 'welfare_other', 'Please specify — "Others" in employee welfare.'))

@@ -3649,6 +3649,7 @@ def seed_menu_translations(languages):
         ('fpo_status',             'Application Status',       'അപേക്ഷ സ്ഥിതി'),
         ('fpo_profile',            'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
         ('fpo_applications',       'Applications',             'അപേക്ഷകൾ'),
+        ('fpo_dpr',                'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('fpo_recommendations',    'AI Recommendations',       'AI ശുപാർശകൾ'),
         ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
         ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),

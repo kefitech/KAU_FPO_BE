@@ -21,10 +21,8 @@ def seed_menu():
     print("=" * 60)
 
     # ── Retire stale FPO menu items ──────────────────────────────────────────
-    # These used to be seeded but aren't real portal sidebar routes (register/
-    # status are onboarding-wizard steps under (wizard)/, not portal nav; dpr
-    # doesn't exist as an FPO portal page).
-    stale_keys = ['menu.fpo_register', 'menu.fpo_status', 'menu.fpo_dpr']
+    # register/status are onboarding-wizard steps under (wizard)/, not portal nav.
+    stale_keys = ['menu.fpo_register', 'menu.fpo_status']
     deleted, _ = MenuItem.objects.filter(label_key__in=stale_keys).delete()
     if deleted:
         print(f"🗑️  Removed {deleted} stale menu item(s): {', '.join(stale_keys)}")
@@ -274,67 +272,74 @@ def seed_menu():
         order     = 3,
     )
     seed_item(
+        label_key = 'menu.fpo_dpr',
+        path      = '/fpo/dpr',
+        icon      = 'file-text',
+        roles     = fpo_roles,
+        order     = 4,
+    )
+    seed_item(
         label_key = 'menu.fpo_recommendations',
         path      = '/fpo/recommendations',
         icon      = 'sparkles',
         roles     = fpo_roles,
-        order     = 4,
+        order     = 5,
     )
     seed_item(
         label_key = 'menu.fpo_products',
         path      = '/fpo/products',
         icon      = 'package',
         roles     = fpo_roles,
-        order     = 5,
+        order     = 6,
     )
     seed_item(
         label_key = 'menu.fpo_market',
         path      = '/fpo/market',
         icon      = 'trending-up',
         roles     = fpo_roles,
-        order     = 6,
+        order     = 7,
     )
     seed_item(
         label_key = 'menu.fpo_schemes',
         path      = '/fpo/schemes',
         icon      = 'book-open',
         roles     = fpo_roles,
-        order     = 7,
+        order     = 8,
     )
     seed_item(
         label_key = 'menu.fpo_experts',
         path      = '/fpo/experts',
         icon      = 'user-check',
         roles     = fpo_roles,
-        order     = 8,
+        order     = 9,
     )
     seed_item(
         label_key = 'menu.fpo_tier_assessment',
         path      = '/fpo/tier-assessment',
         icon      = 'bar-chart-2',
         roles     = fpo_roles,
-        order     = 9,
+        order     = 10,
     )
     seed_item(
         label_key = 'menu.fpo_team',
         path      = '/fpo/team',
         icon      = 'users',
         roles     = fpo_roles,
-        order     = 10,
+        order     = 11,
     )
     seed_item(
         label_key = 'menu.fpo_inbox',
         path      = '/fpo/inbox',
         icon      = 'inbox',
         roles     = fpo_roles,
-        order     = 11,
+        order     = 12,
     )
     seed_item(
         label_key = 'menu.fpo_settings',
         path      = '/fpo/settings',
         icon      = 'settings',
         roles     = fpo_roles,
-        order     = 12,
+        order     = 13,
     )
     # FPO-as-buyer entry (Arunima — P2-11)
     seed_item(
