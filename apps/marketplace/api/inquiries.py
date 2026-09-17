@@ -60,7 +60,7 @@ class InquiryCreateView(APIView):
         except Product.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=http_status.HTTP_404_NOT_FOUND)
 
-        serializer = InquiryCreateSerializer(data=request.data)
+        serializer = InquiryCreateSerializer(data=request.data, context={'product': product})
         serializer.is_valid(raise_exception=True)
 
         contact_user = _resolve_buyer_user(buyer)
@@ -113,10 +113,27 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = InquirySerializer
 
     def get_queryset(self):
-        return Inquiry.objects.filter(
+        from django.db.models import Q
+
+        queryset = Inquiry.objects.filter(
             product__fpo=self.request.user.fpo,
             is_deleted=False,
         ).select_related('product', 'buyer', 'buyer__fpo', 'contact_user').order_by('-created_at')
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(product__name__en__icontains=search)
+                | Q(product__name__ml__icontains=search)
+                | Q(buyer__name__icontains=search)
+                | Q(buyer__fpo__name__icontains=search)
+            )
+
+        status = self.request.query_params.get('status')
+        if status in (Inquiry.Status.PENDING, Inquiry.Status.CONTACTED, Inquiry.Status.RESOLVED):
+            queryset = queryset.filter(status=status)
+
+        return queryset
 
     @extend_schema(tags=['Marketplace - Inquiries'])
     @action(detail=True, methods=['post'], url_path='mark-contacted')

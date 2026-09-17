@@ -152,7 +152,9 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
     Used when a verified buyer (FPO-as-buyer or external buyer) submits a
     purchase inquiry on a product. `product` comes from the URL, not the
     request body — same reasoning as `buyer`/`contact_user` being resolved
-    server-side rather than trusted from client input.
+    server-side rather than trusted from client input. The product itself
+    is passed via serializer context (not validated_data) so we can check
+    the requested quantity against its available stock.
     """
     class Meta:
         model = Inquiry
@@ -162,6 +164,11 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
     def validate_quantity_requested(self, value):
         if value <= 0:
             raise serializers.ValidationError('Quantity requested must be greater than 0.')
+        product = self.context.get('product')
+        if product is not None and value > product.quantity:
+            raise serializers.ValidationError(
+                f'Quantity requested cannot exceed available stock ({product.quantity} {product.unit}).'
+            )
         return value
 
 
