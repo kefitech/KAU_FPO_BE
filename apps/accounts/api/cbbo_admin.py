@@ -46,8 +46,8 @@ logger = logging.getLogger(__name__)
 
 class CBBOCreateSerializer(serializers.Serializer):
     email                = serializers.EmailField()
-    first_name           = serializers.CharField(max_length=150)
-    last_name            = serializers.CharField(max_length=150, required=False, default='')
+    first_name           = serializers.CharField(max_length=35)
+    last_name            = serializers.CharField(max_length=35, required=False, default='')
     phone                = serializers.CharField(max_length=15, required=False, allow_blank=True, default='')
     notification_channel = serializers.ChoiceField(
         choices=['email', 'sms'],
@@ -192,8 +192,8 @@ class CBBOUpdateSerializer(serializers.Serializer):
     """Documents the PATCH shape for drf-spectacular only — partial_update()
     below reads straight from request.data rather than validating through
     this serializer."""
-    first_name = serializers.CharField(max_length=150, required=False, help_text="CBBO's first name")
-    last_name  = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text="CBBO's last name")
+    first_name = serializers.CharField(max_length=35, required=False, help_text="CBBO's first name")
+    last_name  = serializers.CharField(max_length=35, required=False, allow_blank=True, help_text="CBBO's last name")
     phone      = serializers.CharField(max_length=15,  required=False, allow_blank=True, help_text="Indian phone number (10 digits)")
 
 

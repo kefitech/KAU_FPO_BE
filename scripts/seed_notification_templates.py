@@ -63,6 +63,15 @@ TEMPLATE_CODES = [
     ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
     # Expert enquiry
     ('expert_enquiry',              'email',  'Email sent to expert when an FPO submits a contact enquiry',            ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
+        # Expert booking workflow
+    ('expert_booking_requested',   'email',  'Notify expert when an FPO requests a booking',   ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_confirmed',   'email',  'Notify FPO when expert confirms a booking',      ['expert_name', 'date', 'time']),
+    ('expert_booking_confirmed',   'in_app', 'In-app: booking confirmed by expert',            ['expert_name', 'date', 'time']),
+    ('expert_booking_rejected',    'email',  'Expert rejected an FPO booking request',         ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rejected',    'in_app', 'In-app: booking rejected by expert',             ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rescheduled', 'email',  'Notify FPO when expert reschedules a booking',   ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rescheduled', 'in_app', 'In-app: booking rescheduled by expert',          ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_cancelled',   'email',  'Notify expert when an FPO cancels a booking',    ['fpo_name', 'date', 'time', 'reason']),
 ]
 
 
@@ -675,6 +684,61 @@ TEMPLATES = [
 <p style="font-weight:600;">സന്ദേശം:</p>
 <p style="background:#f9f9f9;border-left:4px solid #2e7d32;padding:12px 16px;border-radius:4px;">{{message}}</p>
 <p>ഈ അന്വേഷണത്തിന് മറുപടി നൽകാൻ <a href="mailto:{{user_email}}">{{user_email}}</a>-ലേക്ക് നേരിട്ട് മറുപടി അയക്കുക.</p>''',
+    ),
+
+        # ── Expert Booking Notifications ─────────────────────────────────────────
+    # requested / cancelled: no live DB row existed yet -- drafted to match the
+    # tone of the confirmed/rejected/rescheduled templates below.
+    (
+        'expert_booking_requested', 'email', 'en',
+        'New Booking Request from {{fpo_name}}',
+        '<p>Dear <strong>{{expert_name}}</strong>,</p>'
+        '<p>You have received a new appointment request from <strong>{{fpo_name}}</strong>.</p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
+        '<p>Please log in to confirm or reject this request.</p>',
+    ),
+    (
+        'expert_booking_cancelled', 'email', 'en',
+        'Appointment Cancelled — {{fpo_name}}',
+        '<p><strong>{{fpo_name}}</strong> has cancelled their appointment scheduled for '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>',
+    ),
+
+    # confirmed / rejected / rescheduled: captured exactly from the live
+    # database via shell, so the seed script becomes the source of truth and
+    # re-seeding won't silently overwrite these with different wording.
+    (
+        'expert_booking_confirmed', 'email', 'en',
+        'Your appointment with {{expert_name}} is confirmed',
+        '<p>Good news! <strong>{{expert_name}}</strong> has confirmed your appointment request.</p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>',
+    ),
+    (
+        'expert_booking_confirmed', 'in_app', 'en',
+        'Appointment confirmed',
+        '{{expert_name}} confirmed your appointment on {{date}} at {{time}}.',
+    ),
+    (
+        'expert_booking_rejected', 'email', 'en',
+        'Your appointment request with {{expert_name}} was declined',
+        '<p><strong>{{expert_name}}</strong> was unable to accept your appointment request for {{date}} at {{time}}.</p><p>Reason: {{reason}}</p>',
+    ),
+    (
+        'expert_booking_rejected', 'in_app', 'en',
+        'Appointment declined',
+        '{{expert_name}} declined your appointment request for {{date}} at {{time}}. Reason: {{reason}}',
+    ),
+    (
+        'expert_booking_rescheduled', 'email', 'en',
+        '{{expert_name}} proposed a new time for your appointment',
+        '<p><strong>{{expert_name}}</strong> proposed rescheduling your appointment to <strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p><p>Please log in to confirm.</p>',
+    ),
+    (
+        'expert_booking_rescheduled', 'in_app', 'en',
+        'Appointment rescheduled',
+        '{{expert_name}} proposed {{date}} at {{time}} instead. Reason: {{reason}}',
     ),
 ]
 

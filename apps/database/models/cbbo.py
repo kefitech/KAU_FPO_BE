@@ -96,6 +96,11 @@ class TrainingSession(BaseModel):
     )
     cbbo = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='conducted_sessions'
+
+    )
+    trainer_name = models.CharField(
+        max_length=200, blank=True,
+        help_text='Name of the person who actually conducted the session, if different from the logged-in official'
     )
     topic = models.CharField(
         max_length=300,
