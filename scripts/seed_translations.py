@@ -378,6 +378,11 @@ def seed_ui_translations(languages):
         ('login.back_to_home',          '← Back to Home',                          '← ഹോം പേജിലേക്ക് മടങ്ങുക'),
         ('login.forgot_password',       'Forgot password?',                         'രഹസ്യവാക്ക് മറന്നോ?'),
         ('login.signing_in',            'Signing in...',                            'സൈൻ ഇൻ ചെയ്യുന്നു...'),
+        # New keys for the split-card sign-up call-to-action on /v1/login
+        ('login.new_here',              'New to KAU-FPO',                           'KAU-FPO പുതിയവർക്ക്'),
+        ('login.sign_up_headline',      'Register your FPO in a few simple steps',  'ഏതാനും ഘട്ടങ്ങളിലൂടെ നിങ്ങളുടെ FPO രജിസ്റ്റർ ചെയ്യുക'),
+        ('login.sign_up_subtext',       "Join Kerala's official FPO platform to access training, schemes, market linkages and Detailed Project Reports.", 'പരിശീലനങ്ങൾ, പദ്ധതികൾ, മാർക്കറ്റ് ബന്ധം, വിശദമായ പദ്ധതി റിപ്പോർട്ടുകൾ എന്നിവയ്ക്കായി കേരളത്തിന്റെ ഔദ്യോഗിക FPO പ്ലാറ്റ്‌ഫോമിൽ ചേരുക.'),
+        ('login.sign_up_cta',           'Create a new account',                     'പുതിയ അക്കൗണ്ട് സൃഷ്ടിക്കുക'),
         
         # ── forgot_password — /forgot-password ─────────────────────────────
         ('forgot_password.email_label',           'Email address',                                    'ഇമെയിൽ വിലാസം'),
@@ -3800,7 +3805,7 @@ def seed_contact_translations(languages):
         ('contact.error_subject',      'Subject is required.',                         'വിഷയം ആവശ്യമാണ്.'),
         ('contact.error_message',      'Message is required.',                         'സന്ദേശം ആവശ്യമാണ്.'),
         ('contact.error_generic',      'Something went wrong. Please try again.',      'എന്തോ പ്രശ്‌നം സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.'),
-        ('contact.kau_address',        'Directorate of Extension, Mannuthy P.O, \n Thrissur - 680651', 'എക്സ്റ്റൻഷൻ ഡയറക്ടറേറ്റ്, മണ്ണുത്തി പി.ഒ.,\n തൃശ്ശൂർ - 680651'),
+        ('contact.kau_address',        'Communication Centre, Kerala Agricultural University, Mannuthy P.O, Thrissur - 680651', 'കമ്യൂണിക്കേഷൻ സെന്റർ, കേരള കാർഷിക സർവ്വകലാശാല, മണ്ണുത്തി പി.ഒ, തൃശ്ശൂർ - 680651'),
     ]
 
     count = 0
