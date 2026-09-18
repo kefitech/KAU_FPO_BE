@@ -43,7 +43,7 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
 
 
 class _SessionCreateSerializer(serializers.Serializer):
-    fpo_id = serializers.IntegerField()
+    fpo_application_id = serializers.CharField(max_length=50)
     topic = serializers.CharField(max_length=300)
     date = serializers.DateField()
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1)
@@ -86,7 +86,15 @@ class GovernmentTrainingSessionListView(APIView):
         serializer = _SessionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        fpo = get_fpo_scoped(serializer.validated_data['fpo_id'], request.user)
+        try:
+            fpo_obj = FPO.objects.get(
+                application_id=serializer.validated_data['fpo_application_id'],
+                is_deleted=False,
+            )
+        except FPO.DoesNotExist:
+            return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        fpo = get_fpo_scoped(fpo_obj.id, request.user)
         if not fpo:
             return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
 

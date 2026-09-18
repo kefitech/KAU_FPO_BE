@@ -225,7 +225,7 @@ from .dpr.master import (
 )
 
 # Phase 2 — Expert Booking
-from .expert_booking import ExpertAvailability, ExpertBooking
+from .expert_booking import ExpertAvailability, ExpertTimeSlot, ExpertBooking, ExpertWeeklyDefault
 
 # Phase 2 — Analytics
 from .analytics import AnalyticsSnapshot
@@ -426,7 +426,9 @@ __all__ = [
     'DPRIntendedMarket',
     # Phase 2 — Expert Booking
     'ExpertAvailability',
+    'ExpertTimeSlot',
     'ExpertBooking',
+    'ExpertWeeklyDefault',
     # Phase 2 — Analytics
     'AnalyticsSnapshot',
     # Phase 2 — AI Chatbot

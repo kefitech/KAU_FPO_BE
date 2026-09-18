@@ -106,6 +106,13 @@ class CBBORegistrationOTPSendView(APIView):
         serializer.is_valid(raise_exception=True)
         phone = serializer.validated_data['phone']
 
+        from apps.database.models.user import UserProfile
+        if UserProfile.objects.filter(phone=phone, user__groups__name=UserRole.CBBO).exists():
+            return StandardResponse.error(
+                'An account with this phone number already exists.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             _send_registration_otp(phone, 'phone', lang=lang)
         except OTPRateLimitExceeded:
@@ -161,6 +168,12 @@ class CBBORegistrationEmailOTPSendView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email'].lower()
 
+        if User.objects.filter(email=email, groups__name=UserRole.CBBO).exists():
+            return StandardResponse.error(
+                'An account with this email address already exists.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             _send_registration_otp(email, 'email', lang=lang)
         except OTPRateLimitExceeded:
@@ -215,7 +228,7 @@ class CBBORegistrationSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         value = value.lower()
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email=value, groups__name=UserRole.CBBO).exists():
             raise serializers.ValidationError('A user with this email already exists.')
         if not cache.get(f'cbbo_reg_otp_verified:email:{value}'):
             raise serializers.ValidationError('Email has not been verified. Please verify it first.')
