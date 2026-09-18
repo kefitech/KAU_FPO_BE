@@ -9,6 +9,9 @@ Verified-buyer-only (external or FPO-as-buyer).
 Query params:
     search      — matches against product name (English or Malayalam)
     commodity   — MasterLookup commodity code, exact match
+    fpo         — FPO id, exact match — used for "view all products from
+                  this FPO" (still excludes buyer's own FPO if buyer.fpo_id
+                  matches, same as the base queryset exclusion below)
     price_min   — minimum price_per_unit
     price_max   — maximum price_per_unit
     date_from   — availability window start (requires date_until to also be
@@ -69,6 +72,10 @@ class BuyerProductListView(APIView):
         commodity = request.query_params.get('commodity', '').strip()
         if commodity:
             queryset = queryset.filter(commodity__code=commodity)
+
+        fpo_id = request.query_params.get('fpo')
+        if fpo_id:
+            queryset = queryset.filter(fpo_id=fpo_id)
 
         price_min = request.query_params.get('price_min')
         if price_min:
