@@ -6,6 +6,7 @@ from rest_framework import serializers
 from apps.database.models import (
     BuyerDirectory,
     BuyerSellerMatch,
+    Inquiry,
     MarketPrice,
     Product,
 )
@@ -141,6 +142,86 @@ class BuyerProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'commodity_code',
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
-            'available_from', 'available_until', 'fpo_name', 'image',
+            'available_from', 'available_until', 'fpo', 'fpo_name', 'image',
         ]
         read_only_fields = fields
+
+
+class InquiryCreateSerializer(serializers.ModelSerializer):
+    """
+    Used when a verified buyer (FPO-as-buyer or external buyer) submits a
+    purchase inquiry on a product. `product` comes from the URL, not the
+    request body — same reasoning as `buyer`/`contact_user` being resolved
+    server-side rather than trusted from client input. The product itself
+    is passed via serializer context (not validated_data) so we can check
+    the requested quantity against its available stock.
+    """
+    class Meta:
+        model = Inquiry
+        fields = ['id', 'quantity_requested', 'message']
+        read_only_fields = ['id']
+
+    def validate_quantity_requested(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Quantity requested must be greater than 0.')
+        product = self.context.get('product')
+        if product is not None and value > product.quantity:
+            raise serializers.ValidationError(
+                f'Quantity requested cannot exceed available stock ({product.quantity} {product.unit}).'
+            )
+        return value
+
+
+class InquirySerializer(serializers.ModelSerializer):
+    """
+    Used on the seller's Inquiries list (/fpo/products "View Inquiries" toggle).
+    Read-only — status changes go through dedicated mark-contacted/mark-resolved
+    actions, not raw PATCH (same pattern as BuyerDirectorySerializer.is_verified).
+
+    contact_name/phone/email are resolved LIVE from Inquiry.contact_user at
+    request time — never stored/snapshotted on the Inquiry itself. If
+    contact_user is null (account was later deleted), all three resolve to
+    None — frontend displays "Contact no longer available" in that case.
+    """
+    product_name = serializers.SerializerMethodField()
+    buyer_name = serializers.SerializerMethodField()
+    contact_name = serializers.SerializerMethodField()
+    contact_phone = serializers.SerializerMethodField()
+    contact_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Inquiry
+        fields = [
+            'id', 'product', 'product_name', 'buyer', 'buyer_name',
+            'quantity_requested', 'message', 'status',
+            'contact_name', 'contact_phone', 'contact_email',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_product_name(self, obj):
+        return obj.product.name.get('en', '') if obj.product and obj.product.name else ''
+
+    def get_buyer_name(self, obj):
+        """FPO's name if this is an FPO-as-buyer inquiry, else the external
+        buyer's own name — same fpo-vs-external distinction used elsewhere
+        (see BuyerDirectorySerializer.get_account_active)."""
+        if obj.buyer.fpo_id:
+            return obj.buyer.fpo.name
+        return obj.buyer.name
+
+    def get_contact_name(self, obj):
+        if not obj.contact_user_id:
+            return None
+        u = obj.contact_user
+        return f'{u.first_name} {u.last_name}'.strip() or u.username
+
+    def get_contact_phone(self, obj):
+        if not obj.contact_user_id:
+            return None
+        return getattr(getattr(obj.contact_user, 'profile', None), 'phone', '') or None
+
+    def get_contact_email(self, obj):
+        if not obj.contact_user_id:
+            return None
+        return obj.contact_user.email or None

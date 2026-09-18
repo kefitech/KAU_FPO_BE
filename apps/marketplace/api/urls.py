@@ -5,6 +5,7 @@ from apps.marketplace.api.buyer_dashboard import BuyerDashboardView
 from apps.marketplace.api.buyer_products import BuyerProductListView
 from apps.marketplace.api.buyer_profile import BuyerProfileView
 from apps.marketplace.api.buyers import FPOBuyerListViewSet
+from apps.marketplace.api.inquiries import InquiryCreateView, InquiryViewSet
 from apps.marketplace.api.market_prices import MarketOpportunitiesView, MarketPriceViewSet
 from apps.marketplace.api.matches import BuyerSellerMatchViewSet
 from apps.marketplace.api.products import ProductViewSet
@@ -20,6 +21,7 @@ router.register(r'products', ProductViewSet, basename='marketplace-product')
 router.register(r'buyers', FPOBuyerListViewSet, basename='marketplace-buyer')
 router.register(r'matches', BuyerSellerMatchViewSet, basename='marketplace-match')
 router.register(r'prices', MarketPriceViewSet, basename='marketplace-price')
+router.register(r'inquiries', InquiryViewSet, basename='marketplace-inquiry')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -28,5 +30,6 @@ urlpatterns = [
     # Buyer flow (Arunima — P2-11)
     path('buyer/dashboard/', BuyerDashboardView.as_view(), name='buyer-dashboard'),
     path('buyer/products/',  BuyerProductListView.as_view(), name='buyer-products'),
+    path('buyer/products/<int:pk>/inquire/', InquiryCreateView.as_view(), name='buyer-product-inquire'),
     path('buyer/profile/',   BuyerProfileView.as_view(),   name='buyer-profile'),
 ]
