@@ -1364,6 +1364,11 @@ def seed_ui_translations(languages):
         ('ml_models_table.action_view_stats',        'View Training Stats',                                       'പരിശീലന സ്ഥിതിവിവരക്കണക്കുകൾ കാണുക'),
         ('ml_models_table.action_view_feedback',     'View Feedback',                                             'പ്രതികരണം കാണുക'),
         ('ml_models_table.action_activate',          'Activate',                                                  'സജീവമാക്കുക'),
+        ('ml_models_table.action_delete',            'Delete',                                                    'ഇല്ലാതാക്കുക'),
+        ('ml_models_table.delete_title',             'Delete model version',                                      'മോഡൽ പതിപ്പ് ഇല്ലാതാക്കുക'),
+        ('ml_models_table.delete_description',       "Are you sure you want to delete this model version? This can't be undone from the UI.", 'ഈ മോഡൽ പതിപ്പ് ഇല്ലാതാക്കണമെന്ന് തീർച്ചയാണോ? ഇത് യുഐയിൽ നിന്ന് പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('ml_models_table.toast_deleted',            'Model version deleted',                                     'മോഡൽ പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('ml_models_table.toast_delete_failed',      'Failed to delete model version',                            'മോഡൽ പതിപ്പ് ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു'),
 
         # ── admin_gis_zones — GIS zone boundaries page (Aravind) ───────────
         ('admin_gis_zones.page_title',                 'Agro-Climatic Zone Boundaries',                             'കാർഷിക-കാലാവസ്ഥാ മേഖലാ അതിരുകൾ'),
@@ -4479,6 +4484,33 @@ def seed_gis_translations(languages):
         ('weather_retrieved',          'Weather data retrieved successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ ലഭ്യമാക്കി'),
         ('weather_refreshed',          'Weather data refreshed successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ പുതുക്കി'),
         ('weather_not_found',          'No weather data found. Please refresh to fetch it.', 'കാലാവസ്ഥാ വിവരങ്ങൾ കണ്ടെത്തിയില്ല. ദയവായി പുതുക്കുക.'),
+
+        # Zone boundary upload/versioning (added with the admin GIS zones
+        # upload feature; were never seeded here, so t() fell back to
+        # returning the raw key itself — e.g. a toast literally reading
+        # "gis.zone_file_too_large" instead of a real message).
+        ('zone_file_required',                   'Please choose a GeoJSON file to upload.',                          'അപ്‌ലോഡ് ചെയ്യാൻ ഒരു GeoJSON ഫയൽ തിരഞ്ഞെടുക്കുക.'),
+        ('zone_file_too_large',                  'File is too large. Maximum allowed size is 5MB.',                  'ഫയൽ വളരെ വലുതാണ്. പരമാവധി അനുവദനീയമായ വലിപ്പം 5MB ആണ്.'),
+        ('zone_file_invalid_json',               'File is not valid JSON.',                                          'ഫയൽ സാധുവായ JSON അല്ല.'),
+        ('zone_upload_failed',                   'Zone boundary validation failed. See details below.',             'സോൺ അതിർത്തി പരിശോധന പരാജയപ്പെട്ടു. താഴെയുള്ള വിശദാംശങ്ങൾ കാണുക.'),
+        ('zone_version_uploaded',                'Zone boundary version uploaded — not yet live.',                   'സോൺ അതിർത്തി പതിപ്പ് അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
+        ('zone_version_retrieved',               'Zone boundary version retrieved successfully',                    'സോൺ അതിർത്തി പതിപ്പ് ലഭ്യമാക്കി'),
+        ('zone_version_deleted',                 'Zone boundary version deleted successfully',                       'സോൺ അതിർത്തി പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('zone_version_cannot_delete_active',    'Cannot delete the currently active zone boundary version.',       'നിലവിൽ സജീവമായ സോൺ അതിർത്തി പതിപ്പ് ഇല്ലാതാക്കാൻ കഴിയില്ല.'),
+        ('zone_version_activated',               'Zone boundary version activated — now live.',                     'സോൺ അതിർത്തി പതിപ്പ് സജീവമാക്കി — ഇപ്പോൾ ലൈവ് ആണ്.'),
+        ('zone_version_not_found',               'Zone boundary version not found',                                  'സോൺ അതിർത്തി പതിപ്പ് കണ്ടെത്തിയില്ല'),
+
+        # Soil region upload/versioning — same pattern as zones above.
+        ('soil_region_file_required',                'Please choose a GeoJSON file to upload.',                          'അപ്‌ലോഡ് ചെയ്യാൻ ഒരു GeoJSON ഫയൽ തിരഞ്ഞെടുക്കുക.'),
+        ('soil_region_file_too_large',               'File is too large. Maximum allowed size is 5MB.',                  'ഫയൽ വളരെ വലുതാണ്. പരമാവധി അനുവദനീയമായ വലിപ്പം 5MB ആണ്.'),
+        ('soil_region_file_invalid_json',            'File is not valid JSON.',                                          'ഫയൽ സാധുവായ JSON അല്ല.'),
+        ('soil_region_upload_failed',                'Soil region validation failed. See details below.',               'മണ്ണ് മേഖല പരിശോധന പരാജയപ്പെട്ടു. താഴെയുള്ള വിശദാംശങ്ങൾ കാണുക.'),
+        ('soil_region_version_uploaded',             'Soil region version uploaded — not yet live.',                     'മണ്ണ് മേഖല പതിപ്പ് അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
+        ('soil_region_version_retrieved',            'Soil region version retrieved successfully',                      'മണ്ണ് മേഖല പതിപ്പ് ലഭ്യമാക്കി'),
+        ('soil_region_version_deleted',              'Soil region version deleted successfully',                         'മണ്ണ് മേഖല പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('soil_region_version_cannot_delete_active', 'Cannot delete the currently active soil region version.',        'നിലവിൽ സജീവമായ മണ്ണ് മേഖല പതിപ്പ് ഇല്ലാതാക്കാൻ കഴിയില്ല.'),
+        ('soil_region_version_activated',            'Soil region version activated — now live.',                       'മണ്ണ് മേഖല പതിപ്പ് സജീവമാക്കി — ഇപ്പോൾ ലൈവ് ആണ്.'),
+        ('soil_region_version_not_found',            'Soil region version not found',                                    'മണ്ണ് മേഖല പതിപ്പ് കണ്ടെത്തിയില്ല'),
     ]
 
     count = 0
@@ -4535,6 +4567,8 @@ def seed_recommendations_translations(languages):
         ('model_validation_failed',  'This model file does not match the required feature schema.', 'ഈ മോഡൽ ഫയൽ ആവശ്യമായ ഫീച്ചർ സ്കീമയുമായി പൊരുത്തപ്പെടുന്നില്ല.'),
         ('model_not_ready',          'Only a version with status "ready" can be activated',       '"ready" എന്ന നിലയിലുള്ള പതിപ്പ് മാത്രമേ സജീവമാക്കാൻ കഴിയൂ'),
         ('version_code_exists',      'A model version with this version code already exists',     'ഈ പതിപ്പ് കോഡുള്ള ഒരു മോഡൽ പതിപ്പ് ഇതിനകം നിലവിലുണ്ട്'),
+        ('model_deleted',            'Model version deleted successfully',                        'മോഡൽ പതിപ്പ് നീക്കം ചെയ്തു'),
+        ('model_delete_active_forbidden', 'The active model version cannot be deleted. Activate a different version first.', 'സജീവമായ മോഡൽ പതിപ്പ് നീക്കം ചെയ്യാൻ കഴിയില്ല. ആദ്യം മറ്റൊരു പതിപ്പ് സജീവമാക്കുക.'),
         # Async retraining (P2-06)
         ('dataset_file_required',    'A dataset file is required',                                'ഒരു ഡാറ്റാസെറ്റ് ഫയൽ ആവശ്യമാണ്'),
         ('dataset_file_invalid',     'Dataset file is invalid:',                                  'ഡാറ്റാസെറ്റ് ഫയൽ അസാധുവാണ്:'),

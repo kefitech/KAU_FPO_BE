@@ -33,6 +33,7 @@ from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
 from apps.database.models import FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices
+from apps.recommendations.api.pop_admin import CropPackageOfPracticesSerializer
 from apps.recommendations.services import (
     get_crop_recommendation,
     get_current_financial_year,
@@ -83,8 +84,12 @@ class MLModelVersionSerializer(serializers.ModelSerializer):
             'status', 'training_error',
         ]
         # The retrain flow sets these itself; a client can't claim a
-        # version is ready or write its own error text.
-        read_only_fields = ['status', 'training_error', 'training_metrics']
+        # version is ready or write its own error text. deployed_at is
+        # always stamped by the server (timezone.now()) at creation time --
+        # see MLModelVersionAdminView.post() and MLModelRetrainView.post() --
+        # never taken from client input, so "deployment date" can't drift
+        # from when the version was actually registered/queued.
+        read_only_fields = ['status', 'training_error', 'training_metrics', 'deployed_at']
 
 
 # ---------------------------------------------------------------------------
@@ -148,9 +153,6 @@ class CropPackageOfPracticesDetailView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # Import inside the function to avoid a circular import
-        # (apps.recommendations.api.pop_admin imports from this module).
-        from apps.recommendations.api.pop_admin import CropPackageOfPracticesSerializer
         return StandardResponse.success(
             data=CropPackageOfPracticesSerializer(pop).data,
             message=t('recommendations.pop_retrieved', lang),
@@ -159,10 +161,12 @@ class CropPackageOfPracticesDetailView(APIView):
 
 class _RequestRecommendationSerializer(serializers.Serializer):
     """
-    Optional manual season override for a recommendation request. Left
-    unset (or null), the task auto-detects the season the same way it
-    always has (apps.gis_module.services.get_current_season()) — this
-    is purely an opt-in override, not a required field.
+    Optional manual overrides for a recommendation request. Left unset (or
+    null), season auto-detects the same way it always has
+    (apps.gis_module.services.get_current_season()) and soil_ph falls back
+    to the resolved soil category's book-documented pH-range midpoint
+    (see ml_service/main.py) — both are purely opt-in overrides, not
+    required fields.
     """
     season = serializers.ChoiceField(
         choices=['southwest_monsoon', 'northeast_monsoon', 'dry_season'],
@@ -177,8 +181,8 @@ class _RequestRecommendationSerializer(serializers.Serializer):
         default=None,
         min_value=3.0,
         max_value=10.0,
-        help_text="Optional manual soil pH override (the FPO's actual measured value). "
-                  "Defaults to an estimate from the resolved soil type if omitted.",
+        help_text='Optional manual soil pH override (the FPO\'s actual measured value). '
+                   'Defaults to an estimate from the resolved soil type if omitted.',
     )
 
 
@@ -229,18 +233,40 @@ class RequestRecommendationView(APIView):
 
         fy = get_current_financial_year()
 
-        # Create/reset the record as 'pending' immediately — the actual
-        # FastAPI call happens in the Celery task, not here.
-        rec, _created = CropRecommendation.objects.update_or_create(
-            fpo=fpo,
-            financial_year=fy,
-            defaults={
-                'model_version': active_model,
-                'input_snapshot': {},
-                'recommendations': [],
-                'status': CropRecommendation.Status.PENDING,
-            },
-        )
+        # Mark as 'pending' immediately — the actual FastAPI call happens in
+        # the Celery task, not here. Deliberately does NOT clear
+        # input_snapshot/recommendations on an existing row: if this refresh
+        # ends up falling back to a cached result (ML service unavailable —
+        # see get_crop_recommendation()), the task relies on this row still
+        # holding the last successfully generated recommendation + its
+        # location_snapshot to fall back to. Clearing it here would destroy
+        # that before the task ever runs, leaving nothing to show on failure.
+        existing = CropRecommendation.objects.filter(fpo=fpo, financial_year=fy).first()
+        if existing:
+            existing.model_version = active_model
+            existing.status = CropRecommendation.Status.PENDING
+            # This is a NEW generation request -- any feedback the FPO gave
+            # on the PREVIOUS recommendation no longer applies to whatever
+            # comes back this time, so it must not carry over. Without this,
+            # the frontend (which shows "Thanks for your feedback" purely
+            # from feedback_rating being set, see crop-recommendation-
+            # display.tsx) kept showing that state for a recommendation the
+            # FPO hadn't actually rated yet, since this row is reused
+            # (unique_together fpo+financial_year) rather than replaced.
+            existing.feedback_rating = None
+            existing.feedback_comment = ''
+            existing.save(update_fields=['model_version', 'status', 'feedback_rating', 'feedback_comment'])
+            rec, _created = existing, False
+        else:
+            rec = CropRecommendation.objects.create(
+                fpo=fpo,
+                financial_year=fy,
+                model_version=active_model,
+                input_snapshot={},
+                recommendations=[],
+                status=CropRecommendation.Status.PENDING,
+            )
+            _created = True
 
         AuditService.log(
             user=request.user,
@@ -439,7 +465,19 @@ class MLModelVersionAdminView(APIView):
     def post(self, request, *args, **kwargs):
         lang = request.language
 
-        data = request.data.copy()
+        # NOT request.data.copy(): for a multipart request that .copy() deep-copies
+        # everything in request.data, including the uploaded file object -- fine for
+        # a small file (Django keeps it as an in-memory InMemoryUploadedFile, which
+        # deepcopies cleanly), but a file over FILE_UPLOAD_MAX_MEMORY_SIZE (5MB) is
+        # spooled to disk as a TemporaryUploadedFile wrapping a real OS file handle,
+        # which deepcopy can't pickle -- "TypeError: cannot pickle 'BufferedRandom'
+        # instances". Only the non-file fields are ever needed here (model_file is
+        # already pulled out separately below), so build `data` without the file.
+        # deployed_at is never taken from the client -- it's stamped below
+        # with the server's current time, same as the retrain flow already
+        # does, so "deployment date" always reflects when this was actually
+        # registered instead of a manually-typed date.
+        data = {k: v for k, v in request.data.items() if k not in ('model_file', 'deployed_at')}
         uploaded_file = request.FILES.get('model_file')
         validation_warnings = []
 
@@ -503,7 +541,7 @@ class MLModelVersionAdminView(APIView):
 
         serializer = MLModelVersionSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        version = serializer.save()
+        version = serializer.save(deployed_at=timezone.now())
 
         AuditService.log(
             user=request.user,
@@ -523,6 +561,57 @@ class MLModelVersionAdminView(APIView):
             data=response_data,
             message=t('recommendations.model_registered', lang),
             status_code=status.HTTP_201_CREATED,
+        )
+
+
+class MLModelVersionDetailView(APIView):
+    """
+    DELETE /api/admin/ml-models/{id}/
+
+    Soft-deletes an MLModelVersion row (MLModelVersion already inherits
+    BaseModel's is_deleted/deleted_at/soft_delete() -- this just exposes it
+    over the API, matching the perform_destroy pattern used everywhere else,
+    e.g. CropPackageOfPracticesViewSet). Nothing on disk (the model file) is
+    touched -- only Django's record is marked deleted, and the list view
+    already filters on is_deleted=False.
+
+    The currently active version can't be deleted -- deactivating it first
+    (by activating a different version) is required, so there's never a
+    moment where FastAPI is still serving predictions from a version Django
+    considers gone.
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin - ML Models"])
+    def delete(self, request, pk, *args, **kwargs):
+        lang = request.language
+        try:
+            version = MLModelVersion.objects.get(pk=pk, is_deleted=False)
+        except MLModelVersion.DoesNotExist:
+            return StandardResponse.error(
+                t('recommendations.model_not_found', lang),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if version.is_active:
+            return StandardResponse.error(
+                t('recommendations.model_delete_active_forbidden', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        version.soft_delete(user=request.user)
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.DELETE,
+            instance=version,
+            request=request,
+            changes={'version_code': version.version_code},
+        )
+
+        return StandardResponse.success(
+            data=None,
+            message=t('recommendations.model_deleted', lang),
         )
 
 

@@ -138,6 +138,7 @@ from apps.accounts.api.government_admin import GovernmentViewSet
 from apps.recommendations.api.recommendations import (
     MLModelVersionAdminView,
     MLModelVersionActivateView,
+    MLModelVersionDetailView,
     MLModelRetrainView,
     RecommendationFeedbackAdminViewSet,
 )
@@ -298,6 +299,7 @@ urlpatterns = [
     path('experts/<int:pk>/enquiries/',    ExpertEnquiriesView.as_view(),   name='admin-experts-enquiries'),
     # ML Model Versions (P2-06)
     path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
+    path('ml-models/<int:pk>/',            MLModelVersionDetailView.as_view(),   name='admin-ml-models-detail'),
     path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
     path('ml-models/retrain/',             MLModelRetrainView.as_view(),         name='admin-ml-models-retrain'),
     path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),

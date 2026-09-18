@@ -1,57 +1,55 @@
-# Tailoring the dataset based on the trained model (v2 → v3)
+# ML Service — current state
 
-You asked to tailor the dataset based on what the model showed. The v2 model's `training_metrics_v2.json` exposed two concrete issues, and this round fixes both:
+FastAPI service (`main.py`) that predicts which crops suit a given environment for KAU-FPO's recommendation feature, and trains/retrains that model from CSV uploads (`retrain_pipeline.py`).
 
-1. **`zone` (0.9%) and `soil_ph_mid` (0.4%) were nearly useless features.** v2 gave each of the 5 service zones exactly one representative pH range, so soil never varied independently of zone — nothing zone/soil-specific for the model to learn.
-2. **`elevation_m` (0.5% importance) was pure noise.** It's fully determined by zone (one fixed value per zone in the climate table), so it was really just a duplicate encoding of zone that added nothing.
+## Model: multiclass, environment → crop
 
-## What changed
+The model is a `RandomForestClassifier` where `crop_name` is the predicted TARGET, never an input feature. Inputs are purely environmental:
 
-**Real soil-type variation, within each zone.** Each of the 5 zones now has 2 plausible soil types (`data/soil_type_reference.csv`), drawn from general Kerala pedology and deliberately overlapping across zones — Laterite appears in 3 zones, Forest loam and Lateritic loam each in 2 — so soil carries information independent of which zone it's in:
+- **Categorical**: `zone` (5 service zones), `soil_type` (6 categories, `data/soil_type_reference.csv`), `season` (3 values)
+- **Numeric**: `temperature_avg_C`, `rainfall_mm`, `humidity_pct`, `soil_ph_mid`
 
-| Zone | Soil types |
-|---|---|
-| coastal_zone | Coastal sandy / laterite patches, Coastal alluvium / sandy |
-| southern_zone | Laterite, Lateritic loam (transitional) |
-| central_zone | Laterite, Black soil (Chittoor) / red loam |
-| northern_zone | Laterite, Forest loam / hill soil |
-| high_ranges | Forest loam / hill soil, Lateritic loam (transitional) |
+`predict_crops()` in `main.py` builds one feature row from the request's resolved environment and calls `predict_proba()` once, returning a ranked probability across every known crop. `crop_name` is deliberately excluded from the inputs so the model can't shortcut through crop identity — an earlier binary-classifier design that did include it let `crop_name` dominate with 30.8% feature importance (more than double any other feature), which meant a handful of broadly-documented crops (Rice, Cashew, Anthurium) topped every zone's recommendations almost regardless of actual conditions.
 
-Each crop's actual PoP-book soil description (free text, e.g. "forest loam soils rich in phosphorus... raised on soils rich in humus" for Cardamom) is keyword-matched against each zone's soil types, so a crop can be suitable in one zone's soil and not another zone's — a real soil-specific signal, not a zone-wide constant. See `tailor_dataset_v3.py` for the full keyword dictionary and the label rule (a crop counts as suitable when temperature matches AND (season matches OR soil matches) — pH was dropped as a gating condition once we confirmed it was true for ~100% of rows at these zone-level pH widths and would have just diluted the new soil signal).
+## Training data: two accepted CSV formats
 
-**`elevation_m` removed from the trained feature set.** `CATEGORICAL`/`NUMERIC` in `train_model_v3.py` no longer include it.
+`retrain_pipeline.py`'s `run_retrain()` auto-detects which format an uploaded CSV is (`_detect_dataset_format()`):
 
-**`main.py` now actually uses the request's `soil_type` field.** v2 accepted it but never used it in scoring (a known placeholder gap flagged in `README_v2.md`). v3 resolves the free text (e.g. `"sandy"`, `"lateritic loam"`) to one of the 6 trained soil categories and feeds it into the model; if it can't resolve one, it falls back to averaging the prediction across the zone's own two soil types (what v2 always implicitly did).
+- **Pre-expanded** (`REQUIRED_PREEXPANDED_COLUMNS`: `zone, soil_type, season, crop_name, temperature_avg_C, rainfall_mm, humidity_pct, soil_ph_mid, is_suitable`) — each row is already a real training example. `data/grounded_training_dataset_v5.csv` is the current best version of this (see below); `data/sample_retrain_dataset.csv` is a small illustrative template of the shape.
+- **Rule-based** (`REQUIRED_COLUMNS`: `crop_name, crop_group, commodity_code, commodity_en, commodity_section, soil_type, soil_ph_range, season, agro_zone, temperature_range, variety_recommendations, estimated_yield`) — free text parsed from the KAU PoP crosswalk (`data/crop_prediction_dataset_with_commodity_codes.csv`) and expanded into training rows through 3 stages (parse bounds → aggregate per crop/zone → expand to service zones + build rows). This is how `grounded_training_dataset_v5.csv` was generated.
 
-## Result: did it work?
+Both formats feed the same `_train()` function once expanded to the pre-expanded shape.
 
-Yes, measurably — feature importance:
+## Evaluation: `accuracy` will look low — that's expected, use `top_5_hit_rate`
 
-| Feature | v2 | v3 |
-|---|---|---|
-| zone | 0.9% | **12.6%** |
-| soil_type + soil_ph_mid | 0.4% | **5.7%** |
-| crop_name + crop_group | 77.5% | 53.6% |
-| season | 16.2% | 6.6% |
-| climate (temp/rain/humidity) | 5.5% | 21.5% |
+Many `(zone, soil_type, season)` environments have dozens of crops genuinely valid at once (~87 on average, across only 30 unique environment combinations) — but a random train/test split holds out only one crop_name per row. `accuracy` (strict single-label match) penalizes the model for ranking a *different*, equally-valid crop above the one specific row that happened to land in the test split, so it's structurally incapable of reaching a high number even for a model that's working correctly.
 
-Zone went from noise to the model's 3rd-most-used feature; soil went from negligible to a real, if modest, contributor. Spot-checked live: asking for Cardamom in `high_ranges` with soil_type `"forest loam"` (its actual documented soil) now scores higher (0.368) than the same request with `"lateritic loam"` (0.298) — the direction the book supports. That check also caught and fixed a real bug in the soil-name resolver (a generic keyword tie made `"lateritic loam"` resolve to the wrong category); worth knowing in case you add more soil-type synonyms later — prefer the most specific matching keyword, not just the one with the most hits.
+`top_5_hit_rate` is the metric that reflects real quality: it checks whether the model's top-5 predictions fall within the FULL set of crops the source data marks valid for that environment (`_top_k_hit_rate()` in `retrain_pipeline.py`), not just the one held-out label. Currently 100% on `grounded_training_dataset_v5.csv`, including all 5 leave-one-zone-out folds.
 
-## The honest trade-offs
+## Current best dataset: `grounded_training_dataset_v5.csv`
 
-Nothing here was free:
+Each crop's own documented pH range and temperature range (parsed from the PoP-crosswalk CSV's free text) now feed `soil_ph_mid` and `temperature_avg_C` directly, instead of a soil-category/zone-climate constant shared by every crop in a bucket — these were being parsed correctly in stage 1 and then silently discarded in stage 3 until fixed. `is_suitable` labels are unchanged; this only fixes what numeric signal the model gets to learn from.
 
-- **Coverage vs. strictness.** Requiring temperature AND (season OR soil) — instead of v2's stricter "all three of temp/ph/season" — pushed the positive rate from 42% to 59% and crop coverage from 116/149 to 129/149 crops. That's a real design choice, not a neutral one: it's more lenient in what counts as "suitable," which is part of why coverage went up.
-- **`high_ranges` got harder to generalize to.** Leave-one-zone-out accuracy for the held-out `high_ranges` zone dropped from 0.75 (v2) to 0.55 (v3) — the model now leans more on zone-specific patterns, and `high_ranges` is climatically/pedologically the most distinct zone, so it's the hardest one to predict correctly when the model has never seen it. The other 4 zones held up (0.84-0.85, similar to v2). If `high_ranges` predictions matter a lot to you, this is the number to watch.
-- **The soil-type-per-zone mix is still a documented approximation**, not a soil survey (same caveat as v2's zone crosswalk — see README_v2.md). Replace `ZONE_SOIL_TYPES` in `tailor_dataset_v3.py`/`data_access_v3.py` with real per-field soil data once your GIS lookup is live; the model and API already expect a `soil_type` category, so that swap doesn't require touching the contract.
-- **pH itself is still a weak signal** (0.9% importance) because the 6 soil categories' pH ranges are wide enough to overlap almost every crop's stated tolerance — it's along for the ride numerically but rarely decisive.
+| | dominant feature | accuracy (exact match) | top-5 hit rate |
+|---|---|---|---|
+| `grounded_training_dataset_v3.csv` (original) | temperature (24.7%) | 0.0% | 100%* |
+| `grounded_training_dataset_v4.csv` (pH fix only) | `soil_ph_mid` (59.4%) | 1.8% | 100% |
+| `grounded_training_dataset_v5.csv` (pH + temperature fix) | balanced: temp 37.0%, pH 35.1%, rest ~5% each | 16.6% | 100% |
 
-## Files added/changed this round
+*v3's 100% was hollow — with zero per-crop signal in the features, there was nothing for the model to get wrong.
 
-- `tailor_dataset_v3.py` — builds the soil-varying training data (`data/grounded_training_dataset_v3.csv`) and the soil reference table (`data/soil_type_reference.csv`).
-- `train_model_v3.py` — retrains with `soil_type` in, `elevation_m` out; adds a leave-one-soil-type-out CV alongside leave-one-zone-out.
-- `data_access_v3.py` — adds `resolve_soil_category()` (request text → trained category) and soil-aware knowledge-base methods.
-- `main.py` — updated to call the v3 model/knowledge base, resolve the request's `soil_type`, and average across a zone's soil mix when it can't. Contract (endpoints, Pydantic models, `/reload-model/` mechanism) is unchanged from the previous drop-in.
-- `model/crop_suitability_rf_v3.joblib`, `model/training_metrics_v3.json` — the retrained model and full metrics.
+Real-prediction spot check (using the same feature construction `predict_crops()` uses at inference — zone's real climate + soil category's book pH, not any crop's own value): `high_ranges` + acidic forest-loam soil + `southwest_monsoon` correctly surfaces **Tea and Cardamom** at the top — Idukki's high ranges is Kerala's actual tea-and-cardamom belt.
 
-Live-tested end to end again after this change: health check, soil-resolved vs. soil-unresolved requests, the cardamom soil-direction check above, zone fallback, unresolved-commodity handling, and `/reload-model/` with the new model file — all matched the expected contract shape.
+**Why accuracy won't easily clear ~20%, and what it would take**: only 24 of 179 crop-zone profiles (13%) have a real parsed pH value, 36 (20%) a real temperature, and 131 (73%) have neither — for those, the source CSV's `soil_ph_range`/`temperature_range` text is blank or non-numeric (often elevation/rainfall figures instead), confirmed by inspecting the raw text directly, not a parsing bug. Crops sharing a `crop_group` fallback are genuinely indistinguishable to any model, because the source data doesn't distinguish them either. Pushing higher requires filling in real pH/temperature/rainfall figures from the KAU PoP book for those 131 profiles — data entry, not further modeling.
+
+`grounded_training_dataset_v5.csv` is not yet registered/activated as of this writing.
+
+## Model storage: local disk today, no durable volume in the test deploy
+
+Trained/registered model files are written to `ML_MODELS_DIR/{version_code}/model.joblib` (plus `training_metrics.json`, and `dataset.csv` for CSV retrains) — plain local disk, both this service and Django reading/writing the same path directly (`os.environ["ML_MODELS_DIR"]` here, `settings.ML_MODELS_DIR` in Django). See `main.py`'s `/train/`, `/reload-model/`, `/validate-model/` and Django's `MLModelVersionAdminView`/`MLModelRetrainView`/`retrain_model_task`.
+
+On the deployed test server, `docker-compose.yml` declares no volume for `ML_MODELS_DIR` on the `web`/`celery` containers (only `media_files`, `static_files`, `logs` are mounted) — so unless `.env` there points `ML_MODELS_DIR` at a bind-mounted host path outside the containers, every registered model version is lost on the next rebuild/redeploy.
+
+### TODO: move model storage to S3 (not yet done)
+
+Would touch: `main.py`'s `/train/` (upload instead of/after local `joblib.dump`), `/reload-model/` and `/validate-model/` (load from S3 instead of a local path); Django's `_save_model_file()` and `MLModelRetrainView`'s CSV save; `retrain_model_task`'s shared-filesystem assumption (same "two processes must see the same file" issue this whole section is about); `MLModelVersion.model_file_path`'s shape (full S3 key/URI, or a relative key + shared bucket/prefix setting); a new `boto3`(-like) dependency + AWS credentials/bucket config; and a deliberate decision on whether ml_service caches the active model locally or always loads from S3, since `/predict/crops/` calls `predict_proba()` per request and shouldn't take on network latency per call.
