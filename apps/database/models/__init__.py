@@ -234,7 +234,7 @@ from .analytics import AnalyticsSnapshot
 from .chat import ChatConversation, ChatMessage
 
 # Phase 2 — Marketplace
-from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice
+from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice, Inquiry
 
 # Phase 2 — AI Marketing
 from .marketing import MarketingStrategy
@@ -439,6 +439,7 @@ __all__ = [
     'BuyerDirectory',
     'BuyerSellerMatch',
     'MarketPrice',
+    'Inquiry',
     # Phase 2 — AI Marketing
     'MarketingStrategy',
     # Phase 2 — AI Service Control & Usage Tracking
