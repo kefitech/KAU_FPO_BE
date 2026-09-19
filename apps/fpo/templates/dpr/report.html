@@ -284,11 +284,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <tr><td></td><td class="sub">· {{ label }}</td>                                      <td class="subv">₹ {{ val|money }}</td></tr>
       {% endfor %}
 
-      <tr><td class="rownum">11</td> <td class="k">Debt : Equity ratio</td>                <td class="v">
-        {% if r.mof.by_field.mof_promoters_contribution and r.mof.by_field.mof_promoters_contribution > 0 %}
-          ₹ {{ r.mof.by_field.mof_bank_term_loan|default_if_none:0|money }} : ₹ {{ r.mof.by_field.mof_promoters_contribution|money }}
-        {% else %}—{% endif %}
-      </td></tr>
+      <tr><td class="rownum">11</td> <td class="k">Debt : Equity ratio</td>                <td class="v">{{ debt_equity_ratio_display }}</td></tr>
 
       <tr><td class="rownum">12</td> <td class="k">Profit after tax (PAT) — first 3 years</td>  <td class="v">
         {% if r.profit_loss.rows %}{% for row in r.profit_loss.rows|slice:":3" %}Y{{ row.year }}: ₹ {{ row.pat|money }}{% if not forloop.last %} · {% endif %}{% endfor %}{% else %}—{% endif %}

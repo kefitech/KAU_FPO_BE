@@ -950,6 +950,55 @@ OPEX_FIELDS = (
     'op_professional_charges', 'op_miscellaneous',
 )
 
+# Split opex line items into buckets so each can be escalated by its own
+# Cat-I financial-assumption rate (raw material / salary / electricity /
+# fuel each get their own rate; everything else escalates by general
+# inflation). See DPRSectionFinance.raw_material_price_increase_pct etc.
+OPEX_BUCKETS: dict[str, tuple[str, ...]] = {
+    'raw_material': ('op_raw_material',),
+    'salary':       ('op_salaries_wages',),
+    'electricity':  ('op_electricity',),
+    'fuel':         ('op_fuel',),
+    'other':        (
+        'op_water', 'op_transportation', 'op_packaging',
+        'op_repairs_maintenance', 'op_insurance', 'op_admin_expenses',
+        'op_marketing_expenses', 'op_communication', 'op_professional_charges',
+        'op_miscellaneous',
+    ),
+}
+
+
+def _resolve_escalation_rates(project) -> dict[str, Decimal]:
+    """FPO-entered rate wins; DPRConfig default is the fallback.
+
+    Reads the 6 optional fields from `DPRSectionFinance` (§Cat I: Financial
+    Assumptions) and falls back to `DPRConfig.inflation_rate_pct` for any
+    field the FPO left blank / null. Empty section → all fields fall back.
+
+    KEEP THIS SYMMETRIC with the frontend Finance §Cat I inputs — if a
+    field is added to that block on the wizard, resolve it here too,
+    otherwise the calc silently ignores what the FPO typed (which was the
+    exact bug this helper closes: pre-2026-09-19 the calc engine ignored
+    every one of these fields).
+    """
+    fin = getattr(project, 'section_finance', None)
+    default = DPRConfig.get_decimal('inflation_rate_pct', Decimal('6'))
+
+    def pick(field_name: str) -> Decimal:
+        if fin is None:
+            return default
+        val = _decimal(getattr(fin, field_name, None))
+        return val if val > 0 else default
+
+    return {
+        'inflation':     pick('inflation_rate_pct'),
+        'raw_material':  pick('raw_material_price_increase_pct'),
+        'salary':        pick('salary_escalation_pct'),
+        'electricity':   pick('electricity_tariff_increase_pct'),
+        'fuel':          pick('fuel_price_increase_pct'),
+        'selling_price': pick('selling_price_increase_pct'),
+    }
+
 
 def build_interest_schedule(project, projection_years: int) -> InterestSchedule:
     """Amortise the loan over `tenure_years` after a moratorium.
@@ -1171,16 +1220,19 @@ def _sum_year1_revenue(project) -> Decimal:
     return total
 
 
-def _weighted_revenue_growth_rate(project) -> Decimal:
+def _weighted_revenue_growth_rate(project, rates: dict[str, Decimal] | None = None) -> Decimal:
     """Weighted-average YoY revenue growth from revenue_assumptions.
-    Weight is Y1 revenue. Falls back to `inflation_rate_pct` from DPRConfig
-    when no explicit growth rate is set."""
+    Weight is Y1 revenue. Falls back — in order — to the FPO's
+    `selling_price_increase_pct` (Finance §Cat I) and then to
+    `DPRConfig.inflation_rate_pct` when neither is set on a row."""
+    if rates is None:
+        rates = _resolve_escalation_rates(project)
+    default_rate = rates['selling_price']
     fin = getattr(project, 'section_finance', None)
     if fin is None:
-        return DPRConfig.get_decimal('inflation_rate_pct', Decimal('6'))
+        return default_rate
     total_rev = Decimal('0')
     weighted_rate = Decimal('0')
-    default_rate = DPRConfig.get_decimal('inflation_rate_pct', Decimal('6'))
     for ra in fin.revenue_assumptions.all():
         if ra.annual_sales_revenue:
             rev = _decimal(ra.annual_sales_revenue)
@@ -1199,6 +1251,14 @@ def _year1_opex(project) -> Decimal:
     return total
 
 
+def _year1_opex_by_bucket(project) -> dict[str, Decimal]:
+    """Y1 opex split into `OPEX_BUCKETS`. Each bucket then escalates by its
+    own Cat-I rate in `build_profit_loss` — raw material by
+    raw_material_price_increase_pct, salaries by salary_escalation_pct, etc."""
+    fin = getattr(project, 'section_finance', None)
+    return {name: _sum_fields(fin, fields)[0] for name, fields in OPEX_BUCKETS.items()}
+
+
 def build_profit_loss(
     project,
     depreciation: DepreciationSchedule,
@@ -1215,25 +1275,34 @@ def build_profit_loss(
     Tax: PBT × tax_rate_pct (from DPRConfig). Zero when PBT is negative
          (no MAT / carry-forward modelled at this pass — noted for 3h ratios).
     """
+    rates = _resolve_escalation_rates(project)
     revenue_y1 = _sum_year1_revenue(project)
-    opex_y1 = _year1_opex(project)
-    revenue_growth = _weighted_revenue_growth_rate(project)
-    inflation = DPRConfig.get_decimal('inflation_rate_pct', Decimal('6'))
+    opex_by_bucket_y1 = _year1_opex_by_bucket(project)
+    revenue_growth = _weighted_revenue_growth_rate(project, rates)
     tax_rate = DPRConfig.get_decimal('tax_rate_pct', Decimal('25.17'))
 
     rev_multiplier = Decimal('1') + (revenue_growth / Decimal('100'))
-    opex_multiplier = Decimal('1') + (inflation / Decimal('100'))
+    # One multiplier per opex bucket (raw material / salary / electricity /
+    # fuel each keyed by their own Cat-I rate; "other" tracks general inflation).
+    opex_multipliers: dict[str, Decimal] = {
+        bucket: Decimal('1') + (rates[bucket if bucket != 'other' else 'inflation'] / Decimal('100'))
+        for bucket in OPEX_BUCKETS
+    }
 
     rows: list[ProfitLossRow] = []
     cumulative_pat = Decimal('0')
     cumulative_pat_by_year: dict[int, Decimal] = {}
     current_rev = revenue_y1
-    current_opex = opex_y1
+    current_opex_by_bucket = dict(opex_by_bucket_y1)
 
     for year in range(1, projection_years + 1):
         if year > 1:
             current_rev = (current_rev * rev_multiplier).quantize(Decimal('0.01'))
-            current_opex = (current_opex * opex_multiplier).quantize(Decimal('0.01'))
+            current_opex_by_bucket = {
+                bucket: (val * opex_multipliers[bucket]).quantize(Decimal('0.01'))
+                for bucket, val in current_opex_by_bucket.items()
+            }
+        current_opex = sum(current_opex_by_bucket.values(), Decimal('0'))
 
         dep = depreciation.total_depreciation_by_year.get(year, Decimal('0'))
         int_row = interest.rows[year - 1] if year - 1 < len(interest.rows) else None

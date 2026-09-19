@@ -22,6 +22,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 import os
 import re
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from django.conf import settings
@@ -237,6 +238,27 @@ def build_pdf_filename(project, version_number: int) -> str:
     return f'DPR_{_fpo_slug(project)}_v{version_number}.pdf'
 
 
+def _debt_equity_ratio_display(by_field: dict) -> str:
+    """Format the debt-to-equity ratio as `x.xx : 1` — the standard
+    banking convention KAU wants on the DPR cover appraisal table.
+
+    Returns "—" when there's no equity component (division by zero) or
+    the two amounts sum to zero (empty MoF section).
+
+    Example: bank loan ₹ 60 L, promoter equity ₹ 40 L  →  "1.50 : 1".
+    """
+    debt = by_field.get('mof_bank_term_loan') or Decimal('0')
+    equity = by_field.get('mof_promoters_contribution') or Decimal('0')
+    if not isinstance(debt, Decimal):
+        debt = Decimal(str(debt))
+    if not isinstance(equity, Decimal):
+        equity = Decimal(str(equity))
+    if equity <= 0:
+        return '—'
+    ratio = (debt / equity).quantize(Decimal('0.01'))
+    return f'{ratio} : 1'
+
+
 def render_html_for_project(project, version_number: Optional[int] = None) -> str:
     """Compute + render — returns the raw HTML string.
     Useful for debugging without invoking WeasyPrint.
@@ -259,6 +281,9 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
         # renders human-readable labels without extra filter machinery.
         'cost_breakdown_rows': _breakdown_rows(result.cost.by_field, COST_LABELS),
         'mof_breakdown_rows':  _breakdown_rows(result.mof.by_field, MOF_LABELS),
+        # Debt-to-equity as banking-convention ratio (e.g. "1.50 : 1"),
+        # not raw rupees — per KAU 2026-09-19 reviewer feedback.
+        'debt_equity_ratio_display': _debt_equity_ratio_display(result.mof.by_field),
         # Per-technology process flowcharts. Empty list = section omitted.
         'technologies_with_flow': _technologies_with_flow(project),
         # Product list + cover hero image (first product with a photo).
