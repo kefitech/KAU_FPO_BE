@@ -71,6 +71,10 @@ class AIContentSerializer(serializers.ModelSerializer):
             'has_original', 'has_candidate', 'has_active',
             'active_version', 'is_stale', 'stale_reason',
             'generated_at', 'candidate_generated_at', 'updated_at',
+            # KAU 2026-09-19 placeholder-scrubber signals — FE renders a
+            # "review required" badge + a per-hit tooltip so the FPO sees
+            # which fields the last generation left blank.
+            'needs_review', 'placeholder_hits',
         )
         read_only_fields = fields  # writes go through dedicated action endpoints
 
