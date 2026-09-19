@@ -118,10 +118,28 @@ class ScrubPlaceholdersTests(unittest.TestCase):
 # Shared helpers — fake project + fake CalculationResult
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _fake_project(title='Test project', fpo_name='Test FPO'):
+def _fake_project(
+    title='Test project',
+    fpo_name='Test FPO',
+    *,
+    # KAU 2026-09-19 §Promoter Profile — new DPRProject fields
+    ceo_name='', ceo_qualification='', ceo_experience_years=None,
+    total_area_acreage=None, women_shareholding_pct=None,
+    landholding_summary='', board_meeting_frequency='',
+    psc_members=None,
+    # FPO membership snapshot — new pull-throughs into FACTS
+    total_members=None, female_members=None,
+    total_directors=None, women_directors=None,
+):
     """SimpleNamespace project that quacks like a DPRProject for the pieces
-    narrative.py touches (title / fpo / primary_commodity). No DB required."""
-    fpo = SimpleNamespace(id=1, name=fpo_name)
+    narrative.py touches. No DB required."""
+    fpo = SimpleNamespace(
+        id=1, name=fpo_name,
+        total_members=total_members,
+        female_members=female_members,
+        total_directors=total_directors,
+        women_directors=women_directors,
+    )
     return SimpleNamespace(
         id=1,
         title=title,
@@ -129,6 +147,14 @@ def _fake_project(title='Test project', fpo_name='Test FPO'):
         fpo_id=1,
         primary_commodity=None,
         primary_commodity_id=None,
+        ceo_name=ceo_name,
+        ceo_qualification=ceo_qualification,
+        ceo_experience_years=ceo_experience_years,
+        total_area_acreage=total_area_acreage,
+        women_shareholding_pct=women_shareholding_pct,
+        landholding_summary=landholding_summary,
+        board_meeting_frequency=board_meeting_frequency,
+        psc_members=psc_members or [],
     )
 
 
@@ -258,6 +284,77 @@ class FormatCalcFactsTests(unittest.TestCase):
         result = _make_calc_result(cost_total=Decimal('9500000'))
         facts = narrative.format_calc_facts_for_prompt(_fake_project(), result)
         self.assertIn('₹ 95,00,000.00', facts)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3 — Promoter Profile fields flow into the FACTS block
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PromoterProfileFactsTests(unittest.TestCase):
+    """KAU 2026-09-19 §Promoter Profile added 8 new fields on DPRProject so
+    the narrative stops emitting [Name of the CEO] / [PSC] / [area]. Verify
+    every one of them lands in the FACTS block with a labelled line."""
+
+    def test_ceo_details_appear_when_provided(self):
+        project = _fake_project(
+            ceo_name='Rajan Nair', ceo_qualification='B.Sc Agri, MBA',
+            ceo_experience_years=12,
+        )
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('CEO name:                   Rajan Nair', facts)
+        self.assertIn('CEO qualification:          B.Sc Agri, MBA', facts)
+        self.assertIn('CEO experience:             12 years', facts)
+
+    def test_ceo_missing_renders_not_available_not_bracketed(self):
+        """Empty CEO fields → 'Not available' in prose. Never [Name of the CEO]."""
+        project = _fake_project()  # all defaults blank/None
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('CEO name:                   Not available', facts)
+        self.assertNotIn('[Name of', facts)
+        self.assertNotIn('[CEO', facts)
+
+    def test_fpo_membership_pulled_from_fpo_row(self):
+        """total_members / female_members / director counts come from FPO."""
+        project = _fake_project(
+            total_members=250, female_members=110,
+            total_directors=9, women_directors=4,
+        )
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('250 members', facts)
+        self.assertIn('110 women members', facts)
+        self.assertIn('9 directors (4 women)', facts)
+
+    def test_board_meeting_frequency_renders_display_value_not_key(self):
+        """'quarterly' key → 'Quarterly' display label in the FACTS block."""
+        project = _fake_project(board_meeting_frequency='quarterly')
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('Board meeting frequency:    Quarterly', facts)
+
+    def test_psc_members_list_renders_one_line_per_member(self):
+        """PSC JSON list → one bullet per member in a multi-line block."""
+        project = _fake_project(psc_members=[
+            {'name': 'Dr. Rajan', 'role': 'Chair', 'affiliation': 'KAU'},
+            {'name': 'Anitha Kumari', 'role': 'Member', 'affiliation': 'NABARD'},
+        ])
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('Dr. Rajan — Chair (KAU)', facts)
+        self.assertIn('Anitha Kumari — Member (NABARD)', facts)
+
+    def test_psc_empty_renders_not_constituted(self):
+        project = _fake_project(psc_members=[])
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('Not constituted / Not available', facts)
+
+    def test_area_acreage_and_landholding_flow_through(self):
+        project = _fake_project(
+            total_area_acreage=Decimal('487.50'),
+            women_shareholding_pct=Decimal('44.00'),
+            landholding_summary='70% smallholders under 2 acres',
+        )
+        facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
+        self.assertIn('Total area covered:         487.50 acres', facts)
+        self.assertIn('Women shareholding:         44.00%', facts)
+        self.assertIn('Landholding pattern:        70% smallholders under 2 acres', facts)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

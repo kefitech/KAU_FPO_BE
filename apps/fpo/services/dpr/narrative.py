@@ -142,12 +142,69 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     )
     fpo_name = project.fpo.name if project.fpo_id else 'Not available'
 
+    # KAU 2026-09-19 §Promoter Profile — surface these fields to the LLM
+    # so the promoter_profile chapter stops emitting [Name of the CEO] etc.
+    ceo_name = getattr(project, 'ceo_name', '') or 'Not available'
+    ceo_qual = getattr(project, 'ceo_qualification', '') or 'Not available'
+    ceo_exp  = getattr(project, 'ceo_experience_years', None)
+    ceo_exp_display = f'{ceo_exp} years' if ceo_exp is not None else 'Not available'
+    area_acres = getattr(project, 'total_area_acreage', None)
+    area_display = f'{area_acres} acres' if area_acres is not None else 'Not available'
+    women_pct = getattr(project, 'women_shareholding_pct', None)
+    women_display = f'{women_pct}%' if women_pct is not None else 'Not available'
+    landholding = (getattr(project, 'landholding_summary', '') or '').strip() or 'Not available'
+    board_freq_raw = getattr(project, 'board_meeting_frequency', '') or ''
+    board_freq_display = (
+        dict((k, v) for k, v in [
+            ('monthly', 'Monthly'), ('quarterly', 'Quarterly'),
+            ('half_yearly', 'Half-yearly'), ('annually', 'Annually'),
+        ]).get(board_freq_raw, board_freq_raw)
+        or 'Not available'
+    )
+    # FPO governance / membership snapshot — pulled from FPO row so the
+    # narrative can quote member counts + director composition verbatim.
+    fpo = project.fpo if project.fpo_id else None
+    total_members = getattr(fpo, 'total_members', None) if fpo else None
+    total_members_display = f'{total_members} members' if total_members else 'Not available'
+    women_members = getattr(fpo, 'female_members', None) if fpo else None
+    women_members_display = f'{women_members} women members' if women_members else 'Not available'
+    total_dirs = getattr(fpo, 'total_directors', None) if fpo else None
+    women_dirs = getattr(fpo, 'women_directors', None) if fpo else None
+    board_display = (
+        f'{total_dirs} directors ({women_dirs} women)'
+        if total_dirs and women_dirs is not None else
+        (f'{total_dirs} directors' if total_dirs else 'Not available')
+    )
+
+    # PSC — variable-length list, one line per member so the LLM sees the
+    # full committee without having to parse JSON.
+    psc = getattr(project, 'psc_members', None) or []
+    if psc:
+        psc_lines = [f'  - {m.get("name", "?")} — {m.get("role", "?")} ({m.get("affiliation", "?")})' for m in psc]
+        psc_block = 'Project Steering Committee:\n' + '\n'.join(psc_lines)
+    else:
+        psc_block = 'Project Steering Committee:  Not constituted / Not available'
+
     lines = [
         '=== PROJECT FACTS (use these values verbatim; do not estimate) ===',
         f'Project title:              {project.title or "Not available"}',
         f'FPO / promoter:             {fpo_name}',
         f'Primary commodity:          {commodity}',
         '',
+        '--- Promoter / institutional identity ---',
+        f'CEO name:                   {ceo_name}',
+        f'CEO qualification:          {ceo_qual}',
+        f'CEO experience:             {ceo_exp_display}',
+        f'Total member farmers:       {total_members_display}',
+        f'Women members:              {women_members_display}',
+        f'Board of Directors:         {board_display}',
+        f'Board meeting frequency:    {board_freq_display}',
+        f'Women shareholding:         {women_display}',
+        f'Total area covered:         {area_display}',
+        f'Landholding pattern:        {landholding}',
+        psc_block,
+        '',
+        '--- Project cost + finance ---',
         f'Total project cost:         {_fmt_inr(cost.total)}',
         f'Total means of finance:     {_fmt_inr(mof.total)}',
         f'  - Promoter contribution:  {_fmt_inr(mof.by_field.get("mof_promoters_contribution"))}',
@@ -549,11 +606,15 @@ _CHAPTER_BRIEF = {
         'scheme or policy from the knowledge base. 600-800 words.'
     ),
     'promoter_profile': (
-        'Cover the FPO\'s legal identity + registration status, its member base '
-        '(numbers, gender split if available, geographic spread), governance / '
-        'board composition, past turnover or operational track record (use '
-        'placeholders where not provided), and the CEO / management '
-        'competency. 500-700 words.'
+        "Cover the FPO's legal identity + registration status, its member base "
+        '(total member farmers, women members, geographic spread), governance / '
+        'board composition (total directors + women directors + meeting frequency), '
+        'CEO name / qualification / experience, women shareholding %, total farming '
+        'area covered, member landholding pattern, Project Steering Committee '
+        'composition (if constituted), and any past turnover or operational track '
+        'record from the FACTS block. If a field reads "Not available" in the '
+        'FACTS block, say so in prose — never fill it with generic industry '
+        'language. 500-700 words.'
     ),
     'market_analysis': (
         'Cover demand drivers for the primary commodity + secondary products, '

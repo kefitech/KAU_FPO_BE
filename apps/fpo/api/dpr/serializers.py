@@ -172,6 +172,17 @@ class DPRProjectDetailSerializer(serializers.ModelSerializer):
             'project_objectives_other',
             'expected_outcomes',           # 7 — Multi-select ids
             'expected_outcomes_other',
+            # Promoter Profile detail (KAU AI review 2026-09-19 §Promoter Profile)
+            # Fills the fields the DPR narrative used to leave as [Name of the
+            # CEO], [PSC], [area], [women shareholding] placeholders.
+            'ceo_name',
+            'ceo_qualification',
+            'ceo_experience_years',
+            'total_area_acreage',
+            'women_shareholding_pct',
+            'landholding_summary',
+            'board_meeting_frequency',
+            'psc_members',
             # KAU RCD C.6/C.7 — per-field provenance map. Read-only from FPO
             # perspective (mutated by backend on AI inference + user overrides).
             'field_sources',

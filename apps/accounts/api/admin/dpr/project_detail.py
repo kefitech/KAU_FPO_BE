@@ -143,6 +143,15 @@ def _build_identification_payload(project) -> dict:
         'project_objectives_other': project.project_objectives_other,
         'expected_outcomes':        expected_outcomes,
         'expected_outcomes_other':  project.expected_outcomes_other,
+        # Promoter Profile detail (KAU AI review 2026-09-19)
+        'ceo_name':                 project.ceo_name,
+        'ceo_qualification':        project.ceo_qualification,
+        'ceo_experience_years':     project.ceo_experience_years,
+        'total_area_acreage':       str(project.total_area_acreage) if project.total_area_acreage is not None else None,
+        'women_shareholding_pct':   str(project.women_shareholding_pct) if project.women_shareholding_pct is not None else None,
+        'landholding_summary':      project.landholding_summary,
+        'board_meeting_frequency':  project.board_meeting_frequency,
+        'psc_members':              project.psc_members or [],
     }
 
 
