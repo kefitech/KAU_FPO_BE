@@ -32,6 +32,7 @@ from apps.core.utils.validators import validate_indian_phone
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models.fpo import FPO, ApplicationStatusHistory
 from apps.database.models import UserProfile
 from apps.notifications.services import send_notification
@@ -489,7 +490,8 @@ class FPOMeView(APIView):
         },
     )
     def get(self, request):
-        fpo = self._get_fpo(request)
+        # Read access extends to team members; PATCH stays primary-only.
+        fpo = get_member_fpo(request.user)
         if not fpo:
             return StandardResponse.error(
                 'No FPO found. Start registration at POST /api/fpo/register/',
@@ -610,7 +612,7 @@ class FPOStatusView(APIView):
         responses={200: OpenApiResponse(description="Status and timeline")},
     )
     def get(self, request):
-        fpo = FPO.objects.filter(primary_user=request.user).first()
+        fpo = get_member_fpo(request.user)
         if not fpo:
             return StandardResponse.error(
                 'No FPO found.',
