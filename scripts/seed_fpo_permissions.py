@@ -116,6 +116,12 @@ def seed_fpo_permissions():
             'description': 'View FPO dashboard — tier, status, quick stats',
         },
         {
+            'code':        'can_edit_tier_assessment',
+            'en':          'Edit Tier Assessment',
+            'ml':          'ടയർ വിലയിരുത്തൽ എഡിറ്റ് ചെയ്യുക',
+            'description': 'Answer, submit and reopen the tier assessment (view-only without this)',
+        },
+        {
             'code':        'can_submit_claim',
             'en':          'Submit Ownership Claim',
             'ml':          'ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിക്കുക',
@@ -158,6 +164,7 @@ def seed_fpo_permissions():
             'can_edit_profile':   True,
             'can_view_dashboard': True,
             'can_submit_claim':   True,
+            'can_edit_tier_assessment': True,
         },
         'secondary': {
             'can_submit':         False,
@@ -169,6 +176,7 @@ def seed_fpo_permissions():
             'can_edit_profile':   True,   # RCD: secondary can do data entry
             'can_view_dashboard': True,
             'can_submit_claim':   False,
+            'can_edit_tier_assessment': False,
         },
     }
 
@@ -201,9 +209,10 @@ def seed_fpo_permissions():
         'can_delete_docs':    '/fpo/register',
         'can_view_docs':      '/fpo/register',
         'can_edit_profile':   '/fpo/profile',
-        'can_invite_team':    '/fpo/settings',
+        'can_invite_team':    '/fpo/team',
         'can_manage_team':    '/fpo/settings',
         'can_submit_claim':   '/fpo/applications',
+        'can_edit_tier_assessment': '/fpo/tier-assessment',
     }
 
     page_cache = {}

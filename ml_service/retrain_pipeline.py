@@ -77,9 +77,21 @@ VALID_SERVICE_ZONES = {"coastal_zone", "southern_zone", "central_zone", "norther
 VALID_SEASONS = {"southwest_monsoon", "northeast_monsoon", "dry_season"}
 SOIL_PH_PLAUSIBLE_RANGE = (3.0, 10.0)
 
-# Header columns used to tell the two formats apart -- see _detect_dataset_format().
+# Header columns used to tell the formats apart -- see _detect_dataset_format().
 RULE_BASED_FORMAT_MARKERS = {"temperature_range", "soil_ph_range", "agro_zone"}
 PRE_EXPANDED_FORMAT_MARKERS = {"temperature_avg_C", "soil_ph_mid", "zone", "is_suitable"}
+# Exact shape of apps/recommendations/api/crop_zone_profile_admin.py's
+# EXPORT_CSV_COLUMNS (crop_profiles_service_zones.csv) -- duplicated, not
+# imported, same reason that file's own KAU_TO_SERVICE_ZONE comment gives:
+# ml_service is a separate process/deployment. Checked as a full subset match
+# (not just "any marker present") because it shares "agro_zone" with
+# RULE_BASED_FORMAT_MARKERS -- an any-overlap check would misdetect this as
+# rule_based, so _detect_dataset_format() checks this shape FIRST.
+ZONE_PROFILES_REQUIRED_COLUMNS = [
+    "crop_name", "agro_zone", "crop_group", "temp_lo", "temp_hi", "ph_lo", "ph_hi",
+    "seasons_text", "ph_is_real", "temp_is_real", "service_zone", "kau_zone_source",
+]
+ZONE_PROFILES_FORMAT_MARKERS = {"service_zone", "kau_zone_source", "ph_is_real", "temp_is_real"}
 
 # Prefixes that mark a validate_*_csv() finding as BLOCKING (training cannot proceed).
 # Anything else returned by those functions is a non-blocking warning. Centralized here
@@ -184,11 +196,17 @@ def validate_source_csv(df: pd.DataFrame) -> list[str]:
 
 
 def _detect_dataset_format(df: pd.DataFrame) -> str:
-    """Returns "rule_based", "pre_expanded", or "unknown", based on which of the two
-    accepted CSV shapes the header looks like. Only a few marker columns are checked
-    here (not the full required-column list) -- that's what the per-format validators
-    are for; this just decides which validator to run."""
+    """Returns "zone_profiles", "rule_based", "pre_expanded", or "unknown", based on
+    which of the accepted CSV shapes the header looks like. Only a few marker columns
+    are checked here (not the full required-column list) -- that's what the per-format
+    validators are for; this just decides which validator to run.
+
+    zone_profiles is checked FIRST, as a full-subset match rather than any-overlap:
+    it shares its "agro_zone" column with RULE_BASED_FORMAT_MARKERS, so an any-overlap
+    check would misdetect it as rule_based."""
     cols = set(df.columns)
+    if ZONE_PROFILES_FORMAT_MARKERS.issubset(cols):
+        return "zone_profiles"
     looks_rule_based = bool(RULE_BASED_FORMAT_MARKERS & cols)
     looks_pre_expanded = bool(PRE_EXPANDED_FORMAT_MARKERS & cols)
     if looks_rule_based and not looks_pre_expanded:
@@ -276,6 +294,63 @@ def validate_preexpanded_csv(df: pd.DataFrame) -> list[str]:
             f"soil_ph_mid has value(s) outside the plausible {lo}-{hi} range: {out_of_range[:10]}. "
             f"Could be a legitimate extreme value, but usually indicates a units/parsing mistake -- double check."
         )
+
+    return problems
+
+
+def validate_zone_profiles_csv(df: pd.DataFrame) -> list[str]:
+    """Returns a list of human-readable problems (empty list = OK to proceed), same
+    convention as the other two validate_*_csv() functions.
+
+    This format is CropZoneProfile's own export shape (crop_profiles_service_zones.csv,
+    see apps/recommendations/api/crop_zone_profile_admin.py's EXPORT_CSV_COLUMNS) --
+    an admin's directly-entered temp/pH ranges per (crop, service_zone), already past
+    the free-text-parsing stage the rule_based format needs. Checks are the same shape
+    as validate_preexpanded_csv()'s data-quality checks, just against this format's own
+    columns instead."""
+    problems = []
+    missing_cols = [c for c in ZONE_PROFILES_REQUIRED_COLUMNS if c not in df.columns]
+    if missing_cols:
+        problems.append(f"Missing required columns: {missing_cols}")
+        return problems  # can't check anything else meaningfully without these
+
+    if df["crop_name"].isna().any() or (df["crop_name"].astype(str).str.strip() == "").any():
+        problems.append("Some rows have a blank crop_name.")
+
+    numeric_cols = ["temp_lo", "temp_hi", "ph_lo", "ph_hi"]
+    coerced = {}
+    for col in numeric_cols:
+        parsed = pd.to_numeric(df[col], errors="coerce")
+        coerced[col] = parsed
+        bad_mask = parsed.isna()
+        if bad_mask.any():
+            bad_values = sorted(df.loc[bad_mask, col].astype(str).unique())[:10]
+            problems.append(
+                f"Non-numeric value(s) found in column '{col}': {bad_values}. This column must be numeric for training."
+            )
+
+    if not coerced["temp_lo"].isna().all() and not coerced["temp_hi"].isna().all():
+        inverted = (coerced["temp_lo"] > coerced["temp_hi"])
+        if inverted.any():
+            problems.append(
+                f"{int(inverted.sum())} row(s) have temp_lo greater than temp_hi -- double check before uploading."
+            )
+    if not coerced["ph_lo"].isna().all() and not coerced["ph_hi"].isna().all():
+        inverted = (coerced["ph_lo"] > coerced["ph_hi"])
+        if inverted.any():
+            problems.append(
+                f"{int(inverted.sum())} row(s) have ph_lo greater than ph_hi -- double check before uploading."
+            )
+
+    unknown_zones = sorted(set(df["service_zone"].dropna().unique()) - VALID_SERVICE_ZONES)
+    if unknown_zones:
+        problems.append(
+            f"Unrecognized service_zone value(s): {unknown_zones}. Must be one of {sorted(VALID_SERVICE_ZONES)}. "
+            f"Rows with an unrecognized zone will be silently dropped from training -- fix these before uploading."
+        )
+
+    if len(df) < 20:
+        problems.append(f"Only {len(df)} rows -- suspiciously small for a full crop dataset, double check the file.")
 
     return problems
 
@@ -446,6 +521,64 @@ def _stage3_build_training_rows(profiles: pd.DataFrame, climate: pd.DataFrame) -
     return pd.DataFrame(rows)
 
 
+# ---------------- zone_profiles format: build training rows directly from CropZoneProfile's
+# own export shape, skipping stages 1-2 entirely ----------------
+
+def _build_rows_from_zone_profiles(df: pd.DataFrame, climate_path: str = CLIMATE_PATH) -> pd.DataFrame:
+    """
+    Builds pre-expanded training rows from CropZoneProfile's export shape
+    (crop_profiles_service_zones.csv -- see ZONE_PROFILES_REQUIRED_COLUMNS and
+    apps/recommendations/api/crop_zone_profile_admin.py's EXPORT_CSV_COLUMNS),
+    instead of the rule_based format's free-text book crosswalk.
+
+    Stages 1-2 (_stage1_parse_bounds, _stage2_aggregate_profiles) don't apply
+    here: this format's temp_lo/temp_hi/ph_lo/ph_hi are already real numbers an
+    admin entered directly, not free text to regex-parse, and the rows are
+    already expanded to one row per (crop, service_zone) -- no KAU-zone
+    crosswalk needed either.
+
+    is_suitable is temp_ok ONLY, unlike stage 3's temp_ok AND (season_ok OR
+    soilkw_ok). A CropZoneProfile row already represents an admin's
+    affirmative "this crop is eligible in this zone" -- there is no "not
+    suitable" CropZoneProfile row the way the rule_based book crosswalk lists
+    both suitable and unsuitable candidates for a zone -- so there's nothing
+    to re-derive zone/season eligibility FROM via keyword matching (no
+    soil_text on this model at all, and season eligibility is already implied
+    by the row's existence). temp_ok still does real work: it's what decides
+    WHICH of the zone's climate months this crop's documented temperature
+    range actually covers, since a crop can be broadly eligible for a zone yet
+    still miss a specific month's real climate.
+
+    soil_ph_mid/temperature_avg_C use this crop's own ph_lo/ph_hi/temp_lo/
+    temp_hi midpoint directly -- same convention _stage3_build_training_rows()
+    uses for the rule_based format (see its own comments), except here it's
+    never a fallback: every row in this format has a real, admin-entered
+    range, so there's no "no bounds parsed" case to fall back from.
+    """
+    climate = pd.read_csv(climate_path)
+    rows = []
+    for _, p in df.iterrows():
+        service_zone = p["service_zone"]
+        if service_zone not in ZONE_SOIL_TYPES:
+            continue  # unrecognized zone -- already flagged as a warning by validate_zone_profiles_csv()
+        soil_ph_mid = (p["ph_lo"] + p["ph_hi"]) / 2
+        temperature_avg_C = (p["temp_lo"] + p["temp_hi"]) / 2
+        for _, zc in climate[climate["zone"] == service_zone].iterrows():
+            temp_ok = not (zc["temperature_avg_C"] < p["temp_lo"] - 2 or zc["temperature_avg_C"] > p["temp_hi"] + 2)
+            is_suitable = int(temp_ok)
+            for soil_category in ZONE_SOIL_TYPES[service_zone]:
+                rows.append({
+                    "zone": service_zone, "month": zc["month"], "season": zc["season"],
+                    "soil_type": soil_category, "soil_ph_mid": soil_ph_mid,
+                    "temperature_avg_C": temperature_avg_C, "rainfall_mm": zc["rainfall_mm"],
+                    "humidity_pct": zc["humidity_pct"],
+                    "crop_name": p["crop_name"], "crop_group": p["crop_group"],
+                    "kau_zone_source": p["kau_zone_source"],
+                    "is_suitable": is_suitable,
+                })
+    return pd.DataFrame(rows)
+
+
 # ---------------- stage 4: train (was train_model_v3.py) ----------------
 
 def _build_pipeline():
@@ -590,7 +723,7 @@ def _train(df: pd.DataFrame):
 # ---------------- entry point ----------------
 
 def run_retrain(source_csv_path: str, climate_path: str = CLIMATE_PATH):
-    """Runs the pipeline for whichever of the two accepted CSV formats the uploaded
+    """Runs the pipeline for whichever of the accepted CSV formats the uploaded
     file's header matches (see _detect_dataset_format()). Returns (fitted_pipeline,
     metrics_dict, training_df). Raises DatasetValidationError if the input CSV fails
     structural checks or its format can't be determined -- callers should catch this
@@ -601,10 +734,32 @@ def run_retrain(source_csv_path: str, climate_path: str = CLIMATE_PATH):
     if fmt == "unknown":
         raise DatasetValidationError(
             "Could not tell which training CSV format this is from its header. This service accepts "
-            f"either the rule-based KAU knowledge-base format (columns: {REQUIRED_COLUMNS}) or the "
-            f"pre-expanded/factual format (columns: {REQUIRED_PREEXPANDED_COLUMNS}). "
+            f"the rule-based KAU knowledge-base format (columns: {REQUIRED_COLUMNS}), the "
+            f"pre-expanded/factual format (columns: {REQUIRED_PREEXPANDED_COLUMNS}), or CropZoneProfile's "
+            f"own export format (columns: {ZONE_PROFILES_REQUIRED_COLUMNS}). "
             f"Header found: {list(raw.columns)}."
         )
+
+    if fmt == "zone_profiles":
+        problems = validate_zone_profiles_csv(raw)
+        blocking = [p for p in problems if is_blocking(p)]
+        if blocking:
+            raise DatasetValidationError("; ".join(problems))
+
+        for col in ["temp_lo", "temp_hi", "ph_lo", "ph_hi"]:
+            raw[col] = pd.to_numeric(raw[col])
+        training_df = _build_rows_from_zone_profiles(raw, climate_path)
+
+        if training_df.empty or training_df["crop_name"].nunique() == 0:
+            raise DatasetValidationError(
+                "No trainable rows were produced -- every row's service_zone likely failed to match a "
+                "known zone. Check service_zone values against the required list."
+            )
+
+        pipe, metrics = _train(training_df)
+        metrics["validation_warnings"] = problems  # non-blocking issues, still worth surfacing
+        metrics["source_format"] = "zone_profiles"
+        return pipe, metrics, training_df
 
     if fmt == "pre_expanded":
         problems = validate_preexpanded_csv(raw)

@@ -57,6 +57,7 @@ TEMPLATE_CODES = [
     ('claim_draft_removed',         'email',  'Notify claimant that their incomplete draft FPO was removed during ownership transfer', ['user_name', 'fpo_name']),
     ('claim_draft_removed',         'in_app', 'In-app: draft FPO removed during ownership transfer',     ['user_name', 'fpo_name']),
     ('claim_new_admin',             'in_app', 'Notify admin inbox when a new ownership claim is submitted', ['fpo_name', 'claimant_name', 'identity_info']),
+    ('info_response_admin',         'in_app', 'Notify admin inbox when an FPO replies to an information request', ['fpo_name', 'application_id']),
     ('claim_docs_requested',        'email',  'Notify claimant that admin is requesting additional documents', ['user_name', 'fpo_name', 'admin_message']),
     ('claim_docs_requested',        'sms',    'SMS to claimant: admin requesting additional documents',        ['user_name', 'fpo_name']),
     ('claim_docs_requested',        'in_app', 'In-app: admin requesting additional documents for claim',       ['user_name', 'fpo_name', 'admin_message']),
@@ -601,6 +602,16 @@ TEMPLATES = [
         'claim_new_admin', 'in_app', 'ml',
         'പുതിയ ഉടമസ്ഥാവകാശ അവകാശവാദം ലഭിച്ചു',
         '{{claimant_name}}, {{fpo_name}}-നായി ഒരു ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിച്ചിരിക്കുന്നു ({{identity_info}}). ദയവായി അവലോകനം ചെയ്ത് നടപടി സ്വീകരിക്കുക.',
+    ),
+    (
+        'info_response_admin', 'in_app', 'en',
+        'FPO Responded to Information Request',
+        '<strong>{{fpo_name}}</strong> ({{application_id}}) has responded to your information request. The application is back in the review queue.',
+    ),
+    (
+        'info_response_admin', 'in_app', 'ml',
+        'വിവര അഭ്യർത്ഥനയ്ക്ക് FPO മറുപടി നൽകി',
+        '<strong>{{fpo_name}}</strong> ({{application_id}}) നിങ്ങളുടെ വിവര അഭ്യർത്ഥനയ്ക്ക് മറുപടി നൽകി. അപേക്ഷ വീണ്ടും അവലോകന ക്യൂവിലാണ്.',
     ),
     # Documents requested from claimant
     (

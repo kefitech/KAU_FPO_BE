@@ -119,24 +119,49 @@ class TeamListView(APIView):
     @extend_schema(
         tags=['FPO - Team'],
         summary='List team members',
-        description='Returns all secondary users in this FPO. Only accessible by the primary user.',
+        description='Returns all team members of this FPO. Primary users can manage them; secondary users get a read-only view.',
         responses={200: FPOTeamMemberSerializer(many=True)},
     )
     def get(self, request):
         fpo = _get_primary_fpo(request.user)
         if not fpo:
+            # Team members get a read-only view of their own FPO's team
+            membership = FPOUserMembership.objects.filter(
+                user=request.user, is_active=True, is_deleted=False,
+            ).select_related('fpo').first()
+            fpo = membership.fpo if membership else None
+        if not fpo:
             return StandardResponse.error(
-                'Only the primary user can view the team.',
+                'Only FPO members can view the team.',
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
         memberships = FPOUserMembership.objects.filter(
             fpo=fpo, is_deleted=False
-        ).select_related('user', 'user__profile', 'role').exclude(
-            user=request.user
-        )
-        serializer = FPOTeamMemberSerializer(memberships, many=True)
-        return StandardResponse.success(serializer.data, 'Team members retrieved.')
+        ).select_related('user', 'user__profile', 'role')
+        # The primary manages the team, so they don't list themselves;
+        # team members see their own row as well.
+        if fpo.primary_user_id == request.user.id:
+            memberships = memberships.exclude(user=request.user)
+        data = FPOTeamMemberSerializer(memberships, many=True).data
+
+        # The FPO owner has no membership row, so a team member wouldn't see
+        # them. Prepend the owner in the same shape.
+        owner = fpo.primary_user
+        if owner and owner.id != request.user.id:
+            profile = getattr(owner, 'profile', None)
+            data = [{
+                'id':         owner.id,
+                'first_name': owner.first_name,
+                'last_name':  owner.last_name,
+                'email':      owner.email,
+                'phone':      profile.phone if profile else '',
+                'role':       'primary',
+                'is_active':  owner.is_active,
+                'joined_at':  fpo.created_at,
+            }, *data]
+
+        return StandardResponse.success(data, 'Team members retrieved.')
 
 
 class TeamInviteView(APIView):

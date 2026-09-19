@@ -116,9 +116,38 @@ def _clear_failed_login(user) -> None:
 
 
 def _get_user_role(user):
-    """Return the highest-priority role name for a user."""
+    """
+    Return the highest-priority role name for a user.
+
+    FPO users (in the 'fpo_manager' group) are further disambiguated into
+    'primary' or 'secondary' using their FPOUserMembership row — the
+    'fpo_manager' group only marks "this is an FPO-side user", it doesn't
+    say which kind. Without this, every invited secondary/team-member
+    user reports back as role='fpo_manager', identical to the FPO's own
+    primary/registering user.
+    """
     priority = ['super_admin', 'sub_admin', 'fpo_manager', 'government', 'cbbo', 'expert', 'viewer']
     user_groups = set(user.groups.values_list('name', flat=True))
+
+    if 'fpo_manager' in user_groups:
+        from apps.database.models.fpo import FPO, FPOUserMembership
+
+        membership = (
+            FPOUserMembership.objects
+            .filter(user=user, is_active=True)
+            .select_related('role')
+            .first()
+        )
+        if membership and membership.role:
+            return membership.role.name  # 'primary' or 'secondary'
+
+        # No membership row (or none active) — fall back to FPO.primary_user,
+        # which is how the FPO's own registering user is recorded.
+        if FPO.objects.filter(primary_user=user).exists():
+            return 'primary'
+
+        return 'fpo_manager'
+
     for role in priority:
         if role in user_groups:
             return role
@@ -134,6 +163,11 @@ def _build_menu(user, lang):
     """Return translated menu items the user is allowed to see."""
     user_groups = user.groups.all()
 
+    # Invited team members carry 'fpo_manager' only to mark them as FPO-side
+    # users. Their sidebar comes from their membership role ('secondary'),
+    # so drop the umbrella group or they'd see the full fpo_manager menu.
+    if _get_user_role(user) == 'secondary':
+        user_groups = user_groups.exclude(name='fpo_manager')
     top_level = MenuItem.objects.filter(
         parent=None,
         is_active=True,
@@ -155,6 +189,43 @@ def _build_menu(user, lang):
         return entry
 
     return [serialize_item(item) for item in top_level]
+
+
+def _build_fpo_access(user):
+    """
+    Effective FPO action permissions (role ceiling + member overrides) and a
+    per-page edit flag, both from the permission matrix (the FPO owner has
+    every action). A page is editable
+    if any action linked to it (FPOAction.menu_item) is allowed; pages with
+    no linked actions are not restricted. Returns None for non-members.
+    """
+    from apps.database.models.fpo import FPO, FPOAction, FPOUserMembership
+    from apps.core.services.fpo_permission import get_effective_permissions
+
+    membership = (
+        FPOUserMembership.objects
+        .filter(user=user, is_active=True, is_deleted=False)
+        .select_related('role')
+        .first()
+    )
+    if membership:
+        perms = get_effective_permissions(membership)
+    elif FPO.objects.filter(primary_user=user, is_deleted=False).exists():
+        # The FPO owner has no membership row and owns every action.
+        perms = {c: True for c in FPOAction.objects.filter(is_active=True).values_list('code', flat=True)}
+    else:
+        return None
+
+    pages = {}
+    for code, path in FPOAction.objects.filter(
+        is_active=True, menu_item__isnull=False
+    ).values_list('code', 'menu_item__path'):
+        pages[path] = pages.get(path, False) or perms.get(code, False)
+
+    return {
+        'actions': perms,
+        'pages':   {path: {'can_edit': can_edit} for path, can_edit in pages.items()},
+    }
 
 
 class RegisterSuperAdminView(APIView):
@@ -584,6 +655,7 @@ class MeView(APIView):
             },
             'menu':     None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
             'redirect': redirect,
+            'fpo_access': _build_fpo_access(user),
         }
 
         return StandardResponse.success(

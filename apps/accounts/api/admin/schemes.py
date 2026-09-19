@@ -7,6 +7,8 @@ POST  /api/admin/schemes/{id}/activate/
 POST  /api/admin/schemes/{id}/deactivate/
 """
 
+import re
+
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.views import APIView
@@ -40,6 +42,32 @@ class SchemeSerializer(serializers.ModelSerializer):
         return data
 
 
+# Letters/digits (any script) plus a small punctuation set real scheme names use,
+# e.g. "Agriculture Infrastructure Fund (AIF)", "PM-KISAN", "Ministry of A & B".
+# Deliberately NOT applied to name_ml or the long-text fields: Malayalam vowel
+# signs and ZWNJ are combining marks that \w does not match, so an allow-list
+# there would reject every genuine Malayalam name.
+_NAME_ALLOWED = re.compile(r"^(?:[^\W_]| |[&(),.\-–'’/:])+$")
+_HAS_LETTER = re.compile(r'[^\W\d_]')
+_HAS_LETTER_OR_DIGIT = re.compile(r'[^\W_]')
+
+
+def _validate_english_name(value, label):
+    if not _HAS_LETTER.search(value):
+        raise serializers.ValidationError(f'{label} must contain at least one letter.')
+    if not _NAME_ALLOWED.match(value):
+        raise serializers.ValidationError(
+            f"{label} may only contain letters, numbers, spaces and & ( ) , . - ' / :"
+        )
+    return value
+
+
+def _validate_not_only_symbols(value, label):
+    if value and not _HAS_LETTER_OR_DIGIT.search(value):
+        raise serializers.ValidationError(f'{label} must contain letters or numbers, not only symbols.')
+    return value
+
+
 class SchemeWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Scheme
@@ -54,6 +82,29 @@ class SchemeWriteSerializer(serializers.ModelSerializer):
         if value not in valid:
             raise serializers.ValidationError(f'Must be one of: {", ".join(valid)}')
         return value
+
+    def validate_name_en(self, value):
+        return _validate_english_name(value, 'English name')
+
+    def validate_administering_body(self, value):
+        return _validate_english_name(value, 'Administering body')
+
+    def validate_name_ml(self, value):
+        if value and not _HAS_LETTER.search(value):
+            raise serializers.ValidationError('Malayalam name must contain at least one letter.')
+        return value
+
+    def validate_objective(self, value):
+        return _validate_not_only_symbols(value, 'Objective')
+
+    def validate_eligibility(self, value):
+        return _validate_not_only_symbols(value, 'Eligibility')
+
+    def validate_benefit_details(self, value):
+        return _validate_not_only_symbols(value, 'Benefit details')
+
+    def validate_application_process(self, value):
+        return _validate_not_only_symbols(value, 'Application process')
 
 
 class SchemeListView(APIView):

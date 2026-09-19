@@ -29,6 +29,10 @@ from .translations import TranslationViewSet
 from .fpo_roles import FPOMemberRoleViewSet
 from .fpo_actions import FPOActionViewSet
 from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
+from .master_lookups import (
+    CommodityCreateView, PromotingAgencyCreateView, BankCreateView, CropNameCreateView, CropGroupCreateView,
+    LookupDetailView, LookupActiveView, CommodityUpdateSerializer,
+)
 #-----------------------------------------------------------------------------
 #aug21 import buyer
 #Arunima
@@ -168,9 +172,27 @@ router.register(r'prices', AdminMarketPriceViewSet, basename='admin-price')
 
  #------------------------------------------------------------------------------
 
+# Master lookup admin APIs: list/create, detail (get/patch/delete), activate/deactivate
+_LOOKUPS = [
+    ('commodities',        'commodity',        CommodityCreateView,      dict(update_serializer=CommodityUpdateSerializer, has_section=True, translation_label='Commodity', translation_desc='Agricultural commodities for FPO registration')),
+    ('promoting-agencies', 'promoting_agency', PromotingAgencyCreateView, dict(translation_label='Promoting Agency', translation_desc='FPO promoting/implementing agencies')),
+    ('banks',              'bank_name',        BankCreateView,           dict(translation_label='Bank Names', translation_desc='Banks for FPO Step 4 bank details')),
+    ('crop-names',         'crop_name',        CropNameCreateView,       dict(translation_label='Crop Names', translation_desc='Crop names for Package of Practices and Crop Zone Profiles')),
+    ('crop-groups',        'crop_group',       CropGroupCreateView,      dict(translation_label='Crop Groups', translation_desc='Crop groups for Package of Practices and Crop Zone Profiles')),
+]
+master_lookup_urls = []
+for _slug, _category, _list_view, _cfg in _LOOKUPS:
+    master_lookup_urls += [
+        path(f'{_slug}/',                          _list_view.as_view(),                                             name=f'admin-{_slug}'),
+        path(f'{_slug}/<int:pk>/',                 LookupDetailView.as_view(category=_category, **_cfg),             name=f'admin-{_slug}-detail'),
+        path(f'{_slug}/<int:pk>/deactivate/',      LookupActiveView.as_view(category=_category, activate=False),     name=f'admin-{_slug}-deactivate'),
+        path(f'{_slug}/<int:pk>/activate/',        LookupActiveView.as_view(category=_category, activate=True),      name=f'admin-{_slug}-activate'),
+    ]
+
 # URL patterns
 urlpatterns = [
     path('', include(router.urls)),
+    *master_lookup_urls,
     path('fpo-permissions/',          FPOPermissionMatrixView.as_view(),      name='fpo-permission-matrix'),
     path('fpo-permissions/<int:role_id>/', FPORolePermissionsView.as_view(), name='fpo-role-permissions'),
     # FPO Applications workflow

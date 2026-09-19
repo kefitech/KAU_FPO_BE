@@ -30,7 +30,7 @@ from apps.core.services.translation import t
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
 from apps.database.models.fpo import FPO, ApplicationStatusHistory
-from apps.notifications.services import send_notification
+from apps.notifications.services import send_notification, notify_super_admins
 
 User = get_user_model()
 
@@ -84,6 +84,9 @@ class FPOSubmitView(APIView):
 
         from_status = fpo.status
 
+        # Optional reply to the admin's info request, carried over from the status page
+        reply_notes = str(request.data.get('notes') or '').strip()
+
         with transaction.atomic():
             if from_status == FPOStatus.INFO_REQUIRED:
                 fpo.status = FPOStatus.SUBMITTED
@@ -93,7 +96,7 @@ class FPOSubmitView(APIView):
                     from_status=from_status,
                     to_status=FPOStatus.SUBMITTED,
                     changed_by=request.user,
-                    notes='Re-submitted after information request.',
+                    notes=reply_notes or 'Re-submitted after information request.',
                 )
 
                 AuditService.log(
@@ -103,6 +106,11 @@ class FPOSubmitView(APIView):
                     request=request,
                     changes={'from_status': from_status, 'status': FPOStatus.SUBMITTED},
                 )
+
+                transaction.on_commit(lambda: notify_super_admins('info_response_admin', {
+                    'fpo_name':       fpo.name,
+                    'application_id': fpo.application_id or '',
+                }))
 
                 return StandardResponse.success(
                     message='Application re-submitted. The admin will review your updated information.',

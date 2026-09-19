@@ -18,6 +18,7 @@ from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
 from apps.core.permissions.rbac import IsAdmin
 
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models import FPO, MLModelVersion, CropRecommendation
 from apps.recommendations.services import (
     get_crop_recommendation,
@@ -30,10 +31,10 @@ from apps.recommendations.services import (
 # ---------------------------------------------------------------------------
 
 def _get_fpo_or_404(user, lang):
-    try:
-        return FPO.objects.get(primary_user=user), None
-    except FPO.DoesNotExist:
-        return None, StandardResponse.error(
+    fpo = get_member_fpo(user)
+    if fpo is not None:
+        return fpo, None
+    return None, StandardResponse.error(
             t('recommendations.fpo_not_found', lang),
             status_code=status.HTTP_404_NOT_FOUND,
         )

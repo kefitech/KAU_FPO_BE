@@ -9,6 +9,7 @@ Seeds MasterLookup entries for all FPO registration dropdowns:
   4. block                — Kerala blocks per district (fixed, 180 blocks)
   5. commodity            — commodity master list (EN + ML, from KAU June 2026)
   6. bank_name            — major Indian banks for Step 4
+  7. crop_name, crop_group — crop dropdowns for Package of Practices / Crop Zone Profiles
 
 All entries use update_or_create — safe to re-run.
 Translations seeded in Translation table (category = MasterLookup.category).
@@ -330,6 +331,52 @@ def seed_fpo_master_data():
         code = re2.sub(r'[^a-z0-9]+', '_', bank.lower()).strip('_')[:50]
         bank_entries.append({'code': code, 'en': bank, 'ml': bank})
     _seed_lookup('bank_name', bank_entries, 'Bank Names', 'Banks for FPO Step 4 bank details')
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 7. Crop names + crop groups — dropdowns for Crop Package of Practices and
+    #    Crop Zone Profiles. The models store the exact English name (the ML
+    #    service matches predicted crops on it), so name_en must not be renamed
+    #    once rows use it. Groups follow the zone-profile vocabulary.
+    #    Malayalam falls back to English until translated in the admin UI.
+    # ──────────────────────────────────────────────────────────────────────────
+    import re as re3
+    CROP_NAMES = [
+        'Adapathiyan', 'Agathi', 'Ailanthus or Matti', 'Amaranth', 'Anthurium', 'Apple', 'Arecanut',
+        'Arrow root', 'Ash gourd', 'Asoka', 'Banana', 'Beet root', 'Betel vine', 'Bitter gourd',
+        'Black gram', 'Black pepper', 'Bottle gourd', 'Brahmi', 'Brinjal', 'Cabbage', 'Camboge', 'Cardamom',
+        'Carrot', 'Cashew', 'Cassia', 'Casuarina', 'Cauliflower', 'Chadachi', 'Chengazhinirkizhangu',
+        'Chethikoduveli', 'Chilli', 'China aster', 'Chittadalotakam', 'Chittaratha', 'Cinnamon', 'Clove',
+        'Cocoa', 'Coconut', 'Coffee', 'Coleus', 'Colocasia', 'Congosignal grass', 'Cotton', 'Cowpea',
+        'Crossandra', 'Cucumber and oriental pickling melon', 'Daincha', 'Danthappala', 'Elephant foot yam',
+        'Eucalyptus', 'Fodder cowpea', 'Fodder maize', 'Fodder sorghum', 'French bean', 'Gamba grass',
+        'Garlic', 'Ginger', 'Gladiolus', 'Gliricidia', 'Greater yam', 'Green gram', 'Green pea', 'Groundnut',
+        'Guava', 'Guinea grass', 'Hedge lucerne', 'Horse gram', 'Hybrid napier', 'Indian gooseberry',
+        'Indigo', 'Irul', 'Jack', 'Jasmine', 'Jeevakom', 'Kacholam', 'Kampakam', 'Kanjiram', 'Karinochi',
+        'Kasthurimanjal', 'Kattarvazha', 'Koovalam', 'Kurumthotti', 'Lemongrass', 'Lesser yam', 'Mahagony',
+        'Maize', 'Mandarin orange', 'Mangium', 'Mango', 'Mango ginger', 'Marigold', 'Neela amari', 'Neem',
+        'Nilappana', 'Nutmeg', 'Oilpalm', 'Okra', 'Onion', 'Orchids', 'Palmarosa', 'Papaya', 'Para grass',
+        'Pathimugham', 'Pineapple', 'Potato', 'Pumpkin', 'Punna', 'Radish', 'Ragi', 'Red gram', 'Rice',
+        'Rosewood', 'Rubber', 'Sandal', 'Sapota', 'Sesame', 'Setaria grass', 'Shevri', 'Snake gourd',
+        'Sorghum', 'Soybean', 'Strawberry', 'Stylo', 'Subabul', 'Sugarcane', 'Sun hemp', 'Sweet potato',
+        'Tamarind', 'Tapioca', 'Tea', 'Teak', 'Thembavu', 'Thippali', 'Thorny bamboo', 'Thulasi', 'Tobacco',
+        'Tomato', 'Tuberose', 'Turmeric', 'Vanilla', 'Vegetable cowpea', 'Venga', 'Vetiver', 'Water melon',
+        'West Indian Cherry', 'White yam', 'Wild indigo', 'Wild jack or Aini', 'Xanthosoma',
+    ]
+    CROP_GROUPS = [
+        'Agroforestry', 'Beverages and Stimulants', 'Cereals and Millets', 'Commercial Crops',
+        'Cool Season Vegetables', 'Cucurbitaceous Vegetables', 'Fodder Crops', 'Fruits',
+        'Green Leaf Manure Crops', 'Green Manure Crops', 'Medicinal and Aromatic Plants', 'Oil Seeds',
+        'Ornamental Plants', 'Pulses', 'Solanaceous Vegetables', 'Spices and Condiments', 'Tubers',
+        'Vegetables',
+    ]
+    for category, label, desc, items in (
+        ('crop_name',  'Crop Names',  'Crop names for Package of Practices and Crop Zone Profiles', CROP_NAMES),
+        ('crop_group', 'Crop Groups', 'Crop groups for Package of Practices and Crop Zone Profiles', CROP_GROUPS),
+    ):
+        _seed_lookup(category, [
+            {'code': re3.sub(r'[^a-z0-9]+', '_', item.lower()).strip('_')[:50], 'en': item, 'ml': item}
+            for item in items
+        ], label, desc)
 
     print('\nFPO master data seeded successfully.')
     print('Run seed_menu() and seed_fpo_permissions() if not already done.')
