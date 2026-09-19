@@ -3413,6 +3413,7 @@ def seed_fpo_portal_ml_translations(languages):
         'expert_dashboard.status_rejected':               'നിരസിച്ചു',
         'expert_dashboard.status_cancelled':              'റദ്ദാക്കി',
         'expert_dashboard.status_completed':              'പൂർത്തിയായി',
+        
         # ── expert_availability ─────────────────────────────────────────────
         'expert_availability.page_title':                    'ലഭ്യത സജ്ജീകരിക്കുക',
         'expert_availability.page_description_1':            'ഒരു തീയതി ശ്രേണി തിരഞ്ഞെടുക്കുക, ആഴ്ചയിലെ ഏതൊക്കെ ദിവസങ്ങൾ ഉൾപ്പെടുത്തണമെന്ന് തിരഞ്ഞെടുക്കുക, നിങ്ങളുടെ സമയ സ്ലോട്ടുകൾ സജ്ജീകരിക്കുക - ശ്രേണിയിലെ എല്ലാ തീയതികളും ഒരുമിച്ച് സേവ് ചെയ്യപ്പെടും.',
@@ -3593,9 +3594,10 @@ def seed_menu_translations(languages):
         ('fpo_products',           'My Products',              'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
         ('fpo_market',             'Market Linkage',           'വിപണി ബന്ധം'),
         ('fpo_settings',           'Settings',                 'ക്രമീകരണങ്ങൾ'),
+        ('fpo_trainings', 'Training Sessions', 'പരിശീലന സെഷനുകൾ'),
         ('cbbo_dashboard',          'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
         ('cbbo_verifications',      'FPO Verifications',        'FPO വെരിഫിക്കേഷനുകൾ'),
-        ('cbbo_reports',            'FPO Reports',          'FPO റിപ്പോർട്ടുകൾ')
+        ('cbbo_reports',            'FPO Reports',          'FPO റിപ്പോർട്ടുകൾ'),
         ('cbbo_profile',            'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
         ('government_schemes',       'Schemes & Subsidies',       'പദ്ധതികളും സബ്‌സിഡികളും'),
         ('government_training',      'Training Sessions',         'പരിശീലന സെഷനുകൾ'),
@@ -3607,6 +3609,7 @@ def seed_menu_translations(languages):
         ('expert_dashboard', 'My Bookings', 'എന്റെ ബുക്കിംഗുകൾ'),
         ('expert_availability', 'Set Availability', 'ലഭ്യത സജ്ജീകരിക്കുക'),
         ('expert_profile', 'My Profile', 'എന്റെ പ്രൊഫൈൽ'),     
+        ('expert_booking_overview', 'Booking Overview', 'ബുക്കിംഗ് അവലോകനം'),
     ]
 
 

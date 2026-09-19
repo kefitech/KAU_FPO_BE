@@ -219,7 +219,7 @@ class GovernmentRegistrationEmailOTPConfirmView(APIView):
 class GovernmentRegistrationSerializer(serializers.Serializer):
     email = serializers.EmailField()
     first_name = serializers.CharField(max_length=150)
-    last_name = serializers.CharField(max_length=150, required=False, default='')
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=15)
     designation = serializers.CharField(max_length=200)
     department = serializers.CharField(max_length=200)

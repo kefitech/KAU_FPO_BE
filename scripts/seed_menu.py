@@ -231,6 +231,13 @@ def seed_menu():
         roles     = fpo_roles,
         order     = 9,
     )
+    seed_item(
+        label_key = 'menu.fpo_trainings',
+        path      = '/fpo/trainings',
+        icon      = 'graduation-cap',
+        roles     = fpo_roles,
+        order     = 10,
+    )
 
     # ── CBBO portal pages ─────────────────────────────────────────────────────
 
@@ -317,26 +324,31 @@ def seed_menu():
         path      = '/expert/dashboard',
         icon      = 'layout-dashboard',
         roles     = [expert_group],
-        order     = 1,
+        order     = 2,
     )
     seed_item(
         label_key = 'Availability',
         path      = '/expert/availability',
         icon      = 'calendar-days',
         roles     = [expert_group],
-        order     = 2,
+        order     = 3,
     )
     seed_item(
         label_key = 'Profile',
         path      = '/expert/profile',
         icon      = 'user',
         roles     = [expert_group],
-        order     = 3,
+        order     = 4,
+    )
+    seed_item(
+        label_key = 'Booking Overview',
+        path      = '/expert/stats',
+        icon      = 'bar-chart-3',
+        roles     = [expert_group],
+        order     = 1,
     )
     
  
-
-    
 
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")

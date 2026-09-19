@@ -16,17 +16,23 @@ class _SessionListSerializer(serializers.ModelSerializer):
     fpo_name = serializers.CharField(source='fpo.name', read_only=True)
     district = serializers.CharField(source='fpo.district', read_only=True)
     attendance_count = serializers.SerializerMethodField()
+    attendance_total = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
-        fields = ['id', 'fpo', 'fpo_name', 'district', 'topic', 'trainer_name', 'date',
-                  'duration_hours', 'participants_count', 'venue', 'attendance_count',
+        fields = ['id', 'fpo', 'fpo_name', 'district', 'topic', 'trainer_name', 'date', 'time',
+                  'duration_hours', 'participants_count', 'venue', 'attendance_count', 'attendance_total',
                   'created_by_name', 'can_edit']
 
     def get_attendance_count(self, obj):
         return obj.attendance.filter(attended=True).count()
+
+    def get_attendance_total(self, obj):
+        # Distinguishes "attendance not yet recorded" (0 rows exist at all)
+        # from "recorded, and zero people attended" (rows exist, none marked).
+        return obj.attendance.count()
 
     def get_created_by_name(self, obj):
         return obj.cbbo.get_full_name() or obj.cbbo.username
@@ -44,7 +50,7 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrainingSession
-        fields = ['id', 'fpo', 'fpo_name', 'topic', 'trainer_name', 'date', 'duration_hours',
+        fields = ['id', 'fpo', 'fpo_name', 'topic', 'trainer_name', 'date', 'time', 'duration_hours',
                   'participants_count', 'venue', 'attendance', 'created_at', 'updated_at',
                   'created_by_name', 'can_edit']
 
@@ -63,21 +69,15 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
 
 
 class _SessionCreateSerializer(serializers.Serializer):
-    fpo_application_id = serializers.CharField(max_length=50)
+    fpo_application_ids = serializers.ListField(
+        child=serializers.CharField(max_length=50), min_length=1
+    )
     topic = serializers.CharField(max_length=300)
     trainer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     date = serializers.DateField()
+    time = serializers.CharField(max_length=10, required=False, allow_blank=True)
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1)
     participants_count = serializers.IntegerField(min_value=0, default=0)
-    venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
-
-
-class _SessionUpdateSerializer(serializers.Serializer):
-    topic = serializers.CharField(max_length=300, required=False)
-    trainer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
-    date = serializers.DateField(required=False)
-    duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1, required=False)
-    participants_count = serializers.IntegerField(min_value=0, required=False)
     venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
 
 
@@ -125,31 +125,84 @@ class GovernmentTrainingSessionListView(APIView):
 
         serializer = _SessionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        try:
-            fpo_obj = FPO.objects.get(
-                application_id=serializer.validated_data['fpo_application_id'],
-                is_deleted=False,
+        created_ids = []
+        not_found = []
+
+        for app_id in data['fpo_application_ids']:
+            try:
+                fpo_obj = FPO.objects.get(application_id=app_id, is_deleted=False)
+            except FPO.DoesNotExist:
+                not_found.append(app_id)
+                continue
+
+            fpo = get_fpo_scoped(fpo_obj.id, request.user)
+            if not fpo:
+                not_found.append(app_id)
+                continue
+
+            session = TrainingSession.objects.create(
+                fpo=fpo,
+                cbbo=request.user,
+                topic=data['topic'],
+                trainer_name=data.get('trainer_name', ''),
+                date=data['date'],
+                time=data.get('time', ''),
+                duration_hours=data['duration_hours'],
+                participants_count=data.get('participants_count', 0),
+                venue=data.get('venue', ''),
             )
-        except FPO.DoesNotExist:
-            return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
+            created_ids.append(session.id)
 
-        fpo = get_fpo_scoped(fpo_obj.id, request.user)
-        if not fpo:
-            return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
+            if fpo.primary_user:
+                from apps.notifications.services import send_notification
+                notify_context = {
+                    'fpo_name': fpo.name,
+                    'topic': session.topic,
+                    'trainer_name': session.trainer_name or 'TBD',
+                    'date': str(session.date),
+                    'time': session.time or 'TBD',
+                    'venue': session.venue or 'TBD',
+                }
+                try:
+                    send_notification(
+                        user=fpo.primary_user, code='fpo_training_scheduled', channel='in_app',
+                        context=notify_context,
+                    )
+                except Exception:
+                    pass
+                try:
+                    send_notification(
+                        user=fpo.primary_user, code='fpo_training_scheduled', channel='email',
+                        context=notify_context,
+                    )
+                except Exception:
+                    pass
 
-        session = TrainingSession.objects.create(
-            fpo=fpo,
-            cbbo=request.user,
-            topic=serializer.validated_data['topic'],
-            trainer_name=serializer.validated_data.get('trainer_name', ''),
-            date=serializer.validated_data['date'],
-            duration_hours=serializer.validated_data['duration_hours'],
-            participants_count=serializer.validated_data.get('participants_count', 0),
-            venue=serializer.validated_data.get('venue', ''),
+        if not created_ids:
+            return StandardResponse.error(
+                'None of the selected FPOs could be found in your jurisdiction.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        message = f'Training session recorded for {len(created_ids)} FPO(s).'
+        if not_found:
+            message += f" Could not find/access: {', '.join(not_found)}."
+
+        return StandardResponse.success(
+            data={'session_ids': created_ids, 'not_found': not_found}, message=message,
         )
 
-        return StandardResponse.success(data={'id': session.id}, message='Training session recorded.')
+
+class _SessionUpdateSerializer(serializers.Serializer):
+    topic = serializers.CharField(max_length=300, required=False)
+    trainer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    date = serializers.DateField(required=False)
+    time = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1, required=False)
+    participants_count = serializers.IntegerField(min_value=0, required=False)
+    venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
 
 
 class GovernmentTrainingSessionDetailView(APIView):
@@ -191,6 +244,21 @@ class GovernmentTrainingSessionDetailView(APIView):
             data=_SessionDetailSerializer(session, context={'request': request}).data,
             message='Training session updated.',
         )
+
+    def delete(self, request, session_id):
+        if not is_government_user(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        # Deleting is restricted to the creator, same boundary as edit.
+        session = TrainingSession.objects.filter(id=session_id, cbbo=request.user, is_deleted=False).first()
+        if not session:
+            return StandardResponse.error(
+                'Session not found, or you do not have permission to delete it.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        session.soft_delete(user=request.user)
+        return StandardResponse.success(message='Training session deleted.')
 
 
 class GovernmentTrainingAttendanceSetView(APIView):

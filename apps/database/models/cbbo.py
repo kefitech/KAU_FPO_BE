@@ -96,7 +96,6 @@ class TrainingSession(BaseModel):
     )
     cbbo = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='conducted_sessions'
-
     )
     trainer_name = models.CharField(
         max_length=200, blank=True,
@@ -107,6 +106,10 @@ class TrainingSession(BaseModel):
         help_text='MasterLookup category: training_topic'
     )
     date = models.DateField()
+    time = models.CharField(
+        max_length=10, blank=True,
+        help_text='e.g. 10:00 -- start time of the session'
+    )
     duration_hours = models.DecimalField(max_digits=4, decimal_places=1)
     participants_count = models.IntegerField(default=0)
     venue = models.CharField(
@@ -121,7 +124,6 @@ class TrainingSession(BaseModel):
 
     def __str__(self):
         return f"{self.topic} — {self.fpo} ({self.date})"
-
 
 class TrainingAttendance(BaseModel):
     session = models.ForeignKey(

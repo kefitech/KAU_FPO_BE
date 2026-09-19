@@ -72,6 +72,9 @@ TEMPLATE_CODES = [
     ('expert_booking_rescheduled', 'email',  'Notify FPO when expert reschedules a booking',   ['expert_name', 'date', 'time', 'reason']),
     ('expert_booking_rescheduled', 'in_app', 'In-app: booking rescheduled by expert',          ['expert_name', 'date', 'time', 'reason']),
     ('expert_booking_cancelled',   'email',  'Notify expert when an FPO cancels a booking',    ['fpo_name', 'date', 'time', 'reason']),
+
+    ('fpo_training_scheduled', 'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
+    ('fpo_training_scheduled', 'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
 ]
 
 
@@ -739,6 +742,31 @@ TEMPLATES = [
         'expert_booking_rescheduled', 'in_app', 'en',
         'Appointment rescheduled',
         '{{expert_name}} proposed {{date}} at {{time}} instead. Reason: {{reason}}',
+    ),
+
+
+    (
+        'fpo_training_scheduled', 'email', 'en',
+        'A Training Session Has Been Scheduled — {{topic}}',
+        '<p>Dear FPO,</p>'
+        '<p>A training session has been scheduled for <strong>{{fpo_name}}</strong>.</p>'
+        '<table style="margin:12px 0;border-collapse:collapse;">'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Topic</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{topic}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Trainer</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{trainer_name}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Date</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{date}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Time</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Venue</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
+        '</table>',
+    ),
+    (
+        'fpo_training_scheduled', 'in_app', 'en',
+        'Training Session Scheduled',
+        'A training on "{{topic}}" has been scheduled for {{date}} at {{time}}, venue: {{venue}}, conducted by {{trainer_name}}.',
     ),
 ]
 

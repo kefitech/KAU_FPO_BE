@@ -42,6 +42,7 @@ from .tier_assessment import (
     TierAssessmentUploadView,
     TierAssessmentUploadDeleteView,
 )
+from .training import FPOTrainingSessionListView
 
 # FPO-facing auth urls exposed to accounts/urls.py
 fpo_auth_urls = [
@@ -71,6 +72,7 @@ urlpatterns = [
     path('me/info-response/',           FPOInfoResponseView.as_view(),     name='fpo-info-response'),
     # Dashboard
     path('dashboard/',                  FPODashboardView.as_view(),        name='fpo-dashboard'),
+    path('training-sessions/',          FPOTrainingSessionListView.as_view(), name='fpo-training-list'),
     # Personal profile
     path('me/profile/',                 FPOProfileView.as_view(),          name='fpo-profile'),
     # Ownership claim
