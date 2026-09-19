@@ -195,6 +195,26 @@ class DPRAIContent(TimeStampedModel, AuditModel):
         help_text='When the current candidate_regen was generated.',
     )
 
+    # ── KAU AI grounding (2026-09-19) — placeholder-scrubber trail ─────────
+    # When the post-generation scrubber (apps.fpo.services.dpr.narrative.
+    # scrub_placeholders) catches any `[X ...]` / `[Rs. X ...]` / `[Name of
+    # ...]` / `[Not provided]` etc. token, `needs_review` flips True and each
+    # hit is stored in `placeholder_hits` so admin + FPO see WHICH fields
+    # the AI left blank. Cleared on the next successful regeneration.
+    needs_review = models.BooleanField(
+        default=False,
+        help_text='True when the last generation contained placeholder tokens '
+                  'that had to be scrubbed. Surfaced as a review badge on the '
+                  'admin viewer and FPO AI-content page.',
+    )
+    placeholder_hits = models.JSONField(
+        default=list, blank=True,
+        help_text='List of scrubber matches from the last generation. Each '
+                  'entry is {"raw": "[X MT per day]", "replacement": '
+                  '"Not available", "count": 3}. Cleared on next successful '
+                  'regeneration with zero hits.',
+    )
+
     class Meta:
         db_table = 'dpr_ai_content'
         verbose_name = 'DPR — AI Content'
