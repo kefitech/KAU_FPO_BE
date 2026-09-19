@@ -85,9 +85,17 @@ _COST_LABEL_SHORT = {
 def cost_breakdown_pie(cost_by_field: dict) -> str:
     """Donut chart of non-zero cost heads. Returns '' when nothing to plot.
 
-    Groups anything under 3% of total into a single 'Other' slice so the
-    donut stays readable — IIFPT-style pie in the reference DPR does the
-    same (Figure 5).
+    KAU 2026-09-19 P4.2 revision — the previous version put labels
+    directly beside the wedges, which crowded and overlapped once a
+    project had 6+ cost heads. New layout:
+
+      * Larger canvas (7.5 x 4.5in) so wedges are readable at PDF zoom.
+      * Percentages sit inside each wedge; wedge-side labels removed.
+      * A dedicated legend on the right lists each slice with its label,
+        ₹ amount (Indian-comma), and % share.
+      * Tiny slices < 3% still fold into 'Other' so the donut stays clean.
+
+    Matches the IIFPT reference DPR (Figure 5) legibility bar.
     """
     try:
         # Convert Decimals → floats; drop zero / negative / null rows.
@@ -113,26 +121,79 @@ def cost_breakdown_pie(cost_by_field: dict) -> str:
         values = [v for _, v in big]
         colours = _PIE_COLOURS[:len(values)]
 
-        fig, ax = plt.subplots(figsize=(6.0, 4.0))
+        # Two-panel layout: donut on the left, legend on the right.
+        # gridspec_kw width ratios give the donut most of the canvas.
+        fig, (ax, ax_legend) = plt.subplots(
+            1, 2, figsize=(7.5, 4.5),
+            gridspec_kw={'width_ratios': [3.0, 2.0]},
+        )
         wedges, _texts, autotexts = ax.pie(
             values,
-            labels=labels,
+            labels=None,  # KAU 2026-09-19: labels moved to side legend
             colors=colours,
-            autopct=lambda pct: f'{pct:.1f}%' if pct >= 3 else '',
+            autopct=lambda pct: f'{pct:.1f}%' if pct >= 4 else '',
             startangle=90,
-            pctdistance=0.75,
+            pctdistance=0.78,
             wedgeprops={'edgecolor': 'white', 'linewidth': 1.5, 'width': 0.42},
-            textprops={'fontsize': 9, 'color': '#222'},
+            textprops={'fontsize': 10, 'color': '#222'},
         )
         for t in autotexts:
             t.set_color('white')
             t.set_fontweight('bold')
-            t.set_fontsize(8)
-        ax.set_title('Project Cost Breakdown', fontsize=12, color=KAU_NAVY, pad=12, fontweight='bold')
+            t.set_fontsize(9)
+        ax.set_title(
+            'Project Cost Breakdown',
+            fontsize=13, color=KAU_NAVY, pad=14, fontweight='bold',
+        )
+
+        # Side legend — one entry per slice with label + ₹ value + % share.
+        # Rendered via a dummy axis so we can control alignment + fonts
+        # independently from the pie's default legend positioning.
+        ax_legend.axis('off')
+        legend_labels = [
+            f'{lbl}  —  ₹ {_fmt_indian(val)}  ({val / total * 100:.1f}%)'
+            for lbl, val in big
+        ]
+        ax_legend.legend(
+            handles=wedges,
+            labels=legend_labels,
+            loc='center left',
+            frameon=False,
+            fontsize=9,
+            labelspacing=1.1,
+            handlelength=1.6,
+            handleheight=1.1,
+            borderaxespad=0,
+        )
+        fig.tight_layout()
         return _fig_to_data_url(fig)
     except Exception:  # noqa: BLE001 — chart failure must never block PDF
         log.exception('cost_breakdown_pie: chart render failed')
         return ''
+
+
+def _fmt_indian(v: float) -> str:
+    """Indian comma formatting for the pie legend — e.g. 9500000 → 95,00,000.
+    Matches the money filter used in report.html so legend + tables agree."""
+    s = f'{v:,.0f}'                     # 9,500,000 (US grouping)
+    # Convert US grouping to Indian: last 3 digits, then groups of 2.
+    negative = s.startswith('-')
+    if negative:
+        s = s[1:]
+    parts = s.split(',')
+    if len(parts) <= 1:
+        joined = s
+    else:
+        head = ''.join(parts[:-1])      # drop US commas
+        tail = parts[-1]
+        pieces = []
+        while len(head) > 2:
+            pieces.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            pieces.insert(0, head)
+        joined = ','.join(pieces) + ',' + tail
+    return f'-{joined}' if negative else joined
 
 
 def pnl_trend_bar(profit_loss_rows: Iterable) -> str:

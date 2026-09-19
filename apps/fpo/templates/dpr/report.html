@@ -62,6 +62,13 @@ Author: Athul Gopan (Kefi Tech Solutions)
     h3 { font-size: 11pt; color: #1F3864; margin: 4mm 0 2mm 0; page-break-after: avoid; }
     p, li { margin: 0 0 2mm 0; }
     table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; font-size: 8pt; page-break-inside: auto; }
+    /* KAU 2026-09-19 P4.1: wide 12-14 column tables (depreciation schedule
+       with 10-year columns + rate + initial cost + net block) overflow the
+       landscape page even at 8pt. Denser variant used only where the column
+       count is high — normal narrower tables keep the 8pt baseline. */
+    table.dense-table { font-size: 6.75pt; table-layout: fixed; word-wrap: break-word; }
+    table.dense-table th, table.dense-table td { padding: 0.8mm 1mm; }
+    table.dense-table .label { font-size: 7pt; word-wrap: break-word; }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
     th, td { border: 1px solid #ccc; padding: 1.5mm 2mm; text-align: right; vertical-align: middle; }
@@ -380,14 +387,14 @@ Author: Athul Gopan (Kefi Tech Solutions)
     for banker / scheme review; they may differ from statutory / income-tax depreciation rates
     (Companies Act Schedule II or Income Tax Act §32 WDV rates). Per KAU pre-UAT reply §2.1.
   </p>
-  <table>
+  <table class="dense-table">
     <thead>
       <tr>
         <th class="label">Asset class</th>
         <th>Rate %</th>
         <th>Initial cost</th>
-        {% for y in years %}<th>Y{{ y }} depreciation</th>{% endfor %}
-        <th>Net block Y{{ r.projection_years }}</th>
+        {% for y in years %}<th>Y{{ y }}</th>{% endfor %}
+        <th>Net Y{{ r.projection_years }}</th>
       </tr>
     </thead>
     <tbody>
@@ -451,7 +458,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {# ── 8. Projected P&L ──────────────────────────────────────────────── #}
   <div class="wide-page"></div>
   <h2 id="sec-7">7. Projected Profit &amp; Loss (₹)</h2>
-  <table>
+  <table class="dense-table">
     <thead>
       <tr>
         <th class="label">Item</th>
@@ -490,7 +497,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {# ── 9. Projected cash flow ────────────────────────────────────────── #}
   <div class="wide-page"></div>
   <h2 id="sec-8">8. Projected Cash Flow (₹)</h2>
-  <table>
+  <table class="dense-table">
     <thead>
       <tr>
         <th class="label">Item</th>
@@ -524,7 +531,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {# ── 10. Projected balance sheet ───────────────────────────────────── #}
   <div class="wide-page"></div>
   <h2 id="sec-9">9. Projected Balance Sheet (₹)</h2>
-  <table>
+  <table class="dense-table">
     <thead>
       <tr>
         <th class="label">Item</th>
