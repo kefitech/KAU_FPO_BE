@@ -25,9 +25,9 @@ from rest_framework import mixins, viewsets
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models import Inquiry, Product
+from apps.database.models import BuyerSellerMatch, Inquiry, Product
 from apps.marketplace.api.buyers import _resolve_buyer_user
-from apps.marketplace.serializers import InquiryCreateSerializer, InquirySerializer
+from apps.marketplace.serializers import InquiryCreateSerializer, InquirySerializer, MarketHubInquirySerializer
 from apps.marketplace.services import _get_buyer_row
 
 
@@ -160,3 +160,74 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         inquiry.status = Inquiry.Status.RESOLVED
         inquiry.save(update_fields=['status', 'updated_at'])
         return StandardResponse.success(message='Inquiry marked as resolved')
+
+class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    GET /api/marketplace/market-hub-inquiries/ — seller's own incoming
+    Market Hub (anonymous, public) inquiries, separate from the verified-
+    buyer Inquiry model above. Scoped to inquiries on products belonging
+    to the logged-in FPO.
+
+    A BuyerSellerMatch row is identified as a genuine Market Hub inquiry
+    (as opposed to an algorithmic run_matching() suggestion) by
+    buyer.fpo_id IS NULL AND buyer.user_id IS NULL — true only for
+    PublicProductInquireView's anonymous BuyerDirectory rows; every
+    verified buyer (FPO-as-buyer or external) always has one of these set.
+    """
+    permission_classes = [IsFPOManager]
+    pagination_class = StandardPagination
+    serializer_class = MarketHubInquirySerializer
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        queryset = BuyerSellerMatch.objects.filter(
+            product__fpo=self.request.user.fpo,
+            buyer__fpo__isnull=True,
+            buyer__user__isnull=True,
+            is_deleted=False,
+        ).select_related('product', 'buyer').order_by('-suggested_at')
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(product__name__en__icontains=search)
+                | Q(product__name__ml__icontains=search)
+                | Q(buyer__name__icontains=search)
+            )
+
+        status = self.request.query_params.get('status')
+        if status in (
+            BuyerSellerMatch.Status.SUGGESTED,
+            BuyerSellerMatch.Status.ACCEPTED,
+            BuyerSellerMatch.Status.REJECTED,
+            BuyerSellerMatch.Status.COMPLETED,
+        ):
+            queryset = queryset.filter(status=status)
+
+        return queryset
+    @extend_schema(tags=['Marketplace - Inquiries'])
+    @action(detail=True, methods=['post'], url_path='mark-accepted')
+    def mark_accepted(self, request, pk=None):
+        match = self.get_object()
+        if match.status != BuyerSellerMatch.Status.SUGGESTED:
+            return StandardResponse.error(
+                message='Only pending inquiries can be marked as accepted',
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+            )
+        match.status = BuyerSellerMatch.Status.ACCEPTED
+        match.save(update_fields=['status', 'updated_at'])
+        return StandardResponse.success(message='Inquiry marked as accepted')
+
+    @extend_schema(tags=['Marketplace - Inquiries'])
+    @action(detail=True, methods=['post'], url_path='mark-rejected')
+    def mark_rejected(self, request, pk=None):
+        match = self.get_object()
+        if match.status != BuyerSellerMatch.Status.SUGGESTED:
+            return StandardResponse.error(
+                message='Only pending inquiries can be marked as rejected',
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+            )
+        match.status = BuyerSellerMatch.Status.REJECTED
+        match.save(update_fields=['status', 'updated_at'])
+        return StandardResponse.success(message='Inquiry marked as rejected')

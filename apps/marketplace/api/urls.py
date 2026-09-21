@@ -5,7 +5,7 @@ from apps.marketplace.api.buyer_dashboard import BuyerDashboardView
 from apps.marketplace.api.buyer_products import BuyerProductListView
 from apps.marketplace.api.buyer_profile import BuyerProfileView
 from apps.marketplace.api.buyers import FPOBuyerListViewSet
-from apps.marketplace.api.inquiries import InquiryCreateView, InquiryViewSet
+from apps.marketplace.api.inquiries import InquiryCreateView, InquiryViewSet, MarketHubInquiryViewSet
 from apps.marketplace.api.market_prices import MarketOpportunitiesView, MarketPriceViewSet
 from apps.marketplace.api.matches import BuyerSellerMatchViewSet
 from apps.marketplace.api.products import ProductViewSet
@@ -22,6 +22,7 @@ router.register(r'buyers', FPOBuyerListViewSet, basename='marketplace-buyer')
 router.register(r'matches', BuyerSellerMatchViewSet, basename='marketplace-match')
 router.register(r'prices', MarketPriceViewSet, basename='marketplace-price')
 router.register(r'inquiries', InquiryViewSet, basename='marketplace-inquiry')
+router.register(r'market-hub-inquiries', MarketHubInquiryViewSet, basename='marketplace-market-hub-inquiry')
 
 urlpatterns = [
     path('', include(router.urls)),

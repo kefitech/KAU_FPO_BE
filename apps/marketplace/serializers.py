@@ -225,3 +225,31 @@ class InquirySerializer(serializers.ModelSerializer):
         if not obj.contact_user_id:
             return None
         return obj.contact_user.email or None
+
+class MarketHubInquirySerializer(serializers.ModelSerializer):
+    """
+    Used on the seller's Market Hub Inquiries list (separate from the
+    verified-buyer InquirySerializer above). Reads directly off
+    BuyerSellerMatch + its linked (anonymous) BuyerDirectory row — no
+    contact_user resolution needed here, since the buyer's name/email/phone
+    were entered directly on the public form and stored on BuyerDirectory
+    itself, not linked to any login account.
+
+    status reuses BuyerSellerMatch's existing Suggested/Accepted/Rejected/
+    Completed choices (shared with the algorithmic run_matching() feature)
+    — displayed to the seller as Pending/Accepted/Rejected/Completed
+    respectively; the frontend maps "suggested" -> "Pending" for display.
+    """
+    product_name = serializers.SerializerMethodField()
+    name = serializers.CharField(source='buyer.name', read_only=True)
+    email = serializers.CharField(source='buyer.contact_email', read_only=True)
+    phone = serializers.CharField(source='buyer.contact_phone', read_only=True)
+    created_at = serializers.DateTimeField(source='suggested_at', read_only=True)
+
+    class Meta:
+        model = BuyerSellerMatch
+        fields = ['id', 'product', 'product_name', 'name', 'email', 'phone', 'message', 'status', 'created_at']
+        read_only_fields = fields
+
+    def get_product_name(self, obj):
+        return obj.product.name.get('en', '') if obj.product and obj.product.name else ''
