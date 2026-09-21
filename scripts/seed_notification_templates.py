@@ -72,7 +72,8 @@ TEMPLATE_CODES = [
     ('expert_booking_rescheduled', 'email',  'Notify FPO when expert reschedules a booking',   ['expert_name', 'date', 'time', 'reason']),
     ('expert_booking_rescheduled', 'in_app', 'In-app: booking rescheduled by expert',          ['expert_name', 'date', 'time', 'reason']),
     ('expert_booking_cancelled',   'email',  'Notify expert when an FPO cancels a booking',    ['fpo_name', 'date', 'time', 'reason']),
-
+    ('expert_cancelled_confirmed_booking', 'email',  'Notify FPO when expert cancels a confirmed booking', ['expert_name', 'date', 'time', 'reason']),
+    ('expert_cancelled_confirmed_booking', 'in_app', 'In-app: expert cancelled a confirmed booking',       ['expert_name', 'date', 'time', 'reason']),
     ('fpo_training_scheduled', 'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
     ('fpo_training_scheduled', 'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
 ]
@@ -742,6 +743,20 @@ TEMPLATES = [
         'expert_booking_rescheduled', 'in_app', 'en',
         'Appointment rescheduled',
         '{{expert_name}} proposed {{date}} at {{time}} instead. Reason: {{reason}}',
+    ),
+        (
+        'expert_cancelled_confirmed_booking', 'email', 'en',
+        'Your Confirmed Appointment Was Cancelled',
+        '<p>Dear FPO,</p>'
+        '<p><strong>{{expert_name}}</strong> has cancelled your confirmed appointment scheduled for '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>'
+        '<p>You may submit a new booking request for a different date or time.</p>',
+    ),
+    (
+        'expert_cancelled_confirmed_booking', 'in_app', 'en',
+        'Appointment Cancelled',
+        '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
     ),
 
 

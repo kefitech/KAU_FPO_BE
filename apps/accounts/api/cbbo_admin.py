@@ -119,11 +119,15 @@ class CBBOSerializer(serializers.ModelSerializer):
     assignments = serializers.SerializerMethodField()
     organisation_id   = serializers.SerializerMethodField()
     organisation_name = serializers.SerializerMethodField()
+    registration_status = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name', 'registration_status']
         read_only_fields = fields
+
+    def get_registration_status(self, obj):
+        return getattr(getattr(obj, 'cbbo_profile', None), 'registration_status', None)
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
