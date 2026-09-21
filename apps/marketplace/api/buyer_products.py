@@ -107,3 +107,45 @@ class BuyerProductListView(APIView):
         serializer = BuyerProductSerializer(page, many=True)
 
         return paginator.get_paginated_response(serializer.data)
+
+class BuyerRecommendedProductsView(APIView):
+    """
+    GET /api/marketplace/buyer/products/recommended/
+
+    Returns a fixed, non-paginated top-N list of active + public products
+    whose commodity matches one of the buyer's `commodities_interested`
+    (set on their BuyerDirectory profile via the Buyer Dashboard "Complete
+    your profile" form). Independent of the search/filter params used by
+    BuyerProductListView — this section is always the buyer's own interests,
+    not whatever they're currently filtering the main catalog by.
+
+    Returns an empty list (not an error) if the buyer hasn't set any
+    commodities_interested yet, so the frontend can simply hide the section.
+    """
+    permission_classes = [IsAuthenticated]
+    RECOMMENDED_LIMIT = 8
+
+    def get(self, request):
+        buyer = _get_buyer_row(request.user)
+        if buyer is None or buyer.status != 'verified':
+            return StandardResponse.error(
+                message='Only verified buyers can browse the product catalog',
+                status_code=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        interested = buyer.commodities_interested or []
+        if not interested:
+            return StandardResponse.success(data=[], message='No commodity interests set')
+
+        queryset = Product.objects.filter(
+            status=Product.Status.ACTIVE,
+            is_public=True,
+            is_deleted=False,
+            commodity__code__in=interested,
+        ).select_related('commodity', 'fpo').order_by('-created_at')
+
+        if buyer.fpo_id:
+            queryset = queryset.exclude(fpo_id=buyer.fpo_id)
+
+        serializer = BuyerProductSerializer(queryset[: self.RECOMMENDED_LIMIT], many=True)
+        return StandardResponse.success(data=serializer.data, message='Recommended products retrieved')
