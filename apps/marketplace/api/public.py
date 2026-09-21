@@ -168,11 +168,31 @@ class PublicProductDetailView(APIView):
         return StandardResponse.success(data=data, message='Product retrieved successfully')
 
 
+import re
+
+NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z\s'-]*$")
+PHONE_PATTERN = re.compile(r"^\d{10}$")
+
+
 class PublicInquirySerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=300)
+    name = serializers.CharField(max_length=100)
     email = serializers.EmailField()
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
     message = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not NAME_PATTERN.match(value):
+            raise serializers.ValidationError(
+                'Name must contain only letters, spaces, apostrophes, or hyphens.'
+            )
+        return value
+
+    def validate_phone(self, value):
+        value = value.strip()
+        if value and not PHONE_PATTERN.match(value):
+            raise serializers.ValidationError('Enter a valid 10-digit phone number.')
+        return value
 
 
 class PublicProductInquireView(APIView):
@@ -211,6 +231,7 @@ class PublicProductInquireView(APIView):
             buyer=buyer,
             match_score=1,
             status=BuyerSellerMatch.Status.SUGGESTED,
+            message=data.get('message', ''),
         )
 
         # Notify the FPO's primary user, if one exists.
