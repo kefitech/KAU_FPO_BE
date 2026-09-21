@@ -72,6 +72,17 @@ TEMPLATE_CODES = [
     # ML model retraining (P2-06)
     ('model_retrain_ready',         'in_app', 'Notify admin inbox when async model retraining finishes successfully', ['version_code', 'accuracy']),
     ('model_retrain_failed',        'in_app', 'Notify admin inbox when async model retraining fails',                 ['version_code', 'reason']),
+    # Expert Booking (Jobin — P2-08)
+    ('expert_booking_requested',            'email',  'Notify expert of a new appointment request from an FPO',        ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_cancelled',            'email',  'Notify expert that the FPO cancelled a pending appointment',    ['fpo_name', 'date', 'time', 'reason']),
+    ('expert_booking_confirmed',            'email',  'Notify FPO that expert confirmed the appointment',              ['expert_name', 'date', 'time']),
+    ('expert_booking_confirmed',            'in_app', 'In-app: expert confirmed the appointment',                      ['expert_name', 'date', 'time']),
+    ('expert_booking_rejected',             'email',  'Notify FPO that expert declined the appointment request',       ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rejected',             'in_app', 'In-app: expert declined the appointment request',               ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rescheduled',          'email',  'Notify FPO that expert proposed a new appointment slot',        ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rescheduled',          'in_app', 'In-app: expert proposed a new appointment slot',                ['expert_name', 'date', 'time', 'reason']),
+    ('expert_cancelled_confirmed_booking',  'email',  'Notify FPO that expert cancelled an already-confirmed booking', ['expert_name', 'date', 'time', 'reason']),
+    ('expert_cancelled_confirmed_booking',  'in_app', 'In-app: expert cancelled a confirmed booking',                  ['expert_name', 'date', 'time', 'reason']),
 ]
 
 
@@ -787,6 +798,76 @@ TEMPLATES = [
         'model_retrain_failed', 'in_app', 'ml',
         'മോഡൽ പരിശീലനം പരാജയപ്പെട്ടു',
         'മോഡൽ പതിപ്പ് {{version_code}} പരിശീലനം പരാജയപ്പെട്ടു. കാരണം: {{reason}}',
+    ),
+
+    # ── Expert Booking Notifications (Jobin — P2-08) ─────────────────────────
+    # requested / cancelled: no live DB row existed yet — drafted to match the
+    # tone of the confirmed/rejected/rescheduled templates below.
+    (
+        'expert_booking_requested', 'email', 'en',
+        'New Booking Request from {{fpo_name}}',
+        '<p>Dear <strong>{{expert_name}}</strong>,</p>'
+        '<p>You have received a new appointment request from <strong>{{fpo_name}}</strong>.</p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
+        '<p>Please log in to confirm or reject this request.</p>',
+    ),
+    (
+        'expert_booking_cancelled', 'email', 'en',
+        'Appointment Cancelled — {{fpo_name}}',
+        '<p><strong>{{fpo_name}}</strong> has cancelled their appointment scheduled for '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>',
+    ),
+    # confirmed / rejected / rescheduled: captured exactly from the live
+    # database via shell, so the seed script becomes the source of truth and
+    # re-seeding won't silently overwrite these with different wording.
+    (
+        'expert_booking_confirmed', 'email', 'en',
+        'Your appointment with {{expert_name}} is confirmed',
+        '<p>Good news! <strong>{{expert_name}}</strong> has confirmed your appointment request.</p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>',
+    ),
+    (
+        'expert_booking_confirmed', 'in_app', 'en',
+        'Appointment confirmed',
+        '{{expert_name}} confirmed your appointment on {{date}} at {{time}}.',
+    ),
+    (
+        'expert_booking_rejected', 'email', 'en',
+        'Your appointment request with {{expert_name}} was declined',
+        '<p><strong>{{expert_name}}</strong> was unable to accept your appointment request for {{date}} at {{time}}.</p>'
+        '<p>Reason: {{reason}}</p>',
+    ),
+    (
+        'expert_booking_rejected', 'in_app', 'en',
+        'Appointment declined',
+        '{{expert_name}} declined your appointment request for {{date}} at {{time}}. Reason: {{reason}}',
+    ),
+    (
+        'expert_booking_rescheduled', 'email', 'en',
+        '{{expert_name}} proposed a new time for your appointment',
+        '<p><strong>{{expert_name}}</strong> proposed rescheduling your appointment to '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p><p>Please log in to confirm.</p>',
+    ),
+    (
+        'expert_booking_rescheduled', 'in_app', 'en',
+        'Appointment rescheduled',
+        '{{expert_name}} proposed {{date}} at {{time}} instead. Reason: {{reason}}',
+    ),
+    (
+        'expert_cancelled_confirmed_booking', 'email', 'en',
+        'Your Confirmed Appointment Was Cancelled',
+        '<p>Dear FPO,</p>'
+        '<p><strong>{{expert_name}}</strong> has cancelled your confirmed appointment scheduled for '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>'
+        '<p>You may submit a new booking request for a different date or time.</p>',
+    ),
+    (
+        'expert_cancelled_confirmed_booking', 'in_app', 'en',
+        'Appointment Cancelled',
+        '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
     ),
 ]
 
