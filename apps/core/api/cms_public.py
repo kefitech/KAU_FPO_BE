@@ -322,6 +322,7 @@ class PublicTeamMembersView(APIView):
                 'designation': m.designation,
                 'photo_url':   request.build_absolute_uri(m.photo.url) if m.photo else None,
                 'order':       m.order,
+                'is_patrons':  m.is_patrons,
             }
             for m in qs
         ]

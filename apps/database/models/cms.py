@@ -183,6 +183,7 @@ class TeamMember(BaseModel):
     photo       = models.ImageField(upload_to=_team_member_photo_path, null=True, blank=True)
     order       = models.PositiveSmallIntegerField(default=0)
     is_active   = models.BooleanField(default=True)
+    is_patrons  = models.BooleanField(default=False, help_text='Patrons are shown on the landing page; others on the Our Team page')
 
     class Meta:
         ordering = ['order', 'name']

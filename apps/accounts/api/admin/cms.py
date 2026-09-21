@@ -1024,7 +1024,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = TeamMember
-        fields = ['id', 'name', 'designation', 'photo', 'photo_url', 'order', 'is_active', 'created_at']
+        fields = ['id', 'name', 'designation', 'photo', 'photo_url', 'order', 'is_active', 'is_patrons', 'created_at']
         extra_kwargs = {
             'photo':     {'write_only': True, 'required': False},
             'is_active': {'default': True},
