@@ -29,6 +29,17 @@ def seed_menu():
     if deleted:
         print(f"🗑️  Removed {deleted} stale menu item(s): {', '.join(stale_keys)}")
 
+    # ── Retire admin items that moved into the AI Recommendation hub ─────────
+    # Their pages now live at /admin/ai-recommendation/<page>, so the old
+    # top-level sidebar entries (and their old paths) must not linger.
+    moved_keys = [
+        'menu.ml_models', 'menu.crop_zone_profiles', 'menu.crop_package_of_practices',
+        'menu.gis_zones', 'menu.soil_regions',
+    ]
+    moved_deleted, _ = MenuItem.objects.filter(label_key__in=moved_keys).delete()
+    if moved_deleted:
+        print(f"🗑️  Removed {moved_deleted} menu item(s) now under AI Recommendation: {', '.join(moved_keys)}")
+
     # ── Groups ────────────────────────────────────────────────────────────────
     super_admin_group, _ = Group.objects.get_or_create(name='super_admin')
     sub_admin_group, _   = Group.objects.get_or_create(name='sub_admin')
@@ -194,40 +205,15 @@ def seed_menu():
         order     = 20,
     )
 
+    # One entry for the whole recommendation area; GIS zones, soil regions, ML models,
+    # crop package of practices and crop zone profiles are cards on this hub page and
+    # live under /admin/ai-recommendation/* (same pattern as the DPR hub).
     seed_item(
-        label_key = 'menu.ml_models',
-        path      = '/admin/ml-models',
+        label_key = 'menu.ai_recommendation',
+        path      = '/admin/ai-recommendation',
         icon      = 'brain-circuit',
         roles     = [super_admin_group],
         order     = 21,
-    )
-    seed_item(
-        label_key = 'menu.crop_zone_profiles',
-        path      = '/admin/crop-zone-profiles',
-        icon      = 'sprout',
-        roles     = [super_admin_group],
-        order     = 22,
-    )
-    seed_item(
-        label_key = 'menu.crop_package_of_practices',
-        path      = '/admin/crop-package-of-practices',
-        icon      = 'book-open',
-        roles     = [super_admin_group],
-        order     = 23,
-    )
-    seed_item(
-        label_key = 'menu.gis_zones',
-        path      = '/admin/gis-zones',
-        icon      = 'map',
-        roles     = [super_admin_group],
-        order     = 24,
-    )
-    seed_item(
-        label_key = 'menu.soil_regions',
-        path      = '/admin/soil-regions',
-        icon      = 'layers',
-        roles     = [super_admin_group],
-        order     = 25,
     )
     seed_item(
         label_key = 'menu.government',

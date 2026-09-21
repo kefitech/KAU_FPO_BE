@@ -3748,6 +3748,7 @@ def seed_menu_translations(languages):
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
         ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
+        ('ai_recommendation',      'AI Recommendation',        'AI ശുപാർശ'),
         ('ml_models',              'ML Models',                'ML മോഡലുകൾ'),
         ('crop_zone_profiles',     'Crop Zone Profiles',       'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
         ('crop_package_of_practices', 'Crop Package of Practices', 'ക്രോപ്പ് പാക്കേജ് ഓഫ് പ്രാക്ടീസസ്'),
