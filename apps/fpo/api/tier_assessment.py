@@ -29,10 +29,11 @@ from rest_framework.views import APIView
 from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService
+from apps.core.services.fpo_permission import has_fpo_permission
 from apps.core.utils.constants import FPOStatus
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import (
-    FPO, FPOAssessment, AssessmentAnswer, AssessmentUpload,
+    FPO, FPOUserMembership, FPOAssessment, AssessmentAnswer, AssessmentUpload,
     TierDomain, TierCriterion, TierQuestion, FPOTierHistory,
 )
 
@@ -47,8 +48,32 @@ def _current_financial_year():
     return f'{today.year - 1}-{str(today.year)[2:]}'
 
 
+def _get_member_fpo(user):
+    """FPO of the primary user or an active team member (read access)."""
+    fpo = FPO.objects.filter(primary_user=user, is_deleted=False).first()
+    if fpo:
+        return fpo
+    membership = (
+        FPOUserMembership.objects
+        .filter(user=user, is_active=True, is_deleted=False)
+        .select_related('fpo')
+        .first()
+    )
+    return membership.fpo if membership else None
+
+
 def _get_primary_fpo(user):
-    return FPO.objects.filter(primary_user=user, is_deleted=False).first()
+    """
+    FPO the user may edit the tier assessment for, else None. The primary
+    user always may; team members need 'can_edit_tier_assessment' in the
+    permission matrix.
+    """
+    fpo = _get_member_fpo(user)
+    if not fpo:
+        return None
+    if fpo.primary_user_id == user.id:
+        return fpo
+    return fpo if has_fpo_permission(user, fpo, 'can_edit_tier_assessment') else None
 
 
 def _prefill_answers(assessment, fpo):
@@ -413,7 +438,7 @@ class TierAssessmentView(APIView):
         responses={200: None},
     )
     def get(self, request):
-        fpo = _get_primary_fpo(request.user)
+        fpo = _get_member_fpo(request.user)
         if not fpo:
             return StandardResponse.error(
                 'Only the primary user can access tier assessment.',
@@ -684,7 +709,7 @@ class TierAssessmentHistoryView(APIView):
         responses={200: AssessmentSerializer(many=True)},
     )
     def get(self, request):
-        fpo = _get_primary_fpo(request.user)
+        fpo = _get_member_fpo(request.user)
         if not fpo:
             return StandardResponse.error(
                 'Only the primary user can view assessment history.',

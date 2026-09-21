@@ -31,6 +31,7 @@ from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models.fpo import FPO, FPODocument
 
 
@@ -53,6 +54,14 @@ def _get_fpo_or_404(user, lang):
             t('fpo.fpo_not_found', lang),
             status_code=status.HTTP_404_NOT_FOUND,
         )
+
+
+def get_fpo_for_read(user, lang):
+    """Like _get_fpo_or_404 but also resolves for active team members."""
+    fpo = get_member_fpo(user)
+    if fpo:
+        return fpo, None
+    return _get_fpo_or_404(user, lang)
 
 
 class FPODocumentSerializer(serializers.ModelSerializer):
@@ -208,7 +217,7 @@ class DocumentUploadView(APIView):
     )
     def get(self, request):
         lang = request.language
-        fpo, err = _get_fpo_or_404(request.user, lang)
+        fpo, err = get_fpo_for_read(request.user, lang)
         if err:
             return err
 

@@ -15,6 +15,7 @@ from rest_framework import filters, serializers
 from rest_framework.decorators import action
 
 from apps.core.permissions.rbac import IsAdmin, IsAuthenticated
+from apps.core.services.lookup import resolve_master_name
 from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -35,6 +36,12 @@ class CropPackageOfPracticesSerializer(serializers.ModelSerializer):
 
     def validate_crop_name(self, value):
         value = value.strip()
+        # Unchanged values pass, so editing other fields of an older row is never blocked
+        if not (self.instance and value == self.instance.crop_name):
+            canonical = resolve_master_name('crop_name', value)
+            if canonical is None:
+                raise serializers.ValidationError("Choose a crop from the Master Data 'Crop Names' list.")
+            value = canonical
         qs = CropPackageOfPractices.objects.filter(crop_name__iexact=value, is_deleted=False)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -43,6 +50,15 @@ class CropPackageOfPracticesSerializer(serializers.ModelSerializer):
                 f"A Package of Practices entry already exists for '{value}' (case-insensitive)."
             )
         return value
+
+    def validate_crop_group(self, value):
+        value = value.strip()
+        if not value or (self.instance and value == self.instance.crop_group):
+            return value
+        canonical = resolve_master_name('crop_group', value)
+        if canonical is None:
+            raise serializers.ValidationError("Choose a group from the Master Data 'Crop Groups' list.")
+        return canonical
 
     def validate_varieties(self, value):
         if not isinstance(value, list) or not all(

@@ -25,6 +25,7 @@ from apps.core.views import TranslatedViewSet
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.core.permissions.rbac import IsAdmin
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
@@ -58,13 +59,13 @@ class AgroClimaticZoneSerializer(GeoJSONFixMixin, GeoFeatureModelSerializer):
 # ---------------------------------------------------------------------------
 
 def _get_fpo_or_404(user, lang):
-    try:
-        return FPO.objects.get(primary_user=user), None
-    except FPO.DoesNotExist:
-        return None, StandardResponse.error(
-            t('gis.fpo_not_found', lang),
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    fpo = get_member_fpo(user)
+    if fpo is not None:
+        return fpo, None
+    return None, StandardResponse.error(
+        t('gis.fpo_not_found', lang),
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
 
 
 # ---------------------------------------------------------------------------

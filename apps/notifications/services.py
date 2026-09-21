@@ -139,6 +139,21 @@ def send_notification(
     return log
 
 
+def notify_super_admins(code: str, context: dict = None, channel: str = 'in_app') -> None:
+    """
+    Send one notification per active super admin. Each send is isolated so a
+    missing template or one bad recipient never breaks the calling request.
+    Call inside transaction.on_commit() when the event is saved in a transaction.
+    """
+    from apps.core.utils.constants import UserRole
+
+    for admin in User.objects.filter(groups__name=UserRole.SUPER_ADMIN, is_active=True):
+        try:
+            send_notification(user=admin, code=code, channel=channel, context=context or {})
+        except Exception:
+            logger.exception("notify_super_admins: failed to send '%s' to admin %s", code, admin.pk)
+
+
 def _get_recipient(user_id: int, channel: str) -> str:
     """Extract the correct recipient address from the user based on channel."""
     try:

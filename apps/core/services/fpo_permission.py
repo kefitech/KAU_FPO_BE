@@ -34,6 +34,25 @@ def get_user_membership(user, fpo):
     )
 
 
+def get_member_fpo(user):
+    """
+    FPO the user belongs to — as its primary user or as an active team
+    member — or None. Use for read access; writes should still check
+    primary ownership or has_fpo_permission().
+    """
+    from apps.database.models.fpo import FPO, FPOUserMembership
+    fpo = FPO.objects.filter(primary_user=user, is_deleted=False).first()
+    if fpo:
+        return fpo
+    membership = (
+        FPOUserMembership.objects
+        .filter(user=user, is_active=True, is_deleted=False)
+        .select_related('fpo')
+        .first()
+    )
+    return membership.fpo if membership else None
+
+
 def get_role_permission(role, action_code):
     """
     Return RoleActionPermission.is_allowed for (role, action_code).
@@ -88,7 +107,7 @@ def has_fpo_permission(user, fpo, action_code):
         return False
 
     # FPO owner bypasses the matrix — they own the FPO
-    if fpo.user == user:
+    if fpo.primary_user_id == user.id:
         from apps.database.models.fpo import FPOAction
         return FPOAction.objects.filter(code=action_code, is_active=True).exists()
 

@@ -8,6 +8,8 @@ from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, ApplicationStatusHistory
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
+from apps.notifications.services import notify_super_admins
+from django.db import transaction
 
 class _InfoResponseSerializer(serializers.Serializer):
     notes = serializers.CharField(
@@ -60,7 +62,11 @@ class FPOInfoResponseView(APIView):
 
         fpo.status = FPOStatus.SUBMITTED
         fpo.save(update_fields=['status'])
-        
+
+        transaction.on_commit(lambda: notify_super_admins('info_response_admin', {
+            'fpo_name':       fpo.name,
+            'application_id': fpo.application_id or '',
+        }))
 
         AuditService.log(
             user=request.user,

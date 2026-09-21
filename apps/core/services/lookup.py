@@ -320,3 +320,24 @@ class LookupService:
         cls.invalidate_cache(category)
 
         return count
+
+
+def resolve_master_name(category: str, value: str) -> Optional[str]:
+    """
+    For categories whose English name is stored on other tables (crop_name, crop_group):
+    return the canonical name of the active entry matching `value` (case-insensitive),
+    or None if there is no such entry. If the category has no entries at all, the value
+    is returned unchanged so a not-yet-seeded list never blocks saving.
+    """
+    from apps.database.models import Translation
+
+    active_codes = list(
+        MasterLookup.objects.filter(category=category, is_active=True).values_list('code', flat=True)
+    )
+    if not active_codes:
+        return value if not MasterLookup.objects.filter(category=category).exists() else None
+    return (
+        Translation.objects.filter(
+            category__code=category, language__code='en', key__in=active_codes, value__iexact=value.strip(),
+        ).values_list('value', flat=True).first()
+    )

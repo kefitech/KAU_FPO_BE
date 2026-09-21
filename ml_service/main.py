@@ -71,7 +71,8 @@ from logging_config import setup_logging
 from retrain_pipeline import (
     run_retrain, validate_source_csv, validate_preexpanded_csv,
     _detect_dataset_format, is_blocking, DatasetValidationError,
-    REQUIRED_COLUMNS, REQUIRED_PREEXPANDED_COLUMNS,
+    REQUIRED_COLUMNS, REQUIRED_PREEXPANDED_COLUMNS, ZONE_PROFILES_REQUIRED_COLUMNS,
+    validate_zone_profiles_csv,
 )
 
 setup_logging()
@@ -695,7 +696,7 @@ class DatasetValidationResponse(BaseModel):
     problems: list[str]
     warnings: list[str]
     n_rows: int
-    detected_format: str  # "rule_based", "pre_expanded", or "unknown" -- see retrain_pipeline._detect_dataset_format()
+    detected_format: str  # "rule_based", "pre_expanded", "zone_profiles", or "unknown" -- see retrain_pipeline._detect_dataset_format()
 
 
 @app.post("/validate-dataset/", response_model=DatasetValidationResponse)
@@ -706,10 +707,12 @@ async def validate_dataset(dataset_file: UploadFile = File(...)):
     immediately (missing columns -> 422) instead of queueing a Celery job that
     is guaranteed to fail. Takes milliseconds; no training happens here.
 
-    Two CSV formats are accepted (see retrain_pipeline.py's module docstring
+    Three CSV formats are accepted (see retrain_pipeline.py's module docstring
     and _detect_dataset_format()): the free-text rule-based KAU knowledge-base
-    format, and the pre-expanded/factual format. The format is auto-detected
-    from the header and reported in `detected_format`.
+    format, the pre-expanded/factual format, and CropZoneProfile's own export
+    format (crop_profiles_service_zones.csv -- an admin's directly-entered
+    per-crop temp/pH ranges, no free-text parsing needed). The format is
+    auto-detected from the header and reported in `detected_format`.
 
     `problems` = blocking (would make /train/ return 422).
     `warnings` = non-blocking (training proceeds; surfaced to the admin).
@@ -730,15 +733,21 @@ async def validate_dataset(dataset_file: UploadFile = File(...)):
                 valid=False,
                 problems=[
                     "Could not tell which training CSV format this is from its header. This service accepts "
-                    f"either the rule-based KAU knowledge-base format (columns: {REQUIRED_COLUMNS}) or the "
-                    f"pre-expanded/factual format (columns: {REQUIRED_PREEXPANDED_COLUMNS}). "
+                    f"the rule-based KAU knowledge-base format (columns: {REQUIRED_COLUMNS}), the "
+                    f"pre-expanded/factual format (columns: {REQUIRED_PREEXPANDED_COLUMNS}), or "
+                    f"CropZoneProfile's own export format (columns: {ZONE_PROFILES_REQUIRED_COLUMNS}). "
                     f"Header found: {list(raw.columns)}."
                 ],
                 warnings=[],
                 n_rows=len(raw),
                 detected_format="unknown",
             )
-        findings = validate_source_csv(raw) if fmt == "rule_based" else validate_preexpanded_csv(raw)
+        if fmt == "rule_based":
+            findings = validate_source_csv(raw)
+        elif fmt == "zone_profiles":
+            findings = validate_zone_profiles_csv(raw)
+        else:
+            findings = validate_preexpanded_csv(raw)
     finally:
         tmp_path.unlink(missing_ok=True)
     problems = [f for f in findings if is_blocking(f)]

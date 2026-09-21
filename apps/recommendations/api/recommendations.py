@@ -32,6 +32,7 @@ from apps.core.permissions.rbac import IsAdmin
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models import FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices
 from apps.recommendations.api.pop_admin import CropPackageOfPracticesSerializer
 from apps.recommendations.services import (
@@ -53,10 +54,10 @@ from apps.recommendations.tasks import (
 # ---------------------------------------------------------------------------
 
 def _get_fpo_or_404(user, lang):
-    try:
-        return FPO.objects.get(primary_user=user), None
-    except FPO.DoesNotExist:
-        return None, StandardResponse.error(
+    fpo = get_member_fpo(user)
+    if fpo is not None:
+        return fpo, None
+    return None, StandardResponse.error(
             t('recommendations.fpo_not_found', lang),
             status_code=status.HTTP_404_NOT_FOUND,
         )
