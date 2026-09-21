@@ -48,6 +48,7 @@ from .marketing import (
     MarketingStrategyDetailView,
     MarketingStrategyDownloadView,
 )
+from .training import FPOTrainingSessionListView
 # DPR v1 imports removed 2026-08-24. v2 endpoints will live under /api/fpo/dpr/v2/
 # See context/phase2/Dpr/DPR_V2_CONTEXT.md
 
@@ -79,6 +80,8 @@ urlpatterns = [
     path('me/info-response/',           FPOInfoResponseView.as_view(),     name='fpo-info-response'),
     # Dashboard
     path('dashboard/',                  FPODashboardView.as_view(),        name='fpo-dashboard'),
+    # Training sessions (Jobin — read-only list of sessions scheduled for this FPO)
+    path('training-sessions/',          FPOTrainingSessionListView.as_view(), name='fpo-training-list'),
     # Personal profile
     path('me/profile/',                 FPOProfileView.as_view(),          name='fpo-profile'),
     # Ownership claim
