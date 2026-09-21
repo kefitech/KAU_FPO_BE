@@ -593,3 +593,51 @@ class AdminRescheduleBookingView(APIView):
                 pass
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking rescheduled. Awaiting FPO confirmation.')
+
+
+class AdminCancelBookingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Expert Booking - Admin'], summary='Expert cancels a confirmed booking')
+    def post(self, request, pk):
+        booking = ExpertBooking.objects.filter(pk=pk, is_deleted=False).first()
+        if not booking:
+            return StandardResponse.error('Booking not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_expert(request.user, booking.expert):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        if booking.status != ExpertBooking.Status.CONFIRMED:
+            return StandardResponse.error(
+                'Only confirmed bookings can be cancelled this way.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reason = request.data.get('reason', '')
+        booking.status = ExpertBooking.Status.CANCELLED
+        booking.cancellation_reason = reason
+        booking.save(update_fields=['status', 'cancellation_reason'])
+
+        notify_context = {
+            'expert_name': booking.expert.name_en,
+            'date': str(booking.requested_date),
+            'time': booking.requested_time,
+            'reason': reason,
+        }
+        if booking.fpo.primary_user:
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_cancelled_confirmed_booking',
+                    channel='email', context=notify_context,
+                )
+            except Exception:
+                pass
+            try:
+                send_notification(
+                    user=booking.fpo.primary_user, code='expert_cancelled_confirmed_booking',
+                    channel='in_app', context=notify_context,
+                )
+            except Exception:
+                pass
+
+        return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking cancelled.')

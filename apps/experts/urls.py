@@ -9,8 +9,9 @@ from .api.booking_views import (
     ExpertAvailabilityView, CreateBookingView, CancelBookingView,
     AdminSetAvailabilityView, AdminBookingListView,
     AdminConfirmBookingView, AdminRejectBookingView, AdminRescheduleBookingView,
-    ExpertWeeklyDefaultsView,
+    ExpertWeeklyDefaultsView,  AdminCancelBookingView,
 )
+
 
 app_name = 'experts'
 
@@ -30,4 +31,5 @@ urlpatterns = [
     path('admin/bookings/<int:pk>/confirm/',     AdminConfirmBookingView.as_view(),     name='admin-booking-confirm'),
     path('admin/bookings/<int:pk>/reject/',      AdminRejectBookingView.as_view(),      name='admin-booking-reject'),
     path('admin/bookings/<int:pk>/reschedule/',  AdminRescheduleBookingView.as_view(),  name='admin-booking-reschedule'),
+    path('admin/bookings/<int:pk>/cancel/',  AdminCancelBookingView.as_view(),      name='admin-booking-cancel'),
 ]
