@@ -506,6 +506,23 @@ def seed_menu():
         order     = 3,
     )
 
+    # ── Aravind merge follow-ups (KAU 2026-09-21) ──────────────────────────
+    # `secondary` group backs the FPO team-member role — auth.py disambiguates
+    # 'fpo_manager' users into 'primary' vs 'secondary' via FPOUserMembership.
+    # Without this group, invited team members fall through to plain
+    # 'fpo_manager' and see the wrong sidebar.
+    Group.objects.get_or_create(name='secondary')
+
+    # Sidebar entry for the Master Data admin page (backend restored via
+    # apps/accounts/api/admin/master_lookups.py in the same commit).
+    seed_item(
+        label_key = 'menu.master_data',
+        path      = '/admin/master-data',
+        icon      = 'database',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 15,
+    )
+
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")
     print("=" * 60)

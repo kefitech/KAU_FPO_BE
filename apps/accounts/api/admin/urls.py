@@ -319,3 +319,34 @@ urlpatterns = [
     path('ai-services/<int:pk>/reset-usage/', AIServiceResetUsageView.as_view(), name='admin-ai-services-reset-usage'),
 ]
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Master Data admin (KAU 2026-09-21) — restored after aravind merge.
+# One implementation per FE path slug; category injected via URL kwarg so we
+# don't accidentally cross-edit rows across categories.
+# FE consumer: src/app/admin/master-data/page.tsx
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .master_lookups import (  # noqa: E402
+    CommodityCreateView, PromotingAgencyCreateView, BankCreateView,
+    CropNameCreateView, CropGroupCreateView,
+    CommodityUpdateSerializer,
+    LookupDetailView, LookupActiveView,
+)
+
+_MASTER_LOOKUPS = [
+    ('commodities',        'commodity',        CommodityCreateView,       dict(update_serializer=CommodityUpdateSerializer, has_section=True, translation_label='Commodity',         translation_desc='Agricultural commodities for FPO registration')),
+    ('promoting-agencies', 'promoting_agency', PromotingAgencyCreateView, dict(translation_label='Promoting Agency', translation_desc='FPO promoting/implementing agencies')),
+    ('banks',              'bank_name',        BankCreateView,            dict(translation_label='Bank Names',       translation_desc='Banks for FPO Step 4 bank details')),
+    ('crop-names',         'crop_name',        CropNameCreateView,        dict(translation_label='Crop Names',       translation_desc='Crop names for Package of Practices and Crop Zone Profiles')),
+    ('crop-groups',        'crop_group',       CropGroupCreateView,       dict(translation_label='Crop Groups',      translation_desc='Crop groups for Package of Practices and Crop Zone Profiles')),
+]
+
+for _slug, _cat, _list_view, _cfg in _MASTER_LOOKUPS:
+    urlpatterns += [
+        path(f'{_slug}/',                       _list_view.as_view(),                                             name=f'admin-{_slug}'),
+        path(f'{_slug}/<int:pk>/',              LookupDetailView.as_view(category=_cat, **_cfg),                  name=f'admin-{_slug}-detail'),
+        path(f'{_slug}/<int:pk>/activate/',     LookupActiveView.as_view(category=_cat, activate=True),           name=f'admin-{_slug}-activate'),
+        path(f'{_slug}/<int:pk>/deactivate/',   LookupActiveView.as_view(category=_cat, activate=False),          name=f'admin-{_slug}-deactivate'),
+    ]
+
