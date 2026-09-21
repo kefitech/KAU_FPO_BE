@@ -26,12 +26,18 @@ official government data) but requires organizational registration +
 IP whitelisting — out of scope for this module alone. OpenWeatherMap
 is the pragmatic interim real data source.
 """
+import logging
 from datetime import date
 
 import httpx
+from django.conf import settings
 from django.contrib.gis.geos import Point
+from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
 
 OPENWEATHERMAP_URL = "https://api.openweathermap.org/data/2.5/weather"
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
 
 def _get_weather_api_key() -> str | None:
@@ -105,15 +111,75 @@ def resolve_fpo_location(fpo):
     return None, None
 
 
+def reverse_geocode_address(lat, lng) -> str | None:
+    """
+    Turns coordinates into a short human-readable place, e.g.
+    "Ollur, Thrissur, Thrissur District, Kerala", using OpenStreetMap's
+    Nominatim. Best-effort by design: returns None (never raises) if the
+    lookup fails, times out or finds nothing, so a recommendation is never
+    blocked or failed because an address could not be resolved.
+
+    Nominatim's usage policy requires an identifying User-Agent (set
+    NOMINATIM_USER_AGENT in settings, ideally with a contact address) and
+    allows about one request per second. Only successful results are cached
+    (about 11 m grid, 30 days), so a failed lookup is retried next time.
+    """
+    if lat is None or lng is None:
+        return None
+    cache_key = f"revgeo:{float(lat):.4f}:{float(lng):.4f}"
+    try:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+    except Exception:  # noqa: BLE001 -- a cache outage must not block the lookup
+        pass
+
+    try:
+        response = httpx.get(
+            NOMINATIM_REVERSE_URL,
+            params={
+                "format": "jsonv2", "lat": lat, "lon": lng,
+                "zoom": 16, "addressdetails": 1, "accept-language": "en",
+            },
+            headers={"User-Agent": getattr(settings, "NOMINATIM_USER_AGENT", "KAU-FPO-Linkage-Platform/1.0")},
+            timeout=4.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except Exception:  # noqa: BLE001 -- best-effort, see docstring
+        logger.warning("reverse_geocode_address: lookup failed for %s,%s", lat, lng, exc_info=True)
+        return None
+
+    parts = data.get("address") or {}
+    locality = next(
+        (parts[k] for k in ("village", "hamlet", "suburb", "neighbourhood", "town", "city", "municipality") if parts.get(k)),
+        None,
+    )
+    ordered = [locality, parts.get("county"), parts.get("state_district"), parts.get("state")]
+    seen, pieces = set(), []
+    for piece in ordered:
+        if piece and piece.lower() not in seen:
+            seen.add(piece.lower())
+            pieces.append(piece)
+    address = ", ".join(pieces) or data.get("display_name") or None
+    if address:
+        try:
+            cache.set(cache_key, address, 60 * 60 * 24 * 30)
+        except Exception:  # noqa: BLE001
+            pass
+    return address
+
+
 def build_location_snapshot(fpo) -> dict:
     """
     Snapshot of the FPO's location/boundary at a point in time, for
     persisting alongside a CropRecommendation.input_snapshot -- lets a
     later "stale" recommendation still show where it was actually
     generated for, even after the FPO redraws their cultivation area.
-    Returns {'lat', 'lng', 'area_polygon'} -- area_polygon is a GeoJSON
+    Returns {'lat', 'lng', 'area_polygon', 'address'} -- area_polygon is a GeoJSON
     dict (the FPO's drawn boundary) or None if they haven't drawn one
-    (falls back to their lat/lng only, same as resolve_fpo_location).
+    (falls back to their lat/lng only, same as resolve_fpo_location); address
+    is a best-effort place name (see reverse_geocode_address) or None.
     """
     import json as _json
 
@@ -122,7 +188,7 @@ def build_location_snapshot(fpo) -> dict:
     area_polygon = None
     if cultivation_area and cultivation_area.area_polygon:
         area_polygon = _json.loads(cultivation_area.area_polygon.geojson)
-    return {'lat': lat, 'lng': lng, 'area_polygon': area_polygon}
+    return {'lat': lat, 'lng': lng, 'area_polygon': area_polygon, 'address': reverse_geocode_address(lat, lng)}
 
 
 def resolve_fpo_zone(fpo):

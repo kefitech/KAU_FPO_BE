@@ -11,6 +11,7 @@ Created: 22-04-2026
 import re
 from typing import List
 from rest_framework import serializers
+from rest_framework.exceptions import ErrorDetail
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -285,14 +286,15 @@ class LoginSerializer(serializers.Serializer):
         user = authenticate(username=username, password=password)
 
         if user is None:
+            # authenticate() also returns None for an inactive user with the right password
+            # (ModelBackend.user_can_authenticate), so look for that case to report it distinctly.
+            candidate = User.objects.filter(username=username).first()
+            if candidate and not candidate.is_active and candidate.check_password(password):
+                raise serializers.ValidationError({
+                    'non_field_errors': [ErrorDetail(t('auth.account_disabled'), code='account_disabled')]
+                })
             raise serializers.ValidationError({
                 'non_field_errors': [t('auth.invalid_credentials')]
-            })
-
-        # Check if account is active
-        if not user.is_active:
-            raise serializers.ValidationError({
-                'non_field_errors': [t('auth.account_disabled')]
             })
 
         # Store user in validated data
