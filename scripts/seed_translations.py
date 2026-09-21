@@ -3746,9 +3746,17 @@ def seed_menu_translations(languages):
         ('dpr_knowledge',          'DPR Knowledge Base',       'DPR നോളജ് ബേസ്'),
         ('dpr_risk_matrix',        'DPR Risk Matrix',          'DPR റിസ്ക് മാട്രിക്സ്'),
         ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
-        # Crop knowledge base (Aravind — P2-06)
-        ('crop_zone_profiles',       'Crop Zone Profiles',          'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
-        ('crop_package_of_practices','Crop Package of Practices',   'ക്രോപ്പ് പാക്കേജ് ഓഫ് പ്രാക്ടീസസ്'),
+        # AI recommendation hub + cards (Aravind — P2-05/P2-06)
+        ('ai_recommendation',      'AI Recommendation',        'AI ശുപാർശ'),
+        ('ml_models',              'ML Models',                'ML മോഡലുകൾ'),
+        ('crop_zone_profiles',     'Crop Zone Profiles',       'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
+        ('crop_package_of_practices', 'Crop Package of Practices', 'ക്രോപ്പ് പാക്കേജ് ഓഫ് പ്രാക്ടീസസ്'),
+        ('gis_zones',              'GIS Zones',                'GIS സോണുകൾ'),
+        ('soil_regions',           'Soil Regions',             'മണ്ണ് പ്രദേശങ്ങൾ'),
+        # Admin management
+        ('government',             'Government Officials',     'സർക്കാർ ഉദ്യോഗസ്ഥർ'),
+        ('cbbos',                  'CBBO / NGO Officers',       'CBBO / NGO ഉദ്യോഗസ്ഥർ'),
+        ('master_data',            'Master Data',              'മാസ്റ്റർ ഡാറ്റ'),
         # Jobin follow-up (KAU 2026-09-21)
         ('expert_stats',           'Booking Overview',         'ബുക്കിംഗ് അവലോകനം'),
         ('fpo_trainings',          'Trainings',                'പരിശീലനങ്ങൾ'),

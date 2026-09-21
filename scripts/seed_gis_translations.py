@@ -159,6 +159,22 @@ def seed_gis_translations():
             'location_map_label':        ('Farm location at time of this recommendation', 'ഈ ശുപാർശ നൽകിയ സമയത്തെ കൃഷിയിട സ്ഥാനം'),
         },
 
+        # ── Admin: AI Recommendation hub (landing page for GIS zones, soil regions, ML models, crop data) ──
+        'admin_ai_recommendation': {
+            'page_title':                          ('AI Recommendation', 'AI ശുപാർശ'),
+            'page_description':                    ('Manage the location data, models and crop knowledge that drive crop recommendations for FPOs.', 'FPO-കൾക്കുള്ള വിള ശുപാർശയ്ക്ക് ആധാരമായ സ്ഥാന ഡാറ്റ, മോഡലുകൾ, വിള വിവരങ്ങൾ എന്നിവ നിയന്ത്രിക്കുക.'),
+            'card_gis-zones_title':                ('GIS Zones', 'ജിഐഎസ് സോണുകൾ'),
+            'card_gis-zones_desc':                 ('Agro-climatic zone boundaries used to place each FPO in a zone. Upload a version, preview it on the map, then activate it.', 'ഓരോ FPO-യെയും ഒരു സോണിൽ ഉൾപ്പെടുത്താൻ ഉപയോഗിക്കുന്ന കാർഷിക-കാലാവസ്ഥാ സോൺ അതിരുകൾ. ഒരു പതിപ്പ് അപ്‌ലോഡ് ചെയ്ത് ഭൂപടത്തിൽ പ്രിവ്യൂ ചെയ്ത് സജീവമാക്കുക.'),
+            'card_soil-regions_title':             ('Soil Regions', 'മണ്ണ് മേഖലകൾ'),
+            'card_soil-regions_desc':              ("Soil region boundaries used to identify the soil type at a farm's location. Upload a version, preview it, then activate it.", 'ഒരു കൃഷിയിടത്തിന്റെ സ്ഥാനത്തെ മണ്ണിന്റെ തരം തിരിച്ചറിയാൻ ഉപയോഗിക്കുന്ന മണ്ണ് മേഖലാ അതിരുകൾ. ഒരു പതിപ്പ് അപ്‌ലോഡ് ചെയ്ത് പ്രിവ്യൂ ചെയ്ത് സജീവമാക്കുക.'),
+            'card_ml-models_title':                ('ML Models', 'ML മോഡലുകൾ'),
+            'card_ml-models_desc':                 ('Register, train from CSV, activate and delete the crop-recommendation model versions.', 'വിള ശുപാർശ മോഡൽ പതിപ്പുകൾ രജിസ്റ്റർ ചെയ്യുക, CSV-ൽ നിന്ന് പരിശീലിപ്പിക്കുക, സജീവമാക്കുക, ഇല്ലാതാക്കുക.'),
+            'card_crop-package-of-practices_title': ('Crop Package of Practices', 'ക്രോപ്പ് പാക്കേജ് ഓഫ് പ്രാക്ടീസസ്'),
+            'card_crop-package-of-practices_desc':  ('Cultivation guidance FPOs see when they tap a recommended crop. Only active entries are visible to FPOs.', 'ശുപാർശ ചെയ്ത ഒരു വിളയിൽ ടാപ്പ് ചെയ്യുമ്പോൾ FPO-കൾക്ക് കാണിക്കുന്ന കൃഷിരീതി മാർഗ്ഗനിർദ്ദേശം. സജീവമായ എൻട്രികൾ മാത്രമേ FPO-കൾക്ക് കാണാനാകൂ.'),
+            'card_crop-zone-profiles_title':       ('Crop Zone Profiles', 'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
+            'card_crop-zone-profiles_desc':        ('Which crops are eligible per zone, with their documented temperature, pH and season requirements.', 'ഓരോ സോണിനും യോഗ്യമായ വിളകളും അവയുടെ രേഖപ്പെടുത്തിയ താപനില, pH, സീസൺ ആവശ്യകതകളും.'),
+        },
+
         # ── Admin: Crop Zone Profiles (ml_service's live crop-eligibility knowledge base) ──
         'admin_crop_zone_profiles': {
             'page_title':                ('Crop Zone Profiles', 'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
