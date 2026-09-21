@@ -205,6 +205,56 @@ class DPRProjectAdminDetailView(APIView):
                 readiness = None
             sections_payload[key] = {'data': data, 'readiness': readiness}
 
+        # KAU 2026-09-19 P2.5 — AI content health summary. Compact per-chapter
+        # roll-up of the placeholder-scrubber (P1.5) + consistency-check (P2.3)
+        # results so the admin oversight page can render badges without
+        # shipping full narrative text. Only fields KAU reviewers need at a
+        # glance: chapter key, human label, has any content, needs_review,
+        # counts of placeholder + consistency hits, and the truncated hit
+        # lists themselves for expand-on-click.
+        from apps.database.models import DPRAIContent
+        from apps.database.models.dpr.ai_content import CHAPTER_KEYS, CHAPTER_LABELS
+        ai_rows = {r.chapter: r for r in DPRAIContent.objects.filter(project=project)}
+        ai_content_health = []
+        for chapter in CHAPTER_KEYS:
+            row = ai_rows.get(chapter)
+            if not row:
+                ai_content_health.append({
+                    'chapter': chapter,
+                    'chapter_display': CHAPTER_LABELS.get(chapter, chapter),
+                    'has_content': False,
+                    'needs_review': False,
+                    'placeholder_hits_count': 0,
+                    'consistency_warnings_count': 0,
+                    'placeholder_hits': [],
+                    'consistency_warnings': [],
+                })
+                continue
+            hits = row.placeholder_hits or []
+            warns = row.consistency_warnings or []
+            # Narrative text — admin gets read-only visibility into whatever
+            # the FPO currently has as active. user_edited wins over
+            # original_ai (same rule as PDF rendering). candidate_regen is a
+            # user-decision-pending slot so we surface it separately for
+            # oversight but never as the "active" text.
+            active_text = row.user_edited or row.original_ai or ''
+            active_version = 'user_edited' if row.user_edited else 'original_ai'
+            ai_content_health.append({
+                'chapter': chapter,
+                'chapter_display': row.get_chapter_display(),
+                'has_content': bool(row.user_edited or row.candidate_regen),
+                'needs_review': row.needs_review,
+                'placeholder_hits_count': sum(h.get('count', 1) for h in hits),
+                'consistency_warnings_count': len(warns),
+                # Cap the inline detail — KAU can go to the full AI Content
+                # page for the complete list. 8 is enough for the summary card.
+                'placeholder_hits': hits[:8],
+                'consistency_warnings': warns[:8],
+                'active_text': active_text,
+                'active_version': active_version,
+                'candidate_text': row.candidate_regen or '',
+            })
+
         payload = {
             'project': {
                 'uuid':       str(project.uuid),
@@ -225,5 +275,6 @@ class DPRProjectAdminDetailView(APIView):
                 'total_members':  fpo.total_members,
             } if fpo else None,
             'sections': sections_payload,
+            'ai_content_health': ai_content_health,
         }
         return Response({'status': 'success', 'message': 'DPR project retrieved', 'data': payload})

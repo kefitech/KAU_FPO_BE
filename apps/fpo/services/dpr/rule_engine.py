@@ -91,6 +91,23 @@ MANDATORY = 'M'
 OPTIONAL  = 'O'
 HIDDEN    = 'H'
 
+# Sections that are ALWAYS mandatory regardless of which components the FPO
+# selects — the wizard cannot produce a valid DPR without them. Kept as code
+# (not a seed rule) so KAU cannot accidentally delete the row and break the
+# submission gate. Component-based rules can still push OTHER sections to
+# Mandatory, but these are unconditional.
+ALWAYS_MANDATORY: frozenset[str] = frozenset({
+    'identification',   # project title, promoter profile
+    'components',       # what is being built
+    'nature-of-business',  # business model
+    'investment',       # capex / opex — no DPR without a budget
+    'location',         # site address / GPS
+    'finance',          # funding structure, means of finance
+    'implementation',   # schedule
+    'risk',             # mandated by NABARD/scheme reviewers
+    'compliance',       # statutory clearances
+})
+
 
 @dataclass
 class _RuleBundle:
@@ -202,13 +219,25 @@ def evaluate_data_element(project: DPRProject) -> dict[str, str]:
     the project's components is shown but not mandatory.
     """
     if not is_engine_enabled():
-        return {k: OPTIONAL for k in ALL_SECTION_KEYS}
+        # Engine off — still honour ALWAYS_MANDATORY so the submission gate
+        # keeps working during the rollback state. Non-mandatory sections
+        # default to Optional (shown, not required).
+        return {
+            k: (MANDATORY if k in ALWAYS_MANDATORY else OPTIONAL)
+            for k in ALL_SECTION_KEYS
+        }
 
     bundle = _load_rules(project)
-    return {
-        key: _combine_applicability(bundle.level1.get(key, []))
-        for key in ALL_SECTION_KEYS
-    }
+    result: dict[str, str] = {}
+    for key in ALL_SECTION_KEYS:
+        # ALWAYS_MANDATORY overrides component-based rules — a section in
+        # this set is Mandatory even if every selected component's rule
+        # says H or O. The wizard cannot function without these.
+        if key in ALWAYS_MANDATORY:
+            result[key] = MANDATORY
+        else:
+            result[key] = _combine_applicability(bundle.level1.get(key, []))
+    return result
 
 
 def visible_sections(project: DPRProject) -> list[str]:
