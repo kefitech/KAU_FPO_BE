@@ -52,6 +52,7 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     from apps.recommendations.services import get_crop_recommendation, build_recommendation_payload
     from apps.gis_module.services import resolve_fpo_zone, build_location_snapshot
     from apps.notifications.services import send_notification
+    from django.utils import timezone
 
     try:
         fpo = FPO.objects.get(pk=fpo_id)
@@ -101,10 +102,18 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
         # here -- pairing a brand-new snapshot (e.g. a boundary the FPO just
         # redrew) with the OLD recommendations would show a farm shape that
         # never actually produced them.
-        if recommendations_list:
-            CropRecommendation.objects.filter(
-                fpo=fpo, financial_year=financial_year
-            ).update(status=CropRecommendation.Status.COMPLETED)
+        row = CropRecommendation.objects.filter(fpo=fpo, financial_year=financial_year).first()
+        if recommendations_list and row and row.recommendations:
+            # Record WHY the previous recommendation is on screen so the UI can say so instead of
+            # presenting it as a fresh result. Kept in input_snapshot (no schema change); the next real
+            # generation replaces the whole snapshot, which clears these keys automatically. updated_at
+            # is deliberately left alone -- this is not a new recommendation.
+            snapshot = dict(row.input_snapshot or {})
+            snapshot['ml_service_offline'] = True
+            snapshot['ml_service_offline_at'] = timezone.now().isoformat()
+            row.input_snapshot = snapshot
+            row.status = CropRecommendation.Status.COMPLETED
+            row.save(update_fields=['input_snapshot', 'status'])
             return
         # No prior recommendation exists at all -- nothing to fall back to.
         input_snapshot = build_recommendation_payload(fpo, model_version, financial_year, season_override, ph_override)
@@ -127,6 +136,9 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     # for display, so a later "stale" recommendation can still show the
     # actual farm shape it was generated for, even after the FPO redraws it.
     input_snapshot['location_snapshot'] = build_location_snapshot(fpo)
+    # When this recommendation was actually produced -- shown as "generated on ..." if a later
+    # refresh fails and this one is served again (see the cached branch above).
+    input_snapshot['generated_at'] = timezone.now().isoformat()
 
     new_status = (
         CropRecommendation.Status.COMPLETED if recommendations_list

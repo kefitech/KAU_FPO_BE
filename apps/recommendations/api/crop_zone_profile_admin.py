@@ -175,7 +175,14 @@ class CropZoneProfileViewSet(TranslatedViewSet):
     destroy_message = 'recommendations.zone_profile_deleted'
 
     def get_queryset(self):
-        return CropZoneProfile.objects.filter(is_deleted=False).order_by('crop_name', 'kau_zone')
+        qs = CropZoneProfile.objects.filter(is_deleted=False).order_by('crop_name', 'kau_zone')
+        kau_zone = self.request.query_params.get('kau_zone')
+        if kau_zone:
+            qs = qs.filter(kau_zone=kau_zone)
+        crop_group = self.request.query_params.get('crop_group')
+        if crop_group:
+            qs = qs.filter(crop_group__iexact=crop_group)
+        return qs
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -190,7 +197,8 @@ class CropZoneProfileViewSet(TranslatedViewSet):
 
     def perform_destroy(self, instance):
         was_active = instance.is_active
-        instance.soft_delete(user=self.request.user)
+        # Hard delete: (crop_name, kau_zone) is unique, so a soft-deleted row would block re-creating it.
+        instance.delete()
         if was_active:
             export_and_notify()
 

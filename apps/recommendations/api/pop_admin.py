@@ -102,7 +102,8 @@ class CropPackageOfPracticesViewSet(TranslatedViewSet):
         return CropPackageOfPractices.objects.filter(is_deleted=False).order_by('crop_name')
 
     def perform_destroy(self, instance):
-        instance.soft_delete(user=self.request.user)
+        # Hard delete: crop_name is unique, so a soft-deleted row would block re-creating the name.
+        instance.delete()
 
     @extend_schema(tags=['Admin - Crop Package of Practices'])
     @action(detail=True, methods=['post'])

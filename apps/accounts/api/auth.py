@@ -324,6 +324,19 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
 
         if not serializer.is_valid():
+            non_field = serializer.errors.get('non_field_errors', [])
+            if any(getattr(e, 'code', None) == 'account_disabled' for e in non_field):
+                # Correct password on a disabled account: not a failed attempt, so no lockout count
+                AuditLog.log(
+                    user=None,
+                    action=AuditLog.Action.FAILED_LOGIN,
+                    changes={'username': username_or_email, 'reason': 'Account disabled'},
+                    request=request
+                )
+                return StandardResponse.error(
+                    t('auth.account_disabled', language),
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
             if username_or_email:
                 _increment_failed_login(username_or_email)
                 # Re-check: this attempt may have just triggered the lock
