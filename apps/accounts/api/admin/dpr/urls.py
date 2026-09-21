@@ -30,6 +30,11 @@ from .applicability import (
     ApplicabilityMatrixView,
     ApplicabilityUpsertView,
 )
+from .field_rules import (
+    FieldRuleDetailView,
+    FieldRuleListCreateView,
+    FieldRuleSchemaView,
+)
 from .project_applicability import AdminProjectApplicabilityView
 
 
@@ -128,6 +133,10 @@ urlpatterns = [
     path('applicability/matrix/', ApplicabilityMatrixView.as_view(), name='admin-dpr-applicability-matrix'),
     path('applicability/', ApplicabilityUpsertView.as_view(), name='admin-dpr-applicability-upsert'),
     path('applicability/<int:pk>/', ApplicabilityDeleteView.as_view(), name='admin-dpr-applicability-delete'),
+    # Level 2 — field-level rules (KAU 2026-09-19)
+    path('field-rules/schema/', FieldRuleSchemaView.as_view(), name='admin-dpr-field-rules-schema'),
+    path('field-rules/', FieldRuleListCreateView.as_view(), name='admin-dpr-field-rules-list-create'),
+    path('field-rules/<int:pk>/', FieldRuleDetailView.as_view(), name='admin-dpr-field-rules-detail'),
     # Per-project applicability preview (Phase 6e — admin UAT tool)
     path(
         'projects/<uuid:project_uuid>/applicability/',

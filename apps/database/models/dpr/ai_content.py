@@ -215,6 +215,19 @@ class DPRAIContent(TimeStampedModel, AuditModel):
                   'regeneration with zero hits.',
     )
 
+    # KAU AI grounding (2026-09-19) — cross-chapter consistency check.
+    # Ran after generate_all_narratives() by
+    # `apps.fpo.services.dpr.consistency_check.check_project_chapters()`.
+    # Each entry: {"metric": "IRR", "expected": "19.40", "found": "19",
+    # "kind": "drift" | "mismatch", "excerpt": "…IRR of roughly 19%…"}.
+    # Cleared on the next zero-warning regeneration of this chapter.
+    consistency_warnings = models.JSONField(
+        default=list, blank=True,
+        help_text='Mismatches between narrative numbers and the calc-engine '
+                  '`CalculationResult` for this chapter. Populated by '
+                  'apps.fpo.services.dpr.consistency_check. Empty list = clean.',
+    )
+
     class Meta:
         db_table = 'dpr_ai_content'
         verbose_name = 'DPR — AI Content'

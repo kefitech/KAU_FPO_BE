@@ -238,6 +238,26 @@ def build_pdf_filename(project, version_number: int) -> str:
     return f'DPR_{_fpo_slug(project)}_v{version_number}.pdf'
 
 
+def _key_assumptions_rows() -> list[dict]:
+    """Rows for the PDF's "Key Assumptions" mini-table (KAU 2026-09-19 P2.1).
+
+    Every DPRConfig-configured rate the calc engine reads gets listed here
+    so the DPR reader (banker / KAU reviewer) can see at a glance which
+    figures are platform assumptions vs FPO-entered.
+
+    Each row: {label, value_pct, source}. `value_pct` is a plain string
+    with a "%" suffix; template renders it as-is.
+    """
+    # Local import so a plain `render_pdf_for_project` call in a bare
+    # Django shell doesn't force apps.fpo.services.dpr.provenance to load
+    # before the Django app registry is ready.
+    from .provenance import collect_system_assumptions
+    return [
+        {'label': a.label, 'value_pct': f'{a.value}%', 'source': 'KAU DPR platform default'}
+        for a in collect_system_assumptions()
+    ]
+
+
 def _debt_equity_ratio_display(by_field: dict) -> str:
     """Format the debt-to-equity ratio as `x.xx : 1` — the standard
     banking convention KAU wants on the DPR cover appraisal table.
@@ -259,13 +279,93 @@ def _debt_equity_ratio_display(by_field: dict) -> str:
     return f'{ratio} : 1'
 
 
-def render_html_for_project(project, version_number: Optional[int] = None) -> str:
+class DPRValidationError(Exception):
+    """Raised by render_pdf_for_project when mode='final' but a chapter has
+    unresolved needs_review / hard consistency mismatches.
+
+    `errors` — list of {'chapter': str, 'reason': str}. The API layer can
+    surface these to the FPO so they know which chapters to fix.
+    """
+    def __init__(self, errors: list[dict]):
+        super().__init__(f'Cannot render final PDF — {len(errors)} chapter(s) need review')
+        self.errors = errors
+
+
+def _pre_final_validation(project) -> list[dict]:
+    """KAU 2026-09-19 P6.5 + Kefitech P6.6 — hard gate before final PDF render.
+
+    Flags any AI chapter that still has:
+      * needs_review=True (placeholder scrubber caught unresolved [X] tokens)
+      * consistency_warnings with kind='mismatch' (hard drift, not just soft
+        drift)
+    AND any structural chain warning of severity='error' from
+    `apps.fpo.services.dpr.chain_consistency.check_operational_chain()`.
+
+    Returns a list of {chapter, reason} dicts. Empty list = safe to render.
+    Preview renders always allowed regardless — the gate only fires on
+    mode='final'.
+    """
+    from apps.database.models import DPRAIContent
+    from .chain_consistency import check_operational_chain
+
+    errors: list[dict] = []
+    for row in DPRAIContent.objects.filter(project=project):
+        if row.needs_review and row.placeholder_hits:
+            n = sum(h.get('count', 1) for h in row.placeholder_hits)
+            errors.append({
+                'chapter': row.chapter,
+                'reason': (
+                    f'{n} placeholder token(s) auto-replaced with "Not '
+                    f'available" — regenerate after filling the missing '
+                    f'wizard field(s).'
+                ),
+            })
+        hard = [w for w in (row.consistency_warnings or []) if w.get('kind') == 'mismatch']
+        if hard:
+            metrics = ', '.join(sorted({w['metric'] for w in hard}))
+            errors.append({
+                'chapter': row.chapter,
+                'reason': (
+                    f'Numeric mismatch vs calc engine on: {metrics}. '
+                    f'Regenerate this chapter or edit-in-place before '
+                    f'requesting a final DPR.'
+                ),
+            })
+
+    # Kefitech P6.6 — structural operational-chain checks. Only severity
+    # 'error' entries block the render (warnings surface elsewhere on the
+    # AI Content Health card without blocking).
+    for cw in check_operational_chain(project):
+        if cw.severity == 'error':
+            errors.append({
+                'chapter': cw.section,
+                'reason': cw.message,
+            })
+    return errors
+
+
+def render_html_for_project(
+    project,
+    version_number: Optional[int] = None,
+    mode: str = 'preview',
+) -> str:
     """Compute + render — returns the raw HTML string.
     Useful for debugging without invoking WeasyPrint.
 
     `version_number` is baked into the cover + running footer per KAU §7.2.
     Pass None for one-off previews (renders "Preview" instead of vN).
+
+    `mode` — 'preview' (default) or 'final'. Kefitech 2026-09-19 P6.3:
+    * preview → orange asterisks on [system_default] rates + a "Source"
+      column on the Key Assumptions table. Meant for the FPO reviewing
+      their draft.
+    * final   → asterisks + source column hidden. Meant for the DPR that
+      leaves the platform (bank / scheme officer sees clean numbers with
+      provenance mentioned only in prose, not as visible UI badges).
     """
+    if mode not in ('preview', 'final'):
+        raise ValueError(f"mode must be 'preview' or 'final', got {mode!r}")
+
     result: CalculationResult = compute(project)
     pdf_products, pdf_hero_image = _products_for_pdf(project)
     return render_to_string('dpr/report.html', {
@@ -277,6 +377,8 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
         # rendered on cover + running footer.
         'version_number': version_number,
         'version_label': f'v{version_number}' if version_number else 'Preview',
+        # P6.3 mode flag — template renders provenance markers only when True.
+        'preview_mode': mode == 'preview',
         # Project-at-Glance breakdown rows — pre-computed so the template
         # renders human-readable labels without extra filter machinery.
         'cost_breakdown_rows': _breakdown_rows(result.cost.by_field, COST_LABELS),
@@ -284,6 +386,11 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
         # Debt-to-equity as banking-convention ratio (e.g. "1.50 : 1"),
         # not raw rupees — per KAU 2026-09-19 reviewer feedback.
         'debt_equity_ratio_display': _debt_equity_ratio_display(result.mof.by_field),
+        # KAU 2026-09-19 P2.1 — Key Assumptions mini-table listing every
+        # DPRConfig-configured rate the calc engine used. Rendered just
+        # before the Limitations chapter so bank / KAU reviewer can see
+        # which figures are platform defaults vs project-specific.
+        'key_assumptions_rows': _key_assumptions_rows(),
         # Per-technology process flowcharts. Empty list = section omitted.
         'technologies_with_flow': _technologies_with_flow(project),
         # Product list + cover hero image (first product with a photo).
@@ -302,11 +409,27 @@ def render_html_for_project(project, version_number: Optional[int] = None) -> st
     })
 
 
-def render_pdf_for_project(project, version_number: Optional[int] = None) -> bytes:
-    """Full pipeline: compute → render HTML → convert to PDF bytes."""
+def render_pdf_for_project(
+    project,
+    version_number: Optional[int] = None,
+    mode: str = 'preview',
+) -> bytes:
+    """Full pipeline: compute → render HTML → convert to PDF bytes.
+
+    `mode='final'` runs the Kefitech P6.5 pre-flight gate first — if any
+    AI chapter has unresolved placeholder tokens or hard numeric
+    mismatches vs the calc engine, raises `DPRValidationError` with a
+    per-chapter reason list instead of rendering an unreliable DPR.
+    Preview mode always renders regardless.
+    """
     from weasyprint import HTML   # deferred import — heavy dep, avoid at import time
 
-    html = render_html_for_project(project, version_number=version_number)
+    if mode == 'final':
+        errors = _pre_final_validation(project)
+        if errors:
+            raise DPRValidationError(errors)
+
+    html = render_html_for_project(project, version_number=version_number, mode=mode)
     return HTML(string=html).write_pdf()
 
 

@@ -3701,6 +3701,13 @@ def seed_menu_translations(languages):
         ('soil_regions',           'Soil Regions',             'മണ്ണ് പ്രദേശങ്ങൾ'),
         ('dpr_projects',           'DPR Projects',             'DPR പ്രൊജക്ടുകൾ'),
         ('dpr_config',             'DPR Config',               'DPR കോൺഫിഗ്'),
+        # DPR admin surfaces (2026-09-19 menu sweep — pages were live on
+        # the FE but the sidebar labels weren't seeded).
+        ('dpr_master_data',        'DPR Master Data',          'DPR മാസ്റ്റർ ഡാറ്റ'),
+        ('dpr_applicability',      'DPR Applicability (L1)',   'DPR ബാധകത (L1)'),
+        ('dpr_field_rules',        'DPR Field Rules (L2)',     'DPR ഫീൽഡ് നിയമങ്ങൾ (L2)'),
+        ('dpr_knowledge',          'DPR Knowledge Base',       'DPR നോളജ് ബേസ്'),
+        ('dpr_risk_matrix',        'DPR Risk Matrix',          'DPR റിസ്ക് മാട്രിക്സ്'),
         ('ai_services',            'AI Services',              'AI സേവനങ്ങൾ'),
         # Crop knowledge base (Aravind — P2-06)
         ('crop_zone_profiles',       'Crop Zone Profiles',          'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),

@@ -353,6 +353,27 @@ class FinancialRatios:
     payback_period_years: Optional[Decimal]     # None when cumulative FCF never turns positive
     break_even_year: Optional[int]              # first year cumulative PAT >= 0; None if never
 
+    # KAU / Kefitech 2026-09-19 P6.1 — proper OPERATING break-even
+    # (fixed cost / contribution margin) alongside the year-cumulative-PAT
+    # measure above. Computed off Y1 numbers:
+    #   fixed_costs   = salary + repairs + insurance + admin + marketing +
+    #                   communication + professional + misc + depreciation +
+    #                   interest
+    #   variable_cost = raw material + electricity + fuel + water +
+    #                   transport + packaging
+    #   contribution  = revenue − variable_cost
+    #   BE sales      = fixed_costs / (contribution / revenue)
+    #   BE capacity % = BE sales / revenue × 100  (assuming Y1 revenue
+    #                   reflects the operating-plan capacity utilisation)
+    #
+    # None when Y1 P&L is unavailable OR contribution ≤ 0 (project can't
+    # meet variable cost — no valid break-even point exists).
+    break_even_sales_inr: Optional[Decimal] = None
+    break_even_capacity_utilisation_pct: Optional[Decimal] = None
+    break_even_fixed_cost_inr: Optional[Decimal] = None
+    break_even_variable_cost_inr: Optional[Decimal] = None
+    break_even_contribution_margin_pct: Optional[Decimal] = None
+
 
 @dataclass
 class RiskCategoryScore:
@@ -1676,7 +1697,18 @@ def _free_cash_flows(cash_flow: CashFlow) -> list[Decimal]:
 
 
 def _build_dscr(profit_loss: ProfitLoss, interest: InterestSchedule) -> tuple[list[DSCRRow], Optional[Decimal], Optional[Decimal]]:
-    """Per-year DSCR + min/avg across years with actual debt service."""
+    """Per-year DSCR + min/avg across years with FULL debt service.
+
+    Kefitech 2026-09-19 review said moratorium years (where interest is
+    being paid but principal isn't yet due) inflate the DSCR average
+    because the denominator is interest-only, artificially high cover.
+    The primary appraisal DSCR should therefore be averaged over years
+    with real P+I service — i.e. `principal > 0`.
+
+    The per-year row still surfaces a DSCR for moratorium years (interest
+    charge as denominator) so the PDF schedule stays complete; only the
+    min/avg roll-ups skip those years.
+    """
     rows: list[DSCRRow] = []
     dscrs_for_agg: list[Decimal] = []
     for pl_row, int_row in zip(profit_loss.rows, interest.rows):
@@ -1687,7 +1719,11 @@ def _build_dscr(profit_loss: ProfitLoss, interest: InterestSchedule) -> tuple[li
         dscr = None
         if denom > 0:
             dscr = (numer / denom).quantize(Decimal('0.01'))
-            dscrs_for_agg.append(dscr)
+            # Only years with real principal repayment feed the min/avg —
+            # moratorium (interest-only) years get a computed DSCR on the
+            # row but are excluded from the roll-ups.
+            if principal > 0:
+                dscrs_for_agg.append(dscr)
         rows.append(DSCRRow(
             year=pl_row.year,
             numerator=numer,
@@ -1733,12 +1769,104 @@ def _break_even_year(profit_loss: ProfitLoss) -> Optional[int]:
     return None
 
 
+# Kefitech 2026-09-19 P6.1 — operating break-even (fixed / contribution).
+# Split OPEX_FIELDS into fixed vs variable buckets. Standard bank-appraisal
+# classification for a food-processing / value-addition FPO:
+#   variable  — inputs that scale with output (raw material, utilities,
+#               packaging, transport)
+#   fixed     — costs that are broadly output-independent within the
+#               operating envelope (salaries, R&M, insurance, admin,
+#               marketing, communication, professional charges, misc)
+# Depreciation + interest are added separately (not opex line items).
+_BREAK_EVEN_VARIABLE_OPEX = (
+    'op_raw_material', 'op_electricity', 'op_fuel',
+    'op_water', 'op_transportation', 'op_packaging',
+)
+_BREAK_EVEN_FIXED_OPEX = (
+    'op_salaries_wages', 'op_repairs_maintenance', 'op_insurance',
+    'op_admin_expenses', 'op_marketing_expenses', 'op_communication',
+    'op_professional_charges', 'op_miscellaneous',
+)
+
+
+def _operating_break_even(
+    project,
+    profit_loss: ProfitLoss,
+    interest: InterestSchedule,
+) -> tuple[
+    Optional[Decimal], Optional[Decimal], Optional[Decimal],
+    Optional[Decimal], Optional[Decimal],
+]:
+    """Compute operating break-even off Y1 numbers.
+
+    Returns (be_sales, be_capacity_pct, fixed_cost, variable_cost,
+    contribution_margin_pct). Any tuple element may be None when Y1 P&L
+    is unavailable or contribution is non-positive.
+
+    Formula (standard bank appraisal):
+      fixed_cost   = fixed opex + Y1 depreciation + Y1 interest
+      variable_cost = variable opex (Y1)
+      contribution = revenue − variable_cost
+      contribution_margin_pct = contribution / revenue × 100
+      break_even_sales = fixed_cost / (contribution / revenue)
+      break_even_capacity_pct = break_even_sales / revenue × 100
+        (assumes Y1 revenue reflects the operating-plan capacity
+        utilisation — same assumption bank appraisals make)
+    """
+    if not profit_loss.rows:
+        return None, None, None, None, None
+    y1 = profit_loss.rows[0]
+    revenue = y1.revenue
+    if revenue is None or revenue <= 0:
+        return None, None, None, None, None
+
+    fin = getattr(project, 'section_finance', None)
+    variable_opex, _ = _sum_fields(fin, _BREAK_EVEN_VARIABLE_OPEX)
+    fixed_opex, _   = _sum_fields(fin, _BREAK_EVEN_FIXED_OPEX)
+
+    # For a bank-appraisal break-even we anchor on Y1 numbers — the
+    # opex above is Y1 opex (which is what _sum_fields returns since
+    # DPRSectionFinance stores Y1 values that the P&L then escalates).
+    fixed_cost = fixed_opex + y1.depreciation + y1.interest
+    variable_cost = variable_opex
+
+    contribution = revenue - variable_cost
+    if contribution <= 0:
+        # No valid operating break-even point — variable cost eats all
+        # revenue. Return the raw split so the PDF can show it and flag
+        # the anomaly; break-even measures themselves stay None.
+        return (
+            None, None,
+            fixed_cost.quantize(Decimal('0.01')),
+            variable_cost.quantize(Decimal('0.01')),
+            None,
+        )
+    contribution_margin_ratio = contribution / revenue
+    be_sales = (fixed_cost / contribution_margin_ratio).quantize(Decimal('0.01'))
+    be_capacity_pct = (be_sales / revenue * Decimal('100')).quantize(Decimal('0.01'))
+    contribution_margin_pct = (contribution_margin_ratio * Decimal('100')).quantize(Decimal('0.01'))
+    return (
+        be_sales,
+        be_capacity_pct,
+        fixed_cost.quantize(Decimal('0.01')),
+        variable_cost.quantize(Decimal('0.01')),
+        contribution_margin_pct,
+    )
+
+
 def build_ratios(
     profit_loss: ProfitLoss,
     interest: InterestSchedule,
     cash_flow: CashFlow,
+    project=None,
 ) -> FinancialRatios:
-    """Assemble the appraisal ratios block."""
+    """Assemble the appraisal ratios block.
+
+    `project` is optional so existing callers that only need discount /
+    NPV / IRR / DSCR / payback / break-even-year still work. When passed,
+    the operating break-even (fixed / contribution — Kefitech 2026-09-19
+    P6.1) is computed and populated on the returned FinancialRatios.
+    """
     discount_rate = DPRConfig.get_decimal('discount_rate_pct', Decimal('12'))
     fcfs = _free_cash_flows(cash_flow)
 
@@ -1747,6 +1875,14 @@ def build_ratios(
     dscr_rows, dscr_min, dscr_avg = _build_dscr(profit_loss, interest)
     payback = _payback_period(fcfs)
     break_even = _break_even_year(profit_loss)
+
+    # Operating break-even (P6.1). Requires project to read the raw opex
+    # split; when the caller doesn't have the project instance we fall
+    # back to Nones and the PDF renders "Not available" for those rows.
+    (be_sales, be_cap_pct, be_fixed, be_var, be_margin_pct) = (
+        _operating_break_even(project, profit_loss, interest)
+        if project is not None else (None, None, None, None, None)
+    )
 
     return FinancialRatios(
         discount_rate_pct=discount_rate,
@@ -1758,6 +1894,11 @@ def build_ratios(
         dscr_avg=dscr_avg,
         payback_period_years=payback,
         break_even_year=break_even,
+        break_even_sales_inr=be_sales,
+        break_even_capacity_utilisation_pct=be_cap_pct,
+        break_even_fixed_cost_inr=be_fixed,
+        break_even_variable_cost_inr=be_var,
+        break_even_contribution_margin_pct=be_margin_pct,
     )
 
 
@@ -2017,7 +2158,7 @@ def compute(project) -> CalculationResult:
     balance_sheet = build_balance_sheet(
         cost, mof, depreciation, interest, profit_loss, cash_flow, projection_years,
     )
-    ratios = build_ratios(profit_loss, interest, cash_flow)
+    ratios = build_ratios(profit_loss, interest, cash_flow, project=project)
     risk_assessment = build_risk_assessment(project)
 
     return CalculationResult(

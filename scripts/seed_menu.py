@@ -185,6 +185,46 @@ def seed_menu():
         roles     = [super_admin_group],
         order     = 19,
     )
+    # DPR admin surfaces — 2026-09-19 sweep.
+    # These pages have existed on the FE for a while; the menu entries
+    # were missing so super_admin had to type the URL. Placed at the end
+    # of the super_admin block (order 30-34); MenuItem.order is a
+    # PositiveIntegerField so decimals aren't allowed.
+    seed_item(
+        label_key = 'menu.dpr_master_data',
+        path      = '/admin/dpr/master-data',
+        icon      = 'database',
+        roles     = [super_admin_group],
+        order     = 30,
+    )
+    seed_item(
+        label_key = 'menu.dpr_applicability',
+        path      = '/admin/dpr-applicability',
+        icon      = 'grid-3x3',
+        roles     = [super_admin_group],
+        order     = 31,
+    )
+    seed_item(
+        label_key = 'menu.dpr_field_rules',
+        path      = '/admin/dpr-field-rules',
+        icon      = 'git-branch',
+        roles     = [super_admin_group],
+        order     = 32,
+    )
+    seed_item(
+        label_key = 'menu.dpr_knowledge',
+        path      = '/admin/dpr-knowledge',
+        icon      = 'book-open',
+        roles     = [super_admin_group],
+        order     = 33,
+    )
+    seed_item(
+        label_key = 'menu.dpr_risk_matrix',
+        path      = '/admin/dpr-risk-matrix',
+        icon      = 'shield-alert',
+        roles     = [super_admin_group],
+        order     = 34,
+    )
     seed_item(
         label_key = 'menu.ai_services',
         path      = '/admin/ai-services',

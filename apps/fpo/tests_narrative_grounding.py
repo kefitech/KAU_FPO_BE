@@ -358,6 +358,55 @@ class PromoterProfileFactsTests(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Phase 2 — Provenance markers in FACTS block
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ProvenanceFactsTests(unittest.TestCase):
+    """KAU 2026-09-19 P2.1: the FACTS block must tag DPRConfig-driven rates
+    as [system_default] so the LLM can mention provenance in prose instead
+    of asserting them as project-specific."""
+
+    def test_discount_rate_row_carries_system_default_tag(self):
+        facts = narrative.format_calc_facts_for_prompt(_fake_project(), _make_calc_result())
+        self.assertIn('Discount rate used:', facts)
+        self.assertIn('[system_default]', facts)
+
+    def test_system_assumptions_block_is_appended(self):
+        """The 'System-default assumptions used by the calc engine' sub-block
+        must appear so both the LLM AND the KAU reviewer see every rate."""
+        facts = narrative.format_calc_facts_for_prompt(_fake_project(), _make_calc_result())
+        self.assertIn('--- System-default assumptions used by the calc engine ---', facts)
+        # A handful of the expected DPRConfig rate labels
+        for label in (
+            'NPV discount rate:',
+            'Corporate tax rate:',
+            'Loan interest rate (fallback):',
+            'Buildings — SLM depreciation:',
+            'Plant & machinery — SLM depreciation:',
+        ):
+            self.assertIn(label, facts, f'missing system assumption row: {label!r}')
+
+    def test_new_hard_rule_10_present(self):
+        """The provenance HARD RULE (rule 10) must be in every prompt so the
+        LLM knows to mention [system_default] provenance in prose."""
+        prompt = narrative.build_prompt(_fake_project(), 'executive_summary', [], calc_facts='x')
+        self.assertIn('PROVENANCE', prompt)
+        self.assertIn('[system_default]', prompt)
+
+    def test_new_hard_rule_11_neutral_language_present(self):
+        """KAU 2026-09-19 P6.4: HARD RULE 11 must forbid promotional
+        adjectives + recommendation language. Locked in via the prompt
+        so future prompt refactors can't silently regress."""
+        prompt = narrative.build_prompt(_fake_project(), 'conclusion', [], calc_facts='x')
+        self.assertIn('NEUTRAL BANK-APPRAISAL LANGUAGE', prompt)
+        # A couple of the specific promotional adjectives KAU flagged
+        self.assertIn('highly bankable', prompt)
+        self.assertIn('state-of-the-art', prompt)
+        # Must forbid loan-sanction recommendation
+        self.assertIn('loan sanction', prompt)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # build_prompt
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -446,6 +495,232 @@ class GenerateAllNarrativesOrderingTests(unittest.TestCase):
             for call in m_gen.call_args_list:
                 self.assertIn('calc_facts', call.kwargs)
                 self.assertIsNotNone(call.kwargs['calc_facts'])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2.3 — Cross-chapter consistency check
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ConsistencyCheckTests(unittest.TestCase):
+    """KAU 2026-09-19 P2.3: numeric mentions across chapters must agree with
+    the calc-engine `CalculationResult`. Consistency check extracts numbers
+    around metric keywords and classifies matches as ok / drift / mismatch."""
+
+    def _result(self):
+        return _make_calc_result(
+            cost_total=Decimal('12685000'),
+            mof_total=Decimal('12500000'),
+            promoter=Decimal('3750000'),
+            term_loan=Decimal('7500000'),
+            irr=Decimal('19.4'),
+            npv=Decimal('243482731.36'),
+            dscr_avg=Decimal('30.06'),
+            dscr_min=Decimal('19.76'),
+            payback=Decimal('0.35'),
+        )
+
+    def test_clean_text_produces_zero_warnings(self):
+        from apps.fpo.services.dpr.consistency_check import (
+            check_chapter_text, expected_metrics,
+        )
+        text = (
+            'The project has a Debt : Equity ratio of 2.00 : 1 and an '
+            'average DSCR of 30.06 over the loan tenure. NPV works out '
+            'to ₹ 24,34,82,731.36 with a payback period of 0.35 years.'
+        )
+        warns = check_chapter_text(text, expected_metrics(self._result()))
+        self.assertEqual(warns, [])
+
+    def test_dscr_min_reference_is_accepted(self):
+        """The narrative may legitimately quote either DSCR avg (30.06) OR
+        DSCR min (19.76) — both are valid; neither should be flagged."""
+        from apps.fpo.services.dpr.consistency_check import (
+            check_chapter_text, expected_metrics,
+        )
+        text = 'The minimum DSCR of 19.76 comfortably exceeds the 1.5x lender threshold.'
+        warns = check_chapter_text(text, expected_metrics(self._result()))
+        self.assertEqual([w.metric for w in warns], [])
+
+    def test_mof_component_reference_is_accepted(self):
+        """"Means of finance" keyword window may reference the total OR any
+        component — promoter, bank, WC, subsidy — none should flag."""
+        from apps.fpo.services.dpr.consistency_check import (
+            check_chapter_text, expected_metrics,
+        )
+        text = 'The means of finance breakdown starts with a promoter contribution of ₹ 37,50,000.00.'
+        warns = check_chapter_text(text, expected_metrics(self._result()))
+        self.assertEqual(warns, [])
+
+    def test_hard_mismatch_is_flagged(self):
+        from apps.fpo.services.dpr.consistency_check import (
+            check_chapter_text, expected_metrics,
+        )
+        # Wrong project cost — off by 27% from real value.
+        text = 'The total project cost of ₹ 92,00,000.00 will be structured across the sources.'
+        warns = check_chapter_text(text, expected_metrics(self._result()))
+        self.assertEqual(len(warns), 1)
+        self.assertEqual(warns[0].kind, 'mismatch')
+        self.assertEqual(warns[0].metric, 'Project cost')
+
+    def test_drift_within_tolerance_is_flagged_as_drift(self):
+        from apps.fpo.services.dpr.consistency_check import (
+            check_chapter_text, expected_metrics,
+        )
+        # NPV expected 243482731.36; found 244000000 — 0.21% off — within 0.5%
+        # so this should NOT flag. Test with a real 1% drift instead.
+        text = 'The projected NPV of ₹ 24,58,00,000.00 shows the value creation.'
+        warns = check_chapter_text(text, expected_metrics(self._result()))
+        self.assertEqual([w.kind for w in warns], ['drift'])
+
+    def test_metric_with_no_calc_value_is_silently_skipped(self):
+        """When calc has no IRR (didn't converge), any 'IRR' mention in
+        text stays quiet — otherwise every DPR would light up warnings."""
+        from apps.fpo.services.dpr.consistency_check import (
+            check_chapter_text, expected_metrics,
+        )
+        result = _make_calc_result(irr=None)
+        text = 'The IRR was not solvable given the cash-flow profile.'
+        warns = check_chapter_text(text, expected_metrics(result))
+        # IRR line skipped; other metrics not triggered by this text
+        self.assertEqual([w.metric for w in warns if w.metric == 'IRR'], [])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2.2 — Single-source-of-truth regression
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TemplateSingleSourceTests(unittest.TestCase):
+    """KAU 2026-09-19 P2.2: the PDF template must never do arithmetic —
+    every rendered number should be a direct read of `r.<field>` on
+    `CalculationResult` and passed through the `|money` filter. This test
+    grep-lints the template file to fail if anyone later re-introduces
+    inline computation that could shadow the calc engine.
+
+    Not just style — KAU explicitly flagged that "the same figure must
+    not be independently generated or reconstructed" across chapters.
+    Silent drift caused by a stray `|add:` would violate that.
+    """
+
+    _TEMPLATE = 'apps/fpo/templates/dpr/report.html'
+
+    def _read_template(self) -> str:
+        import os
+        # Anchor to project root — the tests_narrative_grounding file lives
+        # at apps/fpo/tests_narrative_grounding.py, so climb two dirs up.
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.abspath(os.path.join(here, '..', '..'))
+        path = os.path.join(root, self._TEMPLATE)
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    def test_template_has_no_arithmetic_filters(self):
+        """Fail if the template uses arithmetic filters like `|add:` /
+        `|widthratio` / `|multiply` — these enable inline drift."""
+        import re
+        text = self._read_template()
+        # Django's stock arithmetic filters that could shadow calc engine.
+        offenders = re.findall(
+            r'\|\s*(add|subtract|multiply|divide|widthratio|floatformat)\s*:',
+            text,
+        )
+        # `|floatformat:0` for display precision is allowed — the money
+        # filter used everywhere is Indian-comma-formatting, no arithmetic.
+        # If someone adds `|floatformat` for numeric display, it's still
+        # a signal to review manually.
+        self.assertEqual(
+            offenders, [],
+            f'Template arithmetic filters detected in {self._TEMPLATE}: {offenders}. '
+            'All numeric values must be pre-computed by CalculationResult; the '
+            'template should only format via `|money`. See KAU 2026-09-19 P2.2.',
+        )
+
+    def test_template_only_reads_from_r_or_derived_context(self):
+        """Every numeric-looking token in the body should originate from
+        a `{{ r.* }}` read or a pre-computed context key
+        (mof_breakdown_rows / cost_breakdown_rows / key_assumptions_rows /
+        debt_equity_ratio_display), NOT from a hand-typed number.
+
+        This is a soft check — literal digits in class names / mm sizes /
+        column counts etc. are legitimate. We only assert the shape of the
+        `{{ … }}` interpolations.
+        """
+        import re
+        text = self._read_template()
+        # All `{{ … }}` interpolations in the file.
+        interps = re.findall(r'\{\{\s*([^}]+?)\s*\}\}', text)
+
+        # Deny-list: interpolations that hard-code a number.
+        # Allowed: r.*, project.*, fpo.*, generated_at, version_*,
+        # cost_breakdown_rows, mof_breakdown_rows, technologies_with_flow,
+        # pdf_products, pdf_hero_image, pdf_ai, chart_*, years, y, row.*,
+        # cls.*, forloop.*, key_assumptions_rows, debt_equity_ratio_display.
+        # Match anything starting with a bare digit — that would be a
+        # hard-coded number displayed in the DPR body.
+        bad = [i for i in interps if re.match(r'^\d', i)]
+        self.assertEqual(
+            bad, [],
+            f'Template contains hard-coded numeric interpolations: {bad}. '
+            'These should be pre-computed on CalculationResult so a single '
+            'source of truth remains authoritative.',
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6.6 — Cross-chain operational consistency
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ChainConsistencyTests(unittest.TestCase):
+    """Kefitech 2026-09-19 P6.6: check_operational_chain() flags structural
+    holes in the project plan (production ↔ raw material ↔ machinery ↔
+    manpower ↔ utilities). Skips early-stage drafts."""
+
+    def _blank_project(self, y1_revenue=Decimal('0')):
+        """SimpleNamespace project with a section_finance carrying a single
+        revenue_assumptions row and blank opex fields. All section_*
+        managers are missing so every _section_has_rows check returns
+        False by design."""
+        ra = SimpleNamespace(
+            annual_sales_revenue=y1_revenue,
+            year1_sales_quantity=Decimal('0'),
+            expected_selling_price=Decimal('0'),
+        )
+        fin = SimpleNamespace(
+            revenue_assumptions=SimpleNamespace(all=lambda: [ra]),
+            op_raw_material=Decimal('0'),
+            op_salaries_wages=Decimal('0'),
+            op_electricity=Decimal('0'),
+            op_water=Decimal('0'),
+            op_fuel=Decimal('0'),
+        )
+        return SimpleNamespace(section_finance=fin)
+
+    def test_low_revenue_draft_produces_no_warnings(self):
+        """Under the ₹10L Y1 revenue threshold, don't drown the FPO in
+        chain warnings — the plan is still in draft."""
+        from apps.fpo.services.dpr.chain_consistency import check_operational_chain
+        p = self._blank_project(y1_revenue=Decimal('500000'))
+        self.assertEqual(check_operational_chain(p), [])
+
+    def test_high_revenue_no_products_flags_error(self):
+        """₹5 Cr revenue but no products / raw material / machinery →
+        multiple errors (all severity='error') to block a final render."""
+        from apps.fpo.services.dpr.chain_consistency import check_operational_chain
+        p = self._blank_project(y1_revenue=Decimal('50000000'))
+        warns = check_operational_chain(p)
+        errors = [w for w in warns if w.severity == 'error']
+        checks_flagged = {w.check for w in errors}
+        self.assertIn('products_vs_revenue', checks_flagged)
+        self.assertIn('raw_material_vs_production', checks_flagged)
+        self.assertIn('machinery_vs_production', checks_flagged)
+
+    def test_high_revenue_zero_utilities_flags_warning(self):
+        """₹5 Cr revenue + zero utility opex → warning, not error."""
+        from apps.fpo.services.dpr.chain_consistency import check_operational_chain
+        p = self._blank_project(y1_revenue=Decimal('50000000'))
+        warns = check_operational_chain(p)
+        util_warns = [w for w in warns if w.check == 'utilities_vs_production']
+        self.assertEqual(len(util_warns), 1)
+        self.assertEqual(util_warns[0].severity, 'warning')
 
 
 if __name__ == '__main__':

@@ -220,13 +220,30 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         '',
         f'IRR:                        {_fmt_pct(ratios.irr_pct) if ratios else "Not available"}',
         f'NPV (@ discount rate):      {_fmt_inr(ratios.npv) if ratios else "Not available"}',
-        f'Discount rate used:         {_fmt_pct(ratios.discount_rate_pct) if ratios else "Not available"}',
+        f'Discount rate used:         {_fmt_pct(ratios.discount_rate_pct) if ratios else "Not available"} [system_default]',
         f'Average DSCR:               {_fmt_ratio(ratios.dscr_avg) if ratios else "Not available"}',
         f'Minimum DSCR:               {_fmt_ratio(ratios.dscr_min) if ratios else "Not available"}',
         f'Payback period (years):     {_fmt_ratio(ratios.payback_period_years) if ratios else "Not available"}',
         f'Break-even year:            {ratios.break_even_year if ratios and ratios.break_even_year else "Not available"}',
-        '=== END FACTS ===',
+        '',
+        '--- Operating break-even (Y1 basis, Kefitech 2026-09-19) ---',
+        f'Break-even sales:           {_fmt_inr(ratios.break_even_sales_inr) if ratios else "Not available"}',
+        f'Break-even capacity util.:  {_fmt_pct(ratios.break_even_capacity_utilisation_pct) if ratios else "Not available"} of Y1 sales',
+        f'Contribution margin:        {_fmt_pct(ratios.break_even_contribution_margin_pct) if ratios else "Not available"}',
     ]
+
+    # KAU 2026-09-19 P2.1 — surface the platform-configured (system_default)
+    # rates the calc engine used so the LLM can mention provenance in prose
+    # (e.g. "using the platform's default 12% discount rate") rather than
+    # asserting each rate as a project-specific fact. Values snapshotted at
+    # facts-formatting time so the FACTS block stays deterministic.
+    from .provenance import collect_system_assumptions
+    lines.append('')
+    lines.append('--- System-default assumptions used by the calc engine ---')
+    for a in collect_system_assumptions():
+        lines.append(f'{a.label}:  {a.value}%  [system_default]')
+
+    lines.append('=== END FACTS ===')
     return '\n'.join(lines)
 
 
@@ -307,7 +324,23 @@ _HARD_RULES = (
     '9. Do not claim the FPO has certifications, buyers, awards, land, '
     'staff, or turnover that are not present in the FACTS block or the '
     'knowledge base.\n'
-    '10. Start directly with the first sentence of the narrative.'
+    '10. PROVENANCE. Any value tagged [system_default] in the FACTS block '
+    'is a KAU-configured platform assumption, NOT a project-specific '
+    'input. When quoting such a value, indicate that provenance in prose '
+    '— e.g. "at the platform\'s default 12% discount rate" or "using the '
+    'KAU-configured 25.17% corporate tax rate". Never present a '
+    '[system_default] value as if the FPO or the appraiser chose it.\n'
+    '11. NEUTRAL BANK-APPRAISAL LANGUAGE. This is a professional DPR for '
+    'bank / scheme appraisal — write in formal, analytical, evidence-based '
+    'prose. Do NOT use promotional adjectives: "highly bankable", '
+    '"state-of-the-art", "uniquely positioned", "transformative", '
+    '"compelling", "exceptional", "unmatched", "extraordinary", "robust", '
+    '"impressive", "outstanding", "lucrative". Do NOT recommend loan '
+    'sanction, subsidy approval, or project approval — the final appraisal '
+    'decision rests with the concerned bank or implementing agency. '
+    'Present indicators (DSCR, IRR, NPV, payback) as calculated values '
+    'and let the reviewer draw conclusions.\n'
+    '12. Start directly with the first sentence of the narrative.'
 )
 
 
@@ -660,9 +693,17 @@ _CHAPTER_BRIEF = {
         'resilience or renewable-energy initiatives. 500-700 words.'
     ),
     'conclusion': (
-        'Summarise the case for approval: viability signal from key ratios, '
-        'social + economic impact on FPO members, alignment with scheme / '
-        'policy objectives, and a clear recommendation. 300-500 words.'
+        'Summarise, in neutral bank-appraisal language, the calculated '
+        'financial indicators (DSCR, IRR, NPV, payback, break-even) and '
+        'their relationship to the project\'s technical feasibility, market '
+        'position, financing structure, and identified risks. Note any '
+        'material assumptions from the Key Assumptions Used table + any '
+        'limitations. Do NOT recommend loan sanction, subsidy approval or '
+        'project approval — final appraisal is the concerned bank\'s / '
+        'implementing agency\'s decision. Do NOT use promotional language '
+        '("highly bankable", "state-of-the-art", "transformative", '
+        '"compelling", etc.). Present the evidence and let the reviewer '
+        'conclude. 300-500 words.'
     ),
 }
 
@@ -789,4 +830,22 @@ def generate_all_narratives(
         except Exception as e:  # noqa: BLE001 — chapter failure never blocks the loop
             failed.append((chapter, str(e)[:200]))
 
-    return {'generated': generated, 'skipped': skipped, 'failed': failed}
+    # KAU 2026-09-19 P2.3 — after every full-DPR generation, run the
+    # cross-chapter consistency check. Never raises; writes warnings to
+    # DPRAIContent.consistency_warnings so the FE + admin viewer can
+    # surface drift/mismatch badges without a second round-trip.
+    try:
+        from .consistency_check import check_project_chapters
+        consistency_summary = check_project_chapters(project, result=calc_result)
+    except Exception:  # noqa: BLE001 — the check is opportunistic; never block the return
+        consistency_summary = {}
+
+    return {
+        'generated': generated,
+        'skipped': skipped,
+        'failed': failed,
+        'consistency_warnings': {
+            ch: [w.__dict__ for w in warns]
+            for ch, warns in consistency_summary.items()
+        },
+    }

@@ -75,6 +75,9 @@ class AIContentSerializer(serializers.ModelSerializer):
             # "review required" badge + a per-hit tooltip so the FPO sees
             # which fields the last generation left blank.
             'needs_review', 'placeholder_hits',
+            # KAU 2026-09-19 P2.3 — cross-chapter consistency check output.
+            # FE renders drift / mismatch warnings on the AI Content page.
+            'consistency_warnings',
         )
         read_only_fields = fields  # writes go through dedicated action endpoints
 

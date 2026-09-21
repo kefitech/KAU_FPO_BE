@@ -69,6 +69,10 @@ Author: Athul Gopan (Kefi Tech Solutions)
     table.dense-table { font-size: 6.75pt; table-layout: fixed; word-wrap: break-word; }
     table.dense-table th, table.dense-table td { padding: 0.8mm 1mm; }
     table.dense-table .label { font-size: 7pt; word-wrap: break-word; }
+    /* KAU 2026-09-19 P2.1: provenance asterisk. Marks numbers pulled from
+       DPRConfig (system_default) rather than FPO input. Legend on the
+       Assumptions section (§sec-assumptions) explains the meaning. */
+    sup.prov { color: #E86C1A; font-weight: 600; font-size: 0.75em; padding-left: 0.5mm; }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
     th, td { border: 1px solid #ccc; padding: 1.5mm 2mm; text-align: right; vertical-align: middle; }
@@ -299,7 +303,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
       <tr><td class="rownum">13</td> <td class="k">Average DSCR</td>                       <td class="v">{% if r.ratios.dscr_avg %}{{ r.ratios.dscr_avg|money }}x{% else %}n/a (no debt){% endif %}</td></tr>
       <tr><td class="rownum">14</td> <td class="k">Payback period</td>                     <td class="v">{% if r.ratios.payback_period_years %}{{ r.ratios.payback_period_years|money }} years{% else %}—{% endif %}</td></tr>
-      <tr><td class="rownum">15</td> <td class="k">Net Present Value ({{ r.ratios.discount_rate_pct|money }}%)</td> <td class="v">₹ {{ r.ratios.npv|money }}</td></tr>
+      <tr><td class="rownum">15</td> <td class="k">Net Present Value ({{ r.ratios.discount_rate_pct|money }}%{% if preview_mode %}<sup class="prov">*</sup>{% endif %})</td> <td class="v">₹ {{ r.ratios.npv|money }}</td></tr>
       <tr><td class="rownum">16</td> <td class="k">Internal Rate of Return (IRR)</td>      <td class="v">{% if r.ratios.irr_pct %}{{ r.ratios.irr_pct|money }}%{% else %}Not solvable — see §11{% endif %}</td></tr>
       <tr><td class="rownum">17</td> <td class="k">Break-even year</td>                    <td class="v">{% if r.ratios.break_even_year %}Year {{ r.ratios.break_even_year }}{% else %}Not reached in projection{% endif %}</td></tr>
     </tbody>
@@ -607,6 +611,36 @@ Author: Athul Gopan (Kefi Tech Solutions)
       </tbody>
     </table>
 
+    {# ── Operating break-even (Kefitech 2026-09-19 P6.1) ────────────────
+       Fixed cost / contribution margin — the standard bank-appraisal
+       break-even, alongside the year-based measure above. Rendered only
+       when Y1 P&L is available. #}
+    {% if r.ratios.break_even_fixed_cost_inr %}
+      <h3 style="margin-top: 6mm;">Operating Break-even (Y1 basis)</h3>
+      <table style="width: 60%;">
+        <thead><tr><th class="label">Measure</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Fixed cost (Y1)</td>
+              <td>₹ {{ r.ratios.break_even_fixed_cost_inr|money }}</td></tr>
+          <tr><td class="label">Variable cost (Y1)</td>
+              <td>₹ {{ r.ratios.break_even_variable_cost_inr|money }}</td></tr>
+          <tr><td class="label">Contribution margin</td>
+              <td>{% if r.ratios.break_even_contribution_margin_pct %}{{ r.ratios.break_even_contribution_margin_pct|money }}%{% else %}n/a (variable cost ≥ revenue){% endif %}</td></tr>
+          <tr><td class="label">Break-even sales</td>
+              <td>{% if r.ratios.break_even_sales_inr %}₹ {{ r.ratios.break_even_sales_inr|money }}{% else %}Not attainable{% endif %}</td></tr>
+          <tr><td class="label">Break-even capacity utilisation</td>
+              <td>{% if r.ratios.break_even_capacity_utilisation_pct %}{{ r.ratios.break_even_capacity_utilisation_pct|money }}% of Y1 sales{% else %}Not attainable{% endif %}</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-top: 2mm;">
+        Fixed cost = salaries, repairs &amp; maintenance, insurance, admin,
+        marketing, communication, professional charges, misc + Y1 depreciation
+        + Y1 interest.  Variable cost = raw material, electricity, fuel, water,
+        transportation, packaging (Y1 basis).  Contribution margin = (revenue − variable
+        cost) / revenue.  Break-even sales = fixed cost / contribution margin.
+      </p>
+    {% endif %}
+
     {% if not r.ratios.irr_pct %}
       <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-top: 3mm;">
         <strong>Note on IRR:</strong> IRR could not be determined for the given cash-flow
@@ -813,6 +847,45 @@ Author: Athul Gopan (Kefi Tech Solutions)
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
     <div class="ai-narrative">{{ pdf_ai.conclusion|linebreaks }}</div>
   {% endif %}
+
+  {# ── Key Assumptions — KAU 2026-09-19 P2.1 provenance ─────────────────
+       Every DPRConfig-configured rate the calc engine used is listed here
+       so a bank / KAU reviewer can see at a glance which figures are
+       platform defaults vs project-specific FPO inputs. Any `*` mark seen
+       elsewhere in the DPR points back to a row in this table. #}
+  <div class="page-break"></div>
+  <h2 id="sec-assumptions">Key Assumptions Used</h2>
+  <p style="font-size: 9pt; margin-bottom: 3mm;">
+    {% if preview_mode %}
+      The following values are <strong>KAU DPR platform defaults</strong> — not entered by
+      the FPO. Wherever a <sup class="prov">*</sup> appears elsewhere in this DPR (Project at a
+      Glance, financial statements, appraisal ratios), the number is one of these
+      platform-configured rates. Bankers and appraisers should treat these as
+      baseline assumptions to be tested during due diligence.
+    {% else %}
+      The following baseline financial assumptions have been used in this
+      DPR. Bankers and appraisers should treat them as baseline values to
+      be tested during due diligence.
+    {% endif %}
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th class="label" style="{% if preview_mode %}width: 55%;{% else %}width: 70%;{% endif %}">Assumption</th>
+        <th style="width: 15%;">Value</th>
+        {% if preview_mode %}<th class="label" style="width: 30%;">Source</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in key_assumptions_rows %}
+        <tr>
+          <td class="label">{{ row.label }}</td>
+          <td>{{ row.value_pct }}</td>
+          {% if preview_mode %}<td class="label">{{ row.source }}</td>{% endif %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
   {# ── Limitations & Guidelines for Entrepreneurs ─────────────────────── #}
   <div class="page-break"></div>
