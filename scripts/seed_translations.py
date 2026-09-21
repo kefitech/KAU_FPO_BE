@@ -3712,6 +3712,9 @@ def seed_menu_translations(languages):
         # Crop knowledge base (Aravind — P2-06)
         ('crop_zone_profiles',       'Crop Zone Profiles',          'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ'),
         ('crop_package_of_practices','Crop Package of Practices',   'ക്രോപ്പ് പാക്കേജ് ഓഫ് പ്രാക്ടീസസ്'),
+        # Jobin follow-up (KAU 2026-09-21)
+        ('expert_stats',           'Booking Overview',         'ബുക്കിംഗ് അവലോകനം'),
+        ('fpo_trainings',          'Trainings',                'പരിശീലനങ്ങൾ'),
     ]
 
     count = 0

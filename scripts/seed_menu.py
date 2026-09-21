@@ -389,6 +389,15 @@ def seed_menu():
         roles     = fpo_roles,
         order     = 13,
     )
+    # Jobin follow-up (KAU 2026-09-21) — read-only trainings list for FPO
+    # users (sessions scheduled for their FPO by CBBO/gov officials).
+    seed_item(
+        label_key = 'menu.fpo_trainings',
+        path      = '/fpo/trainings',
+        icon      = 'graduation-cap',
+        roles     = fpo_roles,
+        order     = 14,
+    )
 
     # ── External Buyer portal (Arunima — P2-11) ─────────────────────────────
     buyer_roles = [external_buyer_group]
@@ -504,6 +513,15 @@ def seed_menu():
         icon      = 'user',
         roles     = [expert_group],
         order     = 3,
+    )
+    # Jobin follow-up (KAU 2026-09-21) — booking overview sidebar link for
+    # /expert/stats page (page existed but was unreachable from the sidebar).
+    seed_item(
+        label_key = 'menu.expert_stats',
+        path      = '/expert/stats',
+        icon      = 'bar-chart-3',
+        roles     = [expert_group],
+        order     = 4,
     )
 
     # ── Aravind merge follow-ups (KAU 2026-09-21) ──────────────────────────
