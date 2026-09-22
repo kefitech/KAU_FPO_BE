@@ -389,7 +389,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
     Depreciation is computed using the Straight-Line Method (SLM) at the rates configured for
     the KAU DPR platform. Rates are used <strong>for project appraisal</strong> and are indicative
     for banker / scheme review; they may differ from statutory / income-tax depreciation rates
-    (Companies Act Schedule II or Income Tax Act §32 WDV rates). Per KAU pre-UAT reply §2.1.
+    (Companies Act Schedule II or Income Tax Act §32 WDV rates).
   </p>
   <table class="dense-table">
     <thead>
@@ -648,7 +648,6 @@ Author: Athul Gopan (Kefi Tech Solutions)
         sign (fully positive or fully negative — no sign change), or (b) the pattern admits
         multiple IRR solutions (non-conventional cash flows). In such cases NPV at the
         {{ r.ratios.discount_rate_pct|money }}% discount rate is the primary appraisal metric.
-        Per KAU pre-UAT reply §2.3.
       </p>
     {% endif %}
 
@@ -722,8 +721,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       </tbody>
     </table>
     <p style="font-size: 8pt; color: #888; margin-top: 2mm;">
-      Classification rule (RCD B.9): any category High → overall High; else any Moderate → overall Moderate; else Low.
-      Matrix cells are admin-configurable at <span style="font-family: monospace;">/api/admin/dpr/risk-matrix/</span>.
+      Classification rule: any category High → overall High; else any Moderate → overall Moderate; else Low.
     </p>
 
     {# ── Auto-pulled risks from other sections (KAU 2026-09-10) ─────── #}
@@ -913,7 +911,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   <p class="footer-note">
     Prepared using the KAU-FPO Platform DPR module.
-    All financial assumptions and defaults are controlled by the KAU Central Administrator (RCD B.6).
+    All financial assumptions and defaults are controlled by the KAU Central Administrator.
   </p>
 
 </body>

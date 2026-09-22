@@ -17,6 +17,10 @@ from . import master as m
 from .config import DPRConfigDetailView, DPRConfigListView, DPRConfigResetView
 from .project_detail import DPRProjectAdminDetailView
 from .projects import DPRProjectAdminListView
+from .projects_by_fpo import (
+    DPRProjectFpoRollupDetailView,
+    DPRProjectFpoRollupListView,
+)
 from .risk_matrix import DPRRiskMatrixDetailView, DPRRiskMatrixListView
 from .tranches import DPRCapitalTrancheDetailView, DPRCapitalTrancheListView
 from .knowledge import (
@@ -103,8 +107,18 @@ _add('statutory-registrations', m.StatutoryRegistrationAdminListCreateView, m.St
 
 
 urlpatterns = [
-    # Projects
+    # Projects — flat list (legacy) + FPO-first roll-up (new)
     path('projects/', DPRProjectAdminListView.as_view(), name='admin-dpr-projects-list'),
+    path(
+        'projects/fpos/',
+        DPRProjectFpoRollupListView.as_view(),
+        name='admin-dpr-projects-fpos-list',
+    ),
+    path(
+        'projects/fpos/<int:fpo_id>/',
+        DPRProjectFpoRollupDetailView.as_view(),
+        name='admin-dpr-projects-fpos-detail',
+    ),
     path('projects/<uuid:project_uuid>/', DPRProjectAdminDetailView.as_view(), name='admin-dpr-projects-detail'),
     # Config (KAU RCD B.6 — Central Admin-controlled parameters)
     path('config/', DPRConfigListView.as_view(), name='admin-dpr-config-list'),

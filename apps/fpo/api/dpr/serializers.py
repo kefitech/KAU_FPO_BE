@@ -789,6 +789,20 @@ class DPRTechnologyRiskSerializer(serializers.ModelSerializer):
         model = DPRTechnologyRisk
         exclude = ('technology', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
+    def validate(self, attrs):
+        risk_type = (attrs.get('risk_type') or '').strip()
+        mitigation = (attrs.get('mitigation_measure') or '').strip()
+        errors = {}
+        if not risk_type:
+            errors['risk_type'] = 'Risk type is required.'
+        if not mitigation:
+            errors['mitigation_measure'] = 'Mitigation measure is required for each selected risk.'
+        if risk_type == 'other' and not (attrs.get('risk_type_other') or '').strip():
+            errors['risk_type_other'] = 'Please specify — "Others" was selected in risk type.'
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
 
 class DPRTechnologySerializer(serializers.ModelSerializer):
     """One technology row (Cat A + B + C + D + E + F + G) with nested Cat H risks."""

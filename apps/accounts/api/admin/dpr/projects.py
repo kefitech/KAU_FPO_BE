@@ -28,6 +28,7 @@ from apps.database.models import DPRProject
     parameters=[
         OpenApiParameter('status', str, description="Filter by status: draft | in_progress | submitted | generated"),
         OpenApiParameter('district', str, description="FPO district code (e.g. TRS)"),
+        OpenApiParameter('fpo_id', int, description="Restrict list to one FPO's DPR projects (used by drill-down page)."),
         OpenApiParameter('search', str, description="Case-insensitive substring match on FPO name or DPR title"),
     ],
 )
@@ -48,6 +49,11 @@ class DPRProjectAdminListView(APIView):
         district = request.query_params.get('district', '').strip().upper()
         if district:
             qs = qs.filter(fpo__district=district)
+
+        # Drill-down page passes `fpo_id` to scope the list to a single FPO.
+        fpo_id = request.query_params.get('fpo_id', '').strip()
+        if fpo_id.isdigit():
+            qs = qs.filter(fpo_id=int(fpo_id))
 
         search = request.query_params.get('search', '').strip()
         if search:
