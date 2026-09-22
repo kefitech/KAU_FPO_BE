@@ -3857,6 +3857,70 @@ def seed_home_section_translations(languages):
                 count += 1
     return count
 
+#arunima 14th sep
+def seed_admin_buyers_translations(languages):
+    """Admin Buyer Directory page (buyers_table.*) — /admin/buyers"""
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    buyers_table_keys = [
+        ('buyers_table.page_title',        'Buyer Directory',
+         'ക്രേതാവ് ഡയറക്ടറി'),
+        ('buyers_table.page_description',  'Review and manage buyer registrations.',
+         'ക്രേതാവ് രജിസ്ട്രേഷനുകൾ അവലോകനം ചെയ്ത് നിയന്ത്രിക്കുക.'),
+        ('buyers_table.filter_all',        'All',
+         'എല്ലാം'),
+        ('buyers_table.filter_fpo',        'FPO Buyers',
+         'FPO ക്രേതാക്കൾ'),
+        ('buyers_table.filter_external',   'External Buyers',
+         'ബാഹ്യ ക്രേതാക്കൾ'),
+        ('buyers_table.filter_status',     'Status',
+         'നില'),
+        ('buyers_table.status_pending',    'Pending',
+         'തീർപ്പാക്കാത്തത്'),
+        ('buyers_table.status_verified',   'Verified',
+         'സ്ഥിരീകരിച്ചു'),
+        ('buyers_table.status_deactivated','Deactivated',
+         'നിർജ്ജീവമാക്കി'),
+        ('buyers_table.status_rejected',   'Rejected',
+         'നിരസിച്ചു'),
+        ('buyers_table.col_name',          'Name',
+         'പേര്'),
+        ('buyers_table.col_organisation',  'Organisation',
+         'സ്ഥാപനം'),
+        ('buyers_table.col_email',         'Email',
+         'ഇ-മെയിൽ'),
+        ('buyers_table.col_phone',         'Phone',
+         'ഫോൺ'),
+        ('buyers_table.col_status',        'Status',
+         'നില'),
+        ('buyers_table.action_verify',     'Verify',
+         'സ്ഥിരീകരിക്കുക'),
+        ('buyers_table.action_reject',     'Reject',
+         'നിരസിക്കുക'),
+        ('buyers_table.action_deactivate', 'Deactivate',
+         'നിർജ്ജീവമാക്കുക'),
+        ('buyers_table.action_activate',   'Activate',
+         'സജീവമാക്കുക'),
+        ('buyers_table.action_reset_password', 'Reset Password',
+         'രഹസ്യവാക്ക് പുനഃക്രമീകരിക്കുക'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in buyers_table_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Admin Buyer Directory page', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Admin Buyer Directory page', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#-----------------------------------------------------------------------
 
 def seed_banner_translations(languages):
     """Seed homepage carousel/banner UI strings."""
@@ -4384,6 +4448,190 @@ def seed_buyer_portal_translations(languages):
 
     return count
 #------------------------
+
+#22nd sep arunima------
+def seed_fpo_buyer_directory_translations(languages):
+    """
+    FPO Buyer Directory page (fpo_buyer_directory.*) — /fpo/buyer-directory
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    fpo_buyer_directory_keys = [
+        # ── Verified / approved state ──
+        ('fpo_buyer_directory.verified_title', 'Approved!',
+         'അംഗീകരിച്ചു!'),
+        ('fpo_buyer_directory.verified_desc',
+         'Your FPO is approved as a buyer. Browse products from other FPOs below.',
+         'നിങ്ങളുടെ FPO ഒരു ക്രേതാവായി അംഗീകരിച്ചു. താഴെ മറ്റ് FPO-കളുടെ ഉൽപ്പന്നങ്ങൾ ബ്രൗസ് ചെയ്യുക.'),
+
+        # ── Not registered state ──
+        ('fpo_buyer_directory.not_registered_title', 'Register as a Buyer',
+         'ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക'),
+        ('fpo_buyer_directory.not_registered_desc',
+         'Register your FPO as a buyer to purchase products listed by other FPOs on the marketplace.',
+         'മറ്റ് FPO-കൾ ലിസ്റ്റ് ചെയ്ത ഉൽപ്പന്നങ്ങൾ വാങ്ങാൻ നിങ്ങളുടെ FPO-യെ ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക.'),
+        ('fpo_buyer_directory.btn_register', 'Register as a Buyer',
+         'ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക'),
+        ('fpo_buyer_directory.btn_registering', 'Registering…',
+         'രജിസ്റ്റർ ചെയ്യുന്നു…'),
+
+        # ── Pending state ──
+        ('fpo_buyer_directory.pending_title', 'Request Pending',
+         'അഭ്യർത്ഥന തീർപ്പിലാണ്'),
+        ('fpo_buyer_directory.pending_desc',
+         'Your request is pending approval. KAU Admin will review it shortly.',
+         'നിങ്ങളുടെ അഭ്യർത്ഥന അംഗീകാരത്തിനായി കാത്തിരിക്കുന്നു. KAU അഡ്മിൻ ഉടൻ അവലോകനം ചെയ്യും.'),
+
+        # ── Toasts ──
+        ('fpo_buyer_directory.toast_registered', 'Registration request sent successfully.',
+         'രജിസ്ട്രേഷൻ അഭ്യർത്ഥന വിജയകരമായി അയച്ചു.'),
+        ('fpo_buyer_directory.toast_register_failed', 'Failed to register. Please try again.',
+         'രജിസ്റ്റർ ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+
+        # ── Product catalog filters ──
+        ('fpo_buyer_directory.search_placeholder', 'Search products…',
+         'ഉൽപ്പന്നങ്ങൾ തിരയുക…'),
+        ('fpo_buyer_directory.commodity_filter_placeholder', 'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('fpo_buyer_directory.commodity_filter_all', 'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('fpo_buyer_directory.from_date_placeholder', 'From date',
+         'ആരംഭ തീയതി'),
+        ('fpo_buyer_directory.until_date_placeholder', 'To date',
+         'അവസാന തീയതി'),
+        ('fpo_buyer_directory.date_filter_clear', 'Clear',
+         'മായ്ക്കുക'),
+        ('fpo_buyer_directory.empty_state', 'No products found.',
+         'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
+
+        # ── ProductCard ──
+        ('fpo_buyer_directory.label_quantity', 'Quantity',
+         'അളവ്'),
+        ('fpo_buyer_directory.label_price', 'Price',
+         'വില'),
+        ('fpo_buyer_directory.read_more', 'Read more',
+         'കൂടുതൽ വായിക്കുക'),
+        ('fpo_buyer_directory.read_less', 'Read less',
+         'കുറച്ച് കാണിക്കുക'),
+        ('fpo_buyer_directory.view_all_products', 'View all products from this FPO',
+         'ഈ FPO-യുടെ എല്ലാ ഉൽപ്പന്നങ്ങളും കാണുക'),
+        ('fpo_buyer_directory.btn_inquire', 'Inquire',
+         'അന്വേഷിക്കുക'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in fpo_buyer_directory_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'FPO Buyer Directory page (/fpo/buyer-directory)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'FPO Buyer Directory page (/fpo/buyer-directory)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#------------------------
+
+#22nd sep arunima (2)------
+def seed_fpo_products_view_translations(languages):
+    """
+    FPO Products page — view-mode dropdown, inquiry/market-hub titles,
+    and status filter labels (fpo_products.*) — /fpo/products
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    fpo_products_view_keys = [
+        # ── View-mode dropdown ──
+        ('fpo_products.view_products', 'My Products',
+         'എന്റെ ഉൽപ്പന്നങ്ങൾ'),
+        ('fpo_products.view_inquiries', 'Inquiries',
+         'അന്വേഷണങ്ങൾ'),
+        ('fpo_products.view_market_hub_inquiries', 'Market Hub Inquiries',
+         'മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ'),
+
+        # ── Titles / descriptions per view ──
+        ('fpo_products.inquiries_title', 'My Product Inquiries',
+         'എന്റെ ഉൽപ്പന്ന അന്വേഷണങ്ങൾ'),
+        ('fpo_products.inquiries_description', 'View and manage inquiries received on your products.',
+         'നിങ്ങളുടെ ഉൽപ്പന്നങ്ങളിൽ ലഭിച്ച അന്വേഷണങ്ങൾ കാണുകയും നിയന്ത്രിക്കുകയും ചെയ്യുക.'),
+        ('fpo_products.market_hub_inquiries_title', 'Market Hub Inquiries',
+         'മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ'),
+        ('fpo_products.market_hub_inquiries_description',
+         'View inquiries received from anonymous visitors on the public Market Hub.',
+         'പൊതു മാർക്കറ്റ് ഹബ്ബിൽ അജ്ഞാത സന്ദർശകരിൽ നിന്ന് ലഭിച്ച അന്വേഷണങ്ങൾ കാണുക.'),
+
+        # ── Status filter: common label ──
+        ('fpo_products.col_status', 'Status',
+         'സ്ഥിതി'),
+
+        # ── Inquiry statuses ──
+        ('fpo_products.status_pending', 'Pending',
+         'തീർപ്പാക്കാത്തത്'),
+        ('fpo_products.status_contacted', 'Contacted',
+         'ബന്ധപ്പെട്ടു'),
+        ('fpo_products.status_resolved', 'Resolved',
+         'പരിഹരിച്ചു'),
+
+        # ── Market Hub inquiry (match) statuses ──
+        ('fpo_products.status_mh_pending', 'Pending',
+         'തീർപ്പാക്കാത്തത്'),
+        ('fpo_products.status_mh_accepted', 'Accepted',
+         'അംഗീകരിച്ചു'),
+        ('fpo_products.status_mh_rejected', 'Rejected',
+         'നിരസിച്ചു'),
+        ('fpo_products.mh_status_completed', 'Completed',
+         'പൂർത്തിയായി'),
+
+        # ── Market Hub inquiries table columns ──
+        ('fpo_products.col_product_name', 'Product Name',
+         'ഉൽപ്പന്നത്തിന്റെ പേര്'),
+        ('fpo_products.col_name', 'Name',
+         'പേര്'),
+        ('fpo_products.col_email', 'Email',
+         'ഇമെയിൽ'),
+        ('fpo_products.col_phone', 'Phone',
+         'ഫോൺ'),
+        ('fpo_products.col_message', 'Message',
+         'സന്ദേശം'),
+        ('fpo_products.col_date_received', 'Date Received',
+         'ലഭിച്ച തീയതി'),
+
+        # ── Market Hub inquiry row actions + toasts ──
+        ('fpo_products.action_mark_accepted', 'Mark as Accepted',
+         'അംഗീകരിച്ചതായി അടയാളപ്പെടുത്തുക'),
+        ('fpo_products.action_mark_rejected', 'Mark as Rejected',
+         'നിരസിച്ചതായി അടയാളപ്പെടുത്തുക'),
+        ('fpo_products.toast_marked_accepted', 'Inquiry marked as accepted',
+         'അന്വേഷണം അംഗീകരിച്ചതായി അടയാളപ്പെടുത്തി'),
+        ('fpo_products.toast_marked_rejected', 'Inquiry marked as rejected',
+         'അന്വേഷണം നിരസിച്ചതായി അടയാളപ്പെടുത്തി'),
+        ('fpo_products.toast_error_accept', 'Only pending inquiries can be marked as accepted',
+         'തീർപ്പാക്കാത്ത അന്വേഷണങ്ങൾ മാത്രമേ അംഗീകരിച്ചതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('fpo_products.toast_error_reject', 'Only pending inquiries can be marked as rejected',
+         'തീർപ്പാക്കാത്ത അന്വേഷണങ്ങൾ മാത്രമേ നിരസിച്ചതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in fpo_products_view_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'FPO Products page — view dropdown + statuses (/fpo/products)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'FPO Products page — view dropdown + statuses (/fpo/products)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#------------------------
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -4511,6 +4759,20 @@ def seed_translations():
     total_count += buyer_portal_count
     #-----------------------------------
 
+    #22nd sep arunima
+    print("\nSeeding FPO Buyer Directory page translations...")
+    fpo_buyer_directory_count = seed_fpo_buyer_directory_translations(languages)
+    print(f"✅ Seeded {fpo_buyer_directory_count} FPO Buyer Directory translations")
+    total_count += fpo_buyer_directory_count
+    #-----------------------------------
+
+    #22nd sep arunima (2)
+    print("\nSeeding FPO Products page (view dropdown + statuses) translations...")
+    fpo_products_view_count = seed_fpo_products_view_translations(languages)
+    print(f"✅ Seeded {fpo_products_view_count} FPO Products view translations")
+    total_count += fpo_products_view_count
+    #-----------------------------------
+
 
     
     #arunima sep 9------
@@ -4541,8 +4803,12 @@ def seed_translations():
     for trans in Translation.objects.filter(category__code='auth')[:5]:
         print(f"  {trans.full_key} ({trans.language.code}): {trans.value[:50]}...")
 
-
-
+    #arunima sep 14 2026
+    print("\nSeeding Admin Buyer Directory page translations...")
+    admin_buyers_count = seed_admin_buyers_translations(languages)
+    print(f"✅ Seeded {admin_buyers_count} Admin Buyer Directory translations")
+    total_count += admin_buyers_count
+    #--------------------------------
 
 def seed_gis_translations(languages):
     """

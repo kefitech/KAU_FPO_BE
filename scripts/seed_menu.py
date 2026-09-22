@@ -316,6 +316,15 @@ def seed_menu():
         roles     = [external_buyer_group],
         order     = 2,
     )
+#arunima 22 sep 
+    seed_item(
+        label_key = 'menu.buyer_profile',
+        path      = '/buyer/profile',
+        icon      = 'user',
+        roles     = [external_buyer_group],
+        order     = 3,
+    )
+    
     #----------------------------------------------------------------------
 
     print("\n" + "=" * 60)

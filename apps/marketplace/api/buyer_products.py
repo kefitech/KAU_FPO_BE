@@ -69,9 +69,15 @@ class BuyerProductListView(APIView):
                 Q(name__en__icontains=search) | Q(name__ml__icontains=search)
             )
 
+        # Accepts either a single code ("wheat") or several comma-separated
+        # codes ("wheat,sesame,coconut") — the Explore Products page sends
+        # multiple codes when the buyer has several commodities ticked in
+        # the filter dropdown (defaults to their interested commodities).
         commodity = request.query_params.get('commodity', '').strip()
         if commodity:
-            queryset = queryset.filter(commodity__code=commodity)
+            codes = [c.strip() for c in commodity.split(',') if c.strip()]
+            if codes:
+                queryset = queryset.filter(commodity__code__in=codes)
 
         fpo_id = request.query_params.get('fpo')
         if fpo_id:

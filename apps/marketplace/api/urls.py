@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from apps.marketplace.api.buyer_dashboard import BuyerDashboardView
 from apps.marketplace.api.buyer_products import BuyerProductListView
+from apps.marketplace.api.buyer_account_profile import BuyerAccountProfileView
 from apps.marketplace.api.buyer_profile import BuyerProfileView
 from apps.marketplace.api.buyers import FPOBuyerListViewSet
 from apps.marketplace.api.inquiries import InquiryCreateView, InquiryViewSet, MarketHubInquiryViewSet
@@ -35,4 +36,5 @@ urlpatterns = [
     path('buyer/products/recommended/', BuyerRecommendedProductsView.as_view(), name='buyer-products-recommended'),
     path('buyer/products/<int:pk>/inquire/', InquiryCreateView.as_view(), name='buyer-product-inquire'),
     path('buyer/profile/',   BuyerProfileView.as_view(),   name='buyer-profile'),
+    path('buyer/me/profile/', BuyerAccountProfileView.as_view(), name='buyer-account-profile'),
 ]
