@@ -35,9 +35,10 @@ class GovernmentDashboardStatsView(APIView):
         for fpo in qs.only('district'):
             by_district[fpo.district] = by_district.get(fpo.district, 0) + 1
 
+        scope = get_jurisdiction_scope(request.user)
         return StandardResponse.success(data={
             'total': qs.count(),
             'by_status': by_status,
             'by_district': by_district,
-            'jurisdiction_type': 'state' if get_jurisdiction_scope(request.user) == 'ALL' else 'district',
+            'jurisdiction_type': 'state' if scope and scope.get('type') == 'ALL' else 'district',
         })
