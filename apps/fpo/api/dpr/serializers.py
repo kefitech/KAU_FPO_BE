@@ -559,14 +559,23 @@ class DPRProductItemSerializer(serializers.ModelSerializer):
 
     `id` is declared writable so the section update can match existing rows
     by id — preserving uploaded images across re-saves (see _replace_items).
+
+    Additionally accepts a write-only `_image_key` marker used by the
+    multipart section PATCH to attach an uploaded image to this specific
+    new row. Ignored on JSON-only saves.
     """
 
     # DRF marks `id` read_only by default; making it optional-writable lets
     # the section update path distinguish existing rows from new ones.
     id = serializers.IntegerField(required=False, allow_null=True)
-    # Image is upload-only via a dedicated multipart endpoint; read exposes
-    # the URL for the FE to render a thumbnail preview.
+    # Image is uploaded either via the dedicated multipart endpoint OR via
+    # this serializer when the section PATCH is multipart. On JSON read we
+    # expose the URL for the FE to render a thumbnail preview.
     image = serializers.ImageField(required=False, allow_null=True, use_url=True, read_only=True)
+    # Placeholder key the client sets on a new row so the view can match an
+    # uploaded file part (e.g. `image_new_1`) to the row after it's created.
+    # Write-only + not a model field — popped before create.
+    _image_key = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     class Meta:
         model = DPRProductItem
@@ -609,7 +618,10 @@ class DPRSectionProductsSerializer(serializers.ModelSerializer):
         Uploaded images live on DPRProductItem.image and would be lost if we
         did a plain delete+recreate. So instead we match by id:
           * item with id → update-in-place (image stays)
-          * item without id → create new
+          * item without id → create new; if `_image_key` is set AND the
+            view supplied a matching file via context (`image_files`), the
+            file is attached to the freshly created row in the same
+            transaction.
           * existing item id NOT in payload → delete (dropped by user)
         """
         audit = self._audit(user)
@@ -617,13 +629,19 @@ class DPRSectionProductsSerializer(serializers.ModelSerializer):
         # Drop items the user removed from the list.
         section.items.exclude(id__in=payload_ids).delete()
 
+        # Files uploaded alongside the section PATCH (multipart flow). Empty
+        # dict on the JSON path — no attachments will happen.
+        image_files = self.context.get('image_files') or {}
+
         existing = {row.id: row for row in section.items.all()}
         for item in items_data:
             item_id = item.pop('id', None)
+            image_key = item.pop('_image_key', None)
             # Never accept an image via this JSON path — images are uploaded
-            # through the dedicated multipart endpoint. Guard against a
-            # buggy client accidentally clearing an existing image by
-            # sending image=null in the section payload.
+            # through the dedicated multipart endpoint OR the multipart
+            # variant of this section PATCH (via `_image_key`). Guard
+            # against a buggy client accidentally clearing an existing
+            # image by sending image=null in the section payload.
             item.pop('image', None)
             if item_id and item_id in existing:
                 obj = existing[item_id]
@@ -633,7 +651,11 @@ class DPRSectionProductsSerializer(serializers.ModelSerializer):
                     obj.updated_by = user
                 obj.save()
             else:
-                DPRProductItem.objects.create(section=section, **item, **audit)
+                obj = DPRProductItem.objects.create(section=section, **item, **audit)
+                # Attach the uploaded file to this specific new row.
+                if image_key and image_key in image_files:
+                    obj.image = image_files[image_key]
+                    obj.save(update_fields=['image', 'updated_by', 'updated_at'])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

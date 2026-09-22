@@ -7,9 +7,11 @@ Routes:
     GET   /projects/<uuid>/sections/products/readiness/
 """
 
+import json
+
 from django.core.files.base import ContentFile
 from drf_spectacular.utils import extend_schema, OpenApiTypes
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -42,6 +44,9 @@ def _get_or_create_section(project, user):
 @extend_schema(tags=['FPO - DPR §2.3.5 Products & Services'])
 class DPRProductsSectionView(APIView):
     permission_classes = [IsAuthenticated]
+    # Accept both JSON (default section-save path) and multipart (new: lets
+    # clients atomically save a new product row + its image in one PATCH).
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     @extend_schema(summary='Retrieve Products & Services section')
     def get(self, request, project_uuid):
@@ -52,14 +57,82 @@ class DPRProductsSectionView(APIView):
         data = DPRSectionProductsSerializer(section, context={'request': request}).data
         return StandardResponse.success(data, 'Section retrieved')
 
-    @extend_schema(summary='Update Products & Services (full-replace items list)')
+    @extend_schema(
+        summary='Update Products & Services (JSON or multipart, single-call save + image)',
+        description=(
+            'Two request shapes:\n\n'
+            '1. **JSON** — full-replace on `items` list, same as before.\n'
+            '2. **multipart/form-data** — send `items` as a JSON string in a '
+            'form field, and attach files under form field names like '
+            '`image_new_1`. Each new item in `items` that carries a matching '
+            '`_image_key: "new_1"` will have that file attached as its photo '
+            'after the row is created. Existing rows are untouched by the '
+            'image parts. Same allowed types (JPEG / PNG / WebP) and size cap '
+            '(5 MB) as the standalone image endpoint.'
+        ),
+    )
     def patch(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)
         if err:
             return err
         section = _get_or_create_section(project, request.user)
+
+        # ── Detect payload shape ───────────────────────────────────────────
+        # request.FILES is populated by MultiPartParser. If any files were
+        # sent, we're on the multipart flow: unpack `items` from the form
+        # string and collect image parts keyed by their form-field name.
+        payload = request.data
+        image_files: dict = {}
+        if request.FILES:
+            # 1. Parse the `items` JSON blob out of the form field.
+            raw_items = request.data.get('items')
+            if raw_items is None:
+                return StandardResponse.error(
+                    'Multipart save requires the `items` field '
+                    '(JSON-encoded string).',
+                    status_code=400,
+                )
+            if isinstance(raw_items, str):
+                try:
+                    items_parsed = json.loads(raw_items)
+                except json.JSONDecodeError:
+                    return StandardResponse.error(
+                        '`items` must be a valid JSON array.',
+                        status_code=400,
+                    )
+            else:
+                items_parsed = raw_items
+
+            # 2. Extract image files. Keys look like `image_new_1`; the
+            # matching row carries `_image_key: "new_1"`. We validate each
+            # file up-front so a bad blob is rejected before touching the DB.
+            for key, f in request.FILES.items():
+                if not key.startswith('image_'):
+                    continue
+                if getattr(f, 'content_type', None) not in _ALLOWED_IMAGE_TYPES:
+                    return StandardResponse.error(
+                        f'Unsupported image type on {key}. '
+                        'Allowed: JPEG, PNG, WebP.',
+                        status_code=400,
+                    )
+                if f.size > _MAX_IMAGE_BYTES:
+                    return StandardResponse.error(
+                        f'Image on {key} too large ({f.size} bytes). '
+                        'Max size is 5 MB.',
+                        status_code=400,
+                    )
+                # Strip the `image_` prefix so the marker on the row
+                # (`_image_key: "new_1"`) matches the dict key.
+                image_files[key[len('image_'):]] = f
+
+            # 3. Reshape the payload the serializer expects.
+            payload = {'items': items_parsed}
+
         ser = DPRSectionProductsSerializer(
-            section, data=request.data, partial=True, context={'request': request},
+            section,
+            data=payload,
+            partial=True,
+            context={'request': request, 'image_files': image_files},
         )
         if not ser.is_valid():
             return StandardResponse.error(ser.errors, status_code=400)

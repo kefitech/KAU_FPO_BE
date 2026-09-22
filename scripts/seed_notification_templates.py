@@ -66,6 +66,10 @@ TEMPLATE_CODES = [
     # DPR Generation (P2-07)
     ('dpr_generated',               'email',  'Email to FPO when DPR PDF is ready to download',                       ['user_name', 'project_title', 'financial_year', 'button_link', 'button_text']),
     ('dpr_generated',               'in_app', 'In-app notification when DPR PDF is ready',                            ['user_name', 'project_title', 'financial_year']),
+    # DPR Submitted — FPO clicked Finish on the wizard (P2-07)
+    ('dpr_submitted_fpo',           'email',  'Email to FPO confirming their DPR has been submitted',                  ['user_name', 'fpo_name', 'project_title', 'submitted_at']),
+    ('dpr_submitted_fpo',           'in_app', 'In-app confirmation to FPO after Finish click',                          ['user_name', 'fpo_name', 'project_title', 'submitted_at']),
+    ('dpr_submitted_admin',         'in_app', 'In-app alert to KAU staff when an FPO submits a DPR for review',        ['fpo_name', 'fpo_district', 'project_title', 'submitted_at']),
     # Crop recommendations (P2-06)
     ('recommendation_ready',        'email',  'Notify FPO that their crop recommendation is ready',                    ['user_name', 'top_crop', 'financial_year']),
     ('recommendation_ready',        'in_app', 'In-app notification when crop recommendation is ready',                 ['user_name', 'top_crop', 'financial_year']),
@@ -83,6 +87,9 @@ TEMPLATE_CODES = [
     ('expert_booking_rescheduled',          'in_app', 'In-app: expert proposed a new appointment slot',                ['expert_name', 'date', 'time', 'reason']),
     ('expert_cancelled_confirmed_booking',  'email',  'Notify FPO that expert cancelled an already-confirmed booking', ['expert_name', 'date', 'time', 'reason']),
     ('expert_cancelled_confirmed_booking',  'in_app', 'In-app: expert cancelled a confirmed booking',                  ['expert_name', 'date', 'time', 'reason']),
+    # FPO Training Sessions (Jobin — P2-08)
+    ('fpo_training_scheduled',              'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
+    ('fpo_training_scheduled',              'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
 ]
 
 
@@ -746,6 +753,46 @@ TEMPLATES = [
         '<strong>{{project_title}}</strong> (FY {{financial_year}}) DPR തയ്യാറായി. ഡൗൺലോഡ് ചെയ്യാൻ ക്ലിക്ക് ചെയ്യുക.',
     ),
 
+    # ── DPR Submitted — FPO Finish click (P2-07) ──────────────────────────
+    (
+        'dpr_submitted_fpo', 'email', 'en',
+        'Your DPR has been Submitted — {{project_title}}',
+        '''<p>Dear <strong>{{user_name}}</strong>,</p>
+<p>Your <strong>Detailed Project Report</strong> for <strong>{{project_title}}</strong> was submitted on <strong>{{submitted_at}}</strong>.</p>
+<p>You can now generate the final PDF from the <em>Manage DPRs</em> page inside the wizard. Every generation creates a new versioned copy — perfect for bank / scheme submissions.</p>
+<p style="margin-top:14px;color:#555;">You can still edit any section after submission — the DPR will just go back to "In Progress" while you finalise it.</p>''',
+    ),
+    (
+        'dpr_submitted_fpo', 'email', 'ml',
+        'നിങ്ങളുടെ DPR സമർപ്പിച്ചു — {{project_title}}',
+        '''<p>പ്രിയ <strong>{{user_name}}</strong>,</p>
+<p><strong>{{project_title}}</strong> എന്ന <strong>വിശദ പദ്ധതി റിപ്പോർട്ട്</strong> <strong>{{submitted_at}}</strong>-ന് സമർപ്പിച്ചു.</p>
+<p>ഇനി <em>Manage DPRs</em> പേജിൽ പോയി അന്തിമ PDF സൃഷ്ടിക്കാം. ഓരോ ജനറേഷനും ഒരു പുതിയ വേർഷൻ കോപ്പി സൃഷ്ടിക്കും — ബാങ്ക് / സ്കീം സമർപ്പണത്തിനായി അനുയോജ്യം.</p>
+<p style="margin-top:14px;color:#555;">ആവശ്യമെങ്കിൽ ഏത് സെക്ഷനും ഇപ്പോൾ എഡിറ്റ് ചെയ്യാം — DPR "In Progress" അവസ്ഥയിലേക്ക് തിരികെ പോകും.</p>''',
+    ),
+    (
+        'dpr_submitted_fpo', 'in_app', 'en',
+        'DPR Submitted — {{project_title}}',
+        'Your DPR for <strong>{{project_title}}</strong> was submitted on {{submitted_at}}. Head to <em>Manage DPRs</em> to generate the PDF.',
+    ),
+    (
+        'dpr_submitted_fpo', 'in_app', 'ml',
+        'DPR സമർപ്പിച്ചു — {{project_title}}',
+        '{{submitted_at}}-ന് <strong>{{project_title}}</strong>-നുള്ള DPR സമർപ്പിച്ചു. PDF സൃഷ്ടിക്കാൻ <em>Manage DPRs</em> പേജ് സന്ദർശിക്കുക.',
+    ),
+
+    # ── DPR Submitted — KAU staff notification ────────────────────────────
+    (
+        'dpr_submitted_admin', 'in_app', 'en',
+        'DPR Submitted by {{fpo_name}}',
+        '<strong>{{fpo_name}}</strong> ({{fpo_district}}) submitted <strong>{{project_title}}</strong> for review on {{submitted_at}}.',
+    ),
+    (
+        'dpr_submitted_admin', 'in_app', 'ml',
+        '{{fpo_name}} DPR സമർപ്പിച്ചു',
+        '<strong>{{fpo_name}}</strong> ({{fpo_district}}) <strong>{{project_title}}</strong> {{submitted_at}}-ന് അവലോകനത്തിനായി സമർപ്പിച്ചു.',
+    ),
+
     # ── Crop Recommendation Ready (P2-06) ─────────────────────────────────
     (
         'recommendation_ready', 'email', 'en',
@@ -868,6 +915,31 @@ TEMPLATES = [
         'expert_cancelled_confirmed_booking', 'in_app', 'en',
         'Appointment Cancelled',
         '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
+    ),
+
+    # ── FPO Training Sessions (Jobin — P2-08) ────────────────────────────────
+    (
+        'fpo_training_scheduled', 'email', 'en',
+        'A Training Session Has Been Scheduled — {{topic}}',
+        '<p>Dear FPO,</p>'
+        '<p>A training session has been scheduled for <strong>{{fpo_name}}</strong>.</p>'
+        '<table style="margin:12px 0;border-collapse:collapse;">'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Topic</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{topic}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Trainer</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{trainer_name}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Date</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{date}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Time</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Venue</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
+        '</table>',
+    ),
+    (
+        'fpo_training_scheduled', 'in_app', 'en',
+        'Training Session Scheduled',
+        'A training on "{{topic}}" has been scheduled for {{date}} at {{time}}, venue: {{venue}}, conducted by {{trainer_name}}.',
     ),
 ]
 

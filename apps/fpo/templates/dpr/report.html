@@ -593,6 +593,22 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {% if r.ratios %}
     <div class="page-break"></div>
     <h2 id="sec-10">10. Financial Appraisal</h2>
+    {% if r.sanity_warnings %}
+      <div style="border-left: 4px solid #d97706; background: #fef3c7; padding: 10pt 12pt; margin-bottom: 10pt; font-size: 9pt;">
+        <p style="margin: 0 0 4pt 0; font-weight: 600; color: #92400e;">
+          ⚠ Ratios flagged for verification
+        </p>
+        <ul style="margin: 0; padding-left: 16pt; color: #78350f;">
+          {% for w in r.sanity_warnings %}
+            <li style="margin-bottom: 2pt;">{{ w }}</li>
+          {% endfor %}
+        </ul>
+        <p style="margin: 6pt 0 0 0; color: #92400e; font-size: 8pt; font-style: italic;">
+          These ratios are unusually strong. Bank / scheme reviewers should verify the underlying assumptions
+          (product pricing, capacity utilisation, operating cost estimates) before appraisal.
+        </p>
+      </div>
+    {% endif %}
     <table style="width: 60%;">
       <thead><tr><th class="label">Ratio</th><th>Value</th></tr></thead>
       <tbody>

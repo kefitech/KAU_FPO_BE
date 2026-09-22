@@ -449,6 +449,11 @@ class CalculationResult:
     balance_sheet: Optional[BalanceSheet] = None
     ratios: Optional[FinancialRatios] = None
     risk_assessment: Optional[RiskAssessment] = None
+    # Sanity-warning strings surfaced in the PDF's Financial Appraisal
+    # chapter — flags implausible ratios that a banker would want to see
+    # verified (DSCR > 10x, payback < 1yr, EBITDA margin > 60%, PAT
+    # margin > 40%). Empty list = all ratios within plausible bounds.
+    sanity_warnings: list = field(default_factory=list)
 
     todo_future_sub_phases: dict = field(default_factory=dict)
 
@@ -1045,9 +1050,33 @@ def build_interest_schedule(project, projection_years: int) -> InterestSchedule:
     fin = getattr(project, 'section_finance', None)
     loan_proposed = getattr(fin, 'loan_proposed', False) if fin else False
 
+    # Backfill loan_proposed from MoF signals — if the user set a Bank term
+    # loan / working capital loan / NABARD assistance amount without ticking
+    # the "Loan proposed" checkbox, the calc engine previously produced
+    # DSCR = "no debt" (all zeros in the interest schedule). Any non-zero
+    # loan-like MoF value is a clear signal the project has debt.
+    if not loan_proposed and fin is not None:
+        loan_like_mof = (
+            _decimal(getattr(fin, 'mof_bank_term_loan', None))
+            + _decimal(getattr(fin, 'mof_working_capital_loan', None))
+            + _decimal(getattr(fin, 'mof_nabard_assistance', None))
+        )
+        explicit_loan_amount = _decimal(getattr(fin, 'loan_amount', None))
+        if loan_like_mof > 0 or explicit_loan_amount > 0:
+            loan_proposed = True
+
     # Loan parameters — user value first, DPRConfig default second
     if loan_proposed and fin:
         loan_amount = _decimal(fin.loan_amount)
+        # If loan_amount wasn't explicitly set, use the sum of MoF loan-like
+        # rows so the schedule doesn't stay at zero when only MoF was
+        # filled in.
+        if loan_amount <= 0:
+            loan_amount = (
+                _decimal(getattr(fin, 'mof_bank_term_loan', None))
+                + _decimal(getattr(fin, 'mof_working_capital_loan', None))
+                + _decimal(getattr(fin, 'mof_nabard_assistance', None))
+            )
         rate = _decimal(fin.rate_of_interest_pct) or DPRConfig.get_decimal('loan_interest_rate_default_pct', Decimal('10.5'))
         tenure = int(fin.repayment_period_years) if fin.repayment_period_years else DPRConfig.get_int('loan_tenure_default_years', 7)
         moratorium = int(fin.moratorium_period_months) if fin.moratorium_period_months is not None else DPRConfig.get_int('loan_moratorium_default_months', 12)
@@ -1225,19 +1254,43 @@ def _amortise_emi(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _sum_year1_revenue(project) -> Decimal:
-    """Sum Y1 revenue across all revenue_assumptions on the finance section."""
+    """Sum Y1 revenue across all revenue_assumptions on the finance section.
+
+    Falls back to the Products section (§2.3.5) when Finance revenue_assumptions
+    is empty. This matches user intent: they typed the product Y1 volumes and
+    prices into Products, and expect them to feed revenue automatically.
+    Previously the calc engine only read finance.revenue_assumptions, which
+    silently defaulted the P&L to zero revenue whenever the user hadn't
+    duplicated the numbers into the Finance section — producing large negative
+    PAT / NPV and DSCR = "no debt" bogus outputs.
+
+    Preference order (first non-zero wins):
+      1. finance.revenue_assumptions rows (explicit user override)
+      2. Products section items (annual_quantity × selling_price_per_unit)
+    """
     fin = getattr(project, 'section_finance', None)
-    if fin is None:
-        return Decimal('0')
     total = Decimal('0')
-    for ra in fin.revenue_assumptions.all():
-        # Prefer explicit annual_sales_revenue if the user entered it; else qty * price
-        if ra.annual_sales_revenue:
-            total += _decimal(ra.annual_sales_revenue)
-        else:
-            qty = _decimal(ra.year1_sales_quantity)
-            price = _decimal(ra.expected_selling_price)
-            total += qty * price
+    if fin is not None:
+        for ra in fin.revenue_assumptions.all():
+            # Prefer explicit annual_sales_revenue; else qty * price
+            if ra.annual_sales_revenue:
+                total += _decimal(ra.annual_sales_revenue)
+            else:
+                qty = _decimal(ra.year1_sales_quantity)
+                price = _decimal(ra.expected_selling_price)
+                total += qty * price
+    if total > 0:
+        return total
+
+    # Fallback — pull from Products section §2.3.5. Same shape as revenue
+    # assumptions: sum of quantity × unit price per row. Skips rows missing
+    # either value (no silent zero).
+    products = getattr(project, 'section_products', None)
+    if products is None:
+        return Decimal('0')
+    for item in products.items.all():
+        if item.annual_quantity and item.selling_price_per_unit:
+            total += _decimal(item.annual_quantity) * _decimal(item.selling_price_per_unit)
     return total
 
 
@@ -2160,6 +2213,7 @@ def compute(project) -> CalculationResult:
     )
     ratios = build_ratios(profit_loss, interest, cash_flow, project=project)
     risk_assessment = build_risk_assessment(project)
+    sanity_warnings = _compute_sanity_warnings(ratios, profit_loss)
 
     return CalculationResult(
         projection_years=projection_years,
@@ -2175,7 +2229,64 @@ def compute(project) -> CalculationResult:
         balance_sheet=balance_sheet,
         ratios=ratios,
         risk_assessment=risk_assessment,
+        sanity_warnings=sanity_warnings,
     )
+
+
+def _compute_sanity_warnings(ratios, profit_loss) -> list[str]:
+    """Flag implausibly-strong appraisal ratios so KAU / bankers can verify
+    the underlying assumptions. Thresholds are conservative — anything past
+    them is unusual for an Indian FPO project and warrants a second look.
+
+    Returns a list of human-readable warning strings ready for the PDF's
+    Financial Appraisal chapter. Empty list when everything is plausible.
+    """
+    warnings: list[str] = []
+    if ratios is None:
+        return warnings
+
+    # Configurable thresholds — pulled from DPRConfig so KAU can tune per
+    # scheme. Sensible defaults match ChatGPT's audit thresholds (2026-09-22).
+    dscr_max = DPRConfig.get_decimal('sanity_dscr_max', Decimal('10'))
+    payback_min_years = DPRConfig.get_decimal('sanity_payback_min_years', Decimal('1'))
+    ebitda_margin_max_pct = DPRConfig.get_decimal('sanity_ebitda_margin_max_pct', Decimal('60'))
+    pat_margin_max_pct = DPRConfig.get_decimal('sanity_pat_margin_max_pct', Decimal('40'))
+
+    dscr_avg = getattr(ratios, 'dscr_avg', None)
+    if dscr_avg is not None and dscr_avg > dscr_max:
+        warnings.append(
+            f'Average DSCR of {dscr_avg:.2f}x is above the {dscr_max}x sanity '
+            'threshold — verify revenue / cost assumptions.'
+        )
+
+    payback = getattr(ratios, 'payback_period_years', None)
+    if payback is not None and payback < payback_min_years:
+        warnings.append(
+            f'Payback period of {payback:.2f} years is below the {payback_min_years}-year '
+            'sanity threshold — verify project cost and revenue assumptions.'
+        )
+
+    if profit_loss is not None and profit_loss.rows:
+        y1 = profit_loss.rows[0]
+        revenue = _decimal(getattr(y1, 'revenue', None))
+        if revenue > 0:
+            ebitda = _decimal(getattr(y1, 'ebitda', None))
+            pat = _decimal(getattr(y1, 'pat', None))
+            ebitda_pct = (ebitda / revenue) * Decimal('100')
+            pat_pct = (pat / revenue) * Decimal('100')
+            if ebitda_pct > ebitda_margin_max_pct:
+                warnings.append(
+                    f'Y1 EBITDA margin of {ebitda_pct:.1f}% exceeds the '
+                    f'{ebitda_margin_max_pct}% sanity threshold — review operating '
+                    'cost assumptions.'
+                )
+            if pat_pct > pat_margin_max_pct:
+                warnings.append(
+                    f'Y1 PAT margin of {pat_pct:.1f}% exceeds the '
+                    f'{pat_margin_max_pct}% sanity threshold — review margins '
+                    'and tax assumptions.'
+                )
+    return warnings
 
 
 # ─────────────────────────────────────────────────────────────────────────────

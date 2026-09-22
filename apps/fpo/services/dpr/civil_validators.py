@@ -30,6 +30,15 @@ def validate_section(section) -> dict[str, Any]:
             errors.append(_err('type_required', f'{p}.building_type', 'Building Type shall be specified.'))
         if b.floor_area is None or b.floor_area <= 0:
             errors.append(_err('floor_area_positive', f'{p}.floor_area', 'Floor Area shall be greater than zero.'))
+        # `estimated_construction_cost` feeds Fixed Capital Investment,
+        # Means of Finance, DSCR and payback. A blank silently drops the
+        # building out of the project cost (ChatGPT calc audit 2026-09-22).
+        # Hard-required per row to mirror the machinery unit_cost tightening.
+        if b.estimated_construction_cost is None or b.estimated_construction_cost <= 0:
+            errors.append(_err(
+                'cost_required', f'{p}.estimated_construction_cost',
+                'Estimated Construction Cost is required and shall be greater than zero.',
+            ))
 
     # Cat D — if basis is "other", basis_of_estimate_other must be filled
     if section.basis_of_estimate == 'other' and not (section.basis_of_estimate_other or '').strip():

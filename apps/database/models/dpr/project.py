@@ -164,6 +164,17 @@ class DPRProject(BaseModel):
                   'See apps/fpo/services/dpr/field_sources.py for accessor helpers.',
     )
 
+    # Timestamp of the last IN_PROGRESS → SUBMITTED transition (Finish click).
+    # Null while the DPR is still DRAFT / IN_PROGRESS. Re-set every time the
+    # FPO re-clicks Finish after having reverted (edited a section after
+    # submit bumps status back to IN_PROGRESS). Admin dashboards sort/filter
+    # by this to build the review queue.
+    submitted_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text='UTC timestamp of the most recent transition to SUBMITTED. '
+                  'Null while the DPR has never been finished.',
+    )
+
     class Meta:
         db_table = 'dpr_project'
         verbose_name = 'DPR — Project'

@@ -126,6 +126,19 @@ def validate_section(section) -> dict[str, Any]:
             ))
         if not section.loan_type:
             warnings.append(_warn('loan_type_recommended', 'loan_type', 'Loan Type is recommended.'))
+        # Loan terms feed EMI + interest expense + DSCR + IRR. A blank rate
+        # or tenure silently makes the whole loan schedule fall over
+        # (ChatGPT calc audit 2026-09-22 — same silent-blank pattern).
+        if section.rate_of_interest_pct is None or section.rate_of_interest_pct <= 0:
+            errors.append(_err(
+                'interest_rate_required', 'rate_of_interest_pct',
+                'Rate of Interest is required when loan is proposed and shall be greater than zero.',
+            ))
+        if section.repayment_period_years is None or section.repayment_period_years <= 0:
+            errors.append(_err(
+                'tenure_required', 'repayment_period_years',
+                'Repayment Period (years) is required when loan is proposed and shall be greater than zero.',
+            ))
 
     # Cat G — subsidy
     if section.subsidy_proposed and not (section.subsidy_scheme_name or '').strip():

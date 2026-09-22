@@ -17,6 +17,7 @@ from django.urls import path
 from . import ai_content as ai
 from . import applicability as appl
 from . import calculation as calc
+from . import finish as fin_view
 from . import master as m
 from . import projects as p
 from . import tranches as tr
@@ -97,6 +98,13 @@ master_patterns = [
 project_patterns = [
     path('projects/', p.DPRProjectListCreateView.as_view(), name='dpr-projects-list-create'),
     path('projects/<uuid:project_uuid>/', p.DPRProjectDetailView.as_view(), name='dpr-project-detail'),
+    # Wizard "Finish" — IN_PROGRESS → SUBMITTED. Fires FPO + admin
+    # notifications and stamps `submitted_at`.
+    path(
+        'projects/<uuid:project_uuid>/finish/',
+        fin_view.DPRProjectFinishView.as_view(),
+        name='dpr-project-finish',
+    ),
     path(
         'projects/<uuid:project_uuid>/readiness/',
         p.DPRProjectIdentificationReadinessView.as_view(),

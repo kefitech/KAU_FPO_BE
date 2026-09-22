@@ -39,6 +39,19 @@ def validate_section(section) -> dict[str, Any]:
                 'number_positive', f'{p}.number_required',
                 'Number of employees shall be greater than zero.',
             ))
+        # Wages feed the Salaries line of Operating Cost → EBITDA → DSCR.
+        # Silent-blank pattern (ChatGPT calc audit 2026-09-22) — at least
+        # one of monthly_salary or annual_salary must be > 0 per role, or
+        # the salary line silently drops.
+        ms = e.monthly_salary
+        yr = e.annual_salary
+        has_ms = ms is not None and ms > 0
+        has_yr = yr is not None and yr > 0
+        if not has_ms and not has_yr:
+            errors.append(_err(
+                'salary_required', f'{p}.monthly_salary',
+                'Monthly salary (or Annual salary) is required and shall be greater than zero.',
+            ))
 
     # Cat C — "other" specify text
     for i, d in enumerate(section.departments.all()):

@@ -123,6 +123,33 @@ def validate_section(section) -> dict[str, Any]:
             'no_packaging', 'packaging_materials',
             'No packaging materials defined. Mandatory if finished products are marketed.',
         ))
+    # Per-row cost enforcement for packaging + consumables — same silent-blank
+    # pattern (ChatGPT calc audit 2026-09-22). Their unit_cost * annual_requirement
+    # rolls into Operating Cost; a blank silently drops the line.
+    for i, pkg in enumerate(section.packaging_materials.all()):
+        p = f'packaging_materials[{i}]'
+        if pkg.unit_cost is None or pkg.unit_cost <= 0:
+            errors.append(_err(
+                'pkg_cost_required', f'{p}.unit_cost',
+                'Unit Cost is required and shall be greater than zero.',
+            ))
+        if pkg.estimated_annual_requirement is None or pkg.estimated_annual_requirement <= 0:
+            errors.append(_err(
+                'pkg_qty_required', f'{p}.estimated_annual_requirement',
+                'Estimated Annual Requirement is required and shall be greater than zero.',
+            ))
+    for i, c in enumerate(section.consumables.all()):
+        p = f'consumables[{i}]'
+        if c.unit_cost is None or c.unit_cost <= 0:
+            errors.append(_err(
+                'consumable_cost_required', f'{p}.unit_cost',
+                'Unit Cost is required and shall be greater than zero.',
+            ))
+        if c.estimated_annual_requirement is None or c.estimated_annual_requirement <= 0:
+            errors.append(_err(
+                'consumable_qty_required', f'{p}.estimated_annual_requirement',
+                'Estimated Annual Requirement is required and shall be greater than zero.',
+            ))
 
     # ── Category F — Risks are optional at KAU spec level, but we advise ──
     if section.risks.count() == 0:

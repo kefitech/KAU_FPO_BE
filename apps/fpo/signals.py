@@ -94,14 +94,17 @@ def _mark_stale_receiver(section_key: str):
 
 
 def _project_progress_receiver(sender, instance, created, **kwargs):
-    """Flip DPRProject.status DRAFT -> IN_PROGRESS on any section write.
+    """Auto-transition DPRProject.status on any section write.
 
-    Runs for every DPRSection<X> model's post_save. Only writes if the
-    project is still in the draft state — a project that's already
-    IN_PROGRESS or GENERATED stays where it is, and a subsequent edit
-    after PDF generation doesn't demote it back to IN_PROGRESS
-    automatically (that's a KAU workflow decision, not a
-    "did-anything-get-saved" one).
+    Two transitions handled here:
+      * DRAFT → IN_PROGRESS  — first section touch by the FPO.
+      * SUBMITTED → IN_PROGRESS — the FPO clicked Finish earlier, then went
+        back and edited a section. Soft-status semantics: a submitted DPR
+        that gets edited is no longer "user says done".
+
+    GENERATED stays put — editing after a PDF has been cut doesn't demote
+    the project. FPO must click Generate again on Manage DPRs to create
+    v(n+1); the version history remains intact.
 
     Fires for both `created=True` and updates: an initial row create
     (the get_or_create in each section view) still counts as user
@@ -111,11 +114,19 @@ def _project_progress_receiver(sender, instance, created, **kwargs):
     project = getattr(instance, 'project', None)
     if project is None:
         return
-    if project.status != DPRProject.Status.DRAFT:
+    # Transitions we handle here.
+    revertible_statuses = (
+        DPRProject.Status.DRAFT,
+        DPRProject.Status.SUBMITTED,
+    )
+    if project.status not in revertible_statuses:
         return
-    # update_fields is faster and avoids triggering DPRProject signals
-    # (there aren't any today, but keep the write minimal on principle).
-    DPRProject.objects.filter(pk=project.pk, status=DPRProject.Status.DRAFT).update(
+    # Race-safe: only update if the row is still in a revertible state.
+    # update_fields keeps the write minimal and avoids triggering any future
+    # DPRProject signals.
+    DPRProject.objects.filter(
+        pk=project.pk, status__in=revertible_statuses,
+    ).update(
         status=DPRProject.Status.IN_PROGRESS,
     )
 

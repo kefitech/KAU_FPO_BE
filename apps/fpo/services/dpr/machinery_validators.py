@@ -43,15 +43,20 @@ def validate_section(section) -> dict[str, Any]:
                 'capacity_unit_required', f'{p}.capacity_unit',
                 'Capacity Unit shall be specified when machinery capacity is entered.',
             ))
-        if it.unit_cost is not None and it.unit_cost <= 0:
+        # Unit cost + useful life MUST be present for every machinery row —
+        # depreciation, Fixed Capital Investment, Means of Finance, DSCR and
+        # payback all pull from these two numbers. Silently allowing blanks
+        # produced under-costed project totals + inflated ratios (root of the
+        # ChatGPT-flagged calculation issues, 2026-09-22).
+        if it.unit_cost is None or it.unit_cost <= 0:
             errors.append(_err(
-                'cost_positive', f'{p}.unit_cost',
-                'Unit Cost shall be greater than zero.',
+                'cost_required', f'{p}.unit_cost',
+                'Unit Cost is required and shall be greater than zero.',
             ))
-        if it.useful_life_years is not None and it.useful_life_years <= 0:
+        if it.useful_life_years is None or it.useful_life_years <= 0:
             errors.append(_err(
-                'life_positive', f'{p}.useful_life_years',
-                'Useful Life shall be greater than zero.',
+                'life_required', f'{p}.useful_life_years',
+                'Useful Life is required and shall be greater than zero.',
             ))
         if it.machine_category_id is None:
             warnings.append(_warn(
@@ -70,6 +75,14 @@ def validate_section(section) -> dict[str, Any]:
         p = f'supporting_assets[{i}]'
         if s.quantity is None or s.quantity <= 0:
             errors.append(_err('sa_quantity_positive', f'{p}.quantity', 'Supporting asset quantity shall be greater than zero.'))
+        # Same silent-blank pattern as machinery unit_cost — supporting
+        # asset costs also feed Fixed Capital Investment. A missing value
+        # silently drops the asset from project cost totals.
+        if s.estimated_cost is None or s.estimated_cost <= 0:
+            errors.append(_err(
+                'sa_cost_required', f'{p}.estimated_cost',
+                'Estimated Cost is required and shall be greater than zero.',
+            ))
 
     return {
         'errors': errors,

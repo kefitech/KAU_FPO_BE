@@ -45,6 +45,38 @@ def validate_section(section) -> dict[str, Any]:
                 'Disposal method shall be specified for each waste type.',
             ))
 
+    # Cat E — Fuel rows feed the operating cost line in the P&L. A blank
+    # fuel row silently drops that spend from the calc (ChatGPT calc audit
+    # 2026-09-22 — same pattern as machinery unit_cost / civil est. cost).
+    for i, f in enumerate(section.fuels.all()):
+        p = f'fuels[{i}]'
+        if not f.fuel_id:
+            errors.append(_err(
+                'fuel_required', f'{p}.fuel',
+                'Fuel type is required.',
+            ))
+        if f.estimated_annual_cost is None or f.estimated_annual_cost <= 0:
+            errors.append(_err(
+                'fuel_cost_required', f'{p}.estimated_annual_cost',
+                'Estimated Annual Cost is required and shall be greater than zero.',
+            ))
+
+    # Cat J — Renewable Initiatives rows contribute to Fixed Capital
+    # Investment. Same silent-blank pattern — if a row exists, its cost
+    # must too.
+    for i, r in enumerate(section.renewable_initiatives.all()):
+        p = f'renewable_initiatives[{i}]'
+        if not r.initiative_id:
+            errors.append(_err(
+                'initiative_required', f'{p}.initiative',
+                'Initiative is required.',
+            ))
+        if r.estimated_cost is None or r.estimated_cost <= 0:
+            errors.append(_err(
+                'renewable_cost_required', f'{p}.estimated_cost',
+                'Estimated Cost is required and shall be greater than zero.',
+            ))
+
     # H/I "other" text
     if 'other' in (section.communication_items or []) and not (section.communication_other or '').strip():
         errors.append(_err('comm_other_required', 'communication_other', 'Please specify — "Others" in communication items.'))

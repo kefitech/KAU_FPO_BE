@@ -203,6 +203,9 @@ class AuditLog(TimeStampedModel):
         # every add / edit / delete of a component × section rule is audited
         # so KAU can trace who changed what during UAT rule refinement).
         DPR_APPLICABILITY_CHANGE = 'dpr_applicability_change', 'DPR Applicability Rule Change'
+        # FPO clicks Finish on the wizard — IN_PROGRESS → SUBMITTED. Fired
+        # each time the transition happens (re-submits after edits also log).
+        DPR_SUBMITTED = 'dpr_submitted', 'DPR Submitted'
 
     # Who performed the action
     user = models.ForeignKey(
