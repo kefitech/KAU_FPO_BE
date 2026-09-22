@@ -541,6 +541,15 @@ def seed_menu():
         order     = 15,
     )
 
+    # ── External buyer profile (arunima 2026-09-22) ───────────────────────
+    seed_item(
+        label_key = 'menu.buyer_profile',
+        path      = '/buyer/profile',
+        icon      = 'user',
+        roles     = [external_buyer_group],
+        order     = 3,
+    )
+
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")
     print("=" * 60)

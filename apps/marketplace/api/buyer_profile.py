@@ -30,6 +30,7 @@ class BuyerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = BuyerDirectory
         fields = [
+            'organisation',
             'location',
             'commodities_interested',
             'min_quantity',

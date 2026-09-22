@@ -150,10 +150,12 @@ class BuyerSellerMatch(BaseModel):
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUGGESTED)
     suggested_at = models.DateTimeField(auto_now_add=True)
-    # Free-text buyer note attached to a Market Hub inquiry (arunima 2026-09-21).
-    # Written by PublicProductInquireView + surfaced through
-    # MarketHubInquirySerializer on the seller's inbox.
-    message = models.TextField(blank=True)
+    message = models.TextField(
+        blank=True,
+        help_text='Buyer-submitted message, only populated for rows created via the '
+                   'public Market Hub anonymous inquiry flow (PublicProductInquireView). '
+                   'Blank for algorithmic suggested matches from run_matching().'
+    )
 
     class Meta:
         verbose_name = 'Buyer Seller Match'
