@@ -246,12 +246,15 @@ def _validate_zone_geojson(data: dict) -> list[str]:
     strings — empty list means valid. Shared between upload (validate
     only) and activate (validate again defensively, then apply).
     """
-    if data.get('type') != 'FeatureCollection' or 'features' not in data:
+    if not isinstance(data, dict) or data.get('type') != 'FeatureCollection' or not isinstance(data.get('features'), list):
         return ["File is not a valid GeoJSON FeatureCollection."]
 
     valid_codes = set(AgroClimaticZone.objects.values_list('code', flat=True))
     errors = []
     for feature in data['features']:
+        if not isinstance(feature, dict):
+            errors.append("Feature is not a valid GeoJSON object.")
+            continue
         code = (feature.get('properties') or {}).get('code')
         # Leaflet's GeoJSON parser is spec-strict: a feature missing (or
         # with an empty) "type": "Feature" makes it throw "Invalid GeoJSON
