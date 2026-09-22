@@ -249,7 +249,7 @@ def seed_gis_translations():
             'action_deactivate':         ('Deactivate', 'നിർജ്ജീവമാക്കുക'),
             'action_delete':             ('Delete', 'ഇല്ലാതാക്കുക'),
             'delete_title':              ('Delete crop entry', 'വിള എൻട്രി ഇല്ലാതാക്കുക'),
-            'delete_description':        ("Are you sure you want to delete this crop's Package of Practices entry?", 'ഈ വിളയുടെ പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി ഇല്ലാതാക്കണോ?'),
+            'delete_description':        ('Are you sure you want to delete "{name}"\'s Package of Practices entry?', '"{name}" യുടെ പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി ഇല്ലാതാക്കണോ?'),
             'toast_deleted':             ('Crop entry deleted', 'വിള എൻട്രി ഇല്ലാതാക്കി'),
             'toast_status_updated':      ('Status updated', 'നില പുതുക്കി'),
             'toast_created':             ('Crop entry created', 'വിള എൻട്രി സൃഷ്ടിച്ചു'),
