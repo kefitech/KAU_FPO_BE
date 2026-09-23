@@ -225,8 +225,9 @@ class GovernmentRegistrationSerializer(serializers.Serializer):
     department = serializers.CharField(max_length=200)
     user_category = serializers.ChoiceField(choices=USER_CATEGORY_CHOICES)
     id_number = serializers.CharField(max_length=30)
-    jurisdiction_type = serializers.ChoiceField(choices=[('district', 'District'), ('state', 'State')])
+    jurisdiction_type = serializers.ChoiceField(choices=GovernmentOfficialProfile._meta.get_field('jurisdiction_type').choices)
     assigned_district = serializers.ChoiceField(choices=District.choices, required=False, allow_null=True)
+    assigned_block = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
 
     def validate_email(self, value):
         value = value.lower()
@@ -245,6 +246,10 @@ class GovernmentRegistrationSerializer(serializers.Serializer):
         if attrs['jurisdiction_type'] == 'district' and not attrs.get('assigned_district'):
             raise serializers.ValidationError({
                 'assigned_district': 'Required when jurisdiction_type=district.'
+            })
+        if attrs['jurisdiction_type'] == 'block' and not attrs.get('assigned_block'):
+            raise serializers.ValidationError({
+                'assigned_block': 'Required when jurisdiction_type=block.'
             })
 
         is_valid, error = validate_id_number(attrs['user_category'], attrs['id_number'])
@@ -281,6 +286,7 @@ class GovernmentRegistrationView(APIView):
             department=data['department'],
             jurisdiction_type=data['jurisdiction_type'],
             assigned_district=data.get('assigned_district') if data['jurisdiction_type'] == 'district' else None,
+            assigned_block=data.get('assigned_block') if data['jurisdiction_type'] == 'block' else None,
             user_category=data['user_category'],
             id_number=data['id_number'],
             registration_status='pending',
