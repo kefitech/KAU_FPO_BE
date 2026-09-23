@@ -63,7 +63,12 @@ TEMPLATE_CODES = [
     ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
     # Expert enquiry
     ('expert_enquiry',              'email',  'Email sent to expert when an FPO submits a contact enquiry',            ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
-        # Expert booking workflow
+    # Expert booking workflow
+    # TEMPLATE_CODES
+    ('expert_marked_absent_conflict', 'email',  'Notify FPO their confirmed appointment conflicts with expert marking that date absent', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_marked_absent_conflict', 'in_app', 'In-app: expert marked absent conflicts with confirmed booking', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_reminder', 'in_app', 'In-app reminder 24h before a confirmed appointment', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_reminder',    'email',  'Remind FPO and expert 24h before a confirmed appointment', ['expert_name', 'fpo_name', 'date', 'time']),
     ('expert_booking_requested',   'email',  'Notify expert when an FPO requests a booking',   ['expert_name', 'fpo_name', 'date', 'time']),
     ('expert_booking_confirmed',   'email',  'Notify FPO when expert confirms a booking',      ['expert_name', 'date', 'time']),
     ('expert_booking_confirmed',   'in_app', 'In-app: booking confirmed by expert',            ['expert_name', 'date', 'time']),
@@ -758,6 +763,33 @@ TEMPLATES = [
         'Appointment Cancelled',
         '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
     ),
+        (
+        'expert_booking_reminder', 'email', 'en',
+        'Reminder: Your appointment is coming up',
+        '<p>This is a reminder that your appointment with <strong>{{expert_name}}</strong> is coming up.</p>'
+        '<p>FPO: <strong>{{fpo_name}}</strong></p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
+        '<p>Please make sure you are available at the scheduled time.</p>',
+    ),
+        (
+        'expert_booking_reminder', 'in_app', 'en',
+        'Upcoming Appointment Reminder',
+        'Reminder: your appointment with {{expert_name}} / {{fpo_name}} is on {{date}} at {{time}}.',
+    ),
+   
+(
+    'expert_marked_absent_conflict', 'email', 'en',
+    'Your Expert Marked This Date as Unavailable',
+    '<p>Dear FPO,</p>'
+    '<p><strong>{{expert_name}}</strong> has marked <strong>{{date}}</strong> as unavailable, '
+    'which conflicts with your confirmed appointment at <strong>{{time}}</strong>.</p>'
+    '<p>Please contact the expert or check your booking status, as this appointment may need to be rescheduled.</p>',
+),
+(
+    'expert_marked_absent_conflict', 'in_app', 'en',
+    'Possible Scheduling Conflict',
+    '{{expert_name}} marked {{date}} as unavailable, which conflicts with your confirmed appointment at {{time}}.',
+),
 
 
     (
