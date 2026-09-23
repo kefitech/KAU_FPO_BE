@@ -87,6 +87,10 @@ TEMPLATE_CODES = [
     ('expert_booking_rescheduled',          'in_app', 'In-app: expert proposed a new appointment slot',                ['expert_name', 'date', 'time', 'reason']),
     ('expert_cancelled_confirmed_booking',  'email',  'Notify FPO that expert cancelled an already-confirmed booking', ['expert_name', 'date', 'time', 'reason']),
     ('expert_cancelled_confirmed_booking',  'in_app', 'In-app: expert cancelled a confirmed booking',                  ['expert_name', 'date', 'time', 'reason']),
+    ('expert_marked_absent_conflict',       'email',  'Notify FPO their confirmed appointment conflicts with expert marking that date absent', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_marked_absent_conflict',       'in_app', 'In-app: expert marked absent conflicts with confirmed booking',                          ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_reminder',             'email',  'Remind FPO and expert 24h before a confirmed appointment',                               ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_reminder',             'in_app', 'In-app reminder 24h before a confirmed appointment',                                     ['expert_name', 'fpo_name', 'date', 'time']),
     # FPO Training Sessions (Jobin — P2-08)
     ('fpo_training_scheduled',              'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
     ('fpo_training_scheduled',              'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
@@ -915,6 +919,32 @@ TEMPLATES = [
         'expert_cancelled_confirmed_booking', 'in_app', 'en',
         'Appointment Cancelled',
         '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
+    ),
+    (
+        'expert_marked_absent_conflict', 'email', 'en',
+        'Your Expert Marked This Date as Unavailable',
+        '<p>Dear FPO,</p>'
+        '<p><strong>{{expert_name}}</strong> has marked <strong>{{date}}</strong> as unavailable, '
+        'which conflicts with your confirmed appointment at <strong>{{time}}</strong>.</p>'
+        '<p>Please contact the expert or check your booking status, as this appointment may need to be rescheduled.</p>',
+    ),
+    (
+        'expert_marked_absent_conflict', 'in_app', 'en',
+        'Possible Scheduling Conflict',
+        '{{expert_name}} marked {{date}} as unavailable, which conflicts with your confirmed appointment at {{time}}.',
+    ),
+    (
+        'expert_booking_reminder', 'email', 'en',
+        'Reminder: Your appointment is coming up',
+        '<p>This is a reminder that your appointment with <strong>{{expert_name}}</strong> is coming up.</p>'
+        '<p>FPO: <strong>{{fpo_name}}</strong></p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
+        '<p>Please make sure you are available at the scheduled time.</p>',
+    ),
+    (
+        'expert_booking_reminder', 'in_app', 'en',
+        'Upcoming Appointment Reminder',
+        'Reminder: your appointment with {{expert_name}} / {{fpo_name}} is on {{date}} at {{time}}.',
     ),
 
     # ── FPO Training Sessions (Jobin — P2-08) ────────────────────────────────

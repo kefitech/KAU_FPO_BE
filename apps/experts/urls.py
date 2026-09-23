@@ -9,7 +9,7 @@ from .api.booking_views import (
     ExpertAvailabilityView, CreateBookingView, CancelBookingView,
     AdminSetAvailabilityView, AdminBookingListView,
     AdminConfirmBookingView, AdminRejectBookingView, AdminRescheduleBookingView,
-    ExpertWeeklyDefaultsView,  AdminCancelBookingView,
+    ExpertWeeklyDefaultsView, AdminCancelBookingView, FpoBookingListView,
 )
 
 
@@ -24,6 +24,7 @@ urlpatterns = [
     path('<int:pk>/availability/',   ExpertAvailabilityView.as_view(), name='expert-availability'),
     path('<int:pk>/book/',           CreateBookingView.as_view(),      name='expert-book'),
     path('bookings/<int:pk>/cancel/', CancelBookingView.as_view(),     name='booking-cancel'),
+    path('bookings/', FpoBookingListView.as_view(), name='fpo-booking-list'),
     # Admin-side booking management
     path('admin/<int:pk>/availability/',         AdminSetAvailabilityView.as_view(),    name='admin-set-availability'),
     path('admin/<int:pk>/weekly-defaults/',      ExpertWeeklyDefaultsView.as_view(),    name='admin-weekly-defaults'),
@@ -32,4 +33,5 @@ urlpatterns = [
     path('admin/bookings/<int:pk>/reject/',      AdminRejectBookingView.as_view(),      name='admin-booking-reject'),
     path('admin/bookings/<int:pk>/reschedule/',  AdminRescheduleBookingView.as_view(),  name='admin-booking-reschedule'),
     path('admin/bookings/<int:pk>/cancel/',  AdminCancelBookingView.as_view(),      name='admin-booking-cancel'),
+   
 ]

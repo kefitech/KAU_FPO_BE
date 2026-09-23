@@ -129,10 +129,18 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
 
 class CreateBookingSerializer(serializers.Serializer):
     requested_date = serializers.DateField()
-    requested_time = serializers.CharField(max_length=10)
-    time_slot_id = serializers.IntegerField(required=False, allow_null=True, default=None)
-    topic = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
-    notes = serializers.CharField(required=False, allow_blank=True, default='')
+    requested_time = serializers.TimeField()
+    time_slot_id = serializers.IntegerField(required=False)
+    topic = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        max_length=255,
+        error_messages={
+            'blank': 'Please enter a topic for this appointment.',
+            'required': 'Please enter a topic for this appointment.',
+        },
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
 def _get_fpo(user):
     membership = FPOUserMembership.objects.filter(user=user, is_active=True).first()
     if membership:
@@ -220,7 +228,7 @@ class CreateBookingView(APIView):
         booking = ExpertBooking.objects.create(
             expert=expert, fpo=fpo, time_slot=slot,
             requested_date=data['requested_date'], requested_time=data['requested_time'],
-            topic=data.get('topic', ''), notes=data.get('notes', ''),
+            topic=data['topic'], notes=data.get('notes', ''),
         )
 
         try:
@@ -287,6 +295,7 @@ class AdminSetAvailabilityView(APIView):
 
         results = []
         blocked_dates = []
+        affected_bookings = []
         for slot_group in serializer.validated_data['slots']:
             avail, _ = ExpertAvailability.objects.get_or_create(
                 expert=expert, date=slot_group['date'],
@@ -305,6 +314,13 @@ class AdminSetAvailabilityView(APIView):
                         old_slot.soft_delete(user=request.user)
                     else:
                         date_has_blocked_slot = True
+                        affected_bookings.extend(
+                            ExpertBooking.objects.filter(
+                                time_slot=old_slot,
+                                status=ExpertBooking.Status.CONFIRMED,
+                                is_deleted=False,
+                            )
+                        )
             if date_has_blocked_slot:
                 blocked_dates.append(str(slot_group['date']))
 
@@ -319,12 +335,39 @@ class AdminSetAvailabilityView(APIView):
                 )
             results.append(avail)
 
+            for booking in affected_bookings:
+                if booking.fpo.primary_user:
+                    notify_context = {
+                        'expert_name': expert.name_en,
+                        'fpo_name': booking.fpo.name,
+                        'date': str(booking.requested_date),
+                        'time': booking.requested_time,
+                    }
+                    try:
+                        send_notification(
+                            user=booking.fpo.primary_user,
+                            code='expert_marked_absent_conflict',
+                            channel='email',
+                            context=notify_context,
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        send_notification(
+                            user=booking.fpo.primary_user,
+                            code='expert_marked_absent_conflict',
+                            channel='in_app',
+                            context=notify_context,
+                        )
+                    except Exception:
+                        pass
+
         message = 'Availability updated.'
         if blocked_dates:
             message = (
                 'Availability updated. Some slots on '
                 f"{', '.join(blocked_dates)} could not be removed because they already "
-                'have confirmed bookings.'
+                 'have confirmed bookings. Affected FPOs have been notified.'
             )
 
         return StandardResponse.success(
@@ -641,3 +684,25 @@ class AdminCancelBookingView(APIView):
                 pass
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking cancelled.')
+
+
+class FpoBookingListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Expert Booking'], summary="List the FPO's own bookings")
+    def get(self, request):
+        fpo = _get_fpo(request.user)
+        if not fpo:
+            return StandardResponse.error(
+                'FPO not found.', status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        bookings = ExpertBooking.objects.filter(fpo=fpo, is_deleted=False)
+        expert_id = request.query_params.get('expert_id')
+        if expert_id:
+            bookings = bookings.filter(expert_id=expert_id)
+
+        bookings = bookings.order_by('-requested_date')
+        return StandardResponse.success(
+            data=ExpertBookingSerializer(bookings, many=True).data,
+        )
