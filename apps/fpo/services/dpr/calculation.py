@@ -696,8 +696,8 @@ def _schedule_from_tranches(
         final_cost=cum_cost,
         final_mof=cum_mof,
         distribution_note=(
-            f'Actual tranche timing — {len(tranches)} tranche(s) over {n} months '
-            '(per KAU RCD A.3).'
+            f'Based on the FPO-declared disbursement schedule '
+            f'({len(tranches)} tranche(s) over {n} months).'
         ),
         is_estimated=False,
         reconciliation=recon,
@@ -746,9 +746,10 @@ def _schedule_uniform_fallback(
         final_cost=cum_cost,
         final_mof=cum_mof,
         distribution_note=(
-            f'Estimated — uniform monthly distribution across {n} months. '
-            'No capital tranche data recorded for this project. Enter actual '
-            'tranches via DPRCapitalTranche for KAU RCD A.3-compliant timing.'
+            f'Indicative schedule based on a uniform monthly distribution across '
+            f'{n} months of the implementation period. Actual disbursement will '
+            'follow the sanctioned lender release schedule and project execution '
+            'milestones.'
         ),
         is_estimated=True,
         reconciliation={},

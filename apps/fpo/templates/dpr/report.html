@@ -35,8 +35,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
       /* Per KAU pre-UAT reply §7.2 + §9.7 (2026-09-08):
          header shows FPO name (primary), footer carries version + date
          (left), platform attribution (center), page counter (right). */
-      @top-left  { content: "{{ project.fpo.name|default:'—' }} — DPR {{ version_label }}"; font-size: 8pt; color: #444; font-weight: 600; }
-      @top-right { content: "{{ project.title|default:'Untitled Project' }}"; font-size: 8pt; color: #666; }
+      @top-left  { content: "{{ project.fpo.name|default:'—'|safe }} — DPR {{ version_label }}"; font-size: 8pt; color: #444; font-weight: 600; }
+      @top-right { content: "{{ project.title|default:'Untitled Project'|safe }}"; font-size: 8pt; color: #666; }
       @bottom-left   { content: "{{ version_label }} · Generated {{ generated_at }}"; font-size: 7.5pt; color: #666; }
       @bottom-center { content: "Prepared using the Kerala Agricultural University DPR platform"; font-size: 7.5pt; color: #999; font-style: italic; }
       @bottom-right  { content: "Page " counter(page) " of " counter(pages); font-size: 7.5pt; color: #666; }
@@ -48,8 +48,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
     @page wide {
       size: A4 landscape;
       margin: 14mm 10mm 16mm 10mm;
-      @top-left  { content: "{{ project.fpo.name|default:'—' }} — DPR {{ version_label }}"; font-size: 8pt; color: #444; font-weight: 600; }
-      @top-right { content: "{{ project.title|default:'Untitled Project' }}"; font-size: 8pt; color: #666; }
+      @top-left  { content: "{{ project.fpo.name|default:'—'|safe }} — DPR {{ version_label }}"; font-size: 8pt; color: #444; font-weight: 600; }
+      @top-right { content: "{{ project.title|default:'Untitled Project'|safe }}"; font-size: 8pt; color: #666; }
       @bottom-left   { content: "{{ version_label }} · Generated {{ generated_at }}"; font-size: 7.5pt; color: #666; }
       @bottom-center { content: "Prepared using the Kerala Agricultural University DPR platform"; font-size: 7.5pt; color: #999; font-style: italic; }
       @bottom-right  { content: "Page " counter(page) " of " counter(pages); font-size: 7.5pt; color: #666; }
@@ -184,7 +184,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <div class="meta"><strong>Status:</strong> {{ project.get_status_display }}</div>
       <div class="meta"><strong>Projection horizon:</strong> {{ r.projection_years }} years</div>
       {% if project.primary_commodity %}
-      <div class="meta"><strong>Primary commodity:</strong> {{ project.primary_commodity }}</div>
+      <div class="meta"><strong>Primary commodity:</strong> {{ project.primary_commodity.get_name|default:project.primary_commodity.code|default:"—" }}</div>
       {% endif %}
     </div>
 
@@ -219,8 +219,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <li><a href="#sec-2">2.  Fixed Capital Investment</a></li>
       <li><a href="#sec-3">3.  Means of Finance</a></li>
       <li><a href="#sec-4">4.  Capital Investment Schedule</a></li>
-      <li><a href="#sec-5">5.  Depreciation Schedule (SLM)</a></li>
-      <li><a href="#sec-6">6.  Loan Repayment Schedule</a></li>
+      <li><a href="#sec-5">5.  Depreciation Schedule (SLM, ₹)</a></li>
+      <li><a href="#sec-6">6.  Loan Repayment Schedule (₹)</a></li>
       <li><a href="#sec-7">7.  Projected Profit &amp; Loss</a></li>
       <li><a href="#sec-8">8.  Projected Cash Flow</a></li>
       <li><a href="#sec-9">9.  Projected Balance Sheet</a></li>
@@ -277,7 +277,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <tr><td class="rownum">1</td>  <td class="k">Name of the proposed project</td>       <td class="v">{{ project.title|default:"—" }}</td></tr>
       <tr><td class="rownum">2</td>  <td class="k">Name of the FPO</td>                    <td class="v">{{ project.fpo.name|default:"—" }}</td></tr>
       <tr><td class="rownum">3</td>  <td class="k">Nature of proposed project</td>         <td class="v">
-        {% if project.primary_commodity %}{{ project.primary_commodity }}{% endif %}{% if project.project_types.all %}{% if project.primary_commodity %} — {% endif %}{% for pt in project.project_types.all %}{{ pt }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% if not project.primary_commodity and not project.project_types.all %}—{% endif %}
+        {% if project.primary_commodity %}{{ project.primary_commodity.get_name|default:project.primary_commodity.code }}{% endif %}{% if project.project_types.all %}{% if project.primary_commodity %} — {% endif %}{% for pt in project.project_types.all %}{{ pt }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% if not project.primary_commodity and not project.project_types.all %}—{% endif %}
       </td></tr>
       <tr><td class="rownum">4</td>  <td class="k">District</td>                           <td class="v">{% if project.fpo.district %}{{ project.fpo.get_district_display }}, Kerala{% else %}—{% endif %}</td></tr>
       <tr><td class="rownum">5</td>  <td class="k">Legal structure</td>                    <td class="v">{{ project.fpo.legal_structure|default:"—" }}</td></tr>
@@ -353,10 +353,10 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 5. Capital schedule ───────────────────────────────────────────── #}
   <div class="wide-page"></div>
-  <h2 id="sec-4">4. Capital Investment Schedule (Implementation Period)</h2>
-  {% if r.capital_schedule.is_estimated %}
+  <h2 id="sec-4">4. Capital Investment Schedule (Implementation Period, ₹)</h2>
+  {% if r.capital_schedule.distribution_note %}
     <div class="estimated-note">
-      <strong>Estimated:</strong> {{ r.capital_schedule.distribution_note }}
+      <strong>Note:</strong> {{ r.capital_schedule.distribution_note }}
     </div>
   {% endif %}
   <table>
@@ -384,7 +384,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 6. Depreciation schedule ──────────────────────────────────────── #}
   <div class="wide-page"></div>
-  <h2 id="sec-5">5. Depreciation Schedule (SLM)</h2>
+  <h2 id="sec-5">5. Depreciation Schedule (SLM, ₹)</h2>
   <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-bottom: 3mm;">
     Depreciation is computed using the Straight-Line Method (SLM) at the rates configured for
     the KAU DPR platform. Rates are used <strong>for project appraisal</strong> and are indicative
@@ -423,7 +423,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   {# ── 7. Loan repayment schedule ────────────────────────────────────── #}
   {% if r.interest_schedule.loan_amount %}
-    <h2 id="sec-6">6. Loan Repayment Schedule</h2>
+    <h2 id="sec-6">6. Loan Repayment Schedule (₹)</h2>
     <p style="font-size: 9pt; margin-bottom: 3mm;">
       Loan: <strong>₹{{ r.interest_schedule.loan_amount|money }}</strong> @
       <strong>{{ r.interest_schedule.interest_rate_pct|money }}%</strong> ·
@@ -453,7 +453,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
     {% if chart_repayment_bar %}
     <div class="chart-block">
-      <img src="{{ chart_repayment_bar }}" alt="Loan Repayment Schedule" />
+      <img src="{{ chart_repayment_bar }}" alt="Loan Repayment Schedule (₹)" />
       <div class="chart-caption">Figure — Principal + interest per year over the loan tenure</div>
     </div>
     {% endif %}
@@ -627,10 +627,12 @@ Author: Athul Gopan (Kefi Tech Solutions)
       </tbody>
     </table>
 
-    {# ── Operating break-even (Kefitech 2026-09-19 P6.1) ────────────────
-       Fixed cost / contribution margin — the standard bank-appraisal
-       break-even, alongside the year-based measure above. Rendered only
-       when Y1 P&L is available. #}
+    {% comment %}
+      Operating break-even (Kefitech 2026-09-19 P6.1) —
+      fixed cost / contribution margin, the standard bank-appraisal
+      break-even alongside the year-based measure above. Rendered only
+      when Y1 P&L is available.
+    {% endcomment %}
     {% if r.ratios.break_even_fixed_cost_inr %}
       <h3 style="margin-top: 6mm;">Operating Break-even (Y1 basis)</h3>
       <table style="width: 60%;">
@@ -862,11 +864,13 @@ Author: Athul Gopan (Kefi Tech Solutions)
     <div class="ai-narrative">{{ pdf_ai.conclusion|linebreaks }}</div>
   {% endif %}
 
-  {# ── Key Assumptions — KAU 2026-09-19 P2.1 provenance ─────────────────
-       Every DPRConfig-configured rate the calc engine used is listed here
-       so a bank / KAU reviewer can see at a glance which figures are
-       platform defaults vs project-specific FPO inputs. Any `*` mark seen
-       elsewhere in the DPR points back to a row in this table. #}
+  {% comment %}
+    Key Assumptions — KAU 2026-09-19 P2.1 provenance —
+    every DPRConfig-configured rate the calc engine used is listed here
+    so a bank / KAU reviewer can see at a glance which figures are
+    platform defaults vs project-specific FPO inputs. Any `*` mark seen
+    elsewhere in the DPR points back to a row in this table.
+  {% endcomment %}
   <div class="page-break"></div>
   <h2 id="sec-assumptions">Key Assumptions Used</h2>
   <p style="font-size: 9pt; margin-bottom: 3mm;">

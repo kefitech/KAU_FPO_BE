@@ -33,30 +33,34 @@ def validate_section(section) -> dict[str, Any]:
 
     for i, it in enumerate(items):
         prefix = f'items[{i}]'
-        if not (it.name or '').strip():
-            errors.append(_err('name_required', f'{prefix}.name', 'Product name shall not be blank.'))
+        # Human-readable identifier for messages. Falls back to "Product N"
+        # when the name is blank (which is also an error case caught below).
+        name = (it.name or '').strip()
+        label = f'"{name}"' if name else f'Product {i + 1}'
+        if not name:
+            errors.append(_err('name_required', f'{prefix}.name', f'{label}: name shall not be blank.'))
         if not it.unit_of_measurement_id:
-            errors.append(_err('unit_required', f'{prefix}.unit_of_measurement', 'Unit of measurement shall be specified.'))
+            errors.append(_err('unit_required', f'{prefix}.unit_of_measurement', f'Product {label}: unit of measurement shall be specified.'))
         if it.selling_price_per_unit is None or it.selling_price_per_unit <= 0:
             errors.append(_err(
                 'price_positive', f'{prefix}.selling_price_per_unit',
-                'Selling price shall be greater than zero.',
+                f'Product {label}: selling price shall be greater than zero.',
             ))
         if it.annual_quantity is None or it.annual_quantity <= 0:
             errors.append(_err(
                 'quantity_positive', f'{prefix}.annual_quantity',
-                'Annual production quantity shall be greater than zero.',
+                f'Product {label}: annual production quantity shall be greater than zero.',
             ))
         # Advisory
         if not it.category_id:
             warnings.append(_warn(
                 'category_recommended', f'{prefix}.category',
-                'Product category is recommended for better AI content generation.',
+                f'Product {label}: category is missing (recommended for better AI content generation).',
             ))
         if not it.product_type_id:
             warnings.append(_warn(
                 'type_recommended', f'{prefix}.product_type',
-                'Product type is recommended.',
+                f'Product {label}: product type is missing.',
             ))
 
     return {
