@@ -28,6 +28,13 @@ def _is_admin(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
+def _sync_login_account(expert, is_active):
+    # Expert.is_active only hides the directory entry; the linked User is what login checks.
+    if expert.user_id and expert.user.is_active != is_active:
+        expert.user.is_active = is_active
+        expert.user.save(update_fields=['is_active'])
+
+
 class ExpertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expert
@@ -209,6 +216,8 @@ class ExpertDetailView(APIView):
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
         serializer.save()
+        if 'is_active' in serializer.validated_data:
+            _sync_login_account(expert, expert.is_active)
         return StandardResponse.success(data=ExpertSerializer(expert).data, message='Expert updated.')
 
     @extend_schema(tags=['Admin - Experts'], summary='Delete an expert')
@@ -239,6 +248,7 @@ class ExpertActivateView(APIView):
 
         expert.is_active = True
         expert.save(update_fields=['is_active'])
+        _sync_login_account(expert, True)
         return StandardResponse.success(message='Expert activated.')
 
 
@@ -257,6 +267,7 @@ class ExpertDeactivateView(APIView):
 
         expert.is_active = False
         expert.save(update_fields=['is_active'])
+        _sync_login_account(expert, False)
         return StandardResponse.success(message='Expert deactivated.')
 
 

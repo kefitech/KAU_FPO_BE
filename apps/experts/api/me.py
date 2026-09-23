@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from apps.core.services.translation import t
 from apps.core.utils.responses import StandardResponse
 
 
@@ -19,6 +20,11 @@ class MyExpertProfileView(APIView):
         expert = getattr(request.user, 'expert_profile', None)
         if not expert:
             return StandardResponse.error('No expert profile linked to this account.', status_code=status.HTTP_404_NOT_FOUND)
+        if not expert.is_active:
+            return StandardResponse.error(
+                t('auth.account_disabled', getattr(request, 'language', 'en')),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         return StandardResponse.success(data={
             'id': expert.id,

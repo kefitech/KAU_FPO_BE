@@ -156,7 +156,7 @@ def _is_admin(user):
 
 
 def _can_manage_expert(user, expert):
-    return _is_admin(user) or (expert.user_id and expert.user_id == user.id)
+    return _is_admin(user) or (expert.is_active and expert.user_id and expert.user_id == user.id)
 
 
 
@@ -510,7 +510,7 @@ class AdminBookingListView(APIView):
         qs = ExpertBooking.objects.filter(is_deleted=False)
         if not _is_admin(request.user):
             expert = getattr(request.user, 'expert_profile', None)
-            if not expert:
+            if not expert or not expert.is_active:
                 return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
             qs = qs.filter(expert=expert)
 
