@@ -363,6 +363,12 @@ def seed_ml_ui_translations():
             'order_placeholder': 'ഓപ്ഷണൽ — പുതിയ എൻട്രികൾ “മറ്റുള്ളവ”ക്ക് മുമ്പ് വരും',
             'description_label': 'വിവരണം',
             'active_label': 'സജീവം (ഡ്രോപ്പ്ഡൗണുകളിൽ കാണിക്കും)',
+            'val_code_required': 'കോഡ് ആവശ്യമാണ്',
+            'val_code_max': 'പരമാവധി 50 അക്ഷരങ്ങൾ',
+            'val_code_invalid': 'ചെറിയ അക്ഷരങ്ങൾ, അക്കങ്ങൾ, അണ്ടർസ്‌കോർ എന്നിവ മാത്രം അനുവദനീയം',
+            'val_name_en_required': 'ഇംഗ്ലീഷ് പേര് ആവശ്യമാണ്',
+            'val_name_en_max': 'പരമാവധി 40 അക്ഷരങ്ങൾ',
+            'val_display_order_invalid': 'ഒരു പൂർണ്ണസംഖ്യ ആയിരിക്കണം',
         },
 
         'admin_experts': {

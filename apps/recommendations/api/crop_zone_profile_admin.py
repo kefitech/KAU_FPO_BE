@@ -130,14 +130,20 @@ class CropZoneProfileSerializer(serializers.ModelSerializer):
         return canonical
 
     def validate(self, attrs):
+        language = getattr(self.context.get('request'), 'language', 'en')
+
         temp_lo = attrs.get('temp_lo', getattr(self.instance, 'temp_lo', None))
         temp_hi = attrs.get('temp_hi', getattr(self.instance, 'temp_hi', None))
         if temp_lo is not None and temp_hi is not None and temp_lo > temp_hi:
-            raise serializers.ValidationError({'temp_hi': 'Must be greater than or equal to temp_lo.'})
+            raise serializers.ValidationError(
+                {'temp_hi': t('recommendations.zone_profile_temp_range', language)}
+            )
         ph_lo = attrs.get('ph_lo', getattr(self.instance, 'ph_lo', None))
         ph_hi = attrs.get('ph_hi', getattr(self.instance, 'ph_hi', None))
         if ph_lo is not None and ph_hi is not None and ph_lo > ph_hi:
-            raise serializers.ValidationError({'ph_hi': 'Must be greater than or equal to ph_lo.'})
+            raise serializers.ValidationError(
+                {'ph_hi': t('recommendations.zone_profile_ph_range', language)}
+            )
 
         crop_name = attrs.get('crop_name', getattr(self.instance, 'crop_name', None))
         kau_zone = attrs.get('kau_zone', getattr(self.instance, 'kau_zone', None))
@@ -149,7 +155,7 @@ class CropZoneProfileSerializer(serializers.ModelSerializer):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
-                    f"A profile for '{crop_name}' in '{kau_zone}' already exists (case-insensitive)."
+                    t('recommendations.zone_profile_duplicate', language, crop_name=crop_name, kau_zone=kau_zone)
                 )
         return attrs
 

@@ -5621,6 +5621,9 @@ def seed_recommendations_translations(languages):
         ('zone_profile_deleted',        'Crop zone profile deleted successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ നീക്കം ചെയ്തു'),
         ('zone_profile_activated',      'Crop zone profile published',                           'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പ്രസിദ്ധീകരിച്ചു'),
         ('zone_profile_deactivated',    'Crop zone profile unpublished',                         'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പ്രസിദ്ധീകരണം പിൻവലിച്ചു'),
+        ('zone_profile_duplicate',      "A profile for '{{crop_name}}' in '{{kau_zone}}' already exists.", "'{{kau_zone}}' എന്ന മേഖലയിൽ '{{crop_name}}' എന്നതിനുള്ള പ്രൊഫൈൽ ഇതിനകം നിലവിലുണ്ട്."),
+        ('zone_profile_temp_range',     'Must be greater than or equal to temp_lo.',             'temp_lo-യേക്കാൾ വലുതോ തുല്യമോ ആയിരിക്കണം.'),
+        ('zone_profile_ph_range',       'Must be greater than or equal to ph_lo.',               'ph_lo-യേക്കാൾ വലുതോ തുല്യമോ ആയിരിക്കണം.'),
     ]
 
     count = 0
