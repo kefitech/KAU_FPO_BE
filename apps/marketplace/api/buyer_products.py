@@ -110,7 +110,8 @@ class BuyerProductListView(APIView):
 
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
-        serializer = BuyerProductSerializer(page, many=True)
+        lang = getattr(request, 'language', 'en')
+        serializer = BuyerProductSerializer(page, many=True, context={'lang': lang})
 
         return paginator.get_paginated_response(serializer.data)
 
@@ -153,5 +154,6 @@ class BuyerRecommendedProductsView(APIView):
         if buyer.fpo_id:
             queryset = queryset.exclude(fpo_id=buyer.fpo_id)
 
-        serializer = BuyerProductSerializer(queryset[: self.RECOMMENDED_LIMIT], many=True)
+        lang = getattr(request, 'language', 'en')
+        serializer = BuyerProductSerializer(queryset[: self.RECOMMENDED_LIMIT], many=True, context={'lang': lang})
         return StandardResponse.success(data=serializer.data, message='Recommended products retrieved')
