@@ -14,11 +14,17 @@ Endpoints:
     POST   /api/admin/applications/{id}/request-info/               — APPROVED → INFO_REQUIRED
     POST   /api/admin/applications/{id}/verify-document/{doc_id}/
     PATCH  /api/admin/applications/{id}/set-user-limit/             — deprecated (410)
+    POST   /api/admin/applications/{id}/assign-subadmin/            — assign FPO to a sub-admin (P2-01)
+    POST   /api/admin/applications/{id}/unassign-subadmin/          — remove the sub-admin assignment
 
 Permissions:
     list / detail / verify-document  → super_admin OR sub_admin with can_view_all_fpos
     reject / request-info            → super_admin OR sub_admin with can_approve_fpo
-    set-user-limit                   → super_admin only
+    set-user-limit / (un)assign      → super_admin only
+
+Row-level security (P2-01):
+    Sub-admins only see FPOs assigned to them (SubAdminFPOAssignment). Every
+    lookup goes through scope_fpo_queryset(), so an out-of-scope FPO is a 404.
 """
 
 from django.contrib.auth import get_user_model
@@ -37,8 +43,23 @@ from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory,
 from apps.database.models.subadmin import SubAdminFPOAssignment
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
+from apps.core.permissions.fpo_scope import scope_fpo_queryset, is_super_admin
 
 User = get_user_model()
+
+
+def _assigned_subadmin(fpo):
+    """The FPO's assigned sub-admin User, or None."""
+    try:
+        return fpo.subadmin_assignment.subadmin
+    except SubAdminFPOAssignment.DoesNotExist:
+        return None
+
+
+def _user_display_name(user):
+    if not user:
+        return None
+    return f"{user.first_name} {user.last_name}".strip() or user.email or user.username
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -101,6 +122,8 @@ class _ApplicationListSerializer(serializers.ModelSerializer):
     current_tier       = serializers.CharField(source='tier', default=None)
     status_display     = serializers.CharField(source='get_status_display', read_only=True)
     district_display   = serializers.SerializerMethodField()
+    assigned_subadmin_id   = serializers.SerializerMethodField()
+    assigned_subadmin_name = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
@@ -113,8 +136,16 @@ class _ApplicationListSerializer(serializers.ModelSerializer):
             'office_email', 'office_phone',
             'email_verified', 'phone_verified',
             'primary_user_id', 'primary_user_name', 'primary_user_email', 'primary_user_phone',
+            'assigned_subadmin_id', 'assigned_subadmin_name',
             'created_at', 'updated_at',
         ]
+
+    def get_assigned_subadmin_id(self, obj):
+        sub = _assigned_subadmin(obj)
+        return sub.id if sub else None
+
+    def get_assigned_subadmin_name(self, obj):
+        return _user_display_name(_assigned_subadmin(obj))
 
     def get_primary_user_name(self, obj):
         if obj.primary_user:
@@ -141,6 +172,7 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
     district_display    = serializers.SerializerMethodField()
     block_taluk_display = serializers.SerializerMethodField()
     bank_name_display   = serializers.SerializerMethodField()
+    assigned_subadmin   = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
@@ -164,11 +196,25 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
             'annual_turnover', 'bank_name', 'bank_name_display', 'bank_branch',
             'account_number', 'ifsc_code', 'description',
             'primary_user',
+            'assigned_subadmin',
             'documents', 'status_history',
             'claim_origin',
             'created_at', 'updated_at',
         ]
 
+    def get_assigned_subadmin(self, obj):
+        try:
+            a = obj.subadmin_assignment
+        except SubAdminFPOAssignment.DoesNotExist:
+            return None
+        return {
+            'id':          a.subadmin_id,
+            'name':        _user_display_name(a.subadmin),
+            'email':       a.subadmin.email,
+            'assigned_by': _user_display_name(a.assigned_by),
+            # row is updated in place on reassignment, so updated_at is the assignment time
+            'assigned_at': a.updated_at,
+        }
 
     def get_district_display(self, obj):
         from apps.core.utils.constants import get_district_name
@@ -276,7 +322,7 @@ def _can_view(user):
         return True
     return (
         user.groups.filter(name=UserRole.SUB_ADMIN).exists()
-        and user.has_perm('apps_database.can_view_all_fpos')
+        and user.has_perm('accounts.can_view_all_fpos')
     )
 
 
@@ -285,7 +331,7 @@ def _can_act(user):
         return True
     return (
         user.groups.filter(name=UserRole.SUB_ADMIN).exists()
-        and user.has_perm('apps_database.can_approve_fpo')
+        and user.has_perm('accounts.can_approve_fpo')
     )
 
 
@@ -294,7 +340,7 @@ def _can_verify_docs(user):
         return True
     return (
         user.groups.filter(name=UserRole.SUB_ADMIN).exists()
-        and user.has_perm('apps_database.can_verify_documents')
+        and user.has_perm('accounts.can_verify_documents')
     )
 
 
@@ -302,13 +348,47 @@ def _can_verify_docs(user):
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _get_fpo(fpo_id):
-    try:
-        return FPO.objects.select_related(
-            'primary_user', 'primary_user__profile',
-        ).get(id=fpo_id, is_deleted=False)
-    except FPO.DoesNotExist:
-        return None
+def _get_fpo(fpo_id, user):
+    """Fetch an FPO within `user`'s row-level scope. None if missing or out of scope."""
+    qs = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), user)
+    return qs.select_related(
+        'primary_user', 'primary_user__profile',
+    ).filter(id=fpo_id).first()
+
+
+def set_fpo_subadmin(fpo, subadmin, changed_by, request=None):
+    """
+    Assign `fpo` to `subadmin` (or unassign with None) and audit-log the change.
+    One FPO has at most one sub-admin, so assigning replaces any existing assignee.
+    Returns True if the assignee actually changed.
+    """
+    old = _assigned_subadmin(fpo)
+    if (old.id if old else None) == (subadmin.id if subadmin else None):
+        return False
+
+    if subadmin:
+        SubAdminFPOAssignment.objects.update_or_create(
+            fpo=fpo,
+            defaults={'subadmin': subadmin, 'assigned_by': changed_by},
+        )
+    else:
+        SubAdminFPOAssignment.objects.filter(fpo=fpo).delete()
+    # drop the cached reverse one-to-one so later reads see the new state
+    fpo._state.fields_cache.pop('subadmin_assignment', None)
+
+    AuditService.log(
+        user=changed_by,
+        action=AuditLog.Action.UPDATE,
+        instance=fpo,
+        request=request,
+        changes={
+            'assigned_subadmin': {
+                'old': {'id': old.id, 'email': old.email} if old else None,
+                'new': {'id': subadmin.id, 'email': subadmin.email} if subadmin else None,
+            },
+        },
+    )
+    return True
 
 
 def _transition(fpo, to_status, changed_by, notes='', request=None):
@@ -383,6 +463,7 @@ class ApplicationListView(APIView):
             OpenApiParameter('district', description='Filter by district code (e.g. TSR, KLM)', required=False),
             OpenApiParameter('tier',     description='Filter by tier (A/B/C/D)', required=False),
             OpenApiParameter('search',   description='Search by FPO name or application_id', required=False),
+            OpenApiParameter('assigned_subadmin', description='Filter by assignee: a sub-admin user ID, "me", or "unassigned"', required=False),
             OpenApiParameter('ordering', description='Order by field (prefix with "-" for descending), e.g. application_id or -updated_at', required=False),
         ],
     )
@@ -393,14 +474,18 @@ class ApplicationListView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        qs = FPO.objects.filter(is_deleted=False).select_related(
+        qs = scope_fpo_queryset(
+            FPO.objects.filter(is_deleted=False), request.user,
+        ).select_related(
             'primary_user', 'primary_user__profile',
+            'subadmin_assignment__subadmin',
         )
 
-        s      = request.query_params.get('status')
-        d      = request.query_params.get('district')
-        tier   = request.query_params.get('tier')
-        search = request.query_params.get('search', '').strip()
+        s        = request.query_params.get('status')
+        d        = request.query_params.get('district')
+        tier     = request.query_params.get('tier')
+        assignee = request.query_params.get('assigned_subadmin', '').strip()
+        search   = request.query_params.get('search', '').strip()
 
         if s:
             qs = qs.filter(status=s)
@@ -408,6 +493,12 @@ class ApplicationListView(APIView):
             qs = qs.filter(district=d)
         if tier:
             qs = qs.filter(tier=tier)
+        if assignee == 'me':
+            qs = qs.filter(subadmin_assignment__subadmin=request.user)
+        elif assignee == 'unassigned':
+            qs = qs.filter(subadmin_assignment__isnull=True)
+        elif assignee.isdigit():
+            qs = qs.filter(subadmin_assignment__subadmin_id=int(assignee))
         if search:
             qs = qs.filter(name__icontains=search) | qs.filter(application_id__icontains=search)
 
@@ -433,11 +524,14 @@ class ApplicationDetailView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = FPO.objects.select_related(
+        fpo = scope_fpo_queryset(
+            FPO.objects.filter(is_deleted=False), request.user,
+        ).select_related(
             'primary_user', 'primary_user__profile', 'claimed_from_fpo',
+            'subadmin_assignment__subadmin', 'subadmin_assignment__assigned_by',
         ).prefetch_related(
             'documents', 'status_history__changed_by',
-        ).filter(id=fpo_id, is_deleted=False).first()
+        ).filter(id=fpo_id).first()
 
         if not fpo:
             return StandardResponse.error(
@@ -469,7 +563,7 @@ class ApplicationDetailView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(
                 t('fpo.fpo_not_found', request.language),
@@ -567,7 +661,7 @@ class ApplicationRejectView(APIView):
         if not serializer.is_valid():
             return StandardResponse.error(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
@@ -610,7 +704,7 @@ class ApplicationRequestInfoView(APIView):
         if not serializer.is_valid():
             return StandardResponse.error(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
@@ -648,7 +742,7 @@ class ApplicationApproveView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(
                 t('fpo.fpo_not_found', request.language),
@@ -729,7 +823,7 @@ class ApplicationActivateView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(
                 t('fpo.fpo_not_found', request.language),
@@ -799,7 +893,7 @@ class ApplicationDeactivateView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(
                 t('fpo.fpo_not_found', request.language),
@@ -836,7 +930,7 @@ class ApplicationVerifyDocumentView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
@@ -975,9 +1069,8 @@ class ApplicationTierHistoryView(APIView):
         ).exists():
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        try:
-            fpo = FPO.objects.get(id=fpo_id)
-        except FPO.DoesNotExist:
+        fpo = scope_fpo_queryset(FPO.objects.all(), request.user).filter(id=fpo_id).first()
+        if not fpo:
             return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
 
         history = fpo.tier_history.select_related('assigned_by').order_by('created_at')
@@ -1018,7 +1111,7 @@ class ApplicationTierAssessmentView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
@@ -1076,13 +1169,9 @@ class AssignSubAdminSerializer(serializers.Serializer):
     subadmin_id = serializers.IntegerField(help_text="ID of the sub-admin to assign to this FPO")
 
     def validate_subadmin_id(self, value):
-        if not User.objects.filter(id=value, groups__name=UserRole.SUB_ADMIN).exists():
-            raise serializers.ValidationError('Sub-admin not found.')
+        if not User.objects.filter(id=value, groups__name=UserRole.SUB_ADMIN, is_active=True).exists():
+            raise serializers.ValidationError('No active sub-admin found with this ID.')
         return value
-
-
-class UnassignSubAdminSerializer(serializers.Serializer):
-    pass
 
 
 class ApplicationAssignSubAdminView(APIView):
@@ -1091,15 +1180,16 @@ class ApplicationAssignSubAdminView(APIView):
         tags=['Admin - FPO Applications'],
         summary='Assign a sub-admin to this FPO application',
         description=(
-            'Assigns (or reassigns) the sub-admin responsible for reviewing/managing this FPO. '
+            'Super admin only. Assigns (or reassigns) the sub-admin responsible for this FPO. '
+            'Sub-admins only see FPOs assigned to them (P2-01 row-level security).\n\n'
             'Each FPO can have only one sub-admin assigned at a time — assigning a new one '
-            'replaces the existing assignment.'
+            'replaces the existing assignment. Every change is audit-logged with old/new assignee.'
         ),
         request=AssignSubAdminSerializer,
         responses={200: None},
     )
     def post(self, request, fpo_id):
-        if not _can_act(request.user):
+        if not is_super_admin(request.user):
             return StandardResponse.error(
                 t('common.permission_denied', request.language),
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1109,7 +1199,7 @@ class ApplicationAssignSubAdminView(APIView):
         if not ser.is_valid():
             return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(
                 t('fpo.fpo_not_found', request.language),
@@ -1117,15 +1207,15 @@ class ApplicationAssignSubAdminView(APIView):
             )
 
         subadmin = User.objects.get(id=ser.validated_data['subadmin_id'])
-
-        SubAdminFPOAssignment.objects.update_or_create(
-            fpo=fpo,
-            defaults={'subadmin': subadmin, 'assigned_by': request.user},
-        )
+        changed  = set_fpo_subadmin(fpo, subadmin, request.user, request=request)
 
         return StandardResponse.success(
-            data={'fpo_id': fpo.id, 'subadmin_id': subadmin.id},
-            message='Sub-admin assigned successfully.',
+            data={
+                'fpo_id':        fpo.id,
+                'subadmin_id':   subadmin.id,
+                'subadmin_name': _user_display_name(subadmin),
+            },
+            message='Sub-admin assigned successfully.' if changed else 'Sub-admin is already assigned to this FPO.',
         )
 
 
@@ -1134,27 +1224,28 @@ class ApplicationUnassignSubAdminView(APIView):
     @extend_schema(
         tags=['Admin - FPO Applications'],
         summary='Remove the sub-admin assignment from this FPO application',
-        description='Removes the current sub-admin assignment for this FPO, if one exists.',
+        description=(
+            'Super admin only. Removes the current sub-admin assignment for this FPO, if one exists. '
+            'The FPO then becomes visible to super admins only. Audit-logged.'
+        ),
         request=None,
         responses={200: None, 400: None},
     )
     def post(self, request, fpo_id):
-        if not _can_act(request.user):
+        if not is_super_admin(request.user):
             return StandardResponse.error(
                 t('common.permission_denied', request.language),
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = _get_fpo(fpo_id)
+        fpo = _get_fpo(fpo_id, request.user)
         if not fpo:
             return StandardResponse.error(
                 t('fpo.fpo_not_found', request.language),
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        deleted, _ = SubAdminFPOAssignment.objects.filter(fpo=fpo).delete()
-
-        if not deleted:
+        if not set_fpo_subadmin(fpo, None, request.user, request=request):
             return StandardResponse.error(
                 'This FPO has no sub-admin currently assigned.',
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 
 from apps.core.utils.constants import UserRole, DISTRICTS_BILINGUAL
 from apps.core.utils.responses import StandardResponse
+from apps.core.permissions.fpo_scope import scope_fpo_queryset
 from apps.database.models.fpo import FPO
 
 
@@ -33,8 +34,10 @@ def _can_view(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
-def _build_queryset(params):
-    qs = FPO.objects.filter(is_deleted=False).select_related('primary_user', 'primary_user__profile')
+def _build_queryset(params, user):
+    # P2-01: sub-admins can only export their assigned FPOs
+    qs = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), user)
+    qs = qs.select_related('primary_user', 'primary_user__profile')
 
     status_val = params.get('status', '').strip()
     if status_val:
@@ -316,7 +319,7 @@ class FPOSummaryReportView(APIView):
             return StandardResponse.error('file_format must be excel or pdf.',
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        qs   = _build_queryset(request.query_params)
+        qs   = _build_queryset(request.query_params, request.user)
         rows = _rows(qs)
         ts   = datetime.now().strftime('%Y%m%d_%H%M%S')
 
