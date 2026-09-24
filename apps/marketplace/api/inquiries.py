@@ -146,6 +146,7 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             )
         inquiry.status = Inquiry.Status.CONTACTED
         inquiry.save(update_fields=['status', 'updated_at'])
+        self._notify_buyer(inquiry, 'inquiry_contacted')
         return StandardResponse.success(message='Inquiry marked as contacted')
 
     @extend_schema(tags=['Marketplace - Inquiries'])
@@ -159,7 +160,28 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             )
         inquiry.status = Inquiry.Status.RESOLVED
         inquiry.save(update_fields=['status', 'updated_at'])
+        self._notify_buyer(inquiry, 'inquiry_resolved')
         return StandardResponse.success(message='Inquiry marked as resolved')
+
+    def _notify_buyer(self, inquiry, code):
+        """Notify the buyer's inbox (in_app) when the FPO changes an inquiry's status."""
+        if not inquiry.contact_user:
+            return
+        from apps.notifications.services import send_notification
+        lang = getattr(getattr(inquiry.contact_user, 'profile', None), 'preferred_language', 'en')
+        try:
+            send_notification(
+                user=inquiry.contact_user,
+                code=code,
+                channel='in_app',
+                context={
+                    'product_name': inquiry.product.name.get('en', '') if inquiry.product.name else '',
+                    'fpo_name': inquiry.product.fpo.name,
+                },
+                lang=lang or 'en',
+            )
+        except Exception:
+            pass  # Status already saved — don't fail the request if notification dispatch fails
 
 class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
