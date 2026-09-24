@@ -5501,6 +5501,25 @@ def seed_buyer_portal_translations(languages):
          'അളവ്'),
         ('buyer_products.label_price',         'Price',
          'വില'),
+        # ── added: ProductCard + filter strings missing from this page ──
+        ('buyer_products.label_available',        'Available',
+         'ലഭ്യത'),
+        ('buyer_products.read_more',               'Read more',
+         'കൂടുതൽ വായിക്കുക'),
+        ('buyer_products.read_less',               'Read less',
+         'കുറച്ച് കാണിക്കുക'),
+        ('buyer_products.view_all_products',       'View all products from this FPO',
+         'ഈ FPO-യുടെ എല്ലാ ഉൽപ്പന്നങ്ങളും കാണുക'),
+        ('buyer_products.btn_inquire',             'Inquire',
+         'അന്വേഷിക്കുക'),
+        ('buyer_products.from_date_placeholder',   'From date',
+         'ആരംഭ തീയതി'),
+        ('buyer_products.until_date_placeholder',  'To date',
+         'അവസാന തീയതി'),
+        ('buyer_products.date_filter_clear',       'Clear',
+         'മായ്ക്കുക'),
+        ('buyer_products.commodities_selected',    '{count} commodities selected',
+         '{count} ചരക്കുകൾ തിരഞ്ഞെടുത്തു'),
     ]
 
     count = 0
@@ -5651,6 +5670,8 @@ def seed_fpo_buyer_directory_translations(languages):
          'ഈ FPO-യുടെ എല്ലാ ഉൽപ്പന്നങ്ങളും കാണുക'),
         ('fpo_buyer_directory.btn_inquire', 'Inquire',
          'അന്വേഷിക്കുക'),
+         #arunima 24 sep
+        ('fpo_buyer_directory.label_available', 'Available', 'ലഭ്യത'),
     ]
 
     count = 0
@@ -5732,7 +5753,33 @@ def seed_fpo_products_view_translations(languages):
          'സന്ദേശം'),
         ('fpo_products.col_date_received', 'Date Received',
          'ലഭിച്ച തീയതി'),
+         #arunima 24 sep
+        # ── My Product Inquiries table — search + contact column ──
+        ('fpo_products.search_placeholder', 'Search…',
+         'തിരയുക…'),
+        ('fpo_products.col_contact_person', 'Contact Person',
+         'ബന്ധപ്പെടേണ്ട വ്യക്തി'),
 
+        # ── My Product Inquiries table — additional columns, actions, toasts ──
+        ('fpo_products.col_buyer', 'Buyer',
+         'ക്രേതാവ്'),
+        ('fpo_products.col_quantity_requested', 'Quantity Requested',
+         'ആവശ്യപ്പെട്ട അളവ്'),
+        ('fpo_products.contact_unavailable', 'Contact no longer available',
+         'ബന്ധപ്പെടൽ വിവരങ്ങൾ ഇപ്പോൾ ലഭ്യമല്ല'),
+        ('fpo_products.action_mark_contacted', 'Mark as Contacted',
+         'ബന്ധപ്പെട്ടതായി അടയാളപ്പെടുത്തുക'),
+        ('fpo_products.action_mark_resolved', 'Mark as Resolved',
+         'പരിഹരിച്ചതായി അടയാളപ്പെടുത്തുക'),
+        ('fpo_products.toast_marked_contacted', 'Inquiry marked as contacted',
+         'അന്വേഷണം ബന്ധപ്പെട്ടതായി അടയാളപ്പെടുത്തി'),
+        ('fpo_products.toast_marked_resolved', 'Inquiry marked as resolved',
+         'അന്വേഷണം പരിഹരിച്ചതായി അടയാളപ്പെടുത്തി'),
+        ('fpo_products.toast_error_contact', 'Only pending inquiries can be marked as contacted',
+         'തീർപ്പാക്കാത്ത അന്വേഷണങ്ങൾ മാത്രമേ ബന്ധപ്പെട്ടതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('fpo_products.toast_error_resolve', 'Only contacted inquiries can be marked as resolved',
+         'ബന്ധപ്പെട്ട അന്വേഷണങ്ങൾ മാത്രമേ പരിഹരിച്ചതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+#-----------------------------------------------------------------
         # ── Market Hub inquiry row actions + toasts ──
         ('fpo_products.action_mark_accepted', 'Mark as Accepted',
          'അംഗീകരിച്ചതായി അടയാളപ്പെടുത്തുക'),
@@ -5858,6 +5905,56 @@ def seed_buyer_my_profile_translations(languages):
         Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'Buyer My Profile page (/buyer/profile)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
+def seed_fpo_product_catalog_translations(languages):
+    """
+    Shared FpoProductCatalog component (fpo_product_catalog.*) —
+    used by /fpo/buyer-directory/fpo/[id] (and any other "view all products
+    from this FPO" page reusing this component).
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    keys = [
+        ('fpo_product_catalog.back', 'Back',
+         'തിരികെ'),
+        ('fpo_product_catalog.title_with_fpo', 'Products from {fpo_name}',
+         '{fpo_name}-യുടെ ഉൽപ്പന്നങ്ങൾ'),
+        ('fpo_product_catalog.title_default', 'Products from this FPO',
+         'ഈ FPO-യുടെ ഉൽപ്പന്നങ്ങൾ'),
+        ('fpo_product_catalog.description', 'Browse all products listed by this FPO.',
+         'ഈ FPO ലിസ്റ്റ് ചെയ്ത എല്ലാ ഉൽപ്പന്നങ്ങളും ബ്രൗസ് ചെയ്യുക.'),
+        ('fpo_product_catalog.search_placeholder', 'Search products…',
+         'ഉൽപ്പന്നങ്ങൾ തിരയുക…'),
+        ('fpo_product_catalog.filter_all', 'All commodities',
+         'എല്ലാ ചരക്കുകളും'),
+        ('fpo_product_catalog.label_quantity', 'Quantity',
+         'അളവ്'),
+        ('fpo_product_catalog.label_price', 'Price',
+         'വില'),
+        ('fpo_product_catalog.btn_inquire', 'Inquire',
+         'അന്വേഷിക്കുക'),
+        ('fpo_product_catalog.empty_state', 'No products found for this FPO.',
+         'ഈ FPO-ക്ക് ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
+        ('fpo_product_catalog.label_available', 'Available',
+         'ലഭ്യത'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Shared FpoProductCatalog component', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Shared FpoProductCatalog component', 'is_verified': True}
         )
         count += 1
 
@@ -6014,6 +6111,11 @@ def seed_translations():
     buyer_my_profile_count = seed_buyer_my_profile_translations(languages)
     print(f"✅ Seeded {buyer_my_profile_count} buyer my profile translations")
     total_count += buyer_my_profile_count
+
+    print("\nSeeding fpo product catalog translations...")
+    fpo_product_catalog_count = seed_fpo_product_catalog_translations(languages)
+    print(f"✅ Seeded {fpo_product_catalog_count} fpo product catalog translations")
+    total_count += fpo_product_catalog_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
