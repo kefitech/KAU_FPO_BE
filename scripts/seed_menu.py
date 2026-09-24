@@ -315,41 +315,45 @@ def seed_menu():
             order     = 3,
         )
 
-    # ── Expert portal pages ───────────────────────────────────────────────────
+       # ── Expert portal pages ───────────────────────────────────────────────────
 
     expert_group, _ = Group.objects.get_or_create(name='expert')
 
+    # Point existing expert menu rows at the proper translation keys
+    # (they were seeded with plain English labels, which have no translation).
+    MenuItem.objects.filter(path='/expert/dashboard').update(label_key='menu.expert_dashboard')
+    MenuItem.objects.filter(path='/expert/availability').update(label_key='menu.expert_availability')
+    MenuItem.objects.filter(path='/expert/profile').update(label_key='menu.expert_profile')
+    MenuItem.objects.filter(path='/expert/stats').update(label_key='menu.expert_booking_overview')
+
     seed_item(
-        label_key = 'Dashboard',
+        label_key = 'menu.expert_dashboard',
         path      = '/expert/dashboard',
         icon      = 'layout-dashboard',
         roles     = [expert_group],
         order     = 2,
     )
     seed_item(
-        label_key = 'Availability',
+        label_key = 'menu.expert_availability',
         path      = '/expert/availability',
         icon      = 'calendar-days',
         roles     = [expert_group],
         order     = 3,
     )
     seed_item(
-        label_key = 'Profile',
+        label_key = 'menu.expert_profile',
         path      = '/expert/profile',
         icon      = 'user',
         roles     = [expert_group],
         order     = 4,
     )
     seed_item(
-        label_key = 'Booking Overview',
+        label_key = 'menu.expert_booking_overview',
         path      = '/expert/stats',
         icon      = 'bar-chart-3',
         roles     = [expert_group],
         order     = 1,
     )
-    
- 
-
     print("\n" + "=" * 60)
     print(f"✅ Done. Total menu items: {MenuItem.objects.count()}")
     print("=" * 60)
