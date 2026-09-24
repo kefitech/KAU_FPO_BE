@@ -171,13 +171,52 @@ class ExpertAvailabilityView(APIView):
             return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
 
         from datetime import date as date_cls
-        qs = ExpertAvailability.objects.filter(
-            expert=expert, is_deleted=False, date__gte=date_cls.today()
-        ).order_by('date')
+        from django.db.models import Count, Prefetch
 
-        data = ExpertAvailabilitySerializer(qs, many=True).data
+        # 1 query for the dates + 1 query for all their slots (instead of 1 per date).
+        avails = list(
+            ExpertAvailability.objects.filter(
+                expert=expert, is_deleted=False, date__gte=date_cls.today()
+            )
+            .order_by('date')
+            .prefetch_related(
+                Prefetch(
+                    'time_slots',
+                    queryset=ExpertTimeSlot.objects.filter(is_deleted=False).order_by('start_time'),
+                    to_attr='active_slots',
+                )
+            )
+        )
+
+        # 1 query for confirmed-booking counts of every slot (instead of 1-2 per slot).
+        slot_ids = [s.id for a in avails for s in a.active_slots]
+        confirmed_counts = dict(
+            ExpertBooking.objects.filter(
+                time_slot_id__in=slot_ids,
+                status=ExpertBooking.Status.CONFIRMED,
+                is_deleted=False,
+            )
+            .values('time_slot_id')
+            .annotate(n=Count('id'))
+            .values_list('time_slot_id', 'n')
+        )
+
+        data = []
+        for a in avails:
+            slots = []
+            for s in a.active_slots:
+                count = confirmed_counts.get(s.id, 0)
+                slots.append({
+                    'id': s.id,
+                    'start': s.start_time.strftime('%H:%M'),
+                    'end': s.end_time.strftime('%H:%M'),
+                    'max_bookings': s.max_bookings,
+                    'confirmed_count': count,
+                    'is_booked': count >= s.max_bookings,
+                })
+            data.append({'id': a.id, 'date': str(a.date), 'time_slots': slots})
+
         return StandardResponse.success(data=data)
-
 
 class CreateBookingView(APIView):
     permission_classes = [IsAuthenticated]
@@ -276,7 +315,6 @@ class CancelBookingView(APIView):
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking cancelled.')
 
-
 class AdminSetAvailabilityView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -294,35 +332,41 @@ class AdminSetAvailabilityView(APIView):
         serializer.is_valid(raise_exception=True)
 
         results = []
-        blocked_dates = []
+        cancelled_dates = []
         affected_bookings = []
         for slot_group in serializer.validated_data['slots']:
             avail, _ = ExpertAvailability.objects.get_or_create(
                 expert=expert, date=slot_group['date'],
             )
+            if not avail.is_custom:
+                avail.is_custom = True
+                avail.save(update_fields=['is_custom'])
             submitted = {(s['start'], s['end']) for s in slot_group['time_slots']}
 
-            # Remove slots the expert has un-chosen, as long as they have no confirmed
-            # bookings. Slots with confirmed bookings are intentionally kept so we never
-            # silently cancel a live booking -- we report those dates back instead.
+            # Slots the expert has un-chosen are removed. If a slot still has a
+            # confirmed booking on it, the booking is auto-cancelled first (so the
+            # FPO isn't left holding a "confirmed" appointment the expert has
+            # already blocked off), then the slot is removed as normal.
             candidates = avail.time_slots.filter(is_deleted=False)
-            date_has_blocked_slot = False
+            date_has_cancelled_booking = False
             for old_slot in candidates:
                 key = (old_slot.start_time.strftime('%H:%M'), old_slot.end_time.strftime('%H:%M'))
                 if key not in submitted:
-                    if old_slot.confirmed_count == 0:
-                        old_slot.soft_delete(user=request.user)
-                    else:
-                        date_has_blocked_slot = True
-                        affected_bookings.extend(
-                            ExpertBooking.objects.filter(
-                                time_slot=old_slot,
-                                status=ExpertBooking.Status.CONFIRMED,
-                                is_deleted=False,
-                            )
+                    if old_slot.confirmed_count > 0:
+                        confirmed_bookings = ExpertBooking.objects.filter(
+                            time_slot=old_slot,
+                            status=ExpertBooking.Status.CONFIRMED,
+                            is_deleted=False,
                         )
-            if date_has_blocked_slot:
-                blocked_dates.append(str(slot_group['date']))
+                        for booking in confirmed_bookings:
+                            booking.status = ExpertBooking.Status.CANCELLED
+                            booking.cancellation_reason = 'Expert marked this date as unavailable.'
+                            booking.save(update_fields=['status', 'cancellation_reason'])
+                            affected_bookings.append(booking)
+                        date_has_cancelled_booking = True
+                    old_slot.soft_delete(user=request.user)
+            if date_has_cancelled_booking:
+                cancelled_dates.append(str(slot_group['date']))
 
             for s in slot_group['time_slots']:
                 ExpertTimeSlot.objects.update_or_create(
@@ -334,40 +378,41 @@ class AdminSetAvailabilityView(APIView):
                     },
                 )
             results.append(avail)
-
-            for booking in affected_bookings:
-                if booking.fpo.primary_user:
-                    notify_context = {
-                        'expert_name': expert.name_en,
-                        'fpo_name': booking.fpo.name,
-                        'date': str(booking.requested_date),
-                        'time': booking.requested_time,
-                    }
-                    try:
-                        send_notification(
-                            user=booking.fpo.primary_user,
-                            code='expert_marked_absent_conflict',
-                            channel='email',
-                            context=notify_context,
-                        )
-                    except Exception:
-                        pass
-                    try:
-                        send_notification(
-                            user=booking.fpo.primary_user,
-                            code='expert_marked_absent_conflict',
-                            channel='in_app',
-                            context=notify_context,
-                        )
-                    except Exception:
-                        pass
+        # Notify FPOs exactly once per call, after all slot_groups are processed.
+        for booking in affected_bookings:
+            if booking.fpo.primary_user:
+                notify_context = {
+                    'expert_name': expert.name_en,
+                    'fpo_name': booking.fpo.name,
+                    'date': str(booking.requested_date),
+                    'time': booking.requested_time,
+                    'reason': booking.cancellation_reason,
+                }
+                try:
+                    send_notification(
+                        user=booking.fpo.primary_user,
+                        code='expert_cancelled_confirmed_booking',
+                        channel='email',
+                        context=notify_context,
+                    )
+                except Exception:
+                    pass
+                try:
+                    send_notification(
+                        user=booking.fpo.primary_user,
+                        code='expert_cancelled_confirmed_booking',
+                        channel='in_app',
+                        context=notify_context,
+                    )
+                except Exception:
+                    pass
 
         message = 'Availability updated.'
-        if blocked_dates:
+        if cancelled_dates:
             message = (
-                'Availability updated. Some slots on '
-                f"{', '.join(blocked_dates)} could not be removed because they already "
-                 'have confirmed bookings. Affected FPOs have been notified.'
+                'Availability updated. Confirmed bookings on '
+                f"{', '.join(cancelled_dates)} were automatically cancelled because the "
+                'expert marked those dates unavailable. Affected FPOs have been notified.'
             )
 
         return StandardResponse.success(
@@ -375,7 +420,26 @@ class AdminSetAvailabilityView(APIView):
             message=message,
         )
 
+class ResetAvailabilityToDefaultView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=['Expert Booking - Admin'], summary='Reset a date back to the weekly default template')
+    def post(self, request, pk, date):
+        try:
+            expert = Expert.objects.get(pk=pk, is_deleted=False)
+        except Expert.DoesNotExist:
+            return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_expert(request.user, expert):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        avail = ExpertAvailability.objects.filter(expert=expert, date=date, is_deleted=False).first()
+        if not avail:
+            return StandardResponse.error('No availability found for that date.', status_code=status.HTTP_404_NOT_FOUND)
+
+        avail.is_custom = False
+        avail.save(update_fields=['is_custom'])
+        return StandardResponse.success(message='This date will now follow the weekly default schedule again.')
 class WeeklyDefaultSlotSerializer(serializers.Serializer):
     weekday = serializers.IntegerField(min_value=0, max_value=6)
     start = serializers.CharField(max_length=10)
@@ -465,6 +529,10 @@ class ExpertWeeklyDefaultsView(APIView):
                 # Python's date.weekday() is Monday=0..Sunday=6; convert to this
                 # project's 0=Sunday..6=Saturday convention.
                 if (avail.date.weekday() + 1) % 7 != weekday:
+                    continue
+                if avail.is_custom:
+                    # Expert manually edited this specific date — leave it alone
+                    # until they explicitly reset it back to the weekly default.
                     continue
                 date_has_blocked_slot = False
                 for old_slot in avail.time_slots.filter(is_deleted=False):

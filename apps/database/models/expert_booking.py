@@ -13,6 +13,12 @@ class ExpertAvailability(BaseModel):
         'database.Expert', on_delete=models.CASCADE, related_name='availability_slots'
     )
     date = models.DateField()
+    is_custom = models.BooleanField(
+        default=False,
+        help_text='True once the expert has manually set/edited this specific date. '
+                   'Custom dates are skipped by the weekly-default cascade.',
+    )
+
 
     class Meta:
         verbose_name = 'Expert Availability'
