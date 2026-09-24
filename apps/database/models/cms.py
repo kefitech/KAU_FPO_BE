@@ -177,16 +177,30 @@ def _team_member_photo_path(instance, filename):
     return f'cms/team/{uuid.uuid4()}{ext}'
 
 
+class TeamSection(models.TextChoices):
+    PATRON                 = 'patron',                 'Patron'
+    PRINCIPAL_INVESTIGATOR = 'principal_investigator', 'Principal Investigator'
+    CO_INVESTIGATOR        = 'co_investigator',        'Co-Investigator'
+    PIC_MEMBER             = 'pic_member',             'Project Implementation Committee Member'
+    TECHNICAL_CONSULTANT   = 'technical_consultant',   'Technical Consultant'
+
+
 class TeamMember(BaseModel):
     name        = models.CharField(max_length=200)
     designation = models.CharField(max_length=300, help_text='Full title — e.g. "Hon. Chief Minister"')
     photo       = models.ImageField(upload_to=_team_member_photo_path, null=True, blank=True)
     order       = models.PositiveSmallIntegerField(default=0)
     is_active   = models.BooleanField(default=True)
-    is_patrons  = models.BooleanField(default=False, help_text='Patrons are shown on the landing page; others on the Our Team page')
+    section     = models.CharField(max_length=40, choices=TeamSection.choices, null=True, blank=True,
+                                   help_text='Patrons are shown on the landing page; other sections on the Our Team page')
+    is_patrons  = models.BooleanField(default=False, help_text='Derived from section — kept for backward compatibility')
 
     class Meta:
         ordering = ['order', 'name']
+
+    def save(self, *args, **kwargs):
+        self.is_patrons = self.section == TeamSection.PATRON
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
