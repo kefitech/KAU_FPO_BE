@@ -25,7 +25,8 @@ from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.cms import SiteBlock, Announcement, FAQ, QuickLink, Partner, NewsSource, TeamMember, GalleryAlbum, GalleryPhoto, DocumentLibrary, Feedback, VisitorCount
+from apps.database.models.cms import SiteBlock, Announcement, FAQ, QuickLink, Partner, YoutubePlaylist, NewsSource, TeamMember, GalleryAlbum, GalleryPhoto, DocumentLibrary, Feedback, VisitorCount
+from apps.core.services.youtube import fetch_playlist_feed, get_youtube_channel_url
 from apps.database.models.fpo import FPO
 from apps.database.models.language import Language
 from apps.database.models.schemes import Expert
@@ -328,6 +329,39 @@ class PublicTeamMembersView(APIView):
             for m in qs
         ]
         cache.set('public:team_members:v2', data, timeout=60 * 60 * 24)
+        return StandardResponse.success(data=data)
+
+
+class PublicYoutubePlaylistsView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Public - CMS'],
+        summary='Get YouTube playlists',
+        description='Returns the YouTube channel link and active playlists with their latest videos '
+                    '(read from the public YouTube feed, max 15 per playlist). Redis-cached (1h). No auth required.',
+    )
+    def get(self, request):
+        lang      = _lang(request)
+        cache_key = f'public:youtube_playlists:{lang}'
+        cached    = cache.get(cache_key)
+        if cached is not None:
+            return StandardResponse.success(data=cached)
+
+        playlists = []
+        for p in YoutubePlaylist.objects.filter(is_active=True, is_deleted=False):
+            feed = fetch_playlist_feed(p.playlist_id)
+            if not feed or not feed['videos']:
+                continue
+            playlists.append({
+                'id':           p.id,
+                'playlist_id':  p.playlist_id,
+                'title':        p.get_title(lang) or feed['title'],
+                'playlist_url': p.playlist_url,
+                'videos':       feed['videos'],
+            })
+        data = {'channel_url': get_youtube_channel_url(), 'playlists': playlists}
+        cache.set(cache_key, data, timeout=60 * 60)
         return StandardResponse.success(data=data)
 
 

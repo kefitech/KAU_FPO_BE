@@ -19,6 +19,7 @@ Pass ?lang=ml to GET endpoints to receive resolved text + available_languages in
 """
 
 import json
+from urllib.parse import urlparse
 
 from django.core.cache import cache
 
@@ -32,10 +33,13 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.cms import (
     SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,
-    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, TeamSection, GalleryAlbum, GalleryPhoto, DocumentLibrary,
+    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, TeamSection, YoutubePlaylist, GalleryAlbum, GalleryPhoto, DocumentLibrary,
     Feedback, FeedbackStatus,
 )
 from apps.database.models.language import Language
+from apps.core.services.youtube import (
+    YOUTUBE_CHANNEL_BLOCK, extract_playlist_id, fetch_playlist_feed, get_youtube_channel_url,
+)
 
 
 def _is_admin(user):
@@ -1906,3 +1910,179 @@ class FeedbackDetailView(APIView):
         obj.status = new_status
         obj.save(update_fields=['status'])
         return StandardResponse.success(data=FeedbackSerializer(obj).data, message='Status updated.')
+
+
+# =============================================================================
+# YOUTUBE PLAYLISTS
+# =============================================================================
+
+_YOUTUBE_CACHE_PATTERN = 'public:youtube_playlists:*'
+
+
+def _clear_youtube_cache():
+    cache.delete_pattern(_YOUTUBE_CACHE_PATTERN)
+
+
+class YoutubePlaylistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = YoutubePlaylist
+        fields = ['id', 'title', 'playlist_id', 'playlist_url', 'order', 'is_active', 'created_at']
+        read_only_fields = ['playlist_id']
+        extra_kwargs = {'is_active': {'default': True}}
+
+    def validate_title(self, value):
+        value = {k: v.strip() for k, v in (value or {}).items() if isinstance(v, str) and v.strip()}
+        if value:
+            _validate_multilingual_field(value, 'title')
+        return value
+
+    def validate_playlist_url(self, value):
+        playlist_id = extract_playlist_id(value)
+        if not playlist_id:
+            raise serializers.ValidationError(
+                'Enter a YouTube playlist link, e.g. https://www.youtube.com/playlist?list=PL...'
+            )
+        self._playlist_id = playlist_id
+        return f'https://www.youtube.com/playlist?list={playlist_id}'
+
+    def validate(self, attrs):
+        playlist_id = getattr(self, '_playlist_id', None)
+        if playlist_id and (self.instance is None or self.instance.playlist_id != playlist_id):
+            feed = fetch_playlist_feed(playlist_id, use_cache=False)
+            if feed is None:
+                raise serializers.ValidationError(
+                    {'playlist_url': 'Playlist not found or is private. Make sure it is public on YouTube.'}
+                )
+            attrs['playlist_id'] = playlist_id
+            title = attrs.get('title', self.instance.title if self.instance else {})
+            if not title and feed['title']:
+                attrs['title'] = {'en': feed['title']}
+        return attrs
+
+
+class YoutubePlaylistListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='List YouTube playlists',
+                   responses={200: YoutubePlaylistSerializer(many=True)})
+    def get(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        qs = YoutubePlaylist.objects.filter(is_deleted=False)
+        return StandardResponse.success(data=YoutubePlaylistSerializer(qs, many=True).data)
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='Add a YouTube playlist',
+        description='JSON: `playlist_url` (playlist link or id), `title` (optional {"en","ml"} — '
+                    'taken from YouTube when empty), `order`, `is_active`.',
+        request=YoutubePlaylistSerializer,
+        responses={201: YoutubePlaylistSerializer},
+    )
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        serializer = YoutubePlaylistSerializer(data=request.data)
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save(created_by=request.user)
+        _clear_youtube_cache()
+        return StandardResponse.created(data=YoutubePlaylistSerializer(obj).data, message='Playlist added.')
+
+
+class YoutubePlaylistDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get(self, pk):
+        return YoutubePlaylist.objects.filter(pk=pk, is_deleted=False).first()
+
+    @extend_schema(tags=['Admin - CMS'], summary='Update a YouTube playlist',
+                   request=YoutubePlaylistSerializer, responses={200: YoutubePlaylistSerializer})
+    def patch(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        serializer = YoutubePlaylistSerializer(obj, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save(updated_by=request.user)
+        _clear_youtube_cache()
+        return StandardResponse.success(data=YoutubePlaylistSerializer(obj).data, message='Updated.')
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete a YouTube playlist')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.soft_delete(user=request.user)
+        _clear_youtube_cache()
+        return StandardResponse.success(message='Deleted.')
+
+
+class YoutubePlaylistActivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Activate a YouTube playlist')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        updated = YoutubePlaylist.objects.filter(pk=pk, is_deleted=False).update(is_active=True)
+        if not updated:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        _clear_youtube_cache()
+        return StandardResponse.success(message='Activated.')
+
+
+class YoutubePlaylistDeactivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Deactivate a YouTube playlist')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        updated = YoutubePlaylist.objects.filter(pk=pk, is_deleted=False).update(is_active=False)
+        if not updated:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        _clear_youtube_cache()
+        return StandardResponse.success(message='Deactivated.')
+
+
+class YoutubeChannelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Get the YouTube channel link')
+    def get(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        return StandardResponse.success(data={'channel_url': get_youtube_channel_url()})
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='Update the YouTube channel link',
+        request=inline_serializer('YoutubeChannelUpdate', {'channel_url': serializers.URLField()}),
+    )
+    def patch(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        field = serializers.URLField(max_length=500)
+        try:
+            url = field.run_validation((request.data.get('channel_url') or '').strip())
+        except serializers.ValidationError as exc:
+            return StandardResponse.error('Validation failed.', errors={'channel_url': exc.detail},
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        host = (urlparse(url).hostname or '').lower()
+        if host not in ('youtube.com', 'www.youtube.com', 'm.youtube.com'):
+            return StandardResponse.error(
+                'Validation failed.',
+                errors={'channel_url': ['Enter a YouTube channel link, e.g. https://www.youtube.com/@KauIndia']},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        SiteBlock.objects.update_or_create(block_key=YOUTUBE_CHANNEL_BLOCK, defaults={'content': {'en': url}})
+        _clear_youtube_cache()
+        return StandardResponse.success(data={'channel_url': url}, message='Channel link updated.')

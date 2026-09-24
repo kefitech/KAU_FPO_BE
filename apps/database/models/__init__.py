@@ -54,6 +54,7 @@ from .cms import (
     FAQCategory,
     QuickLink,
     Partner,
+    YoutubePlaylist,
     NewsSource,
     NewsSourceCategory,
     TeamMember,
