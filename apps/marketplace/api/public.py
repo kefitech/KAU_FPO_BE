@@ -120,6 +120,7 @@ class PublicProductListView(APIView):
                     'name': p.name,
                     'description': p.description,
                     'commodity_code': p.commodity.code,
+                    'commodity_name': p.commodity.get_name(lang),
                     'quantity': p.quantity,
                     'unit': p.unit,
                     'price_per_unit': p.price_per_unit,
@@ -145,6 +146,7 @@ class PublicProductDetailView(APIView):
 
     @extend_schema(tags=['Public Market Hub'], summary='Public product detail')
     def get(self, request, pk):
+        lang = _lang(request)
         try:
             p = Product.objects.select_related('commodity').get(
                 pk=pk, status=Product.Status.ACTIVE, is_public=True, is_deleted=False,
@@ -157,6 +159,7 @@ class PublicProductDetailView(APIView):
             'name': p.name,
             'description': p.description,
             'commodity_code': p.commodity.code,
+            'commodity_name': p.commodity.get_name(lang),
             'quantity': p.quantity,
             'unit': p.unit,
             'price_per_unit': p.price_per_unit,
