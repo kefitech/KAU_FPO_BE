@@ -653,6 +653,14 @@ class MeView(APIView):
 
         role           = _get_user_role(user)
         permissions    = get_user_permissions(user)
+        if role == 'sub_admin':
+            # per-user permissions the super admin ticked (SUB_ADMIN_PERMISSIONS);
+            # role-level ROLE_PERMISSIONS don't cover these, so the FE couldn't hide actions
+            permissions |= set(
+                user.user_permissions
+                .filter(content_type__app_label='accounts', content_type__model='subadmin')
+                .values_list('codename', flat=True)
+            )
         redirect       = _get_redirect(user, role)
         buyer_redirect = _get_buyer_redirect(user)
         profile        = getattr(user, 'profile', None)

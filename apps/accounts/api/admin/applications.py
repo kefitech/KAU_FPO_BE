@@ -19,7 +19,8 @@ Endpoints:
 
 Permissions:
     list / detail / verify-document  → super_admin OR sub_admin with can_view_all_fpos
-    reject / request-info            → super_admin OR sub_admin with can_approve_fpo
+    reject / approve / (de)activate  → super_admin OR sub_admin with can_approve_fpo
+    request-info                     → super_admin OR sub_admin with can_request_info
     set-user-limit / (un)assign      → super_admin only
 
 Row-level security (P2-01):
@@ -332,6 +333,15 @@ def _can_act(user):
     return (
         user.groups.filter(name=UserRole.SUB_ADMIN).exists()
         and user.has_perm('accounts.can_approve_fpo')
+    )
+
+
+def _can_request_info(user):
+    if user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
+        return True
+    return (
+        user.groups.filter(name=UserRole.SUB_ADMIN).exists()
+        and user.has_perm('accounts.can_request_info')
     )
 
 
@@ -694,7 +704,7 @@ class ApplicationRequestInfoView(APIView):
         ],
     )
     def post(self, request, fpo_id):
-        if not _can_act(request.user):
+        if not _can_request_info(request.user):
             return StandardResponse.error(
                 t('common.permission_denied', request.language),
                 status_code=status.HTTP_403_FORBIDDEN,
