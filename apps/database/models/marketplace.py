@@ -15,10 +15,12 @@ import uuid
 from django.db import models
 from apps.core.models.base import BaseModel
 
-#arunima 15 sep
+#arunima 23 sep
 def _product_image_path(instance, filename):
-    ext = os.path.splitext(filename)[1]
-    return f'marketplace/products/{uuid.uuid4()}{ext}'
+    # Each upload gets its own UUID *folder* (guarantees no collisions,
+    # same as before), but the filename itself is preserved so the FPO
+    # sees their own original file name in the UI instead of a raw UUID.
+    return f'marketplace/products/{uuid.uuid4()}/{filename}'
 #====================
 
 class Product(BaseModel):
