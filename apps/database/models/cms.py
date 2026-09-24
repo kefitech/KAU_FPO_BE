@@ -142,6 +142,26 @@ class Partner(BaseModel):
         return self.name
 
 
+class YoutubePlaylist(BaseModel):
+    title        = models.JSONField(default=dict, blank=True,
+                                    help_text='{"en": "...", "ml": "..."} — falls back to the YouTube playlist title')
+    playlist_id  = models.CharField(max_length=64)
+    playlist_url = models.URLField(max_length=500)
+    order        = models.PositiveSmallIntegerField(default=0)
+    is_active    = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def get_title(self, lang='en'):
+        if isinstance(self.title, dict):
+            return self.title.get(lang) or self.title.get('en', '')
+        return ''
+
+    def __str__(self):
+        return self.get_title() or self.playlist_id
+
+
 class NewsSourceCategory(models.TextChoices):
     NEWSPAPER = 'newspaper', 'Newspaper'
     MAGAZINE  = 'magazine',  'Magazine'
