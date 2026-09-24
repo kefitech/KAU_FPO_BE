@@ -310,7 +310,7 @@ class PublicTeamMembersView(APIView):
         description='Returns active team members ordered by display order. Redis-cached (24h). No auth required.',
     )
     def get(self, request):
-        cached = cache.get('public:team_members')
+        cached = cache.get('public:team_members:v2')
         if cached is not None:
             return StandardResponse.success(data=cached)
 
@@ -322,11 +322,12 @@ class PublicTeamMembersView(APIView):
                 'designation': m.designation,
                 'photo_url':   request.build_absolute_uri(m.photo.url) if m.photo else None,
                 'order':       m.order,
+                'section':     m.section,
                 'is_patrons':  m.is_patrons,
             }
             for m in qs
         ]
-        cache.set('public:team_members', data, timeout=60 * 60 * 24)
+        cache.set('public:team_members:v2', data, timeout=60 * 60 * 24)
         return StandardResponse.success(data=data)
 
 

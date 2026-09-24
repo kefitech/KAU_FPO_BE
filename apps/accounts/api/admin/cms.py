@@ -32,7 +32,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.cms import (
     SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,
-    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, GalleryAlbum, GalleryPhoto, DocumentLibrary,
+    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, TeamSection, GalleryAlbum, GalleryPhoto, DocumentLibrary,
     Feedback, FeedbackStatus,
 )
 from apps.database.models.language import Language
@@ -1019,16 +1019,32 @@ class NewsSourceDeactivateView(APIView):
 # TEAM MEMBERS
 # =============================================================================
 
+_TEAM_CACHE_KEY = 'public:team_members:v2'
+
 class TeamMemberSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = TeamMember
-        fields = ['id', 'name', 'designation', 'photo', 'photo_url', 'order', 'is_active', 'is_patrons', 'created_at']
+        fields = ['id', 'name', 'designation', 'photo', 'photo_url', 'order', 'is_active', 'section', 'is_patrons', 'created_at']
+        read_only_fields = ['is_patrons']
         extra_kwargs = {
             'photo':     {'write_only': True, 'required': False},
             'is_active': {'default': True},
         }
+
+    def to_internal_value(self, data):
+        # Multipart sends an empty string for "no section"
+        if hasattr(data, 'get') and data.get('section') == '':
+            data = data.copy()
+            data['section'] = None
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        section = attrs.get('section', getattr(self.instance, 'section', None))
+        if not section:
+            raise serializers.ValidationError({'section': f'Section is required. Choose one of: {", ".join(TeamSection.values)}.'})
+        return attrs
 
     def get_photo_url(self, obj):
         request = self.context.get('request')
@@ -1073,7 +1089,7 @@ class TeamMemberListView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(created_by=request.user)
-        cache.delete('public:team_members')
+        cache.delete(_TEAM_CACHE_KEY)
         return StandardResponse.created(
             data=TeamMemberSerializer(obj, context={'request': request}).data,
             message='Team member created.',
@@ -1102,7 +1118,7 @@ class TeamMemberDetailView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save(updated_by=request.user)
-        cache.delete('public:team_members')
+        cache.delete(_TEAM_CACHE_KEY)
         return StandardResponse.success(
             data=TeamMemberSerializer(obj, context={'request': request}).data,
             message='Updated.',
@@ -1118,7 +1134,7 @@ class TeamMemberDetailView(APIView):
         if obj.photo:
             obj.photo.delete(save=False)
         obj.soft_delete(user=request.user)
-        cache.delete('public:team_members')
+        cache.delete(_TEAM_CACHE_KEY)
         return StandardResponse.success(message='Deleted.')
 
 
@@ -1137,7 +1153,7 @@ class TeamMemberPhotoDeleteView(APIView):
         obj.photo.delete(save=False)
         obj.photo = None
         obj.save(update_fields=['photo'])
-        cache.delete('public:team_members')
+        cache.delete(_TEAM_CACHE_KEY)
         return StandardResponse.success(message='Photo deleted.')
 
 
@@ -1153,7 +1169,7 @@ class TeamMemberActivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = True
         obj.save(update_fields=['is_active'])
-        cache.delete('public:team_members')
+        cache.delete(_TEAM_CACHE_KEY)
         return StandardResponse.success(message='Activated.')
 
 
@@ -1169,7 +1185,7 @@ class TeamMemberDeactivateView(APIView):
             return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
         obj.is_active = False
         obj.save(update_fields=['is_active'])
-        cache.delete('public:team_members')
+        cache.delete(_TEAM_CACHE_KEY)
         return StandardResponse.success(message='Deactivated.')
 
 
