@@ -5400,8 +5400,13 @@ def seed_market_hub_translations(languages):
          'അന്വേഷണം സമർപ്പിക്കുക'),
         ('market_hub.btn_submitting',     'Submitting...',
          'സമർപ്പിക്കുന്നു...'),
+         #arunima 23 sep
         ('market_hub.btn_cancel',         'Cancel',
          'റദ്ദാക്കുക'),
+        ('market_hub.btn_read_more',      'Read more',
+         'കൂടുതൽ വായിക്കുക'),
+        ('market_hub.btn_read_less',      'Read less',
+         'കുറച്ച് കാണിക്കുക'),
     ]
 
     count = 0
@@ -5453,6 +5458,31 @@ def seed_buyer_portal_translations(languages):
          'താൽപ്പര്യമുള്ള ചരക്കുകൾ'),
         ('buyer_dashboard.no_commodities',     'None specified yet.',
          'ഇതുവരെ വ്യക്തമാക്കിയിട്ടില്ല.'),
+        ('buyer_dashboard.organisation_placeholder', 'Your organisation name',
+         'നിങ്ങളുടെ സ്ഥാപനത്തിന്റെ പേര്'),
+        ('buyer_dashboard.location_placeholder',     'Select a district',
+         'ഒരു ജില്ല തിരഞ്ഞെടുക്കുക'),
+        ('buyer_dashboard.commodity_placeholder',    'Select commodities',
+         'ചരക്കുകൾ തിരഞ്ഞെടുക്കുക'),
+        ('buyer_dashboard.complete_profile_title',   'Complete your buyer profile',
+         'നിങ്ങളുടെ ക്രേതാവ് പ്രൊഫൈൽ പൂർത്തിയാക്കുക'),
+        ('buyer_dashboard.complete_profile_subtitle',
+         'Add your location and commodity interests so FPOs can match you with relevant products.',
+         'FPO-കൾക്ക് അനുയോജ്യമായ ഉൽപ്പന്നങ്ങൾ കണ്ടെത്താൻ കഴിയുന്നതിന് നിങ്ങളുടെ സ്ഥലവും താൽപ്പര്യമുള്ള ചരക്കുകളും ചേർക്കുക.'),
+        ('buyer_dashboard.optional',                 'optional',
+         'ഐച്ഛികം'),
+        ('buyer_dashboard.save_profile',             'Save profile',
+         'പ്രൊഫൈൽ സംരക്ഷിക്കുക'),
+        ('buyer_dashboard.saving',                   'Saving...',
+         'സംരക്ഷിക്കുന്നു...'),
+        ('buyer_dashboard.cancel',                   'Cancel',
+         'റദ്ദാക്കുക'),
+        ('buyer_dashboard.edit_btn',                 'Edit',
+         'തിരുത്തുക'),
+        ('buyer_dashboard.profile_saved',            'Profile updated',
+         'പ്രൊഫൈൽ അപ്ഡേറ്റ് ചെയ്തു'),
+        ('buyer_dashboard.profile_save_failed',      'Failed to save profile',
+         'പ്രൊഫൈൽ സംരക്ഷിക്കുന്നതിൽ പരാജയപ്പെട്ടു'),
 
         # ── buyer_products.* ──
         ('buyer_products.page_title',          'Explore Products',
@@ -5733,6 +5763,107 @@ def seed_fpo_products_view_translations(languages):
     return count
 
 
+def seed_buyer_my_profile_translations(languages):
+    """
+    Buyer "My Profile" page (buyer_my_profile.*) — /buyer/profile
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    buyer_my_profile_keys = [
+        ('buyer_my_profile.page_title',    'My Profile',
+         'എന്റെ പ്രൊഫൈൽ'),
+        ('buyer_my_profile.page_subtitle', 'Manage your account profile.',
+         'നിങ്ങളുടെ അക്കൗണ്ട് പ്രൊഫൈൽ നിയന്ത്രിക്കുക.'),
+        ('buyer_my_profile.section_profile', 'Profile',
+         'പ്രൊഫൈൽ'),
+        ('buyer_my_profile.btn_edit',   'Edit',
+         'തിരുത്തുക'),
+        ('buyer_my_profile.btn_cancel', 'Cancel',
+         'റദ്ദാക്കുക'),
+        ('buyer_my_profile.btn_save',   'Save',
+         'സംരക്ഷിക്കുക'),
+        ('buyer_my_profile.btn_saving', 'Saving...',
+         'സംരക്ഷിക്കുന്നു...'),
+        ('buyer_my_profile.label_avatar', 'Avatar',
+         'അവതാർ'),
+        ('buyer_my_profile.label_first_name', 'First Name',
+         'പേരിന്റെ ആദ്യഭാഗം'),
+        ('buyer_my_profile.placeholder_first_name', 'First name',
+         'പേരിന്റെ ആദ്യഭാഗം'),
+        ('buyer_my_profile.label_last_name', 'Last Name',
+         'പേരിന്റെ അവസാനഭാഗം'),
+        ('buyer_my_profile.placeholder_last_name', 'Last name',
+         'പേരിന്റെ അവസാനഭാഗം'),
+        ('buyer_my_profile.label_phone', 'Phone',
+         'ഫോൺ'),
+        ('buyer_my_profile.desc_phone', 'Used for SMS notifications and account recovery.',
+         'SMS അറിയിപ്പുകൾക്കും അക്കൗണ്ട് വീണ്ടെടുക്കലിനും ഉപയോഗിക്കുന്നു.'),
+        ('buyer_my_profile.placeholder_phone', '+91 98765 43210',
+         '+91 98765 43210'),
+        ('buyer_my_profile.pending_verification', 'Pending verification',
+         'സ്ഥിരീകരണം തീർപ്പിലാണ്'),
+        ('buyer_my_profile.label_preferred_language', 'Preferred Language',
+         'ഇഷ്ടപ്പെട്ട ഭാഷ'),
+        ('buyer_my_profile.desc_preferred_language', 'Language used for notifications and emails.',
+         'അറിയിപ്പുകൾക്കും ഇമെയിലുകൾക്കും ഉപയോഗിക്കുന്ന ഭാഷ.'),
+        ('buyer_my_profile.lang_en', 'English',
+         'ഇംഗ്ലീഷ്'),
+        ('buyer_my_profile.lang_ml', 'Malayalam',
+         'മലയാളം'),
+        ('buyer_my_profile.section_account', 'Account',
+         'അക്കൗണ്ട്'),
+        ('buyer_my_profile.label_email', 'Email Address',
+         'ഇ-മെയിൽ വിലാസം'),
+        ('buyer_my_profile.desc_email', 'Your email cannot be changed.',
+         'നിങ്ങളുടെ ഇ-മെയിൽ മാറ്റാൻ കഴിയില്ല.'),
+        ('buyer_my_profile.toast_profile_updated', 'Profile updated successfully.',
+         'പ്രൊഫൈൽ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു.'),
+        ('buyer_my_profile.toast_update_failed', 'Failed to update profile.',
+         'പ്രൊഫൈൽ അപ്ഡേറ്റ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു.'),
+        ('buyer_my_profile.toast_no_changes', 'No changes to save.',
+         'സംരക്ഷിക്കാൻ മാറ്റങ്ങളൊന്നുമില്ല.'),
+        ('buyer_my_profile.otp_verify_title', 'Verify new phone number',
+         'പുതിയ ഫോൺ നമ്പർ സ്ഥിരീകരിക്കുക'),
+        ('buyer_my_profile.otp_verify_desc',
+         "We'll send a one-time password to confirm this number. It won't be saved to your profile until verified.",
+         'ഈ നമ്പർ സ്ഥിരീകരിക്കാൻ ഞങ്ങൾ ഒരു തവണ മാത്രം ഉപയോഗിക്കാവുന്ന പാസ്‌വേഡ് അയയ്ക്കും. സ്ഥിരീകരിക്കുന്നതുവരെ ഇത് നിങ്ങളുടെ പ്രൊഫൈലിൽ സംരക്ഷിക്കില്ല.'),
+        ('buyer_my_profile.otp_sent_prefix', 'OTP sent to',
+         'OTP അയച്ചത്'),
+        ('buyer_my_profile.otp_placeholder', '6-digit OTP',
+         '6 അക്ക OTP'),
+        ('buyer_my_profile.btn_confirm_save', 'Confirm & Save',
+         'സ്ഥിരീകരിച്ച് സംരക്ഷിക്കുക'),
+        ('buyer_my_profile.btn_verifying', 'Verifying...',
+         'സ്ഥിരീകരിക്കുന്നു...'),
+        ('buyer_my_profile.btn_resend', 'Resend OTP',
+         'OTP വീണ്ടും അയയ്ക്കുക'),
+        ('buyer_my_profile.btn_sending', 'Sending...',
+         'അയയ്ക്കുന്നു...'),
+        ('buyer_my_profile.toast_otp_send_failed', 'Failed to send OTP.',
+         'OTP അയയ്ക്കുന്നതിൽ പരാജയപ്പെട്ടു.'),
+        ('buyer_my_profile.err_otp_invalid', 'Invalid or expired OTP.',
+         'തെറ്റായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട OTP.'),
+        ('buyer_my_profile.toast_phone_updated', 'Phone number updated and verified.',
+         'ഫോൺ നമ്പർ അപ്ഡേറ്റ് ചെയ്ത് സ്ഥിരീകരിച്ചു.'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in buyer_my_profile_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Buyer My Profile page (/buyer/profile)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Buyer My Profile page (/buyer/profile)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -5878,6 +6009,11 @@ def seed_translations():
     admin_buyers_count = seed_admin_buyers_translations(languages)
     print(f"✅ Seeded {admin_buyers_count} admin buyers translations")
     total_count += admin_buyers_count
+
+    print("\nSeeding buyer my profile translations...")
+    buyer_my_profile_count = seed_buyer_my_profile_translations(languages)
+    print(f"✅ Seeded {buyer_my_profile_count} buyer my profile translations")
+    total_count += buyer_my_profile_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
