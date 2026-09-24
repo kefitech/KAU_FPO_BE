@@ -24,6 +24,7 @@ from rest_framework.views import APIView
 
 from apps.core.utils.constants import FPOStatus, District, DISTRICTS_BILINGUAL, UserRole
 from apps.core.utils.responses import StandardResponse
+from apps.core.permissions.fpo_scope import scope_fpo_queryset
 from apps.database.models.fpo import FPO, FPODocument, FPOOwnershipClaim, ClaimStatus
 
 
@@ -51,7 +52,8 @@ class AdminDashboardStatsView(APIView):
         if not _can_view(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        fpos = FPO.objects.filter(is_deleted=False)
+        # P2-01: sub-admins get stats for their assigned FPOs only
+        fpos = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), request.user)
 
         # ── Stat Cards ────────────────────────────────────────────────────────
         total        = fpos.count()
@@ -139,10 +141,15 @@ class AdminDashboardStatsView(APIView):
             })
 
         # ── Pending Actions (items needing attention) ─────────────────────────
-        pending_claims    = FPOOwnershipClaim.objects.filter(status=ClaimStatus.PENDING).count()
-        unverified_docs   = FPODocument.objects.filter(
-            is_deleted=False, is_verified=False,
-            fpo__status=FPOStatus.APPROVED,
+        pending_claims    = scope_fpo_queryset(
+            FPOOwnershipClaim.objects.filter(status=ClaimStatus.PENDING), request.user, fpo_field='fpo',
+        ).count()
+        unverified_docs   = scope_fpo_queryset(
+            FPODocument.objects.filter(
+                is_deleted=False, is_verified=False,
+                fpo__status=FPOStatus.APPROVED,
+            ),
+            request.user, fpo_field='fpo',
         ).count()
 
         pending_actions = {

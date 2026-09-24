@@ -28,6 +28,7 @@ from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.validators import validate_password_strength
+from apps.core.permissions.fpo_scope import scope_fpo_queryset
 from apps.database.models.fpo import FPO, FPOUserMembership
 from apps.notifications.services import send_notification
 
@@ -38,26 +39,24 @@ def _is_admin(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
-def _resolve_fpo_user(user_id):
+def _resolve_fpo_user(user_id, requester):
     """
     Returns (django_user, membership_or_None) for either a primary or secondary FPO user.
+    Only FPO users of FPOs within `requester`'s row-level scope (P2-01) are found.
     Raises User.DoesNotExist if not found in either table.
     """
-    try:
-        mem = FPOUserMembership.objects.select_related('user', 'user__profile').get(
-            user_id=user_id, is_deleted=False
-        )
+    mem = scope_fpo_queryset(
+        FPOUserMembership.objects.filter(is_deleted=False), requester, fpo_field='fpo',
+    ).select_related('user', 'user__profile').filter(user_id=user_id).first()
+    if mem:
         return mem.user, mem
-    except FPOUserMembership.DoesNotExist:
-        pass
 
-    try:
-        fpo = FPO.objects.select_related('primary_user', 'primary_user__profile').get(
-            primary_user_id=user_id, is_deleted=False
-        )
+    fpo = scope_fpo_queryset(
+        FPO.objects.filter(is_deleted=False), requester,
+    ).select_related('primary_user', 'primary_user__profile').filter(primary_user_id=user_id).first()
+    if fpo:
         return fpo.primary_user, None
-    except FPO.DoesNotExist:
-        raise User.DoesNotExist
+    raise User.DoesNotExist
 
 
 def _generate_temp_password():
@@ -119,9 +118,9 @@ class FPOUserListView(APIView):
 
         # --- Primary users (from FPO.primary_user) ---
         if not role_filter or role_filter == 'primary':
-            fpo_qs = FPO.objects.select_related(
-                'primary_user', 'primary_user__profile'
-            ).filter(is_deleted=False)
+            fpo_qs = scope_fpo_queryset(
+                FPO.objects.filter(is_deleted=False), request.user,
+            ).select_related('primary_user', 'primary_user__profile')
 
             if fpo_id:
                 fpo_qs = fpo_qs.filter(id=fpo_id)
@@ -153,9 +152,9 @@ class FPOUserListView(APIView):
 
         # --- Secondary users (from FPOUserMembership) ---
         if not role_filter or role_filter == 'secondary':
-            mem_qs = FPOUserMembership.objects.select_related(
-                'user', 'user__profile', 'fpo', 'role'
-            ).filter(is_deleted=False)
+            mem_qs = scope_fpo_queryset(
+                FPOUserMembership.objects.filter(is_deleted=False), request.user, fpo_field='fpo',
+            ).select_related('user', 'user__profile', 'fpo', 'role')
 
             if fpo_id:
                 mem_qs = mem_qs.filter(fpo_id=fpo_id)
@@ -192,10 +191,12 @@ class FPOUserListView(APIView):
 
 class FPOUserDetailView(APIView):
 
-    def _build_data(self, user_id):
-        # Check secondary first
+    def _build_data(self, user_id, requester):
+        # Check secondary first — both lookups limited to requester's FPO scope (P2-01)
         try:
-            mem = FPOUserMembership.objects.select_related(
+            mem = scope_fpo_queryset(
+                FPOUserMembership.objects.all(), requester, fpo_field='fpo',
+            ).select_related(
                 'user', 'user__profile', 'fpo', 'role'
             ).get(user_id=user_id, is_deleted=False)
             u = mem.user
@@ -218,7 +219,7 @@ class FPOUserDetailView(APIView):
 
         # Fall back to primary user
         try:
-            fpo = FPO.objects.select_related(
+            fpo = scope_fpo_queryset(FPO.objects.all(), requester).select_related(
                 'primary_user', 'primary_user__profile'
             ).get(primary_user_id=user_id, is_deleted=False)
             u = fpo.primary_user
@@ -243,7 +244,7 @@ class FPOUserDetailView(APIView):
     def get(self, request, user_id):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-        data = self._build_data(user_id)
+        data = self._build_data(user_id, request.user)
         if not data:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
         return StandardResponse.success(data=data)
@@ -256,7 +257,7 @@ class FPOUserActivateView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            user, membership = _resolve_fpo_user(user_id)
+            user, membership = _resolve_fpo_user(user_id, request.user)
         except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
 
@@ -283,7 +284,7 @@ class FPOUserDeactivateView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            user, membership = _resolve_fpo_user(user_id)
+            user, membership = _resolve_fpo_user(user_id, request.user)
         except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
 
@@ -314,7 +315,7 @@ class FPOUserResetPasswordView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            user, _ = _resolve_fpo_user(user_id)
+            user, _ = _resolve_fpo_user(user_id, request.user)
         except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
 
