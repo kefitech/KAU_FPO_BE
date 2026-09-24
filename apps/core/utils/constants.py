@@ -42,6 +42,12 @@ class District(models.TextChoices):
     KANNUR = "KNR", "Kannur"
     KASARAGOD = "KSD", "Kasaragod"
 
+DISTRICT_ZONE = {
+    "TVM": "South", "KLM": "South", "PTA": "South", "ALP": "South", "KTM": "South",
+    "IDK": "Central", "EKM": "Central", "TSR": "Central", "PKD": "Central",
+    "MLP": "North", "KZD": "North", "WYD": "North", "KNR": "North", "KSD": "North",
+}
+
 
 # District names with Malayalam translations
 DISTRICTS_BILINGUAL = {
@@ -364,3 +370,13 @@ class ResponseCode(models.TextChoices):
     UNAUTHORIZED = "unauthorized", "Unauthorized"
     FORBIDDEN = "forbidden", "Forbidden"
     SERVER_ERROR = "server_error", "Server Error"
+
+
+#cbbo
+CBBO_PERMISSIONS = [
+    ('can_verify_fpo',        'Can verify or reject FPO applications'),
+    ('can_view_assigned_fpos', 'Can view FPOs assigned to their district'),
+    ('can_request_documents', 'Can request additional documents from FPO'),
+    ('can_submit_reports',    'Can submit capacity building reports'),
+    ('can_view_training',     'Can view and manage training records'),
+]

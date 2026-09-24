@@ -73,6 +73,24 @@ TEMPLATE_CODES = [
     # ML model retraining (P2-06)
     ('model_retrain_ready',         'in_app', 'Notify admin inbox when async model retraining finishes successfully', ['version_code', 'accuracy']),
     ('model_retrain_failed',        'in_app', 'Notify admin inbox when async model retraining fails',                 ['version_code', 'reason']),
+    # Expert booking workflow
+    # TEMPLATE_CODES
+    ('expert_marked_absent_conflict', 'email',  'Notify FPO their confirmed appointment conflicts with expert marking that date absent', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_marked_absent_conflict', 'in_app', 'In-app: expert marked absent conflicts with confirmed booking', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_reminder', 'in_app', 'In-app reminder 24h before a confirmed appointment', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_reminder',    'email',  'Remind FPO and expert 24h before a confirmed appointment', ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_requested',   'email',  'Notify expert when an FPO requests a booking',   ['expert_name', 'fpo_name', 'date', 'time']),
+    ('expert_booking_confirmed',   'email',  'Notify FPO when expert confirms a booking',      ['expert_name', 'date', 'time']),
+    ('expert_booking_confirmed',   'in_app', 'In-app: booking confirmed by expert',            ['expert_name', 'date', 'time']),
+    ('expert_booking_rejected',    'email',  'Expert rejected an FPO booking request',         ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rejected',    'in_app', 'In-app: booking rejected by expert',             ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rescheduled', 'email',  'Notify FPO when expert reschedules a booking',   ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_rescheduled', 'in_app', 'In-app: booking rescheduled by expert',          ['expert_name', 'date', 'time', 'reason']),
+    ('expert_booking_cancelled',   'email',  'Notify expert when an FPO cancels a booking',    ['fpo_name', 'date', 'time', 'reason']),
+    ('expert_cancelled_confirmed_booking', 'email',  'Notify FPO when expert cancels a confirmed booking', ['expert_name', 'date', 'time', 'reason']),
+    ('expert_cancelled_confirmed_booking', 'in_app', 'In-app: expert cancelled a confirmed booking',       ['expert_name', 'date', 'time', 'reason']),
+    ('fpo_training_scheduled', 'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
+    ('fpo_training_scheduled', 'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
 ]
 
 
@@ -777,6 +795,127 @@ TEMPLATES = [
         'model_retrain_failed', 'in_app', 'ml',
         'മോഡൽ പരിശീലനം പരാജയപ്പെട്ടു',
         'മോഡൽ പതിപ്പ് {{version_code}} പരിശീലനം പരാജയപ്പെട്ടു. കാരണം: {{reason}}',
+    ),
+
+        # ── Expert Booking Notifications ─────────────────────────────────────────
+    # requested / cancelled: no live DB row existed yet -- drafted to match the
+    # tone of the confirmed/rejected/rescheduled templates below.
+    (
+        'expert_booking_requested', 'email', 'en',
+        'New Booking Request from {{fpo_name}}',
+        '<p>Dear <strong>{{expert_name}}</strong>,</p>'
+        '<p>You have received a new appointment request from <strong>{{fpo_name}}</strong>.</p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
+        '<p>Please log in to confirm or reject this request.</p>',
+    ),
+    (
+        'expert_booking_cancelled', 'email', 'en',
+        'Appointment Cancelled — {{fpo_name}}',
+        '<p><strong>{{fpo_name}}</strong> has cancelled their appointment scheduled for '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>',
+    ),
+
+    # confirmed / rejected / rescheduled: captured exactly from the live
+    # database via shell, so the seed script becomes the source of truth and
+    # re-seeding won't silently overwrite these with different wording.
+    (
+        'expert_booking_confirmed', 'email', 'en',
+        'Your appointment with {{expert_name}} is confirmed',
+        '<p>Good news! <strong>{{expert_name}}</strong> has confirmed your appointment request.</p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>',
+    ),
+    (
+        'expert_booking_confirmed', 'in_app', 'en',
+        'Appointment confirmed',
+        '{{expert_name}} confirmed your appointment on {{date}} at {{time}}.',
+    ),
+    (
+        'expert_booking_rejected', 'email', 'en',
+        'Your appointment request with {{expert_name}} was declined',
+        '<p><strong>{{expert_name}}</strong> was unable to accept your appointment request for {{date}} at {{time}}.</p><p>Reason: {{reason}}</p>',
+    ),
+    (
+        'expert_booking_rejected', 'in_app', 'en',
+        'Appointment declined',
+        '{{expert_name}} declined your appointment request for {{date}} at {{time}}. Reason: {{reason}}',
+    ),
+    (
+        'expert_booking_rescheduled', 'email', 'en',
+        '{{expert_name}} proposed a new time for your appointment',
+        '<p><strong>{{expert_name}}</strong> proposed rescheduling your appointment to <strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p><p>Please log in to confirm.</p>',
+    ),
+    (
+        'expert_booking_rescheduled', 'in_app', 'en',
+        'Appointment rescheduled',
+        '{{expert_name}} proposed {{date}} at {{time}} instead. Reason: {{reason}}',
+    ),
+        (
+        'expert_cancelled_confirmed_booking', 'email', 'en',
+        'Your Confirmed Appointment Was Cancelled',
+        '<p>Dear FPO,</p>'
+        '<p><strong>{{expert_name}}</strong> has cancelled your confirmed appointment scheduled for '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>'
+        '<p>You may submit a new booking request for a different date or time.</p>',
+    ),
+    (
+        'expert_cancelled_confirmed_booking', 'in_app', 'en',
+        'Appointment Cancelled',
+        '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
+    ),
+        (
+        'expert_booking_reminder', 'email', 'en',
+        'Reminder: Your appointment is coming up',
+        '<p>This is a reminder that your appointment with <strong>{{expert_name}}</strong> is coming up.</p>'
+        '<p>FPO: <strong>{{fpo_name}}</strong></p>'
+        '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
+        '<p>Please make sure you are available at the scheduled time.</p>',
+    ),
+        (
+        'expert_booking_reminder', 'in_app', 'en',
+        'Upcoming Appointment Reminder',
+        'Reminder: your appointment with {{expert_name}} / {{fpo_name}} is on {{date}} at {{time}}.',
+    ),
+   
+(
+    'expert_marked_absent_conflict', 'email', 'en',
+    'Your Expert Marked This Date as Unavailable',
+    '<p>Dear FPO,</p>'
+    '<p><strong>{{expert_name}}</strong> has marked <strong>{{date}}</strong> as unavailable, '
+    'which conflicts with your confirmed appointment at <strong>{{time}}</strong>.</p>'
+    '<p>Please contact the expert or check your booking status, as this appointment may need to be rescheduled.</p>',
+),
+(
+    'expert_marked_absent_conflict', 'in_app', 'en',
+    'Possible Scheduling Conflict',
+    '{{expert_name}} marked {{date}} as unavailable, which conflicts with your confirmed appointment at {{time}}.',
+),
+
+
+    (
+        'fpo_training_scheduled', 'email', 'en',
+        'A Training Session Has Been Scheduled — {{topic}}',
+        '<p>Dear FPO,</p>'
+        '<p>A training session has been scheduled for <strong>{{fpo_name}}</strong>.</p>'
+        '<table style="margin:12px 0;border-collapse:collapse;">'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Topic</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{topic}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Trainer</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{trainer_name}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Date</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{date}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Time</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Venue</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
+        '</table>',
+    ),
+    (
+        'fpo_training_scheduled', 'in_app', 'en',
+        'Training Session Scheduled',
+        'A training on "{{topic}}" has been scheduled for {{date}} at {{time}}, venue: {{venue}}, conducted by {{trainer_name}}.',
     ),
 ]
 

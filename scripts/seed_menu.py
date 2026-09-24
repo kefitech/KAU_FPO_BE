@@ -324,6 +324,124 @@ def seed_menu():
         roles     = fpo_roles_with_secondary,
         order     = 12,
     )
+    seed_item(
+        label_key = 'menu.fpo_trainings',
+        path      = '/fpo/trainings',
+        icon      = 'graduation-cap',
+        roles     = fpo_roles,
+        order     = 10,
+    )
+
+    # ── CBBO portal pages ─────────────────────────────────────────────────────
+
+    cbbo_group, _ = Group.objects.get_or_create(name='cbbo')
+
+    # Fix: earlier record pointed at the nonexistent /cbbo/settings path
+    MenuItem.objects.filter(label_key='menu.cbbo_settings').update(label_key='menu.cbbo_profile', path='/cbbo/profile')
+
+    seed_item(
+        label_key = 'Dashboard',
+        path      = '/cbbo/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [cbbo_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'Verifications',
+        path      = '/cbbo/verifications',
+        icon      = 'check-circle',
+        roles     = [cbbo_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'Reports',
+        path      = '/cbbo/reports',
+        icon      = 'clipboard-list',
+        roles     = [cbbo_group],
+        order     = 3,
+    )
+    seed_item(
+        label_key = 'Profile',
+        path      = '/cbbo/profile',
+        icon      = 'user',
+        roles     = [cbbo_group],
+        order     = 4,
+    )
+
+    # ── Government portal pages ───────────────────────────────────────────────
+
+    government_group, _ = Group.objects.get_or_create(name='government')
+
+    seed_item(
+        label_key = 'Dashboard',
+        path      = '/government/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [government_group],
+        order     = 1,
+    )
+    seed_item(
+        label_key = 'Profile',
+        path      = '/government/profile',
+        icon      = 'user',
+        roles     = [government_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'Schemes',
+        path      = '/government/schemes',
+        icon      = 'file-text',
+        roles     = [government_group],
+        order     = 4,
+    )
+    seed_item(
+        label_key = 'Training',
+        path      = '/government/training',
+        icon      = 'graduation-cap',
+        roles     = [government_group],
+        order     = 5,
+    )
+    seed_item(
+            label_key = 'FPOs',
+            path      = '/government/fpos',
+            icon      = 'building',
+            roles     = [government_group],
+            order     = 3,
+        )
+
+    # ── Expert portal pages ───────────────────────────────────────────────────
+
+    expert_group, _ = Group.objects.get_or_create(name='expert')
+
+    seed_item(
+        label_key = 'Dashboard',
+        path      = '/expert/dashboard',
+        icon      = 'layout-dashboard',
+        roles     = [expert_group],
+        order     = 2,
+    )
+    seed_item(
+        label_key = 'Availability',
+        path      = '/expert/availability',
+        icon      = 'calendar-days',
+        roles     = [expert_group],
+        order     = 3,
+    )
+    seed_item(
+        label_key = 'Profile',
+        path      = '/expert/profile',
+        icon      = 'user',
+        roles     = [expert_group],
+        order     = 4,
+    )
+    seed_item(
+        label_key = 'Booking Overview',
+        path      = '/expert/stats',
+        icon      = 'bar-chart-3',
+        roles     = [expert_group],
+        order     = 1,
+    )
+    
+ 
 
     # ── Government portal pages ───────────────────────────────────────────────
 

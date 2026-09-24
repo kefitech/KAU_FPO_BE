@@ -13,10 +13,6 @@ class ExpertAvailability(BaseModel):
         'database.Expert', on_delete=models.CASCADE, related_name='availability_slots'
     )
     date = models.DateField()
-    time_slots = models.JSONField(
-        default=list,
-        help_text='[{"start":"09:00","end":"10:00","is_booked":false}]'
-    )
 
     class Meta:
         verbose_name = 'Expert Availability'
@@ -24,7 +20,36 @@ class ExpertAvailability(BaseModel):
         unique_together = ('expert', 'date')
 
     def __str__(self):
-        return f"{self.expert} — {self.date}"
+        return f"{self.expert} \u2014 {self.date}"
+
+
+class ExpertTimeSlot(BaseModel):
+    availability = models.ForeignKey(
+        ExpertAvailability, on_delete=models.CASCADE, related_name='time_slots'
+    )
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    max_bookings = models.PositiveIntegerField(
+        default=1, help_text='How many FPOs can book this same slot'
+    )
+
+    class Meta:
+        verbose_name = 'Expert Time Slot'
+        verbose_name_plural = 'Expert Time Slots'
+        ordering = ['start_time']
+        unique_together = ('availability', 'start_time', 'end_time')
+
+    @property
+    def confirmed_count(self):
+        return self.bookings.filter(status='confirmed', is_deleted=False).count()
+
+    @property
+    def is_full(self):
+        return self.confirmed_count >= self.max_bookings
+
+    def __str__(self):
+        status = ' (full)' if self.is_full else ''
+        return f"{self.availability} {self.start_time}-{self.end_time}{status}"
 
 
 class ExpertBooking(BaseModel):
@@ -41,6 +66,10 @@ class ExpertBooking(BaseModel):
     )
     fpo = models.ForeignKey(
         'database.FPO', on_delete=models.CASCADE, related_name='expert_bookings'
+    )
+    time_slot = models.ForeignKey(
+        ExpertTimeSlot, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='bookings'
     )
     requested_date = models.DateField()
     requested_time = models.CharField(max_length=10, help_text='e.g. 09:00')
@@ -64,4 +93,23 @@ class ExpertBooking(BaseModel):
         ordering = ['-requested_date']
 
     def __str__(self):
-        return f"{self.fpo} → {self.expert} on {self.requested_date} ({self.status})"
+        return f"{self.fpo} \u2192 {self.expert} on {self.requested_date} ({self.status})"
+
+
+class ExpertWeeklyDefault(BaseModel):
+    expert = models.ForeignKey(
+        'database.Expert', on_delete=models.CASCADE, related_name='weekly_defaults'
+    )
+    weekday = models.PositiveSmallIntegerField(help_text='0=Sunday .. 6=Saturday')
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    max_bookings = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        verbose_name = 'Expert Weekly Default'
+        verbose_name_plural = 'Expert Weekly Defaults'
+        ordering = ['weekday', 'start_time']
+        unique_together = ('expert', 'weekday', 'start_time', 'end_time')
+
+    def __str__(self):
+        return f"{self.expert} - weekday {self.weekday} {self.start_time}-{self.end_time}"

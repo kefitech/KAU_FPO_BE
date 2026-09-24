@@ -49,6 +49,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
 from django.shortcuts import redirect
+from apps.core.api.navigation import PortalNavigationView
 
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -107,6 +108,7 @@ urlpatterns = [
     # Public endpoints (no auth required)
     path('api/translations/', include('apps.core.urls', namespace='core')),
     path('api/public/',       include('apps.core.public_urls')),
+    path('api/v1/navigation/<str:portal>/', PortalNavigationView.as_view(), name='portal-navigation'),
 
     # API v1 endpoints
     path('api/auth/', include('apps.accounts.urls', namespace='accounts')),
