@@ -414,7 +414,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <tr class="total">
         <td class="label">Total</td>
         <td></td>
-        <td>{{ r.cost.total|money }}</td>
+        <td>{{ r.depreciation.total_initial_cost|money }}</td>
         {% for y in years %}<td>{{ r.depreciation|year_total:y|money }}</td>{% endfor %}
         <td></td>
       </tr>

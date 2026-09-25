@@ -179,6 +179,7 @@ class DepreciationSchedule:
     projection_years: int
     classes: list[AssetClass]
     total_depreciation_by_year: dict[int, Decimal]   # {year: sum across classes}
+    total_initial_cost: Decimal                       # sum of class.initial_cost — excludes WC margin (not a fixed asset)
 
 
 @dataclass
@@ -963,6 +964,9 @@ def build_depreciation_schedule(
         projection_years=projection_years,
         classes=classes,
         total_depreciation_by_year=year_totals,
+        # Excludes WC margin — mirrors the per-class rows so the Total row
+        # in the depreciation schedule table reconciles with the sum above.
+        total_initial_cost=sum((c.initial_cost for c in classes), Decimal('0')),
     )
 
 
