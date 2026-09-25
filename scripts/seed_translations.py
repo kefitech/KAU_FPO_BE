@@ -2877,6 +2877,9 @@ def seed_frontend_ui_translations(languages):
             'status_rejected':               'Rejected',
             'status_cancelled':              'Cancelled',
             'status_completed':              'Completed',
+            'btn_previous':                  'Previous',
+            'btn_next':                      'Next',
+            'pagination_summary':            'Page {page} of {total_pages} · {count} FPOs',
         },
         'expert_availability': {
             'page_title':                    'Set Availability',
@@ -3678,6 +3681,10 @@ def seed_fpo_portal_ml_translations(languages):
         'expert_dashboard.status_rejected':               'നിരസിച്ചു',
         'expert_dashboard.status_cancelled':              'റദ്ദാക്കി',
         'expert_dashboard.status_completed':              'പൂർത്തിയായി',
+        'expert_dashboard.btn_previous':                  'മുമ്പത്തേത്',
+        'expert_dashboard.btn_next':                      'അടുത്തത്',
+        'expert_dashboard.pagination_summary':            'പേജ് {page} / {total_pages} · {count} FPO-കൾ',
+
         # ── expert_availability ─────────────────────────────────────────────
         'expert_availability.page_title':                    'ലഭ്യത സജ്ജീകരിക്കുക',
         'expert_availability.page_description_1':            'ഒരു തീയതി ശ്രേണി തിരഞ്ഞെടുക്കുക, ആഴ്ചയിലെ ഏതൊക്കെ ദിവസങ്ങൾ ഉൾപ്പെടുത്തണമെന്ന് തിരഞ്ഞെടുക്കുക, നിങ്ങളുടെ സമയ സ്ലോട്ടുകൾ സജ്ജീകരിക്കുക - ശ്രേണിയിലെ എല്ലാ തീയതികളും ഒരുമിച്ച് സേവ് ചെയ്യപ്പെടും.',
