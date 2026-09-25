@@ -25,6 +25,7 @@ from typing import Any
 from django.conf import settings
 from django.http import FileResponse, HttpResponse
 from drf_spectacular.utils import extend_schema
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -33,6 +34,7 @@ from apps.database.models import DPRDocument
 from apps.fpo.services.dpr.calculation import compute
 from apps.fpo.services.dpr.financials_excel import render_financials_workbook
 from apps.fpo.services.dpr.pdf import (
+    DPRValidationError,
     build_pdf_filename,
     render_pdf_for_project,
     save_pdf_to_document,
@@ -191,7 +193,17 @@ class DPRDocumentGenerateView(APIView):
         project, err = get_project_or_error(request.user, project_uuid)
         if err:
             return err
-        doc = save_pdf_to_document(project)
+        try:
+            doc = save_pdf_to_document(project)
+        except DPRValidationError as exc:
+            # Pre-final gate rejected the render — surface the per-chapter
+            # errors as a structured 400 so the FE can show which chapters
+            # need regeneration / which sections need fixing.
+            return StandardResponse.error(
+                'This DPR cannot be finalised yet. Fix the flagged chapters and try again.',
+                errors={'chapters': exc.errors},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         # Flip project status to GENERATED so admin dashboards and the FE
         # list can distinguish "PDF already produced" from "still filling
         # sections". Doesn't demote a re-generation on an already-generated
