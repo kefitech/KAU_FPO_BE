@@ -22,6 +22,9 @@ import secrets
 from django.contrib.auth.models import User, Group
 from django.conf import settings as django_settings
 from apps.notifications.services import send_notification
+from apps.database.models.expert_booking import ExpertBooking
+from apps.experts.api.booking_views import ExpertBookingSerializer
+
 
 
 def _is_admin(user):
@@ -289,3 +292,17 @@ class ExpertEnquiriesView(APIView):
         page = paginator.paginate_queryset(qs, request)
         serializer = EnquiryAdminSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+class ExpertBookingsView(ExpertEnquiriesView):
+    """GET /api/admin/experts/{id}/bookings/ — all bookings for an expert (admin)."""
+
+    @extend_schema(tags=['Admin - Experts'], summary='List bookings for an expert')
+    def get(self, request, pk):
+        qs = (
+            ExpertBooking.objects
+            .filter(expert_id=pk)
+            .select_related('fpo')
+            .order_by('-created_at')
+        )
+        serializer = ExpertBookingSerializer(qs, many=True, context={'request': request})
+        return StandardResponse.success(data=serializer.data)

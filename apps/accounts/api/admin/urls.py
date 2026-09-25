@@ -110,6 +110,7 @@ from .schemes import (
     SchemeDeactivateView,
 )
 from .experts import (
+    ExpertBookingsView,
     ExpertListView,
     ExpertDetailView,
     ExpertActivateView,
@@ -249,5 +250,6 @@ urlpatterns = [
     path('experts/<int:pk>/activate/',     ExpertActivateView.as_view(),    name='admin-experts-activate'),
     path('experts/<int:pk>/deactivate/',   ExpertDeactivateView.as_view(),  name='admin-experts-deactivate'),
     path('experts/<int:pk>/enquiries/',    ExpertEnquiriesView.as_view(),   name='admin-experts-enquiries'),
+    path('experts/<int:pk>/bookings/',     ExpertBookingsView.as_view(), name='admin-experts-bookings'),
 ]
 
