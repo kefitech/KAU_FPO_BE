@@ -3057,7 +3057,7 @@ def seed_frontend_ui_translations(languages):
             'weekday_sat':                   'Sat',
         },
         'expert_stats': {
-            'page_title':                    'Booking Overview',
+            'page_title':                    'Expert Dashboard',
             'page_description':              'Track your booking requests across every status',
             'loading':                       'Loading dashboard...',
             'error_load':                    "Couldn't load dashboard data. Please refresh or try again shortly.",
@@ -3643,6 +3643,7 @@ def seed_fpo_portal_ml_translations(languages):
         'cbbos_table.org_created':                   'സ്ഥാപനം സൃഷ്ടിച്ചു',
         'cbbos_table.org_create_failed':             'സ്ഥാപനം സൃഷ്ടിക്കുന്നതിൽ പരാജയപ്പെട്ടു',
         # ── expert_dashboard ──────────────────────────────────────────────
+        'expert_stats.page_title': 'വിദഗ്ധ ഡാഷ്ബോർഡ്',
         'expert_dashboard.page_title':                    'എന്റെ ബുക്കിംഗുകൾ',
         'expert_dashboard.page_description':              'നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് അഭ്യർത്ഥനകൾ നിയന്ത്രിക്കുക',
         'expert_dashboard.empty_no_bookings':             'ഇതുവരെ ബുക്കിംഗുകൾ ഇല്ല.',
@@ -3972,7 +3973,7 @@ def seed_menu_translations(languages):
         ('master_data',            'Master Data',              'മാസ്റ്റർ ഡാറ്റ'),
         # Jobin follow-up (KAU 2026-09-21)
         ('expert_stats',           'Booking Overview',         'ബുക്കിംഗ് അവലോകനം'),
-        ('fpo_trainings',          'Trainings',                'പരിശീലനങ്ങൾ'),
+        ('fpo_trainings',          'Training Sessions',        'പരിശീലന സെഷനുകൾ'),
     ]
 
     count = 0
