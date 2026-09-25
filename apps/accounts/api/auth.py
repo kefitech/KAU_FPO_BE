@@ -974,6 +974,13 @@ class ResetPasswordView(APIView):
         user.save(update_fields=['password'])
         delete_cache(token_key)
 
+        # The user just chose their own password, so any pending temp-password
+        # change is satisfied — otherwise login would keep forcing another change.
+        profile = getattr(user, 'profile', None)
+        if profile and profile.must_change_password:
+            profile.must_change_password = False
+            profile.save(update_fields=['must_change_password'])
+
         AuditLog.log(user=user, action=AuditLog.Action.PASSWORD_CHANGE, request=request)
 
         from apps.notifications.services import send_notification
