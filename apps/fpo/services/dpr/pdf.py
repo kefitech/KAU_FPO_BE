@@ -499,12 +499,15 @@ def save_pdf_to_document(project, status: Optional[str] = None):
     file_url = f'{settings.MEDIA_URL}dpr/{project.uuid}/{filename}'
 
     # 3. Create the tracking row.
+    # Default is FINAL — this function is the versioned Generate flow that
+    # produces banker-ready PDFs (matches the mode='final' render above).
+    # Callers can still pass an explicit status (e.g. USER_EDITED) if needed.
     doc = DPRDocument.objects.create(
         project=project,
         version_number=version_number,
         file_url=file_url,
         file_size=file_size,
-        status=status or DPRDocument.Status.DRAFT,
+        status=status or DPRDocument.Status.FINAL,
     )
 
     # 4. Retention — soft-archive oldest excess un-archived documents.
