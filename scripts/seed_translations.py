@@ -3955,6 +3955,11 @@ def seed_fpo_product_catalog_translations(languages):
          'ഈ FPO-ക്ക് ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
         ('fpo_product_catalog.label_available', 'Available',
          'ലഭ്യത'),
+        #arunima sep 25
+        ('fpo_product_catalog.read_more', 'Read more', 'കൂടുതൽ വായിക്കുക'),
+        ('fpo_product_catalog.no_image', 'No image', 'ചിത്രം ലഭ്യമല്ല'),
+        ('fpo_product_catalog.quality_label', 'Quality Certification', 'ഗുണനിലവാര സർട്ടിഫിക്കേഷൻ'),
+        ('fpo_product_catalog.description_label', 'Description', 'വിവരണം'),
     ]
 
     count = 0
@@ -4530,6 +4535,7 @@ def seed_buyer_portal_translations(languages):
          'മായ്ക്കുക'),
         ('buyer_products.commodities_selected',    '{count} commodities selected',
          '{count} ചരക്കുകൾ തിരഞ്ഞെടുത്തു'),
+        ('buyer_products.no_image', 'No image', 'ചിത്രം ലഭ്യമല്ല'),
     ]
 
     count = 0
