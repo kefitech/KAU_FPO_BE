@@ -24,6 +24,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import serializers, status
 from rest_framework.views import APIView
 from apps.core.services.audit import AuditService as AuditLogService
+from apps.core.services.translation import t
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -315,9 +316,15 @@ class FPOUserResetPasswordView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         try:
-            user, _ = _resolve_fpo_user(user_id, request.user)
+            user, membership = _resolve_fpo_user(user_id, request.user)
         except User.DoesNotExist:
             return StandardResponse.error('User not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not user.is_active or (membership and not membership.is_active):
+            return StandardResponse.error(
+                t('admin.reset_password_inactive_user', getattr(request, 'language', 'en')),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         temp_password = _generate_temp_password()
         user.set_password(temp_password)
