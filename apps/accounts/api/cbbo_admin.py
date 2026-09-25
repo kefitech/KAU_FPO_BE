@@ -403,7 +403,15 @@ class CBBOViewSet(TranslatedViewSet):
         user = self.get_object()
 
         if request.method == 'POST':
-            if not user.is_active:
+            # Self-registered CBBOs stay inactive until approved, so is_active alone
+            # can't distinguish a pending registration from a deactivated account.
+            registration_status = getattr(getattr(user, 'cbbo_profile', None), 'registration_status', None)
+            if registration_status == 'rejected':
+                return StandardResponse.error(
+                    message='Cannot assign districts for a rejected registration.',
+                    status_code=400,
+                )
+            if not user.is_active and registration_status != 'pending':
                 return StandardResponse.error(
                     message='Cannot assign districts to a deactivated CBBO.',
                     status_code=400,
