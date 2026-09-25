@@ -5230,6 +5230,172 @@ def seed_buyer_my_profile_translations(languages):
 
 
 
+def seed_gis_translations(languages):
+    """
+    Seed GIS module messages (P2-05) — zones, districts, cultivation
+    area, weather. Malayalam values are best-effort (not from a native
+    speaker) — marked is_verified=False so they're flagged for review,
+    same as everything else in this GIS module that's a placeholder
+    pending real review/data.
+    """
+    category, _ = TranslationCategory.objects.get_or_create(
+        code='gis',
+        defaults={
+            'name': 'GIS Integration',
+            'description': 'Agro-climatic zones, districts, cultivation area, weather messages',
+            'display_order': 9,
+        }
+    )
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    gis_messages = [
+        ('zones_retrieved',            'Zones retrieved successfully',                       'മേഖലകൾ ലഭ്യമാക്കി'),
+        ('districts_retrieved',        'Districts retrieved successfully',                   'ജില്ലകൾ ലഭ്യമാക്കി'),
+        ('zone_detected',              'Zone detected successfully',                         'മേഖല കണ്ടെത്തി'),
+        ('zone_not_found',             'No zone found for the given location',               'ഈ സ്ഥലത്തിന് മേഖല കണ്ടെത്തിയില്ല'),
+        ('fpo_not_found',              'No FPO found for this user',                         'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
+        ('location_not_set',           'Location has not been set yet',                      'സ്ഥലം ഇതുവരെ സജ്ജമാക്കിയിട്ടില്ല'),
+        ('lat_lng_required',           'Latitude and longitude are required',                'അക്ഷാംശവും രേഖാംശവും ആവശ്യമാണ്'),
+        ('invalid_coordinates',        'Invalid coordinates provided',                       'അസാധുവായ കോർഡിനേറ്റുകൾ'),
+        ('cultivation_area_retrieved', 'Cultivation area retrieved successfully',            'കൃഷിഭൂമി വിവരങ്ങൾ ലഭ്യമാക്കി'),
+        ('cultivation_area_saved',     'Cultivation area saved successfully',                'കൃഷിഭൂമി വിജയകരമായി സംരക്ഷിച്ചു'),
+        ('cultivation_area_deleted',   'Cultivation area deleted successfully',              'കൃഷിഭൂമി വിജയകരമായി ഇല്ലാതാക്കി'),
+        ('cultivation_area_not_found', 'No cultivation area found',                          'കൃഷിഭൂമി കണ്ടെത്തിയില്ല'),
+        ('weather_retrieved',          'Weather data retrieved successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ ലഭ്യമാക്കി'),
+        ('weather_refreshed',          'Weather data refreshed successfully',                'കാലാവസ്ഥാ വിവരങ്ങൾ പുതുക്കി'),
+        ('weather_not_found',          'No weather data found. Please refresh to fetch it.', 'കാലാവസ്ഥാ വിവരങ്ങൾ കണ്ടെത്തിയില്ല. ദയവായി പുതുക്കുക.'),
+
+        # Zone boundary upload/versioning (added with the admin GIS zones
+        # upload feature; were never seeded here, so t() fell back to
+        # returning the raw key itself — e.g. a toast literally reading
+        # "gis.zone_file_too_large" instead of a real message).
+        ('zone_file_required',                   'Please choose a GeoJSON file to upload.',                          'അപ്‌ലോഡ് ചെയ്യാൻ ഒരു GeoJSON ഫയൽ തിരഞ്ഞെടുക്കുക.'),
+        ('zone_file_too_large',                  'File is too large. Maximum allowed size is 5MB.',                  'ഫയൽ വളരെ വലുതാണ്. പരമാവധി അനുവദനീയമായ വലിപ്പം 5MB ആണ്.'),
+        ('zone_file_invalid_json',               'File is not valid JSON.',                                          'ഫയൽ സാധുവായ JSON അല്ല.'),
+        ('zone_upload_failed',                   'Zone boundary validation failed. See details below.',             'സോൺ അതിർത്തി പരിശോധന പരാജയപ്പെട്ടു. താഴെയുള്ള വിശദാംശങ്ങൾ കാണുക.'),
+        ('zone_version_uploaded',                'Zone boundary version uploaded — not yet live.',                   'സോൺ അതിർത്തി പതിപ്പ് അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
+        ('zone_version_retrieved',               'Zone boundary version retrieved successfully',                    'സോൺ അതിർത്തി പതിപ്പ് ലഭ്യമാക്കി'),
+        ('zone_version_deleted',                 'Zone boundary version deleted successfully',                       'സോൺ അതിർത്തി പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('zone_version_cannot_delete_active',    'Cannot delete the currently active zone boundary version.',       'നിലവിൽ സജീവമായ സോൺ അതിർത്തി പതിപ്പ് ഇല്ലാതാക്കാൻ കഴിയില്ല.'),
+        ('zone_version_activated',               'Zone boundary version activated — now live.',                     'സോൺ അതിർത്തി പതിപ്പ് സജീവമാക്കി — ഇപ്പോൾ ലൈവ് ആണ്.'),
+        ('zone_version_not_found',               'Zone boundary version not found',                                  'സോൺ അതിർത്തി പതിപ്പ് കണ്ടെത്തിയില്ല'),
+
+        # Soil region upload/versioning — same pattern as zones above.
+        ('soil_region_file_required',                'Please choose a GeoJSON file to upload.',                          'അപ്‌ലോഡ് ചെയ്യാൻ ഒരു GeoJSON ഫയൽ തിരഞ്ഞെടുക്കുക.'),
+        ('soil_region_file_too_large',               'File is too large. Maximum allowed size is 5MB.',                  'ഫയൽ വളരെ വലുതാണ്. പരമാവധി അനുവദനീയമായ വലിപ്പം 5MB ആണ്.'),
+        ('soil_region_file_invalid_json',            'File is not valid JSON.',                                          'ഫയൽ സാധുവായ JSON അല്ല.'),
+        ('soil_region_upload_failed',                'Soil region validation failed. See details below.',               'മണ്ണ് മേഖല പരിശോധന പരാജയപ്പെട്ടു. താഴെയുള്ള വിശദാംശങ്ങൾ കാണുക.'),
+        ('soil_region_version_uploaded',             'Soil region version uploaded — not yet live.',                     'മണ്ണ് മേഖല പതിപ്പ് അപ്‌ലോഡ് ചെയ്തു — ഇതുവരെ ലൈവ് അല്ല.'),
+        ('soil_region_version_retrieved',            'Soil region version retrieved successfully',                      'മണ്ണ് മേഖല പതിപ്പ് ലഭ്യമാക്കി'),
+        ('soil_region_version_deleted',              'Soil region version deleted successfully',                         'മണ്ണ് മേഖല പതിപ്പ് ഇല്ലാതാക്കി'),
+        ('soil_region_version_cannot_delete_active', 'Cannot delete the currently active soil region version.',        'നിലവിൽ സജീവമായ മണ്ണ് മേഖല പതിപ്പ് ഇല്ലാതാക്കാൻ കഴിയില്ല.'),
+        ('soil_region_version_activated',            'Soil region version activated — now live.',                       'മണ്ണ് മേഖല പതിപ്പ് സജീവമാക്കി — ഇപ്പോൾ ലൈവ് ആണ്.'),
+        ('soil_region_version_not_found',            'Soil region version not found',                                    'മണ്ണ് മേഖല പതിപ്പ് കണ്ടെത്തിയില്ല'),
+    ]
+
+    count = 0
+    for key, en_text, ml_text in gis_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_text, 'context': 'GIS module (P2-05)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_text, 'context': 'GIS module (P2-05) — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
+
+
+def seed_recommendations_translations(languages):
+    """
+    Seed AI Crop Recommendations messages (P2-06). Malayalam values
+    are best-effort (not from a native speaker) — marked
+    is_verified=False so they're flagged for review.
+    """
+    category, _ = TranslationCategory.objects.get_or_create(
+        code='recommendations',
+        defaults={
+            'name': 'AI Crop Recommendations',
+            'description': 'Crop recommendation requests, feedback, and admin ML model management messages',
+            'display_order': 10,
+        }
+    )
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    recommendation_messages = [
+        ('retrieved',               'Recommendation retrieved successfully',                     'ശുപാർശ ലഭ്യമാക്കി'),
+        ('requested',                'Recommendation generated successfully',                     'ശുപാർശ വിജയകരമായി തയ്യാറാക്കി'),
+        ('feedback_saved',           'Feedback saved successfully',                               'പ്രതികരണം സംരക്ഷിച്ചു'),
+        ('not_found',                'No recommendation found for this financial year',           'ഈ സാമ്പത്തിക വർഷത്തിന് ശുപാർശ കണ്ടെത്തിയില്ല'),
+        ('fpo_not_found',            'No FPO found for this user',                                'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
+        ('invalid_rating',           'Rating must be between 1 and 5',                            'റേറ്റിംഗ് 1 നും 5 നും ഇടയിൽ ആയിരിക്കണം'),
+        ('no_active_model',          'No active AI model is currently configured',                'നിലവിൽ സജീവമായ AI മോഡൽ ഇല്ല'),
+        ('service_unavailable',      'AI service is temporarily unavailable',                     'AI സേവനം താൽക്കാലികമായി ലഭ്യമല്ല'),
+        ('models_retrieved',         'Model versions retrieved successfully',                     'മോഡൽ പതിപ്പുകൾ ലഭ്യമാക്കി'),
+        ('model_registered',         'Model version registered successfully',                     'മോഡൽ പതിപ്പ് രജിസ്റ്റർ ചെയ്തു'),
+        ('model_activated',          'Model version activated successfully',                      'മോഡൽ പതിപ്പ് സജീവമാക്കി'),
+        ('model_not_found',          'Model version not found',                                   'മോഡൽ പതിപ്പ് കണ്ടെത്തിയില്ല'),
+        ('model_reload_failed',      'Model activated, but the AI service could not be notified', 'മോഡൽ സജീവമാക്കി, പക്ഷേ AI സേവനത്തെ അറിയിക്കാൻ കഴിഞ്ഞില്ല'),
+        ('version_code_required',    'Version code is required',                                  'പതിപ്പ് കോഡ് ആവശ്യമാണ്'),
+        ('feedback_list_retrieved',  'Feedback list retrieved successfully',                      'പ്രതികരണ പട്ടിക ലഭ്യമാക്കി'),
+        # Model upload validation
+        ('model_file_invalid',       'Model file is invalid:',                                    'മോഡൽ ഫയൽ അസാധുവാണ്:'),
+        ('model_validation_error',   'The AI service could not validate this model file',         'ഈ മോഡൽ ഫയൽ പരിശോധിക്കാൻ AI സേവനത്തിന് കഴിഞ്ഞില്ല'),
+        ('model_validation_failed',  'This model file does not match the required feature schema.', 'ഈ മോഡൽ ഫയൽ ആവശ്യമായ ഫീച്ചർ സ്കീമയുമായി പൊരുത്തപ്പെടുന്നില്ല.'),
+        ('model_not_ready',          'Only a version with status "ready" can be activated',       '"ready" എന്ന നിലയിലുള്ള പതിപ്പ് മാത്രമേ സജീവമാക്കാൻ കഴിയൂ'),
+        ('version_code_exists',      'A model version with this version code already exists',     'ഈ പതിപ്പ് കോഡുള്ള ഒരു മോഡൽ പതിപ്പ് ഇതിനകം നിലവിലുണ്ട്'),
+        ('model_deleted',            'Model version deleted successfully',                        'മോഡൽ പതിപ്പ് നീക്കം ചെയ്തു'),
+        ('model_delete_active_forbidden', 'The active model version cannot be deleted. Activate a different version first.', 'സജീവമായ മോഡൽ പതിപ്പ് നീക്കം ചെയ്യാൻ കഴിയില്ല. ആദ്യം മറ്റൊരു പതിപ്പ് സജീവമാക്കുക.'),
+        # Async retraining (P2-06)
+        ('dataset_file_required',    'A dataset file is required',                                'ഒരു ഡാറ്റാസെറ്റ് ഫയൽ ആവശ്യമാണ്'),
+        ('dataset_file_invalid',     'Dataset file is invalid:',                                  'ഡാറ്റാസെറ്റ് ഫയൽ അസാധുവാണ്:'),
+        ('dataset_validation_failed', 'This dataset does not match the required column schema.',  'ഈ ഡാറ്റാസെറ്റ് ആവശ്യമായ കോളം സ്കീമയുമായി പൊരുത്തപ്പെടുന്നില്ല.'),
+        ('training_started',         'Dataset accepted — training has started in the background', 'ഡാറ്റാസെറ്റ് സ്വീകരിച്ചു — പരിശീലനം പശ്ചാത്തലത്തിൽ ആരംഭിച്ചു'),
+        ('retrain_failed',           'Could not start training',                                  'പരിശീലനം ആരംഭിക്കാൻ കഴിഞ്ഞില്ല'),
+        ('ml_service_unreachable',   'The AI service is currently unreachable. Please try again shortly.', 'AI സേവനം നിലവിൽ ലഭ്യമല്ല. ദയവായി അൽപനേരം കഴിഞ്ഞ് ശ്രമിക്കുക.'),
+        # Crop Package of Practices (KAU PoP 2024)
+        ('pop_list_retrieved',       'Package of Practices entries retrieved successfully',      'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രികൾ ലഭ്യമാക്കി'),
+        ('pop_created',              'Package of Practices entry created successfully',         'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി സൃഷ്ടിച്ചു'),
+        ('pop_updated',              'Package of Practices entry updated successfully',         'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി പുതുക്കി'),
+        ('pop_deleted',              'Package of Practices entry deleted successfully',         'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി നീക്കം ചെയ്തു'),
+        ('pop_activated',            'Package of Practices entry published',                    'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി പ്രസിദ്ധീകരിച്ചു'),
+        ('pop_deactivated',          'Package of Practices entry unpublished',                  'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് എൻട്രി പ്രസിദ്ധീകരണം പിൻവലിച്ചു'),
+        ('pop_retrieved',            'Package of Practices retrieved successfully',             'പാക്കേജ് ഓഫ് പ്രാക്ടീസസ് ലഭ്യമാക്കി'),
+        ('pop_not_found',            'Detailed practices for this crop have not been added yet', 'ഈ വിളയുടെ വിശദമായ കൃഷിരീതികൾ ഇതുവരെ ചേർത്തിട്ടില്ല'),
+        ('pop_crop_name_required',   'crop_name is required',                                   'വിളയുടെ പേര് ആവശ്യമാണ്'),
+        # Crop Zone Profiles (ml_service's live crop-eligibility knowledge base)
+        ('zone_profile_list_retrieved', 'Crop zone profiles retrieved successfully',             'ക്രോപ്പ് സോൺ പ്രൊഫൈലുകൾ ലഭ്യമാക്കി'),
+        ('zone_profile_created',        'Crop zone profile created successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ സൃഷ്ടിച്ചു'),
+        ('zone_profile_updated',        'Crop zone profile updated successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പുതുക്കി'),
+        ('zone_profile_deleted',        'Crop zone profile deleted successfully',                'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ നീക്കം ചെയ്തു'),
+        ('zone_profile_activated',      'Crop zone profile published',                           'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പ്രസിദ്ധീകരിച്ചു'),
+        ('zone_profile_deactivated',    'Crop zone profile unpublished',                         'ക്രോപ്പ് സോൺ പ്രൊഫൈൽ പ്രസിദ്ധീകരണം പിൻവലിച്ചു'),
+        ('zone_profile_duplicate',      "A profile for '{{crop_name}}' in '{{kau_zone}}' already exists.", "'{{kau_zone}}' എന്ന മേഖലയിൽ '{{crop_name}}' എന്നതിനുള്ള പ്രൊഫൈൽ ഇതിനകം നിലവിലുണ്ട്."),
+        ('zone_profile_temp_range',     'Must be greater than or equal to temp_lo.',             'temp_lo-യേക്കാൾ വലുതോ തുല്യമോ ആയിരിക്കണം.'),
+        ('zone_profile_ph_range',       'Must be greater than or equal to ph_lo.',               'ph_lo-യേക്കാൾ വലുതോ തുല്യമോ ആയിരിക്കണം.'),
+    ]
+
+    count = 0
+    for key, en_text, ml_text in recommendation_messages:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_text, 'context': 'AI Recommendations (P2-06)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_text, 'context': 'AI Recommendations (P2-06) — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
+
+
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
