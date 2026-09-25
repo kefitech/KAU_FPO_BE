@@ -107,6 +107,11 @@ Author: Athul Gopan (Kefi Tech Solutions)
     .ai-narrative { margin: 3mm 0 5mm 0; font-size: 10pt; line-height: 1.5; color: #222; text-align: justify; }
     .ai-narrative p { margin: 0 0 2.5mm 0; }
     .ai-narrative-label { font-size: 7.5pt; color: #E86C1A; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 1.5mm; }
+    /* KAU RCD B.5: amber banner above stale AI narratives so preview
+       readers see that this chapter's underlying data has changed since
+       the narrative was generated. Only rendered in preview mode — the
+       pre-final gate blocks the versioned Generate flow before render. */
+    .ai-stale-note { font-size: 9pt; color: #7c2d12; background: #fef3c7; border-left: 3px solid #f59e0b; padding: 2mm 3mm; margin: 0 0 3mm 0; border-radius: 1mm; }
     .cover .meta { font-size: 10.5pt; margin: 1.5mm 0; color: #333; }
     .cover .meta strong { color: #1F3864; display: inline-block; min-width: 45mm; }
     .cover .platform-attribution { margin-top: 12mm; font-size: 9pt; color: #999; font-style: italic; }
@@ -252,16 +257,19 @@ Author: Athul Gopan (Kefi Tech Solutions)
     <div class="page-break"></div>
     <h2 id="sec-exec">Executive Summary</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.executive_summary %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.executive_summary }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.executive_summary|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.project_background %}
     <h2 id="sec-background">Project Background</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.project_background %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.project_background }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.project_background|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.promoter_profile %}
     <h2 id="sec-promoter">Promoter Profile</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.promoter_profile %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.promoter_profile }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.promoter_profile|linebreaks }}</div>
   {% endif %}
 
@@ -831,36 +839,43 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {% if pdf_ai.market_analysis %}
     <h2 id="sec-market-ai">Market Analysis</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.market_analysis %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.market_analysis }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.market_analysis|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.technical_feasibility %}
     <h2 id="sec-tech-ai">Technical Feasibility</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.technical_feasibility %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.technical_feasibility }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.technical_feasibility|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.financial_analysis %}
     <h2 id="sec-finance-ai">Financial Analysis</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.financial_analysis %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.financial_analysis }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.financial_analysis|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.implementation_plan %}
     <h2 id="sec-impl-ai">Implementation Plan</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.implementation_plan %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.implementation_plan }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.implementation_plan|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.swot %}
     <h2 id="sec-swot-ai">SWOT Analysis</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.swot %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.swot }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.swot|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.environmental_impact %}
     <h2 id="sec-env-ai">Environmental Impact</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.environmental_impact %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.environmental_impact }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.environmental_impact|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.conclusion %}
     <h2 id="sec-conclusion-ai">Conclusion</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.conclusion %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.conclusion }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.conclusion|linebreaks }}</div>
   {% endif %}
 

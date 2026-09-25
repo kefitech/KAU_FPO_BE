@@ -105,6 +105,24 @@ def _ai_chapters_for_pdf(project) -> dict:
     return out
 
 
+def _ai_stale_chapters_for_pdf(project) -> dict:
+    """Return {chapter_key: stale_reason} for stale AI chapters with active text.
+
+    Only appears in Preview PDFs — the pre-final gate blocks the versioned
+    Generate flow before it reaches template rendering. Preview PDFs still
+    render so the FPO can see what the DPR looks like, but each stale
+    chapter shows an amber note pointing out it needs regeneration.
+    """
+    try:
+        from apps.database.models import DPRAIContent
+    except ImportError:
+        return {}
+    out: dict = {}
+    for row in DPRAIContent.objects.filter(project=project, is_stale=True).exclude(user_edited=''):
+        out[row.chapter] = row.stale_reason or 'An upstream section was edited after this chapter was generated.'
+    return out
+
+
 def _products_for_pdf(project) -> tuple[list[dict], str]:
     """Return (products, hero_image_path) for the PDF template.
 
@@ -357,6 +375,23 @@ def _pre_final_validation(project) -> list[dict]:
                 'E. Revenue Assumptions and add one row per product/service.'
             ),
         })
+
+    # KAU RCD B.5 — stale AI narratives. If any chapter has active text
+    # (user_edited or original_ai) AND its upstream section has been edited
+    # after generation, block the final PDF so the banker doesn't receive a
+    # DPR whose narrative reflects an older version of the underlying data.
+    # Preview still renders (mode='preview' skips this whole function).
+    stale_rows = DPRAIContent.objects.filter(
+        project=project, is_stale=True,
+    ).exclude(user_edited='')
+    for row in stale_rows:
+        errors.append({
+            'chapter': row.chapter,
+            'reason': (
+                f'Narrative is stale — {row.stale_reason or "an upstream section was edited after generation"}. '
+                f'Open AI Content → {row.chapter.replace("_", " ").title()} and regenerate before requesting a final DPR.'
+            ),
+        })
     return errors
 
 
@@ -422,6 +457,11 @@ def render_html_for_project(
         # AI narrative chapters (Gemini-generated). Dict of {chapter_key: text}.
         # Empty when nothing has been generated — template guards each section.
         'pdf_ai':             _ai_chapters_for_pdf(project),
+        # KAU RCD B.5 — {chapter: stale_reason} for narratives whose upstream
+        # section was edited after generation. Preview PDFs surface an amber
+        # note per stale chapter; the pre-final gate blocks versioned Generate
+        # before it reaches this template.
+        'pdf_ai_stale':       _ai_stale_chapters_for_pdf(project),
     })
 
 
