@@ -496,6 +496,12 @@ class SubAdminViewSet(TranslatedViewSet):
         user    = self.get_object()
         channel = request.data.get('notification_channel', 'email')
 
+        if not user.is_active:
+            return StandardResponse.error(
+                message=t('admin.reset_password_inactive_user', lang),
+                status_code=400,
+            )
+
         if channel == 'sms' and not getattr(getattr(user, 'profile', None), 'phone', ''):
             return StandardResponse.error(
                 message='Cannot use SMS — this sub-admin has no phone number on record.',

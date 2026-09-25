@@ -497,6 +497,12 @@ class CBBOViewSet(TranslatedViewSet):
         user    = self.get_object()
         channel = request.data.get('notification_channel', 'email')
 
+        if not user.is_active:
+            return StandardResponse.error(
+                message=t('admin.reset_password_inactive_user', lang),
+                status_code=400,
+            )
+
         # fail fast rather than silently falling back to email when SMS was
         # explicitly requested but there's nowhere to send it
         if channel == 'sms' and not getattr(getattr(user, 'profile', None), 'phone', ''):

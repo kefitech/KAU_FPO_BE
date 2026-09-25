@@ -255,6 +255,7 @@ def seed_admin_translations(languages):
         ('sub_admin_deactivated',           'Sub-admin deactivated successfully',           'സബ്-അഡ്മിൻ വിജയകരമായി നിഷ്ക്രിയമാക്കി'),
         ('sub_admin_permissions_updated',   'Sub-admin permissions updated successfully',   'സബ്-അഡ്മിൻ അനുമതികൾ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
         ('sub_admin_permissions_retrieved', 'Sub-admin permissions retrieved successfully', 'സബ്-അഡ്മിൻ അനുമതികൾ വിജയകരമായി ലഭിച്ചു'),
+        ('reset_password_inactive_user',    'Cannot reset password: this user is inactive. Activate the account first.', 'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യാൻ കഴിയില്ല: ഈ ഉപയോക്താവ് നിഷ്ക്രിയമാണ്. ആദ്യം അക്കൗണ്ട് സജീവമാക്കുക.'),
         # Menu item management
         ('menu_items_retrieved',       'Menu items retrieved successfully',         'മെനു ഇനങ്ങൾ വിജയകരമായി ലഭിച്ചു'),
         ('menu_item_created',          'Menu item created successfully',            'മെനു ഇനം വിജയകരമായി സൃഷ്ടിച്ചു'),
