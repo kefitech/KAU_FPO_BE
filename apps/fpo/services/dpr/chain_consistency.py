@@ -75,24 +75,32 @@ def _y1_revenue(project) -> Decimal:
     return total
 
 
-def _section_has_rows(project, related_manager_name: str) -> bool:
-    """True if `project.<section>.<related_manager>` has at least one row.
-    Handles missing section rows (returns False without raising)."""
-    for section_attr in (
-        'section_products', 'section_raw_material', 'section_machinery',
-        'section_hr', 'section_utilities', 'section_market',
-    ):
-        section = getattr(project, section_attr, None)
-        if section is None:
-            continue
-        mgr = getattr(section, related_manager_name, None)
-        if mgr is not None:
-            try:
-                if mgr.exists():
-                    return True
-            except Exception:
-                pass
-    return False
+def _section_has_rows(project, section_attr: str, related_manager_name: str) -> bool:
+    """True if `project.<section_attr>.<related_manager_name>` has at least one row.
+    Handles missing section rows (returns False without raising).
+
+    NOTE (bug fix 2026-09-25): previously this iterated across ALL section
+    attributes looking for the first one that had the given manager name.
+    That was wrong for two reasons:
+      1. It searched with the wrong strings ('products', 'raw_materials')
+         that don't match the real related_names ('items', 'materials'),
+         so raw material + products checks ALWAYS returned False even
+         when the FPO had entered data.
+      2. Even if the string had matched, ambiguity — both section_products
+         and section_machinery have related_name='items', so asking "does
+         machinery have items?" could return True from products.
+    Now the caller specifies which section AND which manager explicitly.
+    """
+    section = getattr(project, section_attr, None)
+    if section is None:
+        return False
+    mgr = getattr(section, related_manager_name, None)
+    if mgr is None:
+        return False
+    try:
+        return mgr.exists()
+    except Exception:
+        return False
 
 
 def _sum_opex_bucket(project, fields: tuple[str, ...]) -> Decimal:
@@ -121,7 +129,7 @@ def check_operational_chain(project) -> list[ChainWarning]:
         return warnings
 
     # ── Products & Services ↔ Revenue ──────────────────────────────────
-    products_present = _section_has_rows(project, 'products')
+    products_present = _section_has_rows(project, 'section_products', 'items')
     if not products_present:
         warnings.append(ChainWarning(
             section='Products & Services (§2.3.5)',
@@ -135,7 +143,7 @@ def check_operational_chain(project) -> list[ChainWarning]:
         ))
 
     # ── Raw Material ↔ Production ──────────────────────────────────────
-    raw_material_present = _section_has_rows(project, 'raw_materials')
+    raw_material_present = _section_has_rows(project, 'section_raw_material', 'materials')
     op_raw_material = _sum_opex_bucket(project, ('op_raw_material',))
     if not raw_material_present:
         warnings.append(ChainWarning(
@@ -162,7 +170,7 @@ def check_operational_chain(project) -> list[ChainWarning]:
         ))
 
     # ── Machinery ↔ Capacity ────────────────────────────────────────────
-    machinery_present = _section_has_rows(project, 'items')  # section_machinery.items
+    machinery_present = _section_has_rows(project, 'section_machinery', 'items')
     if not machinery_present:
         warnings.append(ChainWarning(
             section='Plant & Machinery (§2.3.15)',
@@ -176,7 +184,7 @@ def check_operational_chain(project) -> list[ChainWarning]:
         ))
 
     # ── Manpower ↔ Production ──────────────────────────────────────────
-    hr_present = _section_has_rows(project, 'employee_categories')
+    hr_present = _section_has_rows(project, 'section_hr', 'employee_categories')
     if not hr_present:
         warnings.append(ChainWarning(
             section='Human Resources (§2.3.17)',
