@@ -483,8 +483,13 @@ def save_pdf_to_document(project, status: Optional[str] = None):
     absolute_path = os.path.join(project_dir, filename)
 
     # Pass the version number into the render so it appears on the cover +
-    # running footer per KAU §7.2.
-    pdf_bytes = render_pdf_for_project(project, version_number=version_number)
+    # running footer per KAU §7.2. `mode='final'` strips provenance
+    # asterisks + the Source column — versioned documents are what the
+    # FPO sends to bankers, whereas the ephemeral /pdf/ endpoint stays
+    # in preview mode for wizard-time sanity checks.
+    pdf_bytes = render_pdf_for_project(
+        project, version_number=version_number, mode='final',
+    )
     with open(absolute_path, 'wb') as f:
         f.write(pdf_bytes)
     file_size = os.path.getsize(absolute_path)
