@@ -34,9 +34,14 @@ def _can_view(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
-def _build_queryset(params, user):
-    # P2-01: sub-admins can only export their assigned FPOs
-    qs = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), user)
+def _build_queryset(params, user=None):
+    # P2-01: sub-admins can only export their assigned FPOs. Government
+    # callers pass `user=None` because they layer their own jurisdiction
+    # scoping on top (see apps/government/api/reports.py) — sub-admin
+    # scoping via SubAdminFPOAssignment doesn't apply to government users.
+    qs = FPO.objects.filter(is_deleted=False)
+    if user is not None:
+        qs = scope_fpo_queryset(qs, user)
     qs = qs.select_related('primary_user', 'primary_user__profile')
 
     status_val = params.get('status', '').strip()
