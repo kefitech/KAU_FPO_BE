@@ -18,6 +18,7 @@ from . import ai_content as ai
 from . import applicability as appl
 from . import calculation as calc
 from . import finish as fin_view
+from . import pre_flight as pf
 from . import master as m
 from . import projects as p
 from . import tranches as tr
@@ -121,6 +122,13 @@ project_patterns = [
         'projects/<uuid:project_uuid>/calculation/',
         calc.DPRCalculationView.as_view(),
         name='dpr-project-calculation',
+    ),
+    # Pre-flight — list current blockers so the FE can render an amber
+    # banner + disable Generate before the FPO wastes a click.
+    path(
+        'projects/<uuid:project_uuid>/pre-flight/',
+        pf.DPRPreFlightView.as_view(),
+        name='dpr-project-pre-flight',
     ),
     path(
         'projects/<uuid:project_uuid>/pdf/',

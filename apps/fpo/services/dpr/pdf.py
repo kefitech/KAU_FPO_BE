@@ -353,11 +353,14 @@ def _pre_final_validation(project) -> list[dict]:
     # Kefitech P6.6 — structural operational-chain checks. Only severity
     # 'error' entries block the render (warnings surface elsewhere on the
     # AI Content Health card without blocking).
+    # `check` carried through so the pre-flight endpoint can map back to a
+    # wizard section key for the "Fix in section →" jump link.
     for cw in check_operational_chain(project):
         if cw.severity == 'error':
             errors.append({
                 'chapter': cw.section,
-                'reason': cw.message,
+                'check':   cw.check,
+                'reason':  cw.message,
             })
 
     # Finance §Cat E — Section E must have at least one revenue assumption
