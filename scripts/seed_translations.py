@@ -2577,6 +2577,9 @@ def seed_frontend_ui_translations(languages):
             'cat_trainer':            'Trainer / Extension Worker',
             'cat_banker':             'Banker / Financial Advisor',
             'cat_facilitator':        'Facilitator / NGO',
+            'btn_previous':           'Previous',
+            'btn_next':               'Next',
+            'pagination_summary':     'Page {page} of {total_pages} · {count} experts',
         },
 
         'fpo_team': {
