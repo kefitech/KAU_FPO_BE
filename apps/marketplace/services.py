@@ -105,21 +105,18 @@ def compute_opportunities():
 
     return sorted(opportunities, key=lambda o: o['interested_buyer_count'], reverse=True)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Buyer resolution helpers (Arunima — P2-11)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _get_buyer_row(user):
     """Resolve the BuyerDirectory row for this user, whichever way they're linked."""
     buyer = getattr(user, 'buyer_profile', None)
     if buyer is not None:
         return buyer
+
     fpo = getattr(user, 'fpo', None)
     if fpo is not None:
         buyer = fpo.buyer_registration.first()
         if buyer is not None:
             return buyer
+
     return None
 
 
