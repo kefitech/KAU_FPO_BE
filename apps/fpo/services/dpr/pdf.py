@@ -341,6 +341,22 @@ def _pre_final_validation(project) -> list[dict]:
                 'chapter': cw.section,
                 'reason': cw.message,
             })
+
+    # Finance §Cat E — Section E must have at least one revenue assumption
+    # before the versioned/banker PDF can be produced. The calc engine has a
+    # Products-section fallback that keeps Preview useful during wizard
+    # iteration, but the "shall be entered" wording in the section validator
+    # means the FPO cannot ship a final DPR with an empty Section E.
+    fin = getattr(project, 'section_finance', None)
+    if fin is not None and not fin.revenue_assumptions.exists():
+        errors.append({
+            'chapter': 'finance',
+            'reason': (
+                'Finance §E — at least one revenue assumption (product/service) '
+                'must be entered before the DPR can be generated. Open Finance → '
+                'E. Revenue Assumptions and add one row per product/service.'
+            ),
+        })
     return errors
 
 
