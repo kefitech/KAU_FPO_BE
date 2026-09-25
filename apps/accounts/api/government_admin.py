@@ -355,7 +355,15 @@ class GovernmentViewSet(TranslatedViewSet):
         user = self.get_object()
 
         if request.method == 'POST':
-            if not user.is_active:
+            # Self-registered officials stay inactive until approved, so is_active alone
+            # can't distinguish a pending registration from a deactivated account.
+            registration_status = getattr(getattr(user, 'govt_profile', None), 'registration_status', None)
+            if registration_status == 'rejected':
+                return StandardResponse.error(
+                    message='Cannot change jurisdiction for a rejected registration.',
+                    status_code=400,
+                )
+            if not user.is_active and registration_status != 'pending':
                 return StandardResponse.error(
                     message='Cannot change jurisdiction for a deactivated official.',
                     status_code=400,
