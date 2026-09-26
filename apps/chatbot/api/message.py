@@ -133,13 +133,25 @@ class ChatMessageView(APIView):
         user_role = _resolve_role(request.user)
 
         # Preferred language — used for both small-talk lookup below and
-        # the Gemini prompt further down. Middleware sets request.language
-        # from X-Language header; falls back to the user profile preference.
-        lang = getattr(request, 'language', None) or 'en'
-        if request.user and request.user.is_authenticated:
-            prof = getattr(request.user, 'profile', None)
-            if prof and getattr(prof, 'preferred_language', None):
-                lang = prof.preferred_language
+        # the Gemini prompt further down.
+        #
+        # Priority: the X-Language header set by the FE on every request
+        # WINS, because it reflects what language the user is currently
+        # reading on the page. The user profile's `preferred_language` is
+        # only a fallback for the rare case where no header was sent
+        # (e.g. direct API caller, curl). If we let the profile override
+        # the header, a user whose account was created in Malayalam would
+        # keep getting Malayalam replies even after switching the site to
+        # English — that surprised testers, see 2026-09-26 bug report.
+        header_lang = getattr(request, 'language', None)
+        if header_lang:
+            lang = header_lang
+        else:
+            lang = 'en'
+            if request.user and request.user.is_authenticated:
+                prof = getattr(request.user, 'profile', None)
+                if prof and getattr(prof, 'preferred_language', None):
+                    lang = prof.preferred_language
 
         # Resolve / create the ChatConversation this turn belongs to. The
         # helper handles session_id validation + auth ownership. Every turn
