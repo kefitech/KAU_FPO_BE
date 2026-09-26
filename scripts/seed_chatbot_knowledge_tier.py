@@ -33,7 +33,7 @@ TIER_ENTRIES = [
             'The tier appears as a badge on the FPO dashboard and is used by KAU + partner agencies when '
             'allocating schemes, subsidies and capacity-building programmes.'
         ),
-        audiences=['fpo_manager', 'government', 'cbbo', 'super_admin', 'sub_admin', 'all'],
+        audiences=['public', 'fpo_manager', 'government', 'cbbo', 'super_admin', 'sub_admin', 'all'],
         pages=['/fpo/tier-assessment*', '/fpo/dashboard*'],
         keywords='tier grading rating classification A B C D score assessment',
     ),
@@ -44,7 +44,7 @@ TIER_ENTRIES = [
             'Tier A requires 80 or higher, Tier B is 65 to 79, Tier C is 50 to 64, and Tier D is below 50. '
             'Thresholds are set in code and are the same for every financial year.'
         ),
-        audiences=['fpo_manager', 'government', 'cbbo', 'super_admin', 'sub_admin', 'all'],
+        audiences=['public', 'fpo_manager', 'government', 'cbbo', 'super_admin', 'sub_admin', 'all'],
         pages=['/fpo/tier-assessment*'],
         keywords='tier threshold score cutoff 80 65 50 A B C D',
     ),
