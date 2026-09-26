@@ -1490,6 +1490,8 @@ def seed_frontend_ui_translations(languages):
         'admin_dashboard': {
             'page_title':                 'Admin Dashboard',
             'page_description':           'FPO platform overview',
+            'page_title_sub_admin':       'Sub-Admin Dashboard',
+            'page_description_sub_admin': 'Overview of your assigned FPOs',
             'stat_total_registrations':   'Total Registrations',
             'stat_approved':              'Approved FPOs',
             'stat_pending':               'Pending Review',
