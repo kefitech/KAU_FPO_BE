@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers, status
 from rest_framework.views import APIView
  
@@ -99,7 +100,23 @@ class ReportListCreateView(APIView):
         s = request.query_params.get('status')
         if s:
             qs = qs.filter(status=s)
- 
+
+        # ?search= matches FPO name / district, report text and status
+        search = request.query_params.get('search', '').strip()
+        if search:
+            # district is stored as a code (TVM); the table shows the name, so match on both
+            district_codes = [
+                code for code, label in FPO._meta.get_field('district').choices
+                if search.lower() in str(label).lower() or search.lower() in code.lower()
+            ]
+            qs = qs.filter(
+                Q(fpo__name__icontains=search)
+                | Q(fpo__district__in=district_codes)
+                | Q(activities__icontains=search)
+                | Q(outcomes__icontains=search)
+                | Q(status__icontains=search)
+            )
+
         qs = qs.order_by('-date')
  
         paginator = StandardPagination()
