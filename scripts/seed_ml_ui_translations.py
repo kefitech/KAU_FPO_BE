@@ -122,6 +122,8 @@ def seed_ml_ui_translations():
         'admin_dashboard': {
             'page_title':                   'അഡ്മിൻ ഡാഷ്‌ബോർഡ്',
             'page_description':             'FPO പ്ലാറ്റ്‌ഫോം അവലോകനം',
+            'page_title_sub_admin':         'സബ്-അഡ്മിൻ ഡാഷ്‌ബോർഡ്',
+            'page_description_sub_admin':   'നിങ്ങൾക്ക് നൽകിയിട്ടുള്ള FPO-കളുടെ അവലോകനം',
             # Stat cards — keys the frontend actually uses
             'stat_total_registrations':     'മൊത്തം രജിസ്ട്രേഷനുകൾ',
             'stat_approved_fpos':           'അംഗീകൃത FPOകൾ',
