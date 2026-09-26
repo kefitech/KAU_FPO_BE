@@ -6,10 +6,10 @@ Base Path: /api/admin/cbbos/
 Lives at apps/cbbo/api/admin.py, alongside the CBBO-facing files in this
 same package: assignments.py (CBBO sees their assigned FPOs), reports.py
 (capacity building reports), training.py (sessions + attendance). Those
-three are the CBBO's own view of their world; this file is the super-admin's
-view for creating and managing CBBO accounts themselves.
+three are the CBBO's own view of their world; this file is the admin's
+(super-admin / sub-admin) view for creating and managing CBBO accounts themselves.
 
-Super admin creates CBBO accounts and configures which districts (or
+Super admin (or sub-admin) creates CBBO accounts and configures which districts (or
 state-wide access) each CBBO has. Structured the same way as the Sub-Admin
 Management API (SubAdminViewSet) — but assigns *districts* via
 CBBOAssignment instead of *permissions* via Django Permission objects.
@@ -28,7 +28,7 @@ from rest_framework.decorators import action
 
 from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
 
-from apps.core.permissions.rbac import IsSuperAdmin
+from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
 from apps.database.models.organisation import Organisation
 from apps.database.models.cbbo_profile import CBBOOfficerProfile
@@ -220,12 +220,12 @@ class CBBOViewSet(TranslatedViewSet):
     """
     Manage CBBO accounts and their district (or state-wide) assignments.
 
-    - Create CBBO accounts (super_admin only)
+    - Create CBBO accounts (super_admin or sub_admin)
     - Assign/revoke districts per CBBO
     - List available districts
     """
 
-    permission_classes = [IsSuperAdmin]  # super_admin only, enforced for every action on this viewset
+    permission_classes = [IsSubAdminOrSuperAdmin]  # super_admin + sub_admin, enforced for every action on this viewset
     pagination_class   = StandardPagination
     filter_backends    = [filters.SearchFilter, filters.OrderingFilter]
     search_fields      = ['email', 'first_name', 'last_name']

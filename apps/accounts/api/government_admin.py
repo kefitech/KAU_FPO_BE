@@ -14,7 +14,7 @@ from rest_framework.decorators import action
 
 from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
 
-from apps.core.permissions.rbac import IsSuperAdmin
+from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
@@ -198,7 +198,7 @@ class GovernmentUpdateSerializer(serializers.Serializer):
     destroy=extend_schema(tags=['Admin - Government']),
 )
 class GovernmentViewSet(TranslatedViewSet):
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [IsSubAdminOrSuperAdmin]
     pagination_class   = StandardPagination
     filter_backends    = [filters.SearchFilter, filters.OrderingFilter]
     search_fields      = ['email', 'first_name', 'last_name']

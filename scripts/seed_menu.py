@@ -188,7 +188,7 @@ def seed_menu():
         label_key = 'menu.dpr_projects',
         path      = '/admin/dpr',
         icon      = 'file-bar-chart',
-        roles     = [super_admin_group, sub_admin_group],
+        roles     = [super_admin_group],
         order     = 18,
     )
     seed_item(
@@ -217,10 +217,17 @@ def seed_menu():
         order     = 21,
     )
     seed_item(
+        label_key = 'menu.cbbos',
+        path      = '/admin/cbbos',
+        icon      = 'users-round',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 24,
+    )
+    seed_item(
         label_key = 'menu.government',
         path      = '/admin/government',
         icon      = 'landmark',
-        roles     = [super_admin_group],
+        roles     = [super_admin_group, sub_admin_group],
         order     = 26,
     )
     seed_item(
@@ -235,7 +242,7 @@ def seed_menu():
         label_key = 'menu.market_linkage',
         path      = '/admin/market-linkage',
         icon      = 'link',
-        roles     = [super_admin_group],
+        roles     = [super_admin_group, sub_admin_group],
         order     = 24,
     )
     seed_item(

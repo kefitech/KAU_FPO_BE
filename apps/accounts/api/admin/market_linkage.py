@@ -8,12 +8,15 @@ Base Path: /api/admin/market-linkage/
 Read-only. Lets an admin pick an FPO from those that have listed at least
 one product, then view that FPO's product listings. No new model — this
 is a view-only feature over the existing Product/FPO data.
+
+Sub-admins only see FPOs assigned to them (P2-01 row-level security).
 """
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsAdmin, IsAuthenticated
+from apps.core.permissions.fpo_scope import scope_fpo_queryset
+from apps.core.permissions.rbac import IsAuthenticated, IsSubAdminOrSuperAdmin
 from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -29,12 +32,12 @@ class AdminMarketLinkageFPOListView(APIView):
     Lists only FPOs that have listed at least one (non-deleted) product.
     """
 
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
 
     def get(self, request):
         lang = getattr(request, 'language', 'en')
         fpos = (
-            FPO.objects.filter(is_deleted=False, products__is_deleted=False)
+            scope_fpo_queryset(FPO.objects.filter(is_deleted=False, products__is_deleted=False), request.user)
             .distinct()
             .order_by('name')
         )
@@ -60,13 +63,14 @@ class AdminMarketLinkageFPOProductsView(APIView):
     Lists all non-deleted products belonging to the given FPO.
     """
 
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
     pagination_class = StandardPagination
 
     def get(self, request, fpo_id):
         lang = getattr(request, 'language', 'en')
 
-        if not FPO.objects.filter(id=fpo_id).exists():
+        # out-of-scope FPO is a 404, same as a missing one
+        if not scope_fpo_queryset(FPO.objects.filter(id=fpo_id), request.user).exists():
             return StandardResponse.error(
                 message=t('marketplace.linkage_fpo_not_found', lang),
                 status_code=404,

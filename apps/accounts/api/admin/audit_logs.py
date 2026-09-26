@@ -22,6 +22,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 
 from apps.core.models.generic import AuditLog
+from apps.core.permissions.fpo_scope import is_super_admin, scope_fpo_queryset
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -198,6 +199,15 @@ class AuditLogListView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        # Sub-admins only see the audit trail of an FPO assigned to them (P2-01);
+        # the unfiltered, system-wide log is super-admin only.
+        fpo_id = request.query_params.get('fpo_id', '').strip()
+        if not fpo_id and not is_super_admin(request.user):
+            return StandardResponse.error(
+                'Permission denied.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         qs = AuditLog.objects.select_related(
             'user', 'content_type'
         )
@@ -208,10 +218,9 @@ class AuditLogListView(APIView):
             qs = qs.filter(action=action)
 
         # Filter: by FPO — find all AuditLog rows related to a specific FPO
-        fpo_id = request.query_params.get('fpo_id', '').strip()
         if fpo_id:
             try:
-                fpo     = FPO.objects.get(id=fpo_id)
+                fpo     = scope_fpo_queryset(FPO.objects.all(), request.user).get(id=fpo_id)
                 fpo_ct  = ContentType.objects.get_for_model(FPO)
                 doc_ct  = ContentType.objects.get_for_model(FPODocument)
                 doc_ids_str = [

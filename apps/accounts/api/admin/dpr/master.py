@@ -5,7 +5,7 @@ Base view + 33 subclass pairs (list-create + detail).
 Every write invalidates the corresponding public-read cache
 (see apps/fpo/api/dpr/master.py — invalidate_master_cache).
 
-Permissions: IsSubAdminOrSuperAdmin.
+Permissions: IsSuperAdmin (sub-admins have no DPR access).
 """
 
 from functools import lru_cache
@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
+from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import (
     DPRProjectType, DPRProjectObjective, DPRProjectOutcome, DPRProjectRationale,
@@ -55,7 +55,7 @@ def _make_admin_serializer(model_cls):
 
 class BaseDPRMasterAdminListCreateView(APIView):
     """GET (list) + POST (create). Subclass sets `model`."""
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsSuperAdmin]  # no DPR access for sub-admins
     model = None
 
     def get(self, request):
@@ -80,7 +80,7 @@ class BaseDPRMasterAdminListCreateView(APIView):
 
 class BaseDPRMasterAdminDetailView(APIView):
     """GET / PATCH / DELETE by id. Subclass sets `model`."""
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsSuperAdmin]  # no DPR access for sub-admins
     model = None
 
     def _get_obj(self, pk):
