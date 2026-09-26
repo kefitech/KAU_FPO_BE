@@ -116,3 +116,104 @@ class ChatKnowledgeEntry(BaseModel):
 
     def __str__(self):
         return self.topic
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Conversation history (Phase 3, 2026-09-25)
+# ─────────────────────────────────────────────────────────────────────────────
+# `ChatConversation` is one open session — anonymous callers own it via a
+# random session_id kept in localStorage; authenticated callers own it via
+# `user` FK. `ChatMessage` is one turn (user OR assistant). Together they
+# let the widget show scrollback on mount and let the answer service pass
+# prior turns to Gemini for multi-turn context.
+#
+# Retention: a Celery beat task purges anonymous conversations older than
+# 30 days. Authenticated conversations are kept until the user deletes the
+# account or asks for their data to be purged.
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+
+class ChatConversation(BaseModel):
+    """One chatbot session — a container for messages exchanged in a widget."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='chat_conversations',
+        help_text='Null when the session is anonymous (public widget).',
+    )
+    session_id = models.CharField(
+        max_length=64, db_index=True, default='',
+        help_text='UUID from the FE widget. Kept in localStorage so a return '
+                  'visit reuses the same conversation. Reset endpoint creates '
+                  'a new session_id. Default empty just for the schema — the '
+                  'API layer always writes a real UUID before saving.',
+    )
+    audience = models.CharField(
+        max_length=32, blank=True, default='',
+        help_text="'public' for anonymous, else the Django Group name we "
+                  'served this session under. Denormalised for cheap admin '
+                  'filtering.',
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Chatbot Conversation'
+        verbose_name_plural = 'Chatbot Conversations'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['user', '-started_at']),
+            models.Index(fields=['session_id']),
+        ]
+
+    def __str__(self):
+        who = self.user.username if self.user_id else f'anon:{self.session_id[:8]}'
+        return f'chat({who}, started {self.started_at:%Y-%m-%d %H:%M})'
+
+
+class ChatMessage(BaseModel):
+    """One turn in a chat conversation — either from the user or the assistant."""
+
+    class Role(models.TextChoices):
+        USER      = 'user',      'User'
+        ASSISTANT = 'assistant', 'Assistant'
+
+    class Generator(models.TextChoices):
+        # Which path produced the assistant reply. NULL/blank for user turns.
+        GEMINI      = 'gemini',      'Gemini (RAG grounded)'
+        EXTRACTIVE  = 'extractive',  'Extractive QA (fallback)'
+        SMALL_TALK  = 'small_talk',  'Canned small-talk reply'
+        NONE        = 'none',        'No context found — static fallback'
+
+    conversation = models.ForeignKey(
+        ChatConversation, on_delete=models.CASCADE, related_name='messages',
+    )
+    role       = models.CharField(max_length=10, choices=Role.choices)
+    content    = models.TextField()
+    source_ids = models.JSONField(
+        default=list, blank=True,
+        help_text='List of ChatKnowledgeEntry ids used as context. Empty for '
+                  'user turns and small-talk replies.',
+    )
+    generator = models.CharField(
+        max_length=20, choices=Generator.choices, blank=True, default='',
+        help_text='Which generator produced this reply. Blank for user turns.',
+    )
+    confidence = models.FloatField(
+        null=True, blank=True,
+        help_text='Model / retrieval confidence 0-1. Null for user turns.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Chatbot Message'
+        verbose_name_plural = 'Chatbot Messages'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['conversation', 'created_at']),
+        ]
+
+    def __str__(self):
+        preview = (self.content or '')[:60].replace('\n', ' ')
+        return f'[{self.get_role_display()}] {preview}'

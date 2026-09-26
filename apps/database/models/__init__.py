@@ -116,7 +116,10 @@ from .recommendations import (
 )
 
 # Chatbot RAG knowledge base
-from .chatbot import ChatKnowledgeEntry, AUDIENCE_PUBLIC, AUDIENCE_ALL, SPECIAL_AUDIENCES
+from .chatbot import (
+    ChatKnowledgeEntry, ChatConversation, ChatMessage,
+    AUDIENCE_PUBLIC, AUDIENCE_ALL, SPECIAL_AUDIENCES,
+)
 
 # Phase 2 — AI DPR Generation
 # v1 removed 2026-08-24. Fresh rebuild in progress under `dpr/` package.
@@ -232,9 +235,6 @@ from .expert_booking import ExpertAvailability, ExpertTimeSlot, ExpertBooking, E
 # Phase 2 — Analytics
 from .analytics import AnalyticsSnapshot
 
-# Phase 2 — AI Chatbot
-from .chat import ChatConversation, ChatMessage
-
 # Phase 2 — Marketplace
 from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice, Inquiry
 
@@ -322,8 +322,10 @@ __all__ = [
     'CropRecommendation',
     'CropPackageOfPractices',
     'CropZoneProfile',
-    # Chatbot RAG
+    # Chatbot RAG + history
     'ChatKnowledgeEntry',
+    'ChatConversation',
+    'ChatMessage',
     # Phase 2 — AI DPR Generation — Project + Sections
     'DPRProject',
     'DPRConfig',

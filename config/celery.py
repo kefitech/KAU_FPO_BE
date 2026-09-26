@@ -75,6 +75,14 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=2, minute=0),
     },
 
+    # KAU-FPO chatbot — nightly purge of anonymous conversations older than
+    # 30 days. Auth'd conversations are exempt (kept for user history +
+    # admin audit).
+    'purge-anonymous-chat-conversations': {
+        'task': 'apps.chatbot.tasks.purge_anonymous_conversations',
+        'schedule': crontab(hour=3, minute=0),
+    },
+
     # Send pending notification reminders every hour
     'send-notification-reminders': {
         'task': 'apps.notifications.tasks.send_pending_reminders',
