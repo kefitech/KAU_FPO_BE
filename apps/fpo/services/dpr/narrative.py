@@ -277,20 +277,40 @@ _PLACEHOLDER_RE = re.compile(
 )
 
 
-def scrub_placeholders(text: str) -> tuple[str, list[dict]]:
+def scrub_placeholders(text: str, chapter: Optional[str] = None) -> tuple[str, list[dict]]:
     """Post-generation cleanup: replace `[X ...]`, `[Name of ...]`, etc. with
     "Not available" and return per-token hit records.
+
+    Args:
+        text:    LLM response to clean.
+        chapter: chapter key. Lenient chapters (Tech Feasibility, Env Impact)
+                 skip the aggressive scrub entirely — those are ALLOWED to
+                 emit `[TO BE FILLED: ...]` per KAU 2026-09-26 feedback and
+                 draw on AI's general knowledge.
 
     Returns:
         (cleaned_text, hits) — where hits is a list of
         {"raw": <matched substring>, "count": <int>} entries. Aggregation is
         by exact raw match so a chapter that emits `[Name of the CEO]` five
         times reports one hit with count=5, not five hits.
+
+    NOTE: `[TO BE FILLED: ...]` markers are ALWAYS preserved verbatim — they
+    are the sanctioned way for the AI to hand a gap to a human editor.
     """
+    if chapter in _LENIENT_CHAPTERS:
+        # Lenient chapters: skip the aggressive scrub entirely. `[TO BE FILLED: ...]`
+        # is intentional; other `[X ...]` shapes are unlikely because the lenient
+        # prompt explicitly forbids them, but we don't rewrite them either — leave
+        # the raw output for editor review.
+        return text, []
+
     hits_by_raw: dict[str, int] = {}
 
     def _replace(m: re.Match) -> str:
         raw = m.group(0)
+        # Always preserve `[TO BE FILLED: ...]` — sanctioned editor marker.
+        if _TO_BE_FILLED_RE.fullmatch(raw):
+            return raw
         hits_by_raw[raw] = hits_by_raw.get(raw, 0) + 1
         return 'Not available'
 
@@ -299,9 +319,24 @@ def scrub_placeholders(text: str) -> tuple[str, list[dict]]:
     return cleaned, hits
 
 
-# Prompt block reused across every chapter — inverts the old rule #7 (which
-# actively encouraged placeholders). Kept out of `build_prompt` so it's easy
-# to audit at a glance. Renumbered rules match the new sequence in build_prompt.
+# KAU 2026-09-26 finalisation feedback: for two chapters the strict grounding
+# was making the narrative sound mechanical and short. KAU asked us to restore
+# the older expansive style for these, allow AI's general/global knowledge to
+# supplement the KB, and permit `[TO BE FILLED: ...]` markers where an
+# FPO-specific detail is needed. Editors know they must fill those in before
+# submission. All other chapters keep the strict 2026-09-19 grounding.
+_LENIENT_CHAPTERS = frozenset({'technical_feasibility', 'environmental_impact'})
+
+# Placeholder marker the LLM is allowed to emit on lenient chapters. Matches
+# exactly `[TO BE FILLED: <anything>]` (no other bracketed forms). The PDF /
+# DOCX renderers should preserve this verbatim so editors can find + fill it.
+_TO_BE_FILLED_RE = re.compile(r'\[TO BE FILLED:[^\]]+\]', re.IGNORECASE)
+
+
+# Prompt block reused across STRICT chapters (default) — inverts the old rule
+# #7 (which actively encouraged placeholders). Kept out of `build_prompt` so
+# it's easy to audit at a glance. Renumbered rules match the new sequence in
+# build_prompt.
 _HARD_RULES = (
     'STRICT OUTPUT RULES (violations will fail post-processing):\n'
     '1. Output ONLY the finished narrative prose — nothing else.\n'
@@ -342,6 +377,88 @@ _HARD_RULES = (
     'and let the reviewer draw conclusions.\n'
     '12. Start directly with the first sentence of the narrative.'
 )
+
+
+# Prompt block used for LENIENT chapters (Tech Feasibility, Environmental
+# Impact). Per KAU 2026-09-26: these sections benefit from the AI drawing on
+# general industry knowledge and open-source technical/environmental standards.
+# The AI may write expansively and use `[TO BE FILLED: <hint>]` placeholders
+# where an FPO-specific detail is needed — editors will complete them before
+# submission. Neutral bank-appraisal tone still enforced.
+_LENIENT_RULES = (
+    'OUTPUT RULES (lenient — this chapter allows general knowledge):\n'
+    '1. Output ONLY the finished narrative prose — nothing else.\n'
+    '2. NO markdown headers (###, ##), NO bullet lists, NO numbered lists.\n'
+    '3. NO meta-commentary like "Paragraph count:", "Tone:", "Final Polish:" '
+    'or references to this brief itself.\n'
+    '4. NO restating the chapter title as the first line.\n'
+    '5. Write in flowing paragraphs separated by a blank line.\n'
+    '6. Cite knowledge base entries inline as [KB #ID] where relevant, '
+    'and only when directly used — never as a trailing list.\n'
+    '7. KNOWLEDGE SOURCE: You may combine the PROJECT FACTS block, the '
+    'knowledge base entries, AND your own general knowledge of industry '
+    'best practice / open-source technical standards / environmental norms. '
+    'Prefer the FACTS block for anything project-specific, but you are '
+    'encouraged to elaborate with domain expertise the FACTS block does '
+    'not cover.\n'
+    '8. PLACEHOLDERS ALLOWED. Where an FPO-specific detail is required but '
+    'not available in the FACTS block or knowledge base, write exactly '
+    '`[TO BE FILLED: <short hint of what the editor should insert>]`. '
+    'Examples: `[TO BE FILLED: name of the effluent treatment vendor]`, '
+    '`[TO BE FILLED: month of PCB consent application]`. Use this pattern '
+    'ONLY — never the older `[X ...]`, `[Name of ...]`, `[insert ...]` '
+    'forms. Keep placeholders sparse — use them for genuinely FPO-specific '
+    'gaps, not to avoid writing about the topic.\n'
+    '9. Do not fabricate FPO-specific claims (certifications, buyers, '
+    'awards, land, staff, turnover figures). Use the FACTS block for those '
+    'or leave a `[TO BE FILLED: ...]` marker.\n'
+    '10. PROVENANCE. Any value tagged [system_default] in the FACTS block '
+    'is a KAU-configured platform assumption. When quoting such a value, '
+    'indicate that provenance in prose — e.g. "at the platform\'s default '
+    '12% discount rate".\n'
+    '11. NEUTRAL BANK-APPRAISAL LANGUAGE. Formal, analytical, evidence-based '
+    'prose. Do NOT use promotional adjectives: "highly bankable", '
+    '"state-of-the-art", "uniquely positioned", "transformative", '
+    '"compelling", "exceptional", "robust", "impressive". Do NOT recommend '
+    'loan sanction or project approval.\n'
+    '12. Start directly with the first sentence of the narrative.'
+)
+
+
+# Expanded briefs for lenient chapters — encourage the AI to actually
+# use its global knowledge on process technology / environmental standards.
+_LENIENT_CHAPTER_BRIEFS = {
+    'technical_feasibility': (
+        'Cover, in professional consulting-report depth: (a) the process '
+        'technology chosen and why it suits this commodity + Kerala context '
+        '(reference the FACTS block for chosen machinery), (b) an outline of '
+        'the process flow with major unit operations, (c) raw material '
+        'sourcing plan with realistic seasonality + storage considerations, '
+        '(d) plant and machinery selection rationale, (e) utility '
+        'requirements (power load, water, fuel, cold chain) with typical '
+        'industry ranges where FPO-specific numbers are not yet known, '
+        '(f) quality control approach and applicable statutory clearances '
+        '(FSSAI, BIS, HACCP as relevant to the commodity). Draw on '
+        'general industry best practice to add depth beyond the FACTS block, '
+        'and mark FPO-specific gaps with `[TO BE FILLED: <hint>]`. '
+        '800-1200 words.'
+    ),
+    'environmental_impact': (
+        'Cover, in professional consulting-report depth: (a) anticipated '
+        'environmental aspects and impacts of the chosen process (effluent '
+        'volume + typical BOD/COD load ranges, air emissions, solid waste '
+        'streams), (b) pollution control measures — ETP / STP sizing '
+        'guidance, air pollution controls, solid-waste segregation, '
+        '(c) statutory clearances required (Kerala State Pollution Control '
+        'Board consent-to-establish + consent-to-operate, FSSAI, local body '
+        'NOC, Consent for Green/Orange/Red category as applicable), '
+        '(d) climate-resilience measures (rainwater harvesting, solar, '
+        'energy efficiency), (e) occupational safety and worker welfare. '
+        'Use industry norms and open-source environmental standards where '
+        'FPO-specific numbers are not yet known, and mark those gaps with '
+        '`[TO BE FILLED: <hint>]`. 700-1000 words.'
+    ),
+}
 
 
 def _get_service_config() -> AIServiceConfig:
@@ -474,7 +591,7 @@ def generate_chapter(
     # despite the HARD RULES and replace them with "Not available". Hits are
     # recorded on DPRAIContent.placeholder_hits so admin can see WHICH
     # chapters were incomplete without diffing the text against the prompt.
-    text, scrubber_hits = scrub_placeholders(text)
+    text, scrubber_hits = scrub_placeholders(text, chapter=chapter)
 
     # Convert USD → INR using the configured rate, then record + apply the
     # spend against the monthly cap (auto-disables if breached).
@@ -740,7 +857,16 @@ def build_prompt(
         if project.primary_commodity_id else 'unspecified'
     )
     kb_block = format_for_prompt(kb_entries)
-    brief = _CHAPTER_BRIEF.get(chapter, 'Write 500-700 words of professional narrative.')
+    # Lenient chapters get a longer, more expansive brief; others use the
+    # standard tight brief. Falls back to a generic prompt for unknown keys.
+    if chapter in _LENIENT_CHAPTERS:
+        brief = _LENIENT_CHAPTER_BRIEFS.get(
+            chapter, _CHAPTER_BRIEF.get(chapter, 'Write 500-700 words of professional narrative.')
+        )
+        rules = _LENIENT_RULES
+    else:
+        brief = _CHAPTER_BRIEF.get(chapter, 'Write 500-700 words of professional narrative.')
+        rules = _HARD_RULES
 
     if calc_facts is None:
         calc_facts = format_calc_facts_for_prompt(project, compute(project))
@@ -756,7 +882,7 @@ def build_prompt(
         f'{calc_facts}\n\n'
         f'<knowledge_base>\n{kb_block}\n</knowledge_base>\n\n'
         f'BRIEF FOR THIS CHAPTER:\n{brief}\n\n'
-        f'{_HARD_RULES}'
+        f'{rules}'
     )
 
 

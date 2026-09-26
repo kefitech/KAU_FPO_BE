@@ -33,6 +33,7 @@ from apps.core.utils.responses import StandardResponse
 from apps.database.models import DPRDocument
 from apps.fpo.services.dpr.calculation import compute
 from apps.fpo.services.dpr.financials_excel import render_financials_workbook
+from apps.fpo.services.dpr.docx import render_docx_for_project
 from apps.fpo.services.dpr.pdf import (
     DPRValidationError,
     build_pdf_filename,
@@ -144,6 +145,43 @@ class DPRPdfDownloadView(APIView):
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         response['Content-Length'] = str(len(pdf_bytes))
+        return response
+
+
+class DPRDocxDownloadView(APIView):
+    """GET the DPR as an editable Word (.docx) file.
+
+    KAU 2026-09-26 finalisation ask C.3: FPOs asked for a Word-file
+    counterpart to the PDF so they can rearrange + edit the AI-generated
+    draft to fit their own narrative before submission. Same content as
+    the PDF (cover, tables, all 11 AI chapters); different presentation.
+
+    Sync execution mirrors the PDF endpoint. python-docx is faster than
+    WeasyPrint (~1-2s typical) so the timing profile is better, not worse.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Download the generated DPR as an editable Word file',
+        responses={200: bytes},
+    )
+    def get(self, request, project_uuid):
+        project, err = get_project_or_error(request.user, project_uuid)
+        if err:
+            return err
+        docx_bytes = render_docx_for_project(project)
+
+        raw_title = (project.title or '').strip() or 'dpr'
+        slug = ''.join(c if c.isalnum() else '_' for c in raw_title)[:40].strip('_') or 'dpr'
+        short_uuid = str(project.uuid)[:8]
+        filename = f'{slug}_{short_uuid}.docx'
+
+        response = HttpResponse(
+            docx_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = str(len(docx_bytes))
         return response
 
 

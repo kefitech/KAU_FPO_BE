@@ -135,6 +135,12 @@ project_patterns = [
         calc.DPRPdfDownloadView.as_view(),
         name='dpr-project-pdf',
     ),
+    # KAU 2026-09-26 finalisation ask C.3 — editable Word-file counterpart.
+    path(
+        'projects/<uuid:project_uuid>/docx/',
+        calc.DPRDocxDownloadView.as_view(),
+        name='dpr-project-docx',
+    ),
     # Excel export of the full financials tree — KAU pre-UAT reply §6.3.
     path(
         'projects/<uuid:project_uuid>/financials/excel/',
