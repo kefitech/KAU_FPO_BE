@@ -25,6 +25,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 from __future__ import annotations
 
 import logging
+import re
 from decimal import Decimal
 from typing import Optional
 
@@ -63,7 +64,10 @@ B) A REAL FACTUAL QUESTION about the KAU-FPO platform, FPO registration,
    DPR wizard, tier assessment, marketplace, expert booking, KAU schemes,
    or any topic covered by the CONTEXT below:
    → Answer in 2-4 sentences using ONLY facts from the CONTEXT. Be
-     concrete. Cite the CONTEXT numbers inline if helpful.
+     concrete. DO NOT add inline citations like "[1]", "[2, 3]", or
+     "(source: KB #4)" — the frontend already renders the sources
+     separately, so inline markers just clutter the reply. Write the
+     answer as clean flowing prose.
 
 C) A REAL FACTUAL QUESTION that is genuinely off-topic (weather, recipes,
    personal finance, banking process outside KAU, celebrity gossip, math
@@ -242,9 +246,29 @@ def generate_answer(
         )
 
     return {
-        'text':     response.text.strip(),
+        'text':     _strip_inline_citations(response.text).strip(),
         'tokens':   response.input_tokens + response.output_tokens,
         'cost_inr': cost_inr,
         'provider': response.provider,
         'model':    response.model,
     }
+
+
+# Defensive scrubber — even with the "no inline citations" prompt rule,
+# Gemini sometimes still emits `[1]`, `[1, 3]`, `[KB #4]`, `(source: KB #2)`
+# markers. Strip those before the reply reaches the widget so the prose
+# looks clean. Sources are still delivered separately in the API payload.
+_INLINE_CITE_RE = re.compile(
+    r'\s*(?:'
+    r'\[(?:KB\s*#?\d+|\d+(?:\s*,\s*\d+)*)\]'          # [1], [1, 2], [KB #4]
+    r'|\((?:source|ref)[^)]*\)'                       # (source: KB #2)
+    r')',
+    re.IGNORECASE,
+)
+
+
+def _strip_inline_citations(text: str) -> str:
+    """Remove `[N]`, `[N, M]`, `[KB #4]`, `(source: KB #2)` residuals."""
+    cleaned = _INLINE_CITE_RE.sub('', text or '')
+    # Collapse any doubled spaces the regex leaves behind.
+    return re.sub(r'  +', ' ', cleaned)
