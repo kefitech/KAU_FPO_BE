@@ -193,11 +193,6 @@ class ChatMessageView(APIView):
         if canned:
             return _reply(canned, generator='small_talk')
 
-        entries = retrieve(query=message, user_role=user_role, current_path=current_path)
-
-        if not entries:
-            return _reply(_fallback_reply(), generator='none', confidence=0.0)
-
         # Pull the last few turns so Gemini gets multi-turn context and can
         # answer "yes, and what about X?" style follow-ups. Excludes the
         # user turn we just saved (recent_turns is oldest-first).
@@ -205,6 +200,40 @@ class ChatMessageView(APIView):
         # Drop the last item — that's the message we're currently answering.
         if prior and prior[-1]['role'] == 'user' and prior[-1]['content'] == message:
             prior = prior[:-1]
+
+        # KAU 2026-09-27 tester feedback: pronoun follow-ups ("what documents
+        # do I need for that?") were retrieving generic entries because the
+        # search used ONLY the short current message. Fix — for short + likely
+        # elliptical follow-ups, append the previous user turn to the search
+        # query so FTS pulls topically-relevant entries. Kept as a soft
+        # heuristic: only fires when the current message looks like a
+        # follow-up (short + contains a pronoun / connector) AND we have a
+        # prior user turn to anchor on.
+        search_query = message
+        follow_up_markers = (
+            'that', 'this', 'it', 'those', 'these', 'the same',
+            'and ', 'also', 'what about',
+        )
+        looks_like_followup = (
+            len(message.split()) <= 12
+            and any(m in message.lower() for m in follow_up_markers)
+        )
+        if looks_like_followup and prior:
+            last_user = next(
+                (t['content'] for t in reversed(prior) if t['role'] == 'user'),
+                '',
+            )
+            if last_user:
+                search_query = f'{message} {last_user}'
+
+        entries = retrieve(
+            query=search_query,
+            user_role=user_role,
+            current_path=current_path,
+        )
+
+        if not entries:
+            return _reply(_fallback_reply(), generator='none', confidence=0.0)
 
         # Primary path — Gemini via the shared LLM gateway. Returns None if
         # the service is disabled, over budget, or the call errors — in any
