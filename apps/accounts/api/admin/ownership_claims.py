@@ -28,6 +28,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 
 from apps.core.models.generic import AuditLog
+from apps.core.permissions.fpo_scope import scope_fpo_queryset
 from apps.core.services.audit import AuditService
 from apps.core.utils.constants import UserRole, FPOStatus
 from apps.core.utils.pagination import StandardPagination
@@ -146,6 +147,11 @@ def _can_manage(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
+def _scoped_claims(user):
+    """Claims on FPOs within `user`'s row-level scope (sub-admins: assigned FPOs only)."""
+    return scope_fpo_queryset(FPOOwnershipClaim.objects.all(), user, fpo_field='fpo')
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Views
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,7 +176,7 @@ class OwnershipClaimListView(APIView):
             )
 
         qs = (
-            FPOOwnershipClaim.objects.select_related(
+            _scoped_claims(request.user).select_related(
         'fpo',
         'claimant',
         'claimant__profile',
@@ -240,7 +246,7 @@ class OwnershipClaimDetailView(APIView):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
         try:
-            claim = FPOOwnershipClaim.objects.select_related(
+            claim = _scoped_claims(request.user).select_related(
                 'fpo', 'claimant', 'claimant__profile', 'reviewed_by'
             ).get(id=claim_id)
         except FPOOwnershipClaim.DoesNotExist:
@@ -606,7 +612,7 @@ class OwnershipClaimRejectView(APIView):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
         try:
-            claim = FPOOwnershipClaim.objects.select_related('fpo', 'claimant').get(id=claim_id)
+            claim = _scoped_claims(request.user).select_related('fpo', 'claimant').get(id=claim_id)
         except FPOOwnershipClaim.DoesNotExist:
             return StandardResponse.error('Claim not found.', status_code=status.HTTP_404_NOT_FOUND)
 
@@ -682,7 +688,7 @@ class OwnershipClaimRequestDocsView(APIView):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
         try:
-            claim = FPOOwnershipClaim.objects.select_related('fpo', 'claimant').get(id=claim_id)
+            claim = _scoped_claims(request.user).select_related('fpo', 'claimant').get(id=claim_id)
         except FPOOwnershipClaim.DoesNotExist:
             return StandardResponse.error('Claim not found.', status_code=status.HTTP_404_NOT_FOUND)
 
