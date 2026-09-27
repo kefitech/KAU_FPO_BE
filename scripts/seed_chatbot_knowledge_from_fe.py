@@ -218,6 +218,29 @@ _ROUTE_TITLE_OVERRIDES = {
     # picking up a footer / greeting; override with the actual purpose.
     '/v1/login':                         'Login (v1)',
     '/v1/register':                      'Sign up (v1)',
+    # CBBO — profile pages have OTP text at top, detail pages pick tabs.
+    '/cbbo/profile':                     'CBBO Profile',
+    '/cbbo/reports/[id]':                'Capacity Building Report Detail',
+    '/cbbo/verifications/[id]':          'FPO Verification Detail',
+    # Expert — dashboard picks a filter, profile picks OTP text.
+    '/expert/dashboard':                 'Expert Dashboard',
+    '/expert/dashboard/fpo/[fpoId]':     'FPO Booking History',
+    '/expert/profile':                   'Expert Profile',
+    # Government — routes at root + several detail / edit / list pages need
+    # cleaner titles. `/government` (root) is the officials directory.
+    '/government':                       'Government Officials Directory',
+    '/government/fpos/[id]':             'FPO Detail (Government view)',
+    '/government/profile':               'Government Official Profile',
+    '/government/schemes':               'Government Schemes List',
+    '/government/schemes/[id]/edit':     'Edit Government Scheme',
+    '/government/training/[id]':         'Training Session Detail',
+    '/government/training/new':          'New Training Session',
+    # Buyer — several slug fallbacks + a filter picked up as title.
+    '/buyer/dashboard':                  'Buyer Dashboard',
+    '/buyer/inbox':                      'Buyer Inbox',
+    '/buyer/products/fpo/[id]':          'FPO Product Catalogue (Buyer view)',
+    '/buyer/profile':                    'Buyer Profile',
+    '/buyer/status':                     'Buyer Verification Status',
 }
 
 
@@ -408,12 +431,38 @@ _PHASES = {
             'audiences':     ['public', 'all'],
         },
     ],
-    # Placeholders for future phases — same shape when we get to them.
-    # 'cbbo':       [{'sub_root': 'src/app/cbbo', ...}],
-    # 'expert':     [{'sub_root': 'src/app/expert', ...}],
-    # 'government': [{'sub_root': 'src/app/government', ...}],
-    # 'buyer':      [{'sub_root': 'src/app/buyer', ...}],
-    # 'admin':      [{'sub_root': 'src/app/admin', ...}],
+    # Phase 4 — smaller portals batched together. Same parser, different
+    # audience per portal so entries stay role-scoped.
+    'cbbo': [
+        {
+            'sub_root':      'src/app/cbbo',
+            'topic_prefix':  'CBBO Portal — ',
+            'audiences':     ['cbbo'],
+        },
+    ],
+    'expert': [
+        {
+            'sub_root':      'src/app/expert',
+            'topic_prefix':  'Expert Portal — ',
+            'audiences':     ['expert'],
+        },
+    ],
+    'government': [
+        {
+            'sub_root':      'src/app/government',
+            'topic_prefix':  'Government Portal — ',
+            'audiences':     ['government'],
+        },
+    ],
+    'buyer': [
+        {
+            'sub_root':      'src/app/buyer',
+            'topic_prefix':  'Buyer Portal — ',
+            'audiences':     ['external_buyer'],
+        },
+    ],
+    # Placeholder for the last phase.
+    # 'admin': [{'sub_root': 'src/app/admin', ...}],
 }
 
 
