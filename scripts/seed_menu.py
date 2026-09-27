@@ -38,6 +38,19 @@ def seed_menu():
     if moved_deleted:
         print(f"🗑️  Removed {moved_deleted} menu item(s) now under AI Recommendation: {', '.join(moved_keys)}")
 
+    # ── Retire DPR admin sub-pages — now accessed via /admin/dpr ─────────────
+    # KAU 2026-09-27: the DPR admin surfaces (config, master data,
+    # applicability, field rules, knowledge, risk matrix) are reachable
+    # from inside the Manage DPRs page at /admin/dpr. Keeping them as
+    # separate sidebar entries just clutters the nav.
+    dpr_sub_keys = [
+        'menu.dpr_config', 'menu.dpr_master_data', 'menu.dpr_applicability',
+        'menu.dpr_field_rules', 'menu.dpr_knowledge', 'menu.dpr_risk_matrix',
+    ]
+    dpr_sub_deleted, _ = MenuItem.objects.filter(label_key__in=dpr_sub_keys).delete()
+    if dpr_sub_deleted:
+        print(f"🗑️  Removed {dpr_sub_deleted} DPR sub-page menu item(s): {', '.join(dpr_sub_keys)}")
+
     # ── Groups ────────────────────────────────────────────────────────────────
     super_admin_group, _ = Group.objects.get_or_create(name='super_admin')
     sub_admin_group, _   = Group.objects.get_or_create(name='sub_admin')
@@ -189,53 +202,10 @@ def seed_menu():
         roles     = [super_admin_group, sub_admin_group],
         order     = 18,
     )
-    seed_item(
-        label_key = 'menu.dpr_config',
-        path      = '/admin/dpr-config',
-        icon      = 'sliders-horizontal',
-        roles     = [super_admin_group],
-        order     = 19,
-    )
-    # DPR admin surfaces — 2026-09-19 sweep.
-    # These pages have existed on the FE for a while; the menu entries
-    # were missing so super_admin had to type the URL. Placed at the end
-    # of the super_admin block (order 30-34); MenuItem.order is a
-    # PositiveIntegerField so decimals aren't allowed.
-    seed_item(
-        label_key = 'menu.dpr_master_data',
-        path      = '/admin/dpr/master-data',
-        icon      = 'database',
-        roles     = [super_admin_group],
-        order     = 30,
-    )
-    seed_item(
-        label_key = 'menu.dpr_applicability',
-        path      = '/admin/dpr-applicability',
-        icon      = 'grid-3x3',
-        roles     = [super_admin_group],
-        order     = 31,
-    )
-    seed_item(
-        label_key = 'menu.dpr_field_rules',
-        path      = '/admin/dpr-field-rules',
-        icon      = 'git-branch',
-        roles     = [super_admin_group],
-        order     = 32,
-    )
-    seed_item(
-        label_key = 'menu.dpr_knowledge',
-        path      = '/admin/dpr-knowledge',
-        icon      = 'book-open',
-        roles     = [super_admin_group],
-        order     = 33,
-    )
-    seed_item(
-        label_key = 'menu.dpr_risk_matrix',
-        path      = '/admin/dpr-risk-matrix',
-        icon      = 'shield-alert',
-        roles     = [super_admin_group],
-        order     = 34,
-    )
+    # KAU 2026-09-27: DPR sub-pages (config, master data, applicability,
+    # field rules, knowledge, risk matrix) removed from the sidebar. They
+    # remain accessible via the tabs / sub-nav inside /admin/dpr — one
+    # sidebar entry now covers the whole DPR admin surface.
     seed_item(
         label_key = 'menu.ai_services',
         path      = '/admin/ai-services',
