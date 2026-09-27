@@ -214,6 +214,10 @@ _ROUTE_TITLE_OVERRIDES = {
     '/fpo/products/[id]/edit':           'Edit Product',
     # FPO Registration Wizard
     '/fpo/register':                     'FPO Registration Wizard',
+    # Auth — the v1 pages don't have a clean h1 title so the parser was
+    # picking up a footer / greeting; override with the actual purpose.
+    '/v1/login':                         'Login (v1)',
+    '/v1/register':                      'Sign up (v1)',
 }
 
 
@@ -391,6 +395,17 @@ _PHASES = {
             'sub_root':      'src/app/fpo/(wizard)',
             'topic_prefix':  'FPO Registration Wizard — ',
             'audiences':     ['public', 'fpo_manager', 'all'],
+        },
+    ],
+    # Phase 3 — Auth surfaces. All 9 pages are pre-login flows so the
+    # audience is anonymous (public + all). Two independent versions of
+    # the login screen exist (v1 + v2); both are seeded so questions
+    # about either version land on the right entry.
+    'auth': [
+        {
+            'sub_root':      'src/app/(auth)',
+            'topic_prefix':  'Auth — ',
+            'audiences':     ['public', 'all'],
         },
     ],
     # Placeholders for future phases — same shape when we get to them.
