@@ -73,7 +73,7 @@ def seed_chatbot_knowledge():
             'audiences': ['public', 'all'],
             'pages': ['/contact-us'],
             'body_en': (
-                'For help with the KAU-FPO Platform, email kau-fpo@kau.in or use the '
+                'For help with the KAU-FPO Platform, email de@kau.in or use the '
                 'feedback form at /contact-us. KAU responds within 2 business days.'
             ),
             'keywords': 'contact help support email',

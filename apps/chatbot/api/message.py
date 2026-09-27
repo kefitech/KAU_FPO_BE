@@ -282,5 +282,5 @@ def _fallback_reply() -> str:
     """
     return (
         "I couldn't find an answer to that. Please rephrase your question, "
-        "or contact KAU support at kau-fpo@kau.in for help."
+        "or contact KAU support at de@kau.in for help."
     )
