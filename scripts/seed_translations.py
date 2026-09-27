@@ -4015,6 +4015,32 @@ def seed_menu_translations(languages):
         # Jobin follow-up (KAU 2026-09-21)
         ('expert_stats',           'Booking Overview',         'ബുക്കിംഗ് അവലോകനം'),
         ('fpo_trainings',          'Training Sessions',        'പരിശീലന സെഷനുകൾ'),
+        # KAU 2026-09-27: fill 18 missing menu labels so CBBO / Expert /
+        # Government / Buyer + a few FPO sidebar items stop showing the
+        # raw label_key text (e.g. "menu.cbbo_dashboard") in the sidebar.
+        # CBBO portal
+        ('cbbo_dashboard',         'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('cbbo_verifications',     'FPO Verifications',        'FPO വെരിഫിക്കേഷനുകൾ'),
+        ('cbbo_reports',           'Capacity Building Reports','കപ്പാസിറ്റി ബിൽഡിംഗ് റിപ്പോർട്ടുകൾ'),
+        ('cbbo_profile',           'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
+        # Expert portal
+        ('expert_dashboard',       'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('expert_availability',    'Availability',             'ലഭ്യത'),
+        ('expert_profile',         'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
+        # Government portal
+        ('government_dashboard',   'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
+        ('government_profile',     'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
+        ('government_fpos',        'FPOs in Jurisdiction',     'അധികാരപരിധിയിലെ FPOകൾ'),
+        ('government_schemes',     'Schemes',                  'സ്‌കീമുകൾ'),
+        ('government_training',    'Training Sessions',        'ട്രെയിനിംഗ് സെഷനുകൾ'),
+        # Buyer portal
+        ('buyer_profile',          'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
+        # FPO portal (previously-missing items)
+        ('fpo_experts',            'Experts',                  'വിദഗ്ധർ'),
+        ('fpo_inbox',              'Inbox',                    'ഇൻബോക്സ്'),
+        ('fpo_schemes',            'Schemes & Subsidies',      'സ്‌കീമുകളും സബ്‌സിഡികളും'),
+        ('fpo_team',               'Team',                     'ടീം'),
+        ('fpo_tier_assessment',    'Tier Assessment',          'ടയർ അസസ്‌മെന്റ്'),
     ]
 
     count = 0
