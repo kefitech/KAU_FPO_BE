@@ -1731,7 +1731,14 @@ def seed_frontend_ui_translations(languages):
             'tab_gallery':                   'Gallery',
             'tab_team':                      'Our Team',
             'tab_quick_links':               'Quick Links',
+            'tab_kvk_links':                 'KVK Links',
             'tab_partners':                  'Partners',
+            # KVK tab — KVK-prefixed variants so the KVK Links admin tab
+            # never inherits Quick-Link wording from the shared dialog keys.
+            'kvk_section_title':             'KVK Links',
+            'kvk_delete_title':              'Delete KVK Link',
+            'dialog_add_kvk_title':          'Add KVK Link',
+            'dialog_edit_kvk_title':         'Edit KVK Link',
             'tab_news_sources':              'News Sources',
             'tab_feedback':                  'Feedback',
             'tab_youtube': 'YouTube',
@@ -1984,6 +1991,15 @@ def seed_frontend_ui_translations(languages):
             'delete_title':            'Delete Quick Link',
             'delete_description':      'Are you sure you want to delete "{name}"?',
             'empty_state':             'No quick links added yet.',
+        },
+
+        # Public /krishi-vigyan-kendra page — labels fetched via useTranslations("kvk")
+        'kvk': {
+            'title':       'Krishi Vigyan Kendra Directory',
+            'subtitle':    'Krishi Vigyan Kendra',
+            'description': "Krishi Vigyan Kendras (KVKs) are Kerala Agricultural University's district-level agricultural extension centres. Click any card to visit that KVK's website.",
+            'loading':     'Loading KVKs…',
+            'empty':       'No KVK entries have been added yet.',
         },
 
         'admin_partners': {
@@ -3329,6 +3345,18 @@ def seed_fpo_portal_ml_translations(languages):
         'admin_site_content.tab_gallery':                'ഗ്യാലറി',
         'admin_site_content.tab_team':                   'ഞങ്ങളുടെ ടീം',
         'admin_site_content.tab_quick_links':            'ദ്രുത ലിങ്കുകൾ',
+        'admin_site_content.tab_kvk_links':              'കൃഷി വിജ്ഞാൻ കേന്ദ്ര ലിങ്കുകൾ',
+        'admin_site_content.kvk_section_title':          'കൃഷി വിജ്ഞാൻ കേന്ദ്ര ലിങ്കുകൾ',
+        'admin_site_content.kvk_delete_title':           'കൃഷി വിജ്ഞാൻ കേന്ദ്ര ലിങ്ക് ഇല്ലാതാക്കുക',
+        'admin_site_content.dialog_add_kvk_title':       'കൃഷി വിജ്ഞാൻ കേന്ദ്ര ലിങ്ക് ചേർക്കുക',
+        'admin_site_content.dialog_edit_kvk_title':      'കൃഷി വിജ്ഞാൻ കേന്ദ്ര ലിങ്ക് എഡിറ്റ് ചെയ്യുക',
+
+        # ── kvk (public /krishi-vigyan-kendra page) ────────────────────────────
+        'kvk.title':                                     'കൃഷി വിജ്ഞാൻ കേന്ദ്ര ഡയറക്ടറി',
+        'kvk.subtitle':                                  'കൃഷി വിജ്ഞാൻ കേന്ദ്ര',
+        'kvk.description':                               'കൃഷി വിജ്ഞാൻ കേന്ദ്രങ്ങൾ (KVKs) കേരള കാർഷിക സർവ്വകലാശാലയുടെ ജില്ലാതല കാർഷിക വിജ്ഞാന വ്യാപന കേന്ദ്രങ്ങളാണ്. ഓരോ KVK-യുടെ വെബ്‌സൈറ്റ് സന്ദർശിക്കാൻ കാർഡിൽ ക്ലിക്ക് ചെയ്യുക.',
+        'kvk.loading':                                   'കൃഷി വിജ്ഞാൻ കേന്ദ്രങ്ങൾ ലോഡ് ചെയ്യുന്നു…',
+        'kvk.empty':                                     'കൃഷി വിജ്ഞാൻ കേന്ദ്രങ്ങൾ ഇതുവരെ ചേർത്തിട്ടില്ല.',
         'admin_site_content.tab_partners':               'പങ്കാളികൾ',
         'admin_site_content.tab_news_sources':           'വാർത്താ ഉറവിടങ്ങൾ',
         'admin_site_content.tab_feedback':               'ഫീഡ്‌ബാക്ക്',

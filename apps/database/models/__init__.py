@@ -53,6 +53,7 @@ from .cms import (
     FAQ,
     FAQCategory,
     QuickLink,
+    KVKLink,
     Partner,
     YoutubePlaylist,
     NewsSource,

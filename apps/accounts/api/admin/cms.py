@@ -33,7 +33,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.cms import (
     SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,
-    QuickLink, Partner, NewsSource, NewsSourceCategory, TeamMember, TeamSection, YoutubePlaylist, GalleryAlbum, GalleryPhoto, DocumentLibrary,
+    QuickLink, KVKLink, Partner, NewsSource, NewsSourceCategory, TeamMember, TeamSection, YoutubePlaylist, GalleryAlbum, GalleryPhoto, DocumentLibrary,
     Feedback, FeedbackStatus,
 )
 from apps.database.models.language import Language
@@ -710,6 +710,170 @@ class QuickLinkDeactivateView(APIView):
         obj.is_active = False
         obj.save(update_fields=['is_active'])
         cache.delete('public:quick_links')
+        return StandardResponse.success(message='Deactivated.')
+
+
+# =============================================================================
+# KVK LINKS (Krishi Vigyan Kendra directory) — KAU 2026-09-27
+# Mirrors QuickLink CRUD. Separate model + endpoints so the /krishi-vigyan-kendra
+# public page has its own cache key + admin surface without co-mingling with
+# the landing-page Quick Links.
+# =============================================================================
+
+
+class KVKLinkSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = KVKLink
+        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'order', 'is_active', 'created_at']
+        extra_kwargs = {
+            'logo':      {'write_only': True, 'required': False, 'allow_null': True},
+            'is_active': {'default': True},
+            'order':     {'default': 0},
+        }
+
+    def get_logo_url(self, obj):
+        request = self.context.get('request')
+        if obj.logo and request:
+            return request.build_absolute_uri(obj.logo.url)
+        return obj.logo.url if obj.logo else None
+
+    def validate_logo(self, file):
+        if file is None:
+            return None
+        if file.size > _LOGO_MAX_SIZE:
+            raise serializers.ValidationError('Logo must not exceed 5 MB.')
+        return _compress_logo(file)
+
+
+class KVKLinkListView(APIView):
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='List all KVK links',
+        responses={200: KVKLinkSerializer(many=True)},
+    )
+    def get(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        qs = KVKLink.objects.all()
+        serializer = KVKLinkSerializer(qs, many=True, context={'request': request})
+        return StandardResponse.success(serializer.data, 'KVK links retrieved.')
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='Create a KVK link',
+        description='Multipart form: `name`, `url`, `logo` (image file), `order` (int), `is_active` (optional).',
+        request=KVKLinkSerializer,
+        responses={201: KVKLinkSerializer},
+    )
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        serializer = KVKLinkSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save()
+        cache.delete('public:kvk_links')
+        return StandardResponse.created(
+            data=KVKLinkSerializer(obj, context={'request': request}).data,
+            message='KVK link created.',
+        )
+
+
+class KVKLinkDetailView(APIView):
+
+    def _get(self, pk):
+        try:
+            return KVKLink.objects.get(pk=pk)
+        except KVKLink.DoesNotExist:
+            return None
+
+    @extend_schema(tags=['Admin - CMS'], summary='Update a KVK link',
+                   description='Multipart form — all fields optional (partial update).',
+                   request=KVKLinkSerializer, responses={200: KVKLinkSerializer})
+    def patch(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        serializer = KVKLinkSerializer(obj, data=request.data, partial=True,
+                                       context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save()
+        cache.delete('public:kvk_links')
+        return StandardResponse.success(
+            data=KVKLinkSerializer(obj, context={'request': request}).data,
+            message='Updated.',
+        )
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete a KVK link')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        if obj.logo:
+            obj.logo.delete(save=False)
+        obj.delete()
+        cache.delete('public:kvk_links')
+        return StandardResponse.success(message='Deleted.')
+
+
+class KVKLinkLogoDeleteView(APIView):
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete logo from a KVK link')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = KVKLink.objects.get(pk=pk)
+        except KVKLink.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        if not obj.logo:
+            return StandardResponse.error('No logo to delete.', status_code=status.HTTP_400_BAD_REQUEST)
+        obj.logo.delete(save=False)
+        obj.logo = None
+        obj.save(update_fields=['logo'])
+        cache.delete('public:kvk_links')
+        return StandardResponse.success(message='Logo deleted.')
+
+
+class KVKLinkActivateView(APIView):
+
+    @extend_schema(tags=['Admin - CMS'], summary='Activate a KVK link')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = KVKLink.objects.get(pk=pk)
+        except KVKLink.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = True
+        obj.save(update_fields=['is_active'])
+        cache.delete('public:kvk_links')
+        return StandardResponse.success(message='Activated.')
+
+
+class KVKLinkDeactivateView(APIView):
+
+    @extend_schema(tags=['Admin - CMS'], summary='Deactivate a KVK link')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = KVKLink.objects.get(pk=pk)
+        except KVKLink.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = False
+        obj.save(update_fields=['is_active'])
+        cache.delete('public:kvk_links')
         return StandardResponse.success(message='Deactivated.')
 
 

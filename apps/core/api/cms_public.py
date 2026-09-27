@@ -234,6 +234,40 @@ class PublicQuickLinksView(APIView):
         return StandardResponse.success(data=data)
 
 
+class PublicKVKLinksView(APIView):
+    """Public list of Krishi Vigyan Kendras — KAU 2026-09-27.
+    Cache key `public:kvk_links`, invalidated by admin CRUD on KVKLink.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Public - CMS'],
+        summary='Get active KVK links',
+        description='Returns all active Krishi Vigyan Kendra entries (logo + URL) '
+                    'for the /krishi-vigyan-kendra public page. Redis-cached (24h). '
+                    'Ordered by `order` ascending. No auth required.',
+    )
+    def get(self, request):
+        cached = cache.get('public:kvk_links')
+        if cached is not None:
+            return StandardResponse.success(data=cached)
+
+        from apps.database.models import KVKLink
+        qs   = KVKLink.objects.filter(is_active=True).order_by('order', 'id')
+        data = [
+            {
+                'id':       kvk.id,
+                'name':     kvk.name,
+                'url':      kvk.url,
+                'logo_url': request.build_absolute_uri(kvk.logo.url) if kvk.logo else None,
+                'order':    kvk.order,
+            }
+            for kvk in qs
+        ]
+        cache.set('public:kvk_links', data, timeout=60 * 60 * 24)
+        return StandardResponse.success(data=data)
+
+
 class PublicPartnersView(APIView):
     permission_classes = [AllowAny]
 
