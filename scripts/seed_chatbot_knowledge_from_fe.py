@@ -241,6 +241,51 @@ _ROUTE_TITLE_OVERRIDES = {
     '/buyer/products/fpo/[id]':          'FPO Product Catalogue (Buyer view)',
     '/buyer/profile':                    'Buyer Profile',
     '/buyer/status':                     'Buyer Verification Status',
+    # Admin — every list page's `.../[id]/edit` and `.../new` sub-page
+    # picks up an "Active" toggle label or a placeholder phone number
+    # ("98765 43210"). Override with proper CRUD-verb titles.
+    '/admin/ai-recommendation/crop-package-of-practices/[id]/edit': 'Edit Crop Package of Practices',
+    '/admin/ai-recommendation/crop-package-of-practices/new':       'New Crop Package of Practices',
+    '/admin/ai-recommendation/crop-zone-profiles/[id]/edit':        'Edit Crop Zone Profile',
+    '/admin/ai-recommendation/crop-zone-profiles/new':              'New Crop Zone Profile',
+    '/admin/ai-recommendation/ml-models/[id]/feedback':             'ML Model Feedback',
+    '/admin/announcements/[id]/edit':                               'Edit Announcement',
+    '/admin/announcements/new':                                     'New Announcement',
+    '/admin/applications/[id]':                                     'FPO Application Detail',
+    '/admin/categories/[id]/edit':                                  'Edit Category',
+    '/admin/categories/new':                                        'New Category',
+    '/admin/cbbos/[id]/edit':                                       'Edit CBBO Officer',
+    '/admin/cbbos/new':                                             'Add CBBO Officer',
+    '/admin/dpr/projects/[uuid]':                                   'DPR Project Detail (Admin view)',
+    '/admin/dpr/projects/fpo/[fpo_id]':                             'DPR Projects by FPO',
+    '/admin/experts/[id]/bookings/fpo/[fpoId]':                     'Expert Bookings by FPO',
+    '/admin/experts/[id]/bookings':                                 'Expert Bookings Detail',
+    '/admin/experts/[id]/edit':                                     'Edit Expert',
+    '/admin/experts/new':                                           'Add Expert',
+    '/admin/faqs/[id]/edit':                                        'Edit FAQ',
+    '/admin/faqs/new':                                              'New FAQ',
+    '/admin/inbox':                                                 'Admin Inbox',
+    '/admin/languages/[id]/edit':                                   'Edit Language',
+    '/admin/languages/new':                                         'Add Language',
+    '/admin/menu-items/[id]/edit':                                  'Edit Menu Item',
+    '/admin/menu-items/new':                                        'New Menu Item',
+    '/admin/notification-channel-settings/[id]/edit':               'Edit Notification Channel Settings',
+    '/admin/notification-channel-settings/new':                     'New Notification Channel Settings',
+    '/admin/notification-template-codes/[id]/edit':                 'Edit Notification Template Code',
+    '/admin/notification-template-codes/new':                       'New Notification Template Code',
+    '/admin/notification-templates/[id]/edit':                      'Edit Notification Template',
+    '/admin/notification-templates/new':                            'New Notification Template',
+    '/admin/roles/[id]/edit':                                       'Edit Role',
+    '/admin/roles/new':                                             'New Role',
+    '/admin/schemes/[id]/edit':                                     'Edit Scheme',
+    '/admin/schemes/new':                                           'Add Scheme',
+    '/admin/settings':                                              'Admin Settings',
+    '/admin/settings/profile':                                      'Admin Profile Settings',
+    '/admin/settings/security':                                     'Admin Security Settings',
+    '/admin/sub-admins/[id]/edit':                                  'Edit Sub-Admin',
+    '/admin/sub-admins/new':                                        'Add Sub-Admin',
+    '/admin/translations/[id]/edit':                                'Edit Translation',
+    '/admin/translations/new':                                      'New Translation',
 }
 
 
@@ -461,8 +506,17 @@ _PHASES = {
             'audiences':     ['external_buyer'],
         },
     ],
-    # Placeholder for the last phase.
-    # 'admin': [{'sub_root': 'src/app/admin', ...}],
+    # Phase 5 — the biggest surface: KAU admin. Covers 80+ pages across
+    # ai-recommendation, DPR admin, notifications, translations, user
+    # management, site content and settings. Audience is both super_admin
+    # + sub_admin so a locked-down sub-admin can still get KB help.
+    'admin': [
+        {
+            'sub_root':      'src/app/admin',
+            'topic_prefix':  'Admin Portal — ',
+            'audiences':     ['super_admin', 'sub_admin'],
+        },
+    ],
 }
 
 
