@@ -564,10 +564,11 @@ class QuickLinkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = QuickLink
-        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'is_active', 'created_at']
+        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'is_active', 'order', 'created_at']
         extra_kwargs = {
             'logo':      {'write_only': True, 'required': True},
             'is_active': {'default': True},
+            'order':     {'required': False},
         }
 
     def get_logo_url(self, obj):
@@ -679,6 +680,40 @@ class QuickLinkLogoDeleteView(APIView):
         obj.save(update_fields=['logo'])
         cache.delete('public:quick_links')
         return StandardResponse.success(message='Logo deleted.')
+
+
+class QuickLinkReorderView(APIView):
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='Bulk reorder quick links',
+        description=(
+            'Accepts `{"items": [{"id": 1, "order": 0}, {"id": 3, "order": 1}, ...]}`. '
+            'Updates each row\'s `order` field in a single transaction. '
+            'Only ids listed are updated — omitted rows keep their existing order.'
+        ),
+    )
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        items = request.data.get('items') or []
+        if not isinstance(items, list) or not items:
+            return StandardResponse.error(
+                'items must be a non-empty list of {id, order} objects.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        from django.db import transaction as _tx
+        try:
+            with _tx.atomic():
+                for row in items:
+                    QuickLink.objects.filter(pk=row['id']).update(order=int(row['order']))
+        except (KeyError, TypeError, ValueError):
+            return StandardResponse.error(
+                'Each item must have an integer id and integer order.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        cache.delete('public:quick_links')
+        return StandardResponse.success(message='Order updated.')
 
 
 class QuickLinkActivateView(APIView):

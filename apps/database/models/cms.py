@@ -115,9 +115,10 @@ class QuickLink(BaseModel):
     url       = models.URLField(max_length=500)
     logo      = models.ImageField(upload_to=_quick_link_logo_path, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    order     = models.PositiveIntegerField(default=0, help_text='Display order — lower first')
 
     class Meta:
-        ordering = ['id']
+        ordering = ['order', 'id']
 
     def __str__(self):
         return self.name

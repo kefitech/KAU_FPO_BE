@@ -73,6 +73,7 @@ from .cms import (
     QuickLinkLogoDeleteView,
     QuickLinkActivateView,
     QuickLinkDeactivateView,
+    QuickLinkReorderView,
     KVKLinkListView,
     KVKLinkDetailView,
     KVKLinkLogoDeleteView,
@@ -250,6 +251,7 @@ urlpatterns = [
     path('faqs/<int:pk>/',            FAQDetailView.as_view(),          name='admin-faqs-detail'),
 
     path('quick-links/',                          QuickLinkListView.as_view(),       name='admin-quick-links-list'),
+    path('quick-links/reorder/',                  QuickLinkReorderView.as_view(),    name='admin-quick-links-reorder'),
     path('quick-links/<int:pk>/',                 QuickLinkDetailView.as_view(),     name='admin-quick-links-detail'),
     path('quick-links/<int:pk>/logo/',            QuickLinkLogoDeleteView.as_view(), name='admin-quick-links-logo-delete'),
     path('quick-links/<int:pk>/activate/',        QuickLinkActivateView.as_view(),   name='admin-quick-links-activate'),
