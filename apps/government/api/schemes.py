@@ -3,6 +3,10 @@ Government - Schemes and Subsidies (write access)
 GET/POST  /api/government/schemes/
 GET/PATCH/DELETE  /api/government/schemes/{id}/
 Government officials can add/edit scheme catalog entries.
+
+List query params:
+  ?search=<text>
+  ?created_by=me | others | <user_id>
 """
 from rest_framework import serializers, status
 from rest_framework.views import APIView
@@ -54,7 +58,13 @@ class GovernmentSchemeListView(APIView):
     def get(self, request):
         if not is_government_user(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-        qs = Scheme.objects.filter(is_deleted=False).order_by('order', 'name_en')
+        # select_related avoids one extra query per row for created_by_name
+        qs = (
+            Scheme.objects.filter(is_deleted=False)
+            .select_related('created_by')
+            .order_by('order', 'name_en')
+        )
+
         search = request.query_params.get('search')
         if search:
             qs = qs.filter(
@@ -63,6 +73,25 @@ class GovernmentSchemeListView(APIView):
                 Q(administering_body__icontains=search) |
                 Q(objective__icontains=search)
             )
+
+        # ?category=credit  or  ?category=credit,insurance (multi-select)
+        category = request.query_params.get('category')
+        if category:
+            valid = {c.value for c in SchemeCategory}
+            categories = [c for c in category.split(',') if c in valid]
+            if categories:
+                qs = qs.filter(category__in=categories)
+
+        # ?created_by=me | others | <user_id>
+        created_by = request.query_params.get('created_by')
+        if created_by == 'me':
+            qs = qs.filter(created_by=request.user)
+        elif created_by == 'others':
+            # exclude() keeps schemes with no creator (created_by is NULL)
+            qs = qs.exclude(created_by=request.user)
+        elif created_by and created_by.isdigit():
+            qs = qs.filter(created_by_id=int(created_by))
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         data = SchemeSerializer(page, many=True).data
@@ -79,7 +108,6 @@ class GovernmentSchemeListView(APIView):
             message='Scheme created.',
             status_code=201,
         )
-
 
 class GovernmentSchemeDetailView(APIView):
     def get(self, request, pk):
