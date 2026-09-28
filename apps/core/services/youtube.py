@@ -1,10 +1,17 @@
 """
 YouTube playlist feed helper.
 
-Reads the public Atom feed YouTube publishes for every playlist
-(https://www.youtube.com/feeds/videos.xml?playlist_id=...), so no API key is
-needed. The feed lists at most 15 videos. Results are cached in Redis because
-the landing page reads them on every visit.
+Uses the YouTube Data API v3 when an active key is configured in
+ExternalAPISettings (service='youtube_api'), managed from the admin portal's
+External APIs page, the same way as the weather key. The API returns up to
+50 videos per playlist and costs 2 quota units per lookup.
+
+Falls back to the public Atom feed
+(https://www.youtube.com/feeds/videos.xml?playlist_id=...) when no key is
+configured or the API call fails. The feed needs no key but lists at most 15
+videos and is not an officially supported endpoint.
+
+Results are cached in Redis because the landing page reads them on every visit.
 """
 import logging
 import re
@@ -17,6 +24,8 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 FEED_URL        = 'https://www.youtube.com/feeds/videos.xml'
+API_BASE_URL    = 'https://www.googleapis.com/youtube/v3'
+API_MAX_RESULTS = 50            # playlistItems.list page size limit
 FEED_CACHE_TTL  = 60 * 60 * 6   # 6 hours
 FAIL_CACHE_TTL  = 60 * 10       # retry a failed feed after 10 minutes
 _FAILED         = '__failed__'
@@ -74,11 +83,83 @@ def _parse_feed(xml_text):
     }
 
 
+def _get_youtube_api_key():
+    """Return the active youtube_api key from ExternalAPISettings, or None."""
+    from apps.database.models import ExternalAPISettings
+    from apps.notifications.utils import decrypt_config
+
+    settings_obj = ExternalAPISettings.objects.filter(
+        service=ExternalAPISettings.SERVICE_YOUTUBE, is_active=True
+    ).first()
+    if not settings_obj or not settings_obj.config:
+        return None
+    return decrypt_config(settings_obj.config).get('api_key') or None
+
+
+def _fetch_from_api(playlist_id, api_key):
+    # Key goes in a header, not the query string, so it never appears in
+    # logged request URLs or exception messages.
+    headers = {'X-Goog-Api-Key': api_key}
+
+    response = httpx.get(
+        f'{API_BASE_URL}/playlists',
+        params={'part': 'snippet', 'id': playlist_id},
+        headers=headers, timeout=5.0,
+    )
+    response.raise_for_status()
+    items = response.json().get('items') or []
+    if not items:
+        return None  # missing or private playlist
+    snippet = items[0]['snippet']
+
+    response = httpx.get(
+        f'{API_BASE_URL}/playlistItems',
+        params={
+            'part':       'snippet,contentDetails,status',
+            'playlistId': playlist_id,
+            'maxResults': API_MAX_RESULTS,
+        },
+        headers=headers, timeout=5.0,
+    )
+    response.raise_for_status()
+
+    videos = []
+    for item in response.json().get('items') or []:
+        # Private and deleted videos stay in playlists as placeholders
+        if item.get('status', {}).get('privacyStatus') not in ('public', 'unlisted'):
+            continue
+        video_id = item.get('contentDetails', {}).get('videoId')
+        if not video_id:
+            continue
+        thumbs = item['snippet'].get('thumbnails') or {}
+        thumb  = thumbs.get('high') or thumbs.get('medium') or thumbs.get('default') or {}
+        videos.append({
+            'video_id':  video_id,
+            'title':     item['snippet'].get('title', ''),
+            'thumbnail': thumb.get('url') or f'https://i.ytimg.com/vi/{video_id}/hqdefault.jpg',
+            'published': item['contentDetails'].get('videoPublishedAt', ''),
+        })
+
+    channel_id = snippet.get('channelId')
+    return {
+        'title':       snippet.get('title', ''),
+        'channel_url': f'https://www.youtube.com/channel/{channel_id}' if channel_id else '',
+        'videos':      videos,
+    }
+
+
+def _fetch_from_feed(playlist_id):
+    response = httpx.get(FEED_URL, params={'playlist_id': playlist_id}, timeout=5.0)
+    response.raise_for_status()
+    return _parse_feed(response.text)
+
+
 def fetch_playlist_feed(playlist_id, use_cache=True):
     """
     Return {title, channel_url, videos: [{video_id, title, thumbnail, published}]}
     for a playlist, or None when the playlist is missing, private or YouTube
-    is unreachable. Best-effort: never raises.
+    is unreachable. Tries the Data API first when a key is configured, then
+    the public feed. Best-effort: never raises.
     """
     cache_key = f'youtube:feed:{playlist_id}'
     if use_cache:
@@ -89,13 +170,24 @@ def fetch_playlist_feed(playlist_id, use_cache=True):
         except Exception:  # noqa: BLE001 -- a cache outage must not block the lookup
             pass
 
+    data = None
     try:
-        response = httpx.get(FEED_URL, params={'playlist_id': playlist_id}, timeout=5.0)
-        response.raise_for_status()
-        data = _parse_feed(response.text)
-    except Exception:  # noqa: BLE001 -- best-effort, see docstring
-        logger.warning('fetch_playlist_feed: could not load playlist %s', playlist_id, exc_info=True)
-        data = None
+        api_key = _get_youtube_api_key()
+    except Exception:  # noqa: BLE001 -- a settings lookup failure falls back to the feed
+        logger.warning('fetch_playlist_feed: could not read youtube_api settings', exc_info=True)
+        api_key = None
+
+    if api_key:
+        try:
+            data = _fetch_from_api(playlist_id, api_key)
+        except Exception:  # noqa: BLE001 -- best-effort, see docstring
+            logger.warning('fetch_playlist_feed: YouTube API failed for playlist %s', playlist_id, exc_info=True)
+
+    if data is None:
+        try:
+            data = _fetch_from_feed(playlist_id)
+        except Exception:  # noqa: BLE001 -- best-effort, see docstring
+            logger.warning('fetch_playlist_feed: could not load feed for playlist %s', playlist_id, exc_info=True)
 
     try:
         if data is None:
