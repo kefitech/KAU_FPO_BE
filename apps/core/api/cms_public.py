@@ -339,7 +339,8 @@ class PublicYoutubePlaylistsView(APIView):
         tags=['Public - CMS'],
         summary='Get YouTube playlists',
         description='Returns the YouTube channel link and active playlists with their latest videos '
-                    '(read from the public YouTube feed, max 15 per playlist). Redis-cached (1h). No auth required.',
+                    '(YouTube Data API, max 50 per playlist; public feed fallback, max 15). '
+                    'Redis-cached (1h). No auth required.',
     )
     def get(self, request):
         lang      = _lang(request)

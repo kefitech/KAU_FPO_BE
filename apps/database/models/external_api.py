@@ -10,6 +10,7 @@ Services:
     gstin_verification — GST API via GSP integration (SRS §5.2)
     cin_verification   — MCA21 Portal API (SRS §5.2)
     weather_api         — OpenWeatherMap Current Weather API (P2-05 GIS)
+    youtube_api         — YouTube Data API v3 (landing page video playlists)
 
 Flow:
     is_active=True  → VerificationService calls live API first
@@ -19,6 +20,10 @@ Flow:
 For weather_api specifically (apps/gis_module/services.py):
     is_active=True  → get_weather_for_point() calls OpenWeatherMap live
     is_active=False → falls back to the simulated season/zone estimate
+
+For youtube_api specifically (apps/core/services/youtube.py):
+    is_active=True  → fetch_playlist_feed() calls the YouTube Data API
+    is_active=False → falls back to the public playlist Atom feed
 """
 
 from django.db import models
@@ -39,12 +44,14 @@ class ExternalAPISettings(BaseModel):
     SERVICE_GSTIN   = 'gstin_verification'
     SERVICE_CIN     = 'cin_verification'
     SERVICE_WEATHER = 'weather_api'
+    SERVICE_YOUTUBE = 'youtube_api'
 
     SERVICE_CHOICES = [
         (SERVICE_PAN,     'PAN Verification (Income Tax Dept API)'),
         (SERVICE_GSTIN,   'GSTIN Verification (GST API / GSP)'),
         (SERVICE_CIN,     'CIN Verification (MCA21 Portal API)'),
         (SERVICE_WEATHER, 'Weather API (OpenWeatherMap)'),
+        (SERVICE_YOUTUBE, 'YouTube Data API v3'),
     ]
 
     service   = models.CharField(max_length=30, choices=SERVICE_CHOICES, unique=True)

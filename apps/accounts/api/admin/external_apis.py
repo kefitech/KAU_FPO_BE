@@ -16,6 +16,7 @@ Config shapes per service:
     pan_verification   → { api_key, client_id, base_url }
     gstin_verification → { api_key, client_id, base_url }
     cin_verification   → { api_key, client_id, base_url }
+    youtube_api        → { api_key }  (api_url: https://www.googleapis.com/youtube/v3)
 
 Sensitive fields (encrypted at rest, masked as •••••••• in responses):
     api_key, client_id, password, secret
@@ -71,7 +72,7 @@ class ExternalAPISettingsSerializer(serializers.ModelSerializer):
 class ExternalAPISettingsCreateSerializer(serializers.Serializer):
     service   = serializers.ChoiceField(
         choices=ExternalAPISettings.SERVICE_CHOICES,
-        help_text='pan_verification | gstin_verification | cin_verification'
+        help_text='pan_verification | gstin_verification | cin_verification | weather_api | youtube_api'
     )
     api_url   = serializers.URLField(required=False, allow_blank=True, default='')
     config    = serializers.DictField(
