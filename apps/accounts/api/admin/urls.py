@@ -25,6 +25,7 @@ from .categories import TranslationCategoryViewSet
 from .translations import TranslationViewSet
 from .fpo_roles import FPOMemberRoleViewSet
 from .fpo_actions import FPOActionViewSet
+from .tier_upgrade_tips import TierUpgradeTipViewSet
 from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
 from .applications import (
     ApplicationListView,
@@ -190,6 +191,7 @@ router.register(r'cbbos', CBBOViewSet, basename='cbbo')
 router.register(r'government', GovernmentViewSet, basename='government')   # ADD THIS LINE
 router.register(r'fpo-member-roles', FPOMemberRoleViewSet, basename='fpo-member-role')
 router.register(r'fpo-actions', FPOActionViewSet, basename='fpo-action')
+router.register(r'tier-upgrade-tips', TierUpgradeTipViewSet, basename='tier-upgrade-tip')
 # Marketplace admin (Arunima — P2-11)
 router.register(r'buyers', BuyerDirectoryViewSet, basename='admin-buyer')
 router.register(r'matches', AdminMatchViewSet, basename='admin-match')

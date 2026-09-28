@@ -90,6 +90,7 @@ from .fpo import (
     FPOAssessment,
     AssessmentAnswer,
     AssessmentUpload,
+    TierUpgradeTip,
 )
 
 # Phase 2 — Government Portal
@@ -286,6 +287,7 @@ __all__ = [
     'FPOAssessment',
     'AssessmentAnswer',
     'AssessmentUpload',
+    'TierUpgradeTip',
     # External API Settings
     'ExternalAPISettings',
     # Schemes & Expert Directory

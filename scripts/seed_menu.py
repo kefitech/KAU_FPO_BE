@@ -196,6 +196,13 @@ def seed_menu():
         order     = 17,
     )
     seed_item(
+        label_key = 'menu.tier_upgrade_tips',
+        path      = '/admin/tier-upgrade-tips',
+        icon      = 'sparkles',
+        roles     = [super_admin_group, sub_admin_group],
+        order     = 18,
+    )
+    seed_item(
         label_key = 'menu.dpr_projects',
         path      = '/admin/dpr',
         icon      = 'file-bar-chart',

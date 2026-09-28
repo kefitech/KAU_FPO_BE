@@ -41,6 +41,7 @@ from .tier_assessment import (
     TierAssessmentReopenView,
     TierAssessmentUploadView,
     TierAssessmentUploadDeleteView,
+    TierAssessmentRecommendationsView,
 )
 from .marketing import (
     MarketingStrategyListView,
@@ -109,6 +110,7 @@ urlpatterns = [
     path('me/tier-assessment/<int:assessment_id>/reopen/', TierAssessmentReopenView.as_view(), name='fpo-tier-assessment-reopen'),
     path('me/tier-assessment/<int:assessment_id>/upload/', TierAssessmentUploadView.as_view(), name='fpo-tier-assessment-upload'),
     path('me/tier-assessment/<int:assessment_id>/upload/<int:upload_id>/', TierAssessmentUploadDeleteView.as_view(), name='fpo-tier-assessment-upload-delete'),
+    path('me/tier-assessment/<int:assessment_id>/recommendations/', TierAssessmentRecommendationsView.as_view(), name='fpo-tier-assessment-recommendations'),
 
     # DPR module — routes registered in apps/fpo/api/dpr/urls.py, mounted at /api/fpo/dpr/
     path('dpr/', include('apps.fpo.api.dpr.urls')),

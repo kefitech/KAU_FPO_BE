@@ -36,6 +36,7 @@ from apps.database.models.fpo import (
     FPO, FPOUserMembership, FPOAssessment, AssessmentAnswer, AssessmentUpload,
     TierDomain, TierCriterion, TierQuestion, FPOTierHistory,
 )
+from apps.fpo.services.tier_recommendations import get_recommendations
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -788,6 +789,46 @@ class TierAssessmentReopenView(APIView):
             data=AssessmentSerializer(assessment).data,
             message='Assessment reopened. You can now update your answers and resubmit.',
         )
+
+
+class TierAssessmentRecommendationsView(APIView):
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Tier Assessment'],
+        summary='Rule-based upgrade recommendations for a submitted assessment',
+        description=(
+            'Returns a checklist of "what to fix to reach the next tier" based on '
+            'the FPO\'s answers vs. active `TierUpgradeTip` rows. No AI — deterministic. '
+            'For Tier A FPOs, returns maintain-tier tips.\n\n'
+            'Language honours `X-Language` header (falls back to English).'
+        ),
+        responses={200: None},
+    )
+    def get(self, request, assessment_id):
+        fpo = _get_member_fpo(request.user)
+        if not fpo:
+            return StandardResponse.error(
+                'Only the primary user can view recommendations.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            assessment = FPOAssessment.objects.prefetch_related(
+                'answers__question__criterion'
+            ).get(id=assessment_id, fpo=fpo)
+        except FPOAssessment.DoesNotExist:
+            return StandardResponse.error('Assessment not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if assessment.status != FPOAssessment.Status.SUBMITTED:
+            return StandardResponse.error(
+                'Recommendations are only available after the assessment is submitted.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        language = getattr(request, 'language', 'en')
+        payload  = get_recommendations(assessment, language=language)
+        return StandardResponse.success(payload, 'Recommendations retrieved.')
 
 
 # Upload-enabled question numbers

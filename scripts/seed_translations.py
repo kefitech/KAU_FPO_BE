@@ -3959,6 +3959,7 @@ def seed_menu_translations(languages):
         ('audit_logs',             'Audit Logs',                'ഓഡിറ്റ് ലോഗുകൾ'),
         ('experts',                'Experts',                   'വിദഗ്ധർ'),
         ('schemes',                'Schemes & Subsidies',       'പദ്ധതികളും സബ്‌സിഡികളും'),
+        ('tier_upgrade_tips',      'Tier Upgrade Tips',         'ടയർ അപ്‌ഗ്രേഡ് ടിപ്പുകൾ'),
 #---------------------------------------------------------------
 # arunima
         ('market_linkage',         'Market Linkage',            'മാർക്കറ്റ് ലിങ്കേജ്'),

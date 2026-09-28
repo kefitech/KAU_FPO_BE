@@ -620,6 +620,74 @@ class AssessmentUpload(models.Model):
 
 
 # =============================================================================
+# TIER UPGRADE TIPS — RULE-BASED RECOMMENDATIONS
+# =============================================================================
+
+class TierUpgradeTip(BaseModel):
+    """
+    Rule-based upgrade tips. After an FPO submits a tier assessment we compare
+    each answer against the tips tied to that question; matching tips are
+    returned as "here's what to fix to reach the next tier."
+
+    Editable by KAU Admin — no code deploy needed to update wording.
+    """
+
+    class Trigger(models.TextChoices):
+        SCORE_BELOW_MAX  = 'score_below_max',      'Answer score below max for the question'
+        BOOLEAN_NO       = 'boolean_no',           'Boolean answer is "no"'
+        VALUE_BELOW      = 'value_below_threshold', 'Numeric value below threshold'
+        VALUE_ABOVE      = 'value_above_threshold', 'Numeric value above threshold'
+        ANSWER_EQUALS    = 'answer_equals',        'Answer exactly matches trigger_value'
+        ANSWER_NOT_IN    = 'answer_not_in',        'Answer not in trigger_value (list)'
+        UNANSWERED       = 'unanswered',           'Question was skipped or empty'
+        ALWAYS           = 'always',               'Always fire (for maintain-tier tips)'
+
+    # Tie to a question (fine-grained) OR a criterion (coarse). Question wins if set.
+    question    = models.ForeignKey(
+        TierQuestion, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='upgrade_tips',
+    )
+    criterion   = models.ForeignKey(
+        TierCriterion, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='upgrade_tips',
+    )
+
+    trigger_type  = models.CharField(max_length=25, choices=Trigger.choices)
+    trigger_value = models.JSONField(
+        default=dict, blank=True,
+        help_text=(
+            'Depends on trigger_type:\n'
+            '  value_below_threshold / value_above_threshold: {"threshold": 33}\n'
+            '  answer_equals: {"value": "no"}\n'
+            '  answer_not_in: {"values": ["yes", "partial"]}\n'
+            'Empty for score_below_max, boolean_no, unanswered, always.'
+        ),
+    )
+
+    tip_en      = models.TextField(help_text='English recommendation text')
+    tip_ml      = models.TextField(blank=True, help_text='Malayalam recommendation text (optional)')
+
+    target_tier = models.CharField(
+        max_length=1, choices=TierChoice.choices,
+        help_text='Which tier this tip helps the FPO reach (or maintain).',
+    )
+    priority    = models.PositiveSmallIntegerField(
+        default=5,
+        help_text='1 (highest) to 10 (lowest). Top-N are shown to the FPO.',
+    )
+    is_active   = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name        = 'Tier Upgrade Tip'
+        verbose_name_plural = 'Tier Upgrade Tips'
+        ordering            = ['target_tier', 'priority', 'id']
+
+    def __str__(self):
+        anchor = f"Q{self.question.question_no}" if self.question_id else (self.criterion.code if self.criterion_id else 'unbound')
+        return f"[Tier {self.target_tier}] {anchor} — {self.tip_en[:60]}"
+
+
+# =============================================================================
 # FPO OWNERSHIP CLAIM
 # =============================================================================
 
