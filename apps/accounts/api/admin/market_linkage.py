@@ -12,7 +12,8 @@ is a view-only feature over the existing Product/FPO data.
 Sub-admins only see FPOs assigned to them (P2-01 row-level security).
 """
 
-from drf_spectacular.utils import extend_schema
+from django.db.models import Q
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.views import APIView
 
 from apps.core.permissions.fpo_scope import scope_fpo_queryset
@@ -21,7 +22,15 @@ from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import FPO, Product
-from apps.marketplace.serializers import ProductSerializer
+from apps.marketplace.serializers import BuyerProductSerializer
+
+
+class AdminLinkageProductSerializer(BuyerProductSerializer):
+    """Same shape as the buyer product catalog, plus status/visibility (admins see every status)."""
+
+    class Meta(BuyerProductSerializer.Meta):
+        fields = BuyerProductSerializer.Meta.fields + ['status', 'is_public']
+        read_only_fields = fields
 
 
 @extend_schema(tags=['Marketplace - Admin Market Linkage'])
@@ -55,12 +64,20 @@ class AdminMarketLinkageFPOListView(APIView):
         )
 
 
-@extend_schema(tags=['Marketplace - Admin Market Linkage'])
+@extend_schema(
+    tags=['Marketplace - Admin Market Linkage'],
+    parameters=[
+        OpenApiParameter('search', str, description='Product name (English or Malayalam) contains'),
+        OpenApiParameter('commodity', str, description='Commodity code, or several comma-separated codes'),
+        OpenApiParameter('status', str, description='draft / active / sold / expired'),
+    ],
+)
 class AdminMarketLinkageFPOProductsView(APIView):
     """
     GET /api/admin/market-linkage/fpos/{fpo_id}/products/
 
-    Lists all non-deleted products belonging to the given FPO.
+    Lists all non-deleted products belonging to the given FPO, in the same
+    shape as the buyer product catalog (plus status/is_public).
     """
 
     permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
@@ -78,13 +95,28 @@ class AdminMarketLinkageFPOProductsView(APIView):
 
         queryset = (
             Product.objects.filter(fpo_id=fpo_id, is_deleted=False)
-            .select_related('commodity')
+            .select_related('commodity', 'fpo')
             .order_by('-created_at')
         )
 
+        search = request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(Q(name__en__icontains=search) | Q(name__ml__icontains=search))
+
+        commodity = request.query_params.get('commodity', '').strip()
+        codes = [c.strip() for c in commodity.split(',') if c.strip()]
+        if codes:
+            queryset = queryset.filter(commodity__code__in=codes)
+
+        status_filter = request.query_params.get('status', '').strip()
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request, view=self)
-        serializer = ProductSerializer(page if page is not None else queryset, many=True)
+        serializer = AdminLinkageProductSerializer(
+            page if page is not None else queryset, many=True, context={'lang': lang},
+        )
 
         if page is not None:
             return paginator.get_paginated_response(serializer.data)

@@ -249,7 +249,7 @@ def seed_menu():
         label_key = 'menu.buyer_directory',
         path      = '/admin/buyers',
         icon      = 'shopping-cart',
-        roles     = [super_admin_group],
+        roles     = [super_admin_group, sub_admin_group],
         order     = 25,
     )
 

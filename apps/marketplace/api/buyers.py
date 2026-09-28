@@ -16,7 +16,10 @@ from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework import filters
 from apps.core.models.generic import AuditLog
-from apps.core.permissions.rbac import IsAdmin, IsAuthenticated, IsFPOManager
+from rest_framework.exceptions import PermissionDenied
+
+from apps.core.permissions.fpo_scope import is_super_admin, scope_fpo_queryset
+from apps.core.permissions.rbac import IsAuthenticated, IsFPOManager, IsSubAdminOrSuperAdmin
 from apps.core.services.audit import AuditService as AuditLogService
 from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
@@ -69,10 +72,14 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     GET/POST          /api/admin/buyers/
     PATCH/DELETE      /api/admin/buyers/{id}/
     POST              /api/admin/buyers/{id}/verify/
+
+    Super admin manages every buyer. A sub-admin manages only FPO-as-buyer
+    rows whose FPO is assigned to them (P2-01); external buyers and other
+    FPOs' rows are out of scope (404).
     """
 
-    serializer_class = BuyerDirectorySerializer 
-    permission_classes = [IsAuthenticated, IsAdmin]
+    serializer_class = BuyerDirectorySerializer
+    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
     pagination_class = StandardPagination
 
     filter_backends = [filters.SearchFilter]
@@ -87,6 +94,8 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
         from django.db.models import Q
 
         queryset = BuyerDirectory.objects.filter(is_deleted=False).order_by('-created_at')
+        # sub-admins: assigned FPOs' buyer rows only (drops external buyers, which have no FPO)
+        queryset = scope_fpo_queryset(queryset, self.request.user, fpo_field='fpo')
         buyer_type = self.request.query_params.get('buyer_type')
         if buyer_type == 'fpo':
             queryset = queryset.filter(fpo__isnull=False)
@@ -111,6 +120,18 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
             queryset = queryset.filter(status=status)
 
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        # Manual directory entries aren't tied to an assigned FPO — super admin only.
+        if not is_super_admin(request.user):
+            raise PermissionDenied(t('common.permission_denied', self.get_language()))
+        return super().create(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        # Re-linking a buyer to another FPO/account would move it out of a sub-admin's scope.
+        if not is_super_admin(self.request.user) and {'fpo', 'user'} & set(serializer.validated_data):
+            raise PermissionDenied('Only a super admin can link a buyer to a different FPO or account.')
+        serializer.save()
 
     def perform_destroy(self, instance):
         # BaseModel provides soft_delete() — use it instead of a hard delete.
