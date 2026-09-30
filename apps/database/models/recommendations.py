@@ -102,6 +102,43 @@ class CropRecommendation(BaseModel):
         return f"{self.fpo} — {self.financial_year} ({self.status})"
 
 
+class RecommendationFeedback(BaseModel):
+    """
+    One row per feedback submission. CropRecommendation is reused per FPO per
+    financial year (and its feedback_rating/comment are cleared on every new
+    request), so feedback can't live on it alone without each submission
+    overwriting the last -- this keeps the full history for admin review.
+    crops/location_snapshot are copied at submit time so an entry still shows
+    what was rated, and for which farm boundary, after the FPO re-requests.
+    """
+    recommendation = models.ForeignKey(
+        CropRecommendation, on_delete=models.CASCADE, related_name='feedback_entries'
+    )
+    fpo = models.ForeignKey(
+        'database.FPO', on_delete=models.CASCADE, related_name='recommendation_feedback'
+    )
+    model_version = models.ForeignKey(
+        MLModelVersion, on_delete=models.PROTECT, related_name='feedback_entries',
+        help_text='Model that produced the rated recommendation'
+    )
+    financial_year = models.CharField(max_length=10)
+    rating = models.IntegerField(help_text='FPO rates the recommendation 1–5')
+    comment = models.TextField(blank=True)
+    crops = models.JSONField(default=list, help_text='Crop names that were recommended')
+    location_snapshot = models.JSONField(
+        null=True, blank=True,
+        help_text='{lat, lng, area_polygon, address} the rated recommendation was generated for'
+    )
+
+    class Meta:
+        verbose_name = 'Recommendation Feedback'
+        verbose_name_plural = 'Recommendation Feedback'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.fpo} — {self.rating}/5 ({self.created_at:%Y-%m-%d})"
+
+
 class CropPackageOfPractices(BaseModel):
     """
     Real cultivation guidance per crop, sourced from KAU's official

@@ -9,7 +9,7 @@ Endpoints:
     POST /api/admin/ml-models/                 — register new model version (file validated by ML service first)
     POST /api/admin/ml-models/retrain/         — upload a dataset CSV; returns 202, a Celery task trains it
     POST /api/admin/ml-models/{id}/activate/   — set as active model (ready versions only)
-    GET  /api/admin/recommendations/feedback/  — list recommendations that have farmer feedback
+    GET  /api/admin/recommendations/feedback/  — list every farmer feedback submission (history)
 
     GET  /api/recommendations/internal/active-model/ — ML service only (shared token): active version
 """
@@ -38,7 +38,9 @@ from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
 from apps.core.services.fpo_permission import get_member_fpo
-from apps.database.models import FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices
+from apps.database.models import (
+    FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices, RecommendationFeedback,
+)
 from apps.recommendations.api.pop_admin import CropPackageOfPracticesSerializer
 from apps.recommendations.services import (
     get_crop_recommendation,
@@ -338,9 +340,30 @@ class RecommendationFeedbackView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        # One submission per generated recommendation -- feedback_rating is
+        # cleared when the FPO requests a fresh one, which reopens feedback.
+        if rec.feedback_rating is not None:
+            return StandardResponse.error(
+                t('recommendations.feedback_already_submitted', lang),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
         rec.feedback_rating = rating
         rec.feedback_comment = comment
         rec.save(update_fields=['feedback_rating', 'feedback_comment'])
+        # rec's own feedback fields only hold the latest submission (and are
+        # cleared on the next request), so keep every submission for admin.
+        RecommendationFeedback.objects.create(
+            recommendation=rec,
+            fpo=fpo,
+            model_version=rec.model_version,
+            financial_year=rec.financial_year,
+            rating=rating,
+            comment=comment,
+            crops=[item.get('crop') for item in (rec.recommendations or []) if item.get('crop')],
+            location_snapshot=(rec.input_snapshot or {}).get('location_snapshot'),
+            created_by=request.user,
+        )
 
         AuditService.log(
             user=request.user,
@@ -1180,31 +1203,31 @@ class MLModelActiveInternalView(APIView):
 
 class RecommendationFeedbackSerializer(serializers.ModelSerializer):
     """
-    Read-only view of a CropRecommendation for admin feedback review.
-    Includes the FPO's name and a flat list of the crops that were
-    recommended (pulled from the JSON recommendations field) so an
-    admin can see what was rated without opening the full record.
+    Read-only view of one RecommendationFeedback submission for admin
+    review. feedback_rating/feedback_comment keep the field names this
+    endpoint returned when feedback lived on CropRecommendation itself.
+    location_snapshot is the farm boundary ({lat, lng, area_polygon,
+    address}) the rated recommendation was generated for.
     """
     fpo_name = serializers.CharField(source='fpo.name', read_only=True)
-    crops = serializers.SerializerMethodField()
+    model_version_code = serializers.CharField(source='model_version.version_code', read_only=True)
+    feedback_rating = serializers.IntegerField(source='rating', read_only=True)
+    feedback_comment = serializers.CharField(source='comment', read_only=True)
 
     class Meta:
-        model = CropRecommendation
+        model = RecommendationFeedback
         fields = [
-            'id', 'fpo_name', 'financial_year',
+            'id', 'recommendation', 'fpo_name', 'model_version_code', 'financial_year',
             'feedback_rating', 'feedback_comment',
-            'crops', 'created_at',
+            'crops', 'location_snapshot', 'created_at',
         ]
-
-    def get_crops(self, obj):
-        return [item.get('crop') for item in (obj.recommendations or []) if item.get('crop')]
 
 
 class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     """
-    GET /api/admin/recommendations/feedback/ — list recommendations
-    that have farmer feedback (feedback_rating is not null), most
-    recent first.
+    GET /api/admin/recommendations/feedback/ — every feedback submission,
+    most recent first (an FPO that rates several recommendations has one
+    row per submission). Optional ?model_version=<id>.
 
     Read-only by design — admins review feedback here, they don't edit
     it (feedback belongs to the FPO who submitted it). Same MRO note as
@@ -1216,9 +1239,8 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     """
     def get_queryset(self):
         queryset = (
-            CropRecommendation.objects
-            .exclude(feedback_rating__isnull=True)
-            .select_related('fpo')
+            RecommendationFeedback.objects
+            .select_related('fpo', 'model_version')
             .order_by('-created_at')
         )
         model_version = self.request.query_params.get('model_version')
@@ -1230,7 +1252,7 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     permission_classes = [IsAdmin]
     pagination_class = StandardPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ['fpo__name', 'feedback_comment']
+    search_fields = ['fpo__name', 'comment']
 
     list_message = 'recommendations.feedback_list_retrieved'
 

@@ -1,4 +1,9 @@
 crop_name,agro_zone,crop_group,temp_lo,temp_hi,ph_lo,ph_hi,seasons_text,ph_is_real,temp_is_real,service_zone,kau_zone_source,seasons,suitable_soils
+Adapathiyan,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False,coastal_zone,General (all zones),southwest_monsoon;dry_season,Black soil (Chittoor black soil) / red loam
+Adapathiyan,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False,southern_zone,General (all zones),southwest_monsoon;dry_season,Black soil (Chittoor black soil) / red loam
+Adapathiyan,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False,central_zone,General (all zones),southwest_monsoon;dry_season,Black soil (Chittoor black soil) / red loam
+Adapathiyan,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False,northern_zone,General (all zones),southwest_monsoon;dry_season,Black soil (Chittoor black soil) / red loam
+Adapathiyan,General (all zones),Medicinal and Aromatic Plants,22.0,32.0,5.0,6.5,Rainfed crop planted with onset of monsoon in May-June; irrigated crop can be planted any time,False,False,high_ranges,General (all zones),southwest_monsoon;dry_season,Black soil (Chittoor black soil) / red loam
 Agathi,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False,coastal_zone,General (all zones),,
 Agathi,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False,southern_zone,General (all zones),,
 Agathi,General (all zones),Fodder Crops,22.0,32.0,5.0,6.5,General,False,False,central_zone,General (all zones),,
