@@ -144,6 +144,21 @@ class KVKLink(BaseModel):
     logo      = models.ImageField(upload_to=_kvk_logo_path, null=True, blank=True)
     order     = models.PositiveSmallIntegerField(default=0, help_text='Sort order on the public page (ascending)')
     is_active = models.BooleanField(default=True)
+    # KAU suggestion #2 — chatbot fallback needs to route users to their
+    # district's KVK. Nullable so admins can leave it blank on non-KVK links
+    # that happen to share this model (there are only 14 KVKs total).
+    district  = models.CharField(
+        max_length=5, blank=True, default='',
+        help_text='3-letter Kerala district code (TSR, PKD, ...) for chatbot fallback routing.',
+    )
+    contact_email = models.EmailField(
+        blank=True, default='',
+        help_text='Direct contact email shown in the chatbot fallback message.',
+    )
+    contact_phone = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='Direct contact phone shown in the chatbot fallback message.',
+    )
 
     class Meta:
         ordering = ['order', 'id']

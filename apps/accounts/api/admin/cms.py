@@ -761,11 +761,18 @@ class KVKLinkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = KVKLink
-        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'order', 'is_active', 'created_at']
+        fields = [
+            'id', 'name', 'url', 'logo', 'logo_url',
+            'district', 'contact_email', 'contact_phone',
+            'order', 'is_active', 'created_at',
+        ]
         extra_kwargs = {
-            'logo':      {'write_only': True, 'required': False, 'allow_null': True},
-            'is_active': {'default': True},
-            'order':     {'default': 0},
+            'logo':          {'write_only': True, 'required': False, 'allow_null': True},
+            'is_active':     {'default': True},
+            'order':         {'default': 0},
+            'district':      {'required': False, 'allow_blank': True},
+            'contact_email': {'required': False, 'allow_blank': True},
+            'contact_phone': {'required': False, 'allow_blank': True},
         }
 
     def get_logo_url(self, obj):
