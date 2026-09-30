@@ -28,6 +28,10 @@ class Scheme(BaseModel):
     application_process = models.TextField()
     official_link       = models.URLField(blank=True)
     last_updated        = models.DateField(null=True, blank=True)
+    deadline            = models.DateField(
+        null=True, blank=True,
+        help_text='Application deadline. Auto-expires scheme_expiry_days after this date.',
+    )
     is_active           = models.BooleanField(default=True)
     order               = models.PositiveSmallIntegerField(default=0)
 

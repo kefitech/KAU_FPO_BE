@@ -202,8 +202,11 @@ router.register(r'crop-pop', CropPackageOfPracticesViewSet, basename='crop-pop')
 router.register(r'crop-zone-profiles', CropZoneProfileViewSet, basename='crop-zone-profile')
 
 # URL patterns
+from .subadmin_config import SubAdminConfigView
+
 urlpatterns = [
     path('', include(router.urls)),
+    path('sub-admin-config/',         SubAdminConfigView.as_view(),           name='sub-admin-config'),
     path('fpo-permissions/',          FPOPermissionMatrixView.as_view(),      name='fpo-permission-matrix'),
     path('fpo-permissions/<int:role_id>/', FPORolePermissionsView.as_view(), name='fpo-role-permissions'),
     # FPO Applications workflow

@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
+from apps.core.permissions.rbac import IsDPRAdmin
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import (
     DPRProject,
@@ -165,7 +165,7 @@ def _build_identification_payload(project) -> dict:
     ),
 )
 class DPRProjectAdminDetailView(APIView):
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request, project_uuid):
         try:

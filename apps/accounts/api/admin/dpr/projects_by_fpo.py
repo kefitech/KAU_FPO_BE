@@ -26,7 +26,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
+from apps.core.permissions.rbac import IsDPRAdmin
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import DPRProject, FPO
@@ -80,7 +80,7 @@ def _fpo_rollup(fpo: FPO, aggregates: dict) -> dict:
     ],
 )
 class DPRProjectFpoRollupListView(APIView):
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request):
         # One SQL aggregate — annotate each FPO with per-status counts and
@@ -147,7 +147,7 @@ class DPRProjectFpoRollupListView(APIView):
     ),
 )
 class DPRProjectFpoRollupDetailView(APIView):
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request, fpo_id: int):
         try:

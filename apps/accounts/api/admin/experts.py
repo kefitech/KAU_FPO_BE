@@ -287,7 +287,12 @@ class ExpertEnquiriesView(APIView):
         except Expert.DoesNotExist:
             return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
 
+        # KAU suggestion #1 — district sub-admins see only inquiries from FPOs
+        # in their district. Super admin sees everything.
+        from apps.core.permissions.fpo_scope import scope_fpo_queryset
         qs = expert.enquiries.select_related('fpo', 'fpo_user').order_by('-submitted_at')
+        qs = scope_fpo_queryset(qs, request.user, fpo_field='fpo')
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = EnquiryAdminSerializer(page, many=True)

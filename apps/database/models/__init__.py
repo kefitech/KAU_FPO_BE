@@ -102,7 +102,12 @@ from .cbbo_profile import CBBOOfficerProfile
 from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
 
 # Phase 2 — Sub-admin FPO assignment (Jobin)
-from .subadmin import SubAdminFPOAssignment
+from .subadmin import (
+    SubAdminFPOAssignment,
+    SubAdminDistrictAssignment,
+    SubAdminDistrictTransfer,
+    SubAdminConfig,
+)
 
 # Phase 2 — GIS (requires PostGIS + django.contrib.gis in INSTALLED_APPS)
 from .gis import (
@@ -311,6 +316,9 @@ __all__ = [
     'TrainingSession',
     'TrainingAttendance',
     'SubAdminFPOAssignment',
+    'SubAdminDistrictAssignment',
+    'SubAdminDistrictTransfer',
+    'SubAdminConfig',
     # Phase 2 — GIS
     'AgroClimaticZone',
     'DistrictBoundary',

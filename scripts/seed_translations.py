@@ -3947,6 +3947,7 @@ def seed_menu_translations(languages):
         ('menu_cms',               'Menu CMS',                 'മെനു CMS'),
         ('roles',                  'Roles',                    'റോളുകൾ'),
         ('sub_admins',             'Sub-Admins',               'സബ്-അഡ്മിൻ'),
+        ('sub_admin_settings',     'Sub-Admin Settings',       'സബ്-അഡ്മിൻ ക്രമീകരണങ്ങൾ'),
         ('fpo_actions',            'FPO Actions',              'FPO ആക്ഷനുകൾ'),
         ('fpo_member_roles',       'Member Roles',             'അംഗ റോളുകൾ'),
         ('fpo_permissions',        'FPO Permissions',          'FPO അനുമതികൾ'),

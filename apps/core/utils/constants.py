@@ -128,11 +128,16 @@ ROLE_HIERARCHY = {
 # Format: (codename, description)
 # Add new entries here as new features are built.
 SUB_ADMIN_PERMISSIONS = [
-    ('can_approve_fpo',      'Can approve or reject FPO applications'),
-    ('can_view_all_fpos',    'Can view all FPO profiles'),
-    ('can_request_info',     'Can request additional info from FPO'),
-    ('can_verify_documents', 'Can mark FPO documents as verified'),
-    ('can_generate_reports', 'Can export FPO summary reports'),
+    ('can_approve_fpo',                  'Can approve or reject FPO applications'),
+    ('can_view_all_fpos',                'Can view all FPO profiles'),
+    ('can_request_info',                 'Can request additional info from FPO'),
+    ('can_verify_documents',             'Can mark FPO documents as verified'),
+    ('can_generate_reports',             'Can export FPO summary reports'),
+    ('can_use_dpr_facilities',           'Can access the DPR generation module'),
+    ('can_approve_govt_official_logins', 'Can approve or reject government official applications'),
+    ('can_approve_cbbo_logins',          'Can approve or reject CBBO officer applications'),
+    ('can_manage_schemes',               'Can create/edit/delete own schemes (read-only otherwise)'),
+    ('can_manage_trainings',             'Can create/edit/delete own trainings (read-only otherwise)'),
 ]
 
 

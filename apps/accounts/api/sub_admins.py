@@ -22,17 +22,29 @@ from django.db.models import Count, Q
 
 from rest_framework import serializers, filters
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser
 
 from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
 
 from apps.core.permissions.rbac import IsSuperAdmin
-from apps.core.utils.constants import UserRole, SUB_ADMIN_PERMISSIONS
+from apps.core.utils.constants import UserRole, SUB_ADMIN_PERMISSIONS, District
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
+from apps.core.services.subadmin_district import (
+    check_cap,
+    get_effective_cap,
+    count_active_in_district,
+    bust_district_count_cache,
+    get_all_district_counts,
+)
 from apps.core.views import TranslatedViewSet
 from apps.accounts.api.admin.applications import set_fpo_subadmin
 from apps.database.models.fpo import FPO
+from apps.database.models.subadmin import (
+    SubAdminDistrictAssignment,
+    SubAdminDistrictTransfer,
+)
 from apps.notifications.services import send_notification
 
 logger = logging.getLogger(__name__)
@@ -54,6 +66,10 @@ class SubAdminCreateSerializer(serializers.Serializer):
     first_name           = serializers.CharField(max_length=150)
     last_name            = serializers.CharField(max_length=150, required=False, default='')
     phone                = serializers.CharField(max_length=15, required=False, allow_blank=True, default='')
+    district             = serializers.ChoiceField(
+        choices=District.choices,
+        help_text='3-letter Kerala district code (e.g. "TSR"). Required — every sub-admin belongs to one district.',
+    )
     notification_channel = serializers.ChoiceField(
         choices=['email', 'sms'],
         default='email',
@@ -90,22 +106,43 @@ class SubAdminCreateSerializer(serializers.Serializer):
 
 
 class SubAdminSerializer(serializers.ModelSerializer):
-    permissions         = serializers.SerializerMethodField()
-    phone               = serializers.SerializerMethodField()
-    assigned_fpos_count = serializers.SerializerMethodField()
+    permissions             = serializers.SerializerMethodField()
+    phone                   = serializers.SerializerMethodField()
+    assigned_fpos_count     = serializers.SerializerMethodField()
+    visible_fpos_count      = serializers.SerializerMethodField()
+    district                = serializers.SerializerMethodField()
+    district_transfer_count = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'permissions', 'assigned_fpos_count']
+        fields = [
+            'id', 'email', 'first_name', 'last_name', 'phone', 'is_active',
+            'date_joined', 'permissions',
+            'assigned_fpos_count', 'visible_fpos_count',
+            'district', 'district_transfer_count',
+        ]
         read_only_fields = fields
 
     @extend_schema_field(serializers.IntegerField())
     def get_assigned_fpos_count(self, obj):
-        # annotated in SubAdminViewSet.get_queryset; fall back to a query for single objects
+        """Legacy per-FPO assignment count. Preserved for backward compat."""
         count = getattr(obj, '_assigned_fpos_count', None)
         if count is None:
             count = obj.fpo_assignments.filter(fpo__is_deleted=False).count()
         return count
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_visible_fpos_count(self, obj):
+        """Total FPOs the sub-admin can currently see.
+
+        For district sub-admins → count of FPOs in that district.
+        For legacy sub-admins   → count of manually-assigned FPOs.
+        """
+        assignment = getattr(obj, 'district_assignment', None)
+        if assignment:
+            from apps.database.models import FPO
+            return FPO.objects.filter(district=assignment.district, is_deleted=False).count()
+        return self.get_assigned_fpos_count(obj)
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
@@ -116,6 +153,17 @@ class SubAdminSerializer(serializers.ModelSerializer):
         sub_admin_perms = _get_sub_admin_permissions()
         assigned = obj.user_permissions.filter(id__in=sub_admin_perms)
         return list(assigned.values_list('codename', flat=True))
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_district(self, obj):
+        """District code (e.g. 'TSR') this sub-admin owns, or None if unassigned (legacy)."""
+        assignment = getattr(obj, 'district_assignment', None)
+        return assignment.district if assignment else None
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_district_transfer_count(self, obj):
+        # Cheap — most sub-admins never transfer. Ordered index on subadmin.
+        return obj.district_transfers.count() if hasattr(obj, 'district_transfers') else 0
 
 
 class SubAdminPermissionSerializer(serializers.Serializer):
@@ -173,6 +221,20 @@ class AssignedFPOSerializer(serializers.Serializer):
 class AvailablePermissionSerializer(serializers.Serializer):
     codename    = serializers.CharField()
     description = serializers.CharField()
+
+
+class TransferDistrictSerializer(serializers.Serializer):
+    to_district = serializers.ChoiceField(choices=District.choices)
+    reason      = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class DistrictTransferHistorySerializer(serializers.ModelSerializer):
+    transferred_by_email = serializers.CharField(source='transferred_by.email', default=None, read_only=True)
+
+    class Meta:
+        model  = SubAdminDistrictTransfer
+        fields = ['id', 'from_district', 'to_district', 'reason', 'transferred_by_email', 'created_at']
+        read_only_fields = fields
 
 
 # ─── ViewSet ─────────────────────────────────────────────────────────────────
@@ -240,27 +302,47 @@ class SubAdminViewSet(TranslatedViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        # Cap check BEFORE creating the user — cheaper to fail fast.
+        try:
+            check_cap(data['district'])
+        except ValueError as e:
+            return StandardResponse.error(message={'district': str(e)}, status_code=400)
+
         temp_password = secrets.token_urlsafe(10)
 
-        user = User.objects.create_user(
-            username=data['email'],
-            email=data['email'],
-            password=temp_password,
-            first_name=data['first_name'],
-            last_name=data.get('last_name', ''),
-        )
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=data['email'],
+                email=data['email'],
+                password=temp_password,
+                first_name=data['first_name'],
+                last_name=data.get('last_name', ''),
+            )
 
-        sub_admin_group, _ = Group.objects.get_or_create(name=UserRole.SUB_ADMIN)
-        user.groups.add(sub_admin_group)
+            sub_admin_group, _ = Group.objects.get_or_create(name=UserRole.SUB_ADMIN)
+            user.groups.add(sub_admin_group)
 
-        if data.get('permissions'):
-            self._assign_permissions(user, data['permissions'])
+            if data.get('permissions'):
+                self._assign_permissions(user, data['permissions'])
 
-        profile = user.profile
-        if data.get('phone'):
-            profile.phone = data['phone']
-        profile.must_change_password = True
-        profile.save(update_fields=['phone', 'must_change_password'])
+            profile = user.profile
+            if data.get('phone'):
+                profile.phone = data['phone']
+            profile.must_change_password = True
+            profile.save(update_fields=['phone', 'must_change_password'])
+
+            # District assignment + first-time audit row.
+            SubAdminDistrictAssignment.objects.create(
+                subadmin=user, district=data['district'], created_by=request.user,
+            )
+            SubAdminDistrictTransfer.objects.create(
+                subadmin=user,
+                from_district='',
+                to_district=data['district'],
+                reason='Initial assignment on create.',
+                transferred_by=request.user,
+            )
+            bust_district_count_cache(data['district'])
 
         channel = data.get('notification_channel', 'email')
         try:
@@ -538,6 +620,453 @@ class SubAdminViewSet(TranslatedViewSet):
             data=SubAdminSerializer(user).data,
             message=t('admin.sub_admin_password_reset', lang),
         )
+
+    # ─── District management ─────────────────────────────────────────────
+
+    @extend_schema(
+        tags=['Admin - Sub Admins'],
+        request=TransferDistrictSerializer,
+        responses=SubAdminSerializer,
+        summary='Transfer sub-admin to another district',
+        description=(
+            'Moves this sub-admin from their current district to `to_district`. '
+            'Checks destination cap, updates the assignment row, and writes an '
+            'append-only SubAdminDistrictTransfer audit record.\n\n'
+            'If the sub-admin has no current assignment (legacy), this creates the '
+            'first one — same as calling create.'
+        ),
+    )
+    @action(detail=True, methods=['post'], url_path='transfer-district')
+    def transfer_district(self, request, pk=None):
+        lang = self.get_language()
+        user = self.get_object()
+
+        s = TransferDistrictSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        to_district = s.validated_data['to_district']
+        reason      = s.validated_data.get('reason', '')
+
+        current = getattr(user, 'district_assignment', None)
+        from_district = current.district if current else ''
+
+        if from_district == to_district:
+            return StandardResponse.error(
+                message='Sub-admin is already assigned to this district.',
+                status_code=400,
+            )
+
+        try:
+            check_cap(to_district)
+        except ValueError as e:
+            return StandardResponse.error(message={'to_district': str(e)}, status_code=400)
+
+        with transaction.atomic():
+            if current:
+                current.district   = to_district
+                current.updated_by = request.user
+                current.save(update_fields=['district', 'updated_by', 'updated_at'])
+            else:
+                SubAdminDistrictAssignment.objects.create(
+                    subadmin=user, district=to_district, created_by=request.user,
+                )
+            SubAdminDistrictTransfer.objects.create(
+                subadmin=user,
+                from_district=from_district,
+                to_district=to_district,
+                reason=reason,
+                transferred_by=request.user,
+            )
+
+        if from_district:
+            bust_district_count_cache(from_district)
+        bust_district_count_cache(to_district)
+
+        return StandardResponse.success(
+            data=SubAdminSerializer(user).data,
+            message=t('admin.sub_admin_updated', lang),
+        )
+
+    @extend_schema(
+        tags=['Admin - Sub Admins'],
+        responses=DistrictTransferHistorySerializer(many=True),
+        summary='Full district transfer history for a sub-admin',
+        description='Append-only log — every district move including the very first assignment.',
+    )
+    @action(detail=True, methods=['get'], url_path='district-transfers')
+    def district_transfers(self, request, pk=None):
+        user = self.get_object()
+        qs = user.district_transfers.select_related('transferred_by').order_by('-created_at')
+        return StandardResponse.success(
+            data=DistrictTransferHistorySerializer(qs, many=True).data,
+            message='Transfer history retrieved.',
+        )
+
+    @extend_schema(
+        tags=['Admin - Sub Admins'],
+        responses=None,
+        summary='District cap status for every district',
+        description=(
+            'Returns `{district_code: {count, cap}}` — used to render '
+            '"Thrissur (28 / 30)" chips in the admin sub-admin list.'
+        ),
+    )
+    @action(detail=False, methods=['get'], url_path='district-cap-status')
+    def district_cap_status(self, request):
+        counts = get_all_district_counts()
+        data = {
+            code: {
+                'district_name': label,
+                'count':         counts.get(code, 0),
+                'cap':           get_effective_cap(code),
+            }
+            for code, label in District.choices
+        }
+        return StandardResponse.success(data=data, message='District cap status retrieved.')
+
+    # ─── Bulk invite (Excel / CSV) ──────────────────────────────────────
+
+    @extend_schema(
+        tags=['Admin - Sub Admins'],
+        summary='Download bulk-invite Excel template',
+        description=(
+            'Returns an xlsx with the required header row filled in. Fill it, '
+            'upload via `/bulk-invite/`.'
+        ),
+        responses={200: None},
+    )
+    @action(detail=False, methods=['get'], url_path='bulk-invite-template')
+    def bulk_invite_template(self, request):
+        import io
+        import openpyxl
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.datavalidation import DataValidation
+        from openpyxl.worksheet.table import Table, TableStyleInfo
+        from django.http import HttpResponse
+
+        KAU_NAVY   = '1F3864'
+        KAU_ORANGE = 'E86C1A'
+        BG_LIGHT   = 'F5F7FA'
+
+        thin = Side(border_style='thin', color='D0D5DD')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        wb = openpyxl.Workbook()
+
+        # ────────────────────────────────────────────────────────────────
+        # SHEET 1 — Instructions
+        # ────────────────────────────────────────────────────────────────
+        info = wb.active
+        info.title = 'Instructions'
+
+        info['A1'] = 'KAU-FPO — Sub-Admin Bulk Invite Template'
+        info['A1'].font      = Font(name='Calibri', size=16, bold=True, color=KAU_NAVY)
+        info['A1'].alignment = Alignment(horizontal='left', vertical='center')
+        info.row_dimensions[1].height = 28
+
+        info['A3'] = 'How to use this template'
+        info['A3'].font = Font(name='Calibri', size=12, bold=True, color=KAU_ORANGE)
+
+        instructions = [
+            '1. Open the "Sub-Admins" sheet.',
+            '2. Fill one row per sub-admin under the header row. Remove the sample rows before uploading.',
+            '3. district must be a 3-letter code — see the "Districts" sheet for the list.',
+            '4. notification_channel accepts "email" or "sms". Choose "sms" only when a phone is present.',
+            '5. Save the file (keep it as .xlsx) and upload via Admin Portal → Sub-Admins → Bulk Invite.',
+            '6. Rows that fail validation (duplicate email, cap reached, missing district, etc.) will come back listed in the upload result.',
+        ]
+        for i, line in enumerate(instructions, start=4):
+            info[f'A{i}'] = line
+            info[f'A{i}'].font = Font(name='Calibri', size=11, color='344054')
+            info[f'A{i}'].alignment = Alignment(wrap_text=True, vertical='top')
+
+        info['A12'] = 'Required columns'
+        info['A12'].font = Font(name='Calibri', size=12, bold=True, color=KAU_ORANGE)
+        required_rows = [
+            ('first_name',           'Sub-admin\'s first name.'),
+            ('last_name',            'Sub-admin\'s last name (optional but recommended).'),
+            ('email',                'Login email. Must be unique.'),
+            ('phone',                '10-digit Indian mobile. Required when notification_channel = sms.'),
+            ('district',             '3-letter Kerala district code from the "Districts" sheet.'),
+            ('notification_channel', '"email" (default) or "sms". How the temp password is sent.'),
+        ]
+        for i, (name, desc) in enumerate(required_rows, start=13):
+            info[f'A{i}'] = name
+            info[f'B{i}'] = desc
+            info[f'A{i}'].font = Font(name='Calibri', size=10, bold=True, color=KAU_NAVY)
+            info[f'B{i}'].font = Font(name='Calibri', size=10, color='344054')
+            info[f'A{i}'].alignment = Alignment(vertical='top')
+            info[f'B{i}'].alignment = Alignment(wrap_text=True, vertical='top')
+
+        info.column_dimensions['A'].width = 26
+        info.column_dimensions['B'].width = 90
+
+        # ────────────────────────────────────────────────────────────────
+        # SHEET 2 — Sub-Admins (data entry sheet)
+        # ────────────────────────────────────────────────────────────────
+        ws = wb.create_sheet('Sub-Admins')
+        headers = ['first_name', 'last_name', 'email', 'phone', 'district', 'notification_channel']
+        ws.append(headers)
+
+        # Header styling
+        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        header_fill = PatternFill('solid', fgColor=KAU_NAVY)
+        for col_idx, _ in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font      = header_font
+            cell.fill      = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border    = border
+        ws.row_dimensions[1].height = 26
+
+        # Sample rows (styled slightly dimmer — user should replace them).
+        sample_rows = [
+            ['Rajesh', 'Kumar', 'rajesh@kau.in', '9876543210', 'TSR', 'email'],
+            ['Priya',  'Nair',  'priya@kau.in',  '9876543211', 'PKD', 'email'],
+            ['Anil',   'Menon', 'anil@kau.in',   '9876543212', 'EKM', 'sms'],
+        ]
+        for r_idx, row in enumerate(sample_rows, start=2):
+            for c_idx, val in enumerate(row, start=1):
+                cell = ws.cell(row=r_idx, column=c_idx, value=val)
+                cell.font      = Font(name='Calibri', size=10, italic=True, color='667085')
+                cell.border    = border
+                cell.alignment = Alignment(vertical='center')
+                if r_idx % 2 == 0:
+                    cell.fill = PatternFill('solid', fgColor=BG_LIGHT)
+
+        # Freeze header row so it stays visible while scrolling.
+        ws.freeze_panes = 'A2'
+
+        # Column widths — tuned for readability.
+        widths = {'A': 16, 'B': 16, 'C': 34, 'D': 15, 'E': 12, 'F': 22}
+        for col, w in widths.items():
+            ws.column_dimensions[col].width = w
+
+        # Data validation dropdowns
+        district_codes = ','.join(f'"{code}"' for code, _ in District.choices)
+        dv_district = DataValidation(
+            type='list', formula1=f'"{",".join(c for c, _ in District.choices)}"',
+            allow_blank=False, showDropDown=False,
+            errorTitle='Invalid district',
+            error='Use a 3-letter Kerala district code — see the "Districts" sheet.',
+        )
+        dv_district.add('E2:E1000')
+        ws.add_data_validation(dv_district)
+
+        dv_channel = DataValidation(
+            type='list', formula1='"email,sms"',
+            allow_blank=False, showDropDown=False,
+            errorTitle='Invalid channel',
+            error='Use "email" or "sms".',
+        )
+        dv_channel.add('F2:F1000')
+        ws.add_data_validation(dv_channel)
+
+        # ────────────────────────────────────────────────────────────────
+        # SHEET 3 — Districts reference
+        # ────────────────────────────────────────────────────────────────
+        ref = wb.create_sheet('Districts')
+        ref.append(['code', 'name'])
+        ref.cell(row=1, column=1).font      = header_font
+        ref.cell(row=1, column=2).font      = header_font
+        ref.cell(row=1, column=1).fill      = header_fill
+        ref.cell(row=1, column=2).fill      = header_fill
+        ref.cell(row=1, column=1).alignment = Alignment(horizontal='center')
+        ref.cell(row=1, column=2).alignment = Alignment(horizontal='center')
+        ref.row_dimensions[1].height = 24
+
+        for i, (code, label) in enumerate(District.choices, start=2):
+            ref.cell(row=i, column=1, value=code).font      = Font(name='Calibri', size=10, bold=True, color=KAU_NAVY)
+            ref.cell(row=i, column=2, value=label).font     = Font(name='Calibri', size=10, color='344054')
+            ref.cell(row=i, column=1).alignment             = Alignment(horizontal='center')
+            for c_idx in (1, 2):
+                cell = ref.cell(row=i, column=c_idx)
+                cell.border = border
+                if i % 2 == 0:
+                    cell.fill = PatternFill('solid', fgColor=BG_LIGHT)
+
+        ref.column_dimensions['A'].width = 10
+        ref.column_dimensions['B'].width = 28
+        ref.freeze_panes = 'A2'
+
+        # Save + return
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        response = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="sub_admin_bulk_invite_template.xlsx"'
+        return response
+
+    @extend_schema(
+        tags=['Admin - Sub Admins'],
+        summary='Bulk invite sub-admins (Excel/CSV)',
+        description=(
+            'Upload an xlsx or csv with columns: '
+            '`first_name`, `last_name`, `email`, `phone` (optional), `district`, '
+            '`notification_channel` (optional: email/sms, default email).\n\n'
+            'Each row is processed independently. Rows that fail cap or validation '
+            'come back in the `errors` list — the rest are created.'
+        ),
+        responses={200: None},
+    )
+    @action(
+        detail=False, methods=['post'], url_path='bulk-invite',
+        parser_classes=[MultiPartParser],
+    )
+    def bulk_invite(self, request):
+        import csv
+        import io
+        import openpyxl
+
+        lang = self.get_language()
+        file = request.FILES.get('file')
+        if not file:
+            return StandardResponse.error('No file uploaded. Send file as multipart form field "file".',
+                                          status_code=400)
+
+        filename = file.name.lower()
+        rows = []
+        try:
+            if filename.endswith('.csv'):
+                content = file.read().decode('utf-8-sig')
+                reader  = csv.DictReader(io.StringIO(content))
+                rows    = list(reader)
+            elif filename.endswith('.xlsx'):
+                wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+                # Prefer a sheet named "Sub-Admins" (our template's data sheet).
+                # Fall back to the first sheet that actually has the required
+                # header cell so an admin who renamed the tab still works.
+                ws = None
+                for name in wb.sheetnames:
+                    candidate = wb[name]
+                    first_row = next(candidate.iter_rows(values_only=True), None)
+                    if not first_row:
+                        continue
+                    header_cells = [str(v).strip().lower() if v is not None else '' for v in first_row]
+                    if 'email' in header_cells and 'district' in header_cells:
+                        ws = candidate
+                        break
+                if ws is None:
+                    return StandardResponse.error(
+                        'Could not find a sheet with "email" + "district" headers. '
+                        'Use the downloaded template — the data goes in the "Sub-Admins" sheet.',
+                        status_code=400,
+                    )
+                headers = [str(c.value).strip().lower() if c.value else '' for c in next(ws.iter_rows())]
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if not any(v not in (None, '') for v in row):
+                        continue  # skip fully-blank trailing rows
+                    rows.append(dict(zip(headers, [str(v).strip() if v is not None else '' for v in row])))
+            else:
+                return StandardResponse.error('Only .xlsx and .csv are supported.', status_code=400)
+        except Exception as e:
+            return StandardResponse.error(f'Could not parse file: {e}', status_code=400)
+
+        if not rows:
+            return StandardResponse.error('File has no data rows.', status_code=400)
+
+        success, errors = [], []
+        for i, row in enumerate(rows, start=2):
+            try:
+                user = self._invite_one(row, request.user, lang)
+                success.append({'row': i, 'email': user.email, 'district': row.get('district')})
+            except Exception as e:
+                errors.append({
+                    'row':        i,
+                    'email':      row.get('email', ''),
+                    'first_name': row.get('first_name', ''),
+                    'last_name':  row.get('last_name', ''),
+                    'district':   row.get('district', ''),
+                    'reason':     str(e),
+                })
+
+        return StandardResponse.success(
+            data={'success': len(success), 'failed': len(errors), 'results': success, 'errors': errors},
+            message=f'{len(success)} sub-admin(s) invited, {len(errors)} failed.',
+        )
+
+    def _invite_one(self, row, invited_by, lang):
+        """Invite a single sub-admin from a bulk-invite row. Raises on any validation failure."""
+        email      = (row.get('email') or '').strip().lower()
+        first_name = (row.get('first_name') or '').strip()
+        last_name  = (row.get('last_name') or '').strip()
+        phone      = (row.get('phone') or '').strip()
+        district   = (row.get('district') or '').strip().upper()
+        channel    = (row.get('notification_channel') or 'email').strip().lower() or 'email'
+
+        if not email:
+            raise ValueError('email is required.')
+        from django.core.validators import EmailValidator
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            EmailValidator()(email)
+        except DjangoValidationError:
+            raise ValueError('email is not a valid address.')
+        if not first_name:
+            raise ValueError('first_name is required.')
+        if not district:
+            raise ValueError('district is required.')
+        if district not in dict(District.choices):
+            raise ValueError(f'Unknown district code "{district}".')
+        if User.objects.filter(email=email).exists():
+            raise ValueError('A user with this email already exists.')
+        if channel not in ('email', 'sms'):
+            raise ValueError('notification_channel must be email or sms.')
+        if channel == 'sms' and not phone:
+            raise ValueError('SMS channel needs a phone number.')
+
+        check_cap(district)   # raises ValueError if full
+
+        temp_password = secrets.token_urlsafe(10)
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=email, email=email, password=temp_password,
+                first_name=first_name, last_name=last_name,
+            )
+            sub_admin_group, _ = Group.objects.get_or_create(name=UserRole.SUB_ADMIN)
+            user.groups.add(sub_admin_group)
+
+            profile = user.profile
+            if phone:
+                profile.phone = phone
+            profile.must_change_password = True
+            profile.save(update_fields=['phone', 'must_change_password'])
+
+            SubAdminDistrictAssignment.objects.create(
+                subadmin=user, district=district, created_by=invited_by,
+            )
+            SubAdminDistrictTransfer.objects.create(
+                subadmin=user, from_district='', to_district=district,
+                reason='Initial assignment via bulk invite.',
+                transferred_by=invited_by,
+            )
+            bust_district_count_cache(district)
+
+        # Fire welcome notification outside the transaction so a send error
+        # doesn't roll back the account creation.
+        try:
+            frontend_url = getattr(django_settings, 'FRONTEND_URL', '')
+            send_notification(
+                user=user, code='welcome', channel=channel,
+                context={
+                    'user_name':     user.first_name,
+                    'email':         user.email,
+                    'temp_password': temp_password,
+                    'button_link':   frontend_url,
+                    'button_text':   'Login Now',
+                },
+                lang=lang,
+            )
+        except Exception:
+            logger.exception(f'Failed to send welcome to {user.email} (bulk invite).')
+
+        return user
+
+    # ─── Permissions helper (unchanged) ─────────────────────────────────
 
     def _assign_permissions(self, user, codenames, action='replace'):
         """Add, remove, or replace sub-admin permissions."""

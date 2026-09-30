@@ -101,6 +101,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(day_of_month=1, hour=3, minute=0),
     },
 
+    # KAU suggestion #1 — nightly auto-expire schemes + trainings past their
+    # deadline. Threshold days configurable via SubAdminConfig.
+    'expire-stale-schemes-and-trainings': {
+        'task': 'apps.accounts.tasks.expire_stale_schemes_and_trainings',
+        'schedule': crontab(hour=1, minute=30),
+    },
+
     # Sync FPO data with external systems (if applicable)
     'sync-external-data': {
         'task': 'apps.fpo.tasks.sync_external_data',
