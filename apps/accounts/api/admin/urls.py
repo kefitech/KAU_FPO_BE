@@ -113,6 +113,8 @@ from .cms import (
     DocumentLibraryDeactivateView,
     FeedbackListView,
     FeedbackDetailView,
+    HeaderLogoListView, HeaderLogoDetailView, HeaderLogoReorderView,
+    HeaderLogoActivateView, HeaderLogoDeactivateView,
 )
 from .organisations import OrganisationListView, OrganisationDetailView
 from .schemes import (
@@ -256,6 +258,13 @@ urlpatterns = [
     path('quick-links/<int:pk>/logo/',            QuickLinkLogoDeleteView.as_view(), name='admin-quick-links-logo-delete'),
     path('quick-links/<int:pk>/activate/',        QuickLinkActivateView.as_view(),   name='admin-quick-links-activate'),
     path('quick-links/<int:pk>/deactivate/',      QuickLinkDeactivateView.as_view(), name='admin-quick-links-deactivate'),
+# Header Logos (KAU 2026-09-30)
+    path('header-logos/',                     HeaderLogoListView.as_view()),
+    path('header-logos/reorder/',             HeaderLogoReorderView.as_view()),
+    path('header-logos/<int:pk>/',            HeaderLogoDetailView.as_view()),
+    path('header-logos/<int:pk>/activate/',   HeaderLogoActivateView.as_view()),
+    path('header-logos/<int:pk>/deactivate/', HeaderLogoDeactivateView.as_view()),
+
     # KVK Links (Krishi Vigyan Kendra directory) — KAU 2026-09-27
     path('kvk-links/',                            KVKLinkListView.as_view(),         name='admin-kvk-links-list'),
     path('kvk-links/<int:pk>/',                   KVKLinkDetailView.as_view(),       name='admin-kvk-links-detail'),

@@ -24,15 +24,17 @@ from urllib.parse import urlparse
 from django.core.cache import cache
 
 from drf_spectacular.utils import extend_schema, extend_schema_field, OpenApiExample, OpenApiTypes, inline_serializer
+from isort import file
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.cms import (
-    SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,
+    SiteBlock, Announcement, AnnouncementCategory, FAQ, FAQCategory,HeaderLogo,
     QuickLink, KVKLink, Partner, NewsSource, NewsSourceCategory, TeamMember, TeamSection, YoutubePlaylist, GalleryAlbum, GalleryPhoto, DocumentLibrary,
     Feedback, FeedbackStatus,
 )
@@ -1061,7 +1063,322 @@ class PartnerDeactivateView(APIView):
         cache.delete('public:partners')
         return StandardResponse.success(message='Deactivated.')
 
+# =============================================================================
+# HEADER LOGOS (landing-page header, next to the main menu)
+# Mirrors QuickLink CRUD. Uploads are trimmed + resized to a fixed height so any
+# logo the superadmin uploads fits the header without manual cropping.
+# One logo can be flagged `is_platform` (KAU–FPO platform logo) — shown first.
+# =============================================================================
 
+_HEADER_LOGOS_CACHE_KEY = 'public:header_logos'
+_HEADER_LOGOS_MAX       = 3     # admin can add at most 3 header logos
+_HEADER_MOBILE_ORDER    = 3     # order 3 = separate logo for the mobile menu (not one of the 3)
+_HEADER_FOOTER_ORDER    = 4     # order 4 = logo in the website footer
+_HEADER_LOGO_HEIGHT     = 160   # stored height (2x the ~64-80px display height → sharp on HiDPI)
+_HEADER_LOGO_MAX_WIDTH  = 960   # wide banners (e.g. Directorate of Extension) shrink to fit
+_HEADER_LOGO_TRIM_PAD   = 4     # px of breathing room kept after trimming
+
+# Exact pixel size for each header position (1st, 2nd, 3rd logo)
+_HEADER_SLOT_SIZES      = [(2048, 285), (1594, 1038), (1594, 1038)]
+
+
+def _header_slot_index(instance, is_platform, order):
+    """0-based position this logo will have in the header (platform logo is always first)."""
+    if is_platform:
+        return 0
+    qs = HeaderLogo.objects.filter(is_active=True)
+    if instance is not None:
+        qs = qs.exclude(pk=instance.pk)
+    platform_count = qs.filter(is_platform=True).count()
+    before = qs.filter(is_platform=False).filter(order__lt=order).count()
+    if instance is not None:
+        before += qs.filter(is_platform=False, order=order, id__lt=instance.pk).count()
+    return platform_count + before
+
+
+def _trim_logo_margins(img):
+    """Crop transparent / near-white margins so every logo looks the same size at equal height."""
+    from PIL import Image, ImageChops
+
+    alpha_bbox = img.getchannel('A').point(lambda a: 255 if a > 10 else 0).getbbox()
+    rgb = img.convert('RGB')
+    diff = ImageChops.difference(rgb, Image.new('RGB', rgb.size, (255, 255, 255)))
+    white_bbox = diff.convert('L').point(lambda p: 255 if p > 15 else 0).getbbox()
+
+    boxes = [b for b in (alpha_bbox, white_bbox) if b]
+    if not boxes:
+        return img
+    left, top = max(b[0] for b in boxes), max(b[1] for b in boxes)
+    right, bottom = min(b[2] for b in boxes), min(b[3] for b in boxes)
+    if right <= left or bottom <= top:
+        return img
+    pad = _HEADER_LOGO_TRIM_PAD
+    return img.crop((max(left - pad, 0), max(top - pad, 0),
+                     min(right + pad, img.width), min(bottom + pad, img.height)))
+
+
+def _compress_header_logo(file, fixed_size=None):
+    """Trim margins and save as WebP. fixed_size=(w, h) fits the logo inside an exact w×h canvas."""
+    import magic
+    import io
+    from PIL import Image, ImageOps
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+
+    mime = magic.from_buffer(file.read(2048), mime=True)
+    file.seek(0)
+
+    if mime not in _LOGO_ALLOWED_MIME:
+        raise serializers.ValidationError(
+            f'Only JPG, PNG, WebP, and SVG logos are allowed. Got: {mime}'
+        )
+
+    if mime == 'image/svg+xml':
+        return file  # vector — scales to any height without quality loss
+
+    img = ImageOps.exif_transpose(Image.open(file)).convert('RGBA')
+    img = _trim_logo_margins(img)
+
+    if fixed_size:
+        box_w, box_h = fixed_size
+        scale = min(box_w / img.width, box_h / img.height)
+        img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+        canvas = Image.new('RGBA', (box_w, box_h), (0, 0, 0, 0))
+        canvas.paste(img, ((box_w - img.width) // 2, (box_h - img.height) // 2), img)
+        img = canvas
+    else:
+        scale = min(_HEADER_LOGO_HEIGHT / img.height, _HEADER_LOGO_MAX_WIDTH / img.width)
+        img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+
+    output = io.BytesIO()
+    img.save(output, format='WEBP', quality=90, method=6)
+    output.seek(0)
+
+    return InMemoryUploadedFile(
+        output, 'ImageField',
+        file.name.rsplit('.', 1)[0] + '.webp',
+        'image/webp',
+        output.getbuffer().nbytes,
+        None,
+    )
+
+
+class HeaderLogoSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = HeaderLogo
+        fields = ['id', 'name', 'logo', 'logo_url', 'is_platform', 'order', 'is_active', 'created_at']
+        read_only_fields = ['is_platform']
+        extra_kwargs = {
+            'logo':      {'write_only': True, 'required': True},
+            'is_active': {'default': True},
+            'order':     {'required': False},   # 0-2 = header positions, 3 = mobile logo, 4 = footer logo
+        }
+
+    def get_logo_url(self, obj):
+        request = self.context.get('request')
+        if obj.logo and request:
+            return request.build_absolute_uri(obj.logo.url)
+        return obj.logo.url if obj.logo else None
+
+    def validate_logo(self, file):
+        if file.size > _LOGO_MAX_SIZE:
+            raise serializers.ValidationError('Logo must not exceed 5 MB.')
+        return file  # resized in validate(), once we know the logo's position
+
+    def validate(self, attrs):
+        order = attrs.get('order', self.instance.order if self.instance else None)
+        if order is None:
+            raise serializers.ValidationError({'order': 'Choose a position (1, 2, 3, mobile or footer).'})
+        if not 0 <= order <= _HEADER_FOOTER_ORDER:
+            raise serializers.ValidationError({'order': f'Position must be 0 to {_HEADER_FOOTER_ORDER}.'})
+
+        taken = HeaderLogo.objects.filter(order=order)
+        if self.instance is not None:
+            taken = taken.exclude(pk=self.instance.pk)
+        other = taken.first()
+        if other:
+            label = {_HEADER_MOBILE_ORDER: 'The mobile menu logo',
+                     _HEADER_FOOTER_ORDER: 'The footer logo'}.get(order, f'Position {order + 1}')
+            raise serializers.ValidationError(
+                {'order': f'{label} is already used by "{other.name}". Edit or delete that logo first.'}
+            )
+
+        attrs['is_platform'] = order == 0   # position 1 is the main (first) logo
+        size = _HEADER_SLOT_SIZES[order] if order < len(_HEADER_SLOT_SIZES) else None  # mobile/footer: default resize
+
+        if attrs.get('logo'):
+            attrs['logo'] = _compress_header_logo(attrs['logo'], fixed_size=size)
+        elif self.instance is not None and order != self.instance.order and self.instance.logo:
+            # moved to another position without a new file → refit the existing image
+            with self.instance.logo.open('rb') as existing:
+                attrs['logo'] = _compress_header_logo(existing, fixed_size=size)
+        return attrs
+    
+class HeaderLogoListView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='List all header logos',
+        responses={200: HeaderLogoSerializer(many=True)},
+    )
+    def get(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        qs = HeaderLogo.objects.all()
+        serializer = HeaderLogoSerializer(qs, many=True, context={'request': request})
+        return StandardResponse.success(serializer.data, 'Header logos retrieved.')
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='Create a header logo',
+        description=(
+            'Multipart form: `name`, `logo` (image file), `order` (position), `is_active` (optional).\n\n'
+            '`order`: 0 = Position 1 (main logo, 2048×285), 1 = Position 2 (1594×1038), '
+            '2 = Position 3 (1594×1038), 3 = Mobile menu logo, 4 = Footer logo.\n\n'
+            'Each position can hold only one logo. Any image size is accepted — it is trimmed and '
+            'fitted to the chosen position (no stretching or cropping) and stored as WebP. SVGs are stored as-is.'
+        ),
+        request=HeaderLogoSerializer,
+        responses={201: HeaderLogoSerializer},
+    )
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        if HeaderLogo.objects.count() >= _HEADER_FOOTER_ORDER + 1:   # 3 header + 1 mobile + 1 footer
+            return StandardResponse.error(
+                f'Only {_HEADER_LOGOS_MAX} header logos, 1 mobile logo and 1 footer logo are allowed. '
+                'Delete or replace an existing logo first.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = HeaderLogoSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save()
+        cache.delete(_HEADER_LOGOS_CACHE_KEY)
+        return StandardResponse.created(
+            data=HeaderLogoSerializer(obj, context={'request': request}).data,
+            message='Header logo created.',
+        )
+class HeaderLogoDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get(self, pk):
+        try:
+            return HeaderLogo.objects.get(pk=pk)
+        except HeaderLogo.DoesNotExist:
+            return None
+
+    @extend_schema(tags=['Admin - CMS'], summary='Update a header logo',
+                   description='Multipart form — all fields optional (partial update). '
+                               'Sending a new `logo` replaces the old file.',
+                   request=HeaderLogoSerializer, responses={200: HeaderLogoSerializer})
+    def patch(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        old_logo = obj.logo.name if obj.logo else None
+        serializer = HeaderLogoSerializer(obj, data=request.data, partial=True,
+                                          context={'request': request})
+        if not serializer.is_valid():
+            return StandardResponse.error('Validation failed.', errors=serializer.errors,
+                                          status_code=status.HTTP_400_BAD_REQUEST)
+        obj = serializer.save()
+        if old_logo and obj.logo and obj.logo.name != old_logo:
+            obj.logo.storage.delete(old_logo)  # remove the replaced file
+        cache.delete(_HEADER_LOGOS_CACHE_KEY)
+        return StandardResponse.success(
+            data=HeaderLogoSerializer(obj, context={'request': request}).data,
+            message='Updated.',
+        )
+
+    @extend_schema(tags=['Admin - CMS'], summary='Delete a header logo')
+    def delete(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        obj = self._get(pk)
+        if not obj:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        if obj.logo:
+            obj.logo.delete(save=False)
+        obj.delete()
+        cache.delete(_HEADER_LOGOS_CACHE_KEY)
+        return StandardResponse.success(message='Deleted.')
+
+
+class HeaderLogoReorderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Admin - CMS'],
+        summary='Bulk reorder header logos',
+        description=(
+            'Accepts `{"items": [{"id": 1, "order": 0}, {"id": 3, "order": 1}, ...]}`. '
+            'The platform logo is always shown first regardless of order.'
+        ),
+    )
+    def post(self, request):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        items = request.data.get('items') or []
+        if not isinstance(items, list) or not items:
+            return StandardResponse.error(
+                'items must be a non-empty list of {id, order} objects.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        from django.db import transaction as _tx
+        try:
+            with _tx.atomic():
+                for row in items:
+                    HeaderLogo.objects.filter(pk=row['id']).update(order=int(row['order']))
+        except (KeyError, TypeError, ValueError):
+            return StandardResponse.error(
+                'Each item must have an integer id and integer order.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        cache.delete(_HEADER_LOGOS_CACHE_KEY)
+        return StandardResponse.success(message='Order updated.')
+
+
+class HeaderLogoActivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Activate a header logo')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = HeaderLogo.objects.get(pk=pk)
+        except HeaderLogo.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = True
+        obj.save(update_fields=['is_active'])
+        cache.delete(_HEADER_LOGOS_CACHE_KEY)
+        return StandardResponse.success(message='Activated.')
+
+
+class HeaderLogoDeactivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['Admin - CMS'], summary='Deactivate a header logo')
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = HeaderLogo.objects.get(pk=pk)
+        except HeaderLogo.DoesNotExist:
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+        obj.is_active = False
+        obj.save(update_fields=['is_active'])
+        cache.delete(_HEADER_LOGOS_CACHE_KEY)
+        return StandardResponse.success(message='Deactivated.')
 # =============================================================================
 # NEWS SOURCES
 # =============================================================================
