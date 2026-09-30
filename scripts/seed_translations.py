@@ -5410,6 +5410,7 @@ def seed_recommendations_translations(languages):
         ('not_found',                'No recommendation found for this financial year',           'ഈ സാമ്പത്തിക വർഷത്തിന് ശുപാർശ കണ്ടെത്തിയില്ല'),
         ('fpo_not_found',            'No FPO found for this user',                                'ഈ ഉപയോക്താവിന് FPO കണ്ടെത്തിയില്ല'),
         ('invalid_rating',           'Rating must be between 1 and 5',                            'റേറ്റിംഗ് 1 നും 5 നും ഇടയിൽ ആയിരിക്കണം'),
+        ('feedback_already_submitted', 'Feedback has already been submitted for this recommendation', 'ഈ ശുപാർശയ്ക്ക് പ്രതികരണം ഇതിനകം സമർപ്പിച്ചിട്ടുണ്ട്'),
         ('no_active_model',          'No active AI model is currently configured',                'നിലവിൽ സജീവമായ AI മോഡൽ ഇല്ല'),
         ('service_unavailable',      'AI service is temporarily unavailable',                     'AI സേവനം താൽക്കാലികമായി ലഭ്യമല്ല'),
         ('models_retrieved',         'Model versions retrieved successfully',                     'മോഡൽ പതിപ്പുകൾ ലഭ്യമാക്കി'),

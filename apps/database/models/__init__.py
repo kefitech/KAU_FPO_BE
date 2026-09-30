@@ -113,6 +113,7 @@ from .gis import (
 from .recommendations import (
     MLModelVersion,
     CropRecommendation,
+    RecommendationFeedback,
     CropPackageOfPractices,
     CropZoneProfile,
     BusinessPlan,
@@ -324,6 +325,7 @@ __all__ = [
     # Phase 2 — AI Crop Recommendations
     'MLModelVersion',
     'CropRecommendation',
+    'RecommendationFeedback',
     'CropPackageOfPractices',
     'CropZoneProfile',
     'BusinessPlan',
