@@ -28,6 +28,7 @@ class AIServiceConfig(BaseModel):
         CHATBOT        = 'chatbot',         'AI Chatbot'
         MARKETING      = 'marketing',       'Marketing Strategy AI'
         TRANSLATE      = 'translate',       'Auto-Translate AI'
+        BUSINESS_PLAN  = 'business_plan',   'Business Plan Generation'
 
     class Provider(models.TextChoices):
         """Which LLM vendor this feature calls.
@@ -186,6 +187,7 @@ class AIUsageLog(BaseModel):
         CHATBOT        = 'chatbot',        'AI Chatbot'
         MARKETING      = 'marketing',      'Marketing Strategy AI'
         TRANSLATE      = 'translate',      'Auto-Translate AI'
+        BUSINESS_PLAN  = 'business_plan',  'Business Plan Generation'
 
     service = models.CharField(max_length=30, choices=Service.choices)
     fpo = models.ForeignKey(

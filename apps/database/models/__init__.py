@@ -115,6 +115,7 @@ from .recommendations import (
     CropRecommendation,
     CropPackageOfPractices,
     CropZoneProfile,
+    BusinessPlan,
 )
 
 # Chatbot RAG knowledge base
@@ -325,6 +326,7 @@ __all__ = [
     'CropRecommendation',
     'CropPackageOfPractices',
     'CropZoneProfile',
+    'BusinessPlan',
     # Chatbot RAG + history
     'ChatKnowledgeEntry',
     'ChatConversation',
