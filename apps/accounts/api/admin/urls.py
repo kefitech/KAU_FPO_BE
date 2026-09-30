@@ -339,6 +339,7 @@ urlpatterns = [
     path('ml-models/test-location/',       MLModelTestLocationView.as_view(),    name='admin-ml-models-test-location'),
     path('ml-models/<int:pk>/test/',       MLModelTestView.as_view(),            name='admin-ml-models-test'),
     path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),
+    path('recommendations/feedback/export/', RecommendationFeedbackAdminViewSet.as_view({'get': 'export'}), name='admin-recommendations-feedback-export'),
     # GIS admin
     path('gis/zone-versions/',                          ZoneBoundaryVersionListView.as_view(),     name='admin-gis-zone-versions'),
     path('gis/zone-versions/<int:pk>/activate/',        ZoneBoundaryVersionActivateView.as_view(), name='admin-gis-zone-versions-activate'),
