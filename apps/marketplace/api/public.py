@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models import BuyerDirectory, BuyerSellerMatch, MarketPrice, Product
+from apps.database.models import BuyerDirectory, BuyerSellerMatch, MarketPrice, Product, ProductStock
 
 CACHE_TTL = 60 * 60  # 1h — spec says shorter than CMS's 24h, since prices/stock change faster
 
@@ -49,7 +49,7 @@ class PublicCommodityListView(APIView):
 
         # One commodity per public product currently listed, with its latest price.
         commodity_codes = set(Product.objects.filter(
-            is_public=True, status=Product.Status.ACTIVE, is_deleted=False,
+            stock__is_public=True, stock__status=ProductStock.Status.ACTIVE, is_deleted=False,
         ).values_list('commodity__code', flat=True))
 
         data = []
@@ -105,8 +105,8 @@ class PublicProductListView(APIView):
         cached = cache.get(cache_key)
         if cached is None:
             queryset = Product.objects.filter(
-                status=Product.Status.ACTIVE, is_public=True, is_deleted=False,
-            ).select_related('commodity', 'fpo').order_by('-created_at')
+                stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
+            ).select_related('commodity', 'fpo', 'stock').order_by('-created_at')
 
             if search:
                 from django.db.models import Q
@@ -121,12 +121,12 @@ class PublicProductListView(APIView):
                     'description': p.description,
                     'commodity_code': p.commodity.code,
                     'commodity_name': p.commodity.get_name(lang),
-                    'quantity': p.quantity,
-                    'unit': p.unit,
-                    'price_per_unit': p.price_per_unit,
-                    'quality_certification': p.quality_certification,
-                    'available_from': p.available_from,
-                    'available_until': p.available_until,
+                    'quantity': p.stock.quantity,
+                    'unit': p.stock.unit,
+                    'price_per_unit': p.stock.price_per_unit,
+                    'quality_certification': p.stock.quality_certification,
+                    'available_from': p.stock.available_from,
+                    'available_until': p.stock.available_until,
                     'image': p.image.url if p.image else None,
                     # NOTE: fpo_name intentionally omitted per Business Rule #2 —
                     # "FPO contact details not exposed in public listing."
@@ -148,8 +148,8 @@ class PublicProductDetailView(APIView):
     def get(self, request, pk):
         lang = _lang(request)
         try:
-            p = Product.objects.select_related('commodity').get(
-                pk=pk, status=Product.Status.ACTIVE, is_public=True, is_deleted=False,
+            p = Product.objects.select_related('commodity', 'stock').get(
+                pk=pk, stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
             )
         except Product.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=status.HTTP_404_NOT_FOUND)
@@ -160,12 +160,12 @@ class PublicProductDetailView(APIView):
             'description': p.description,
             'commodity_code': p.commodity.code,
             'commodity_name': p.commodity.get_name(lang),
-            'quantity': p.quantity,
-            'unit': p.unit,
-            'price_per_unit': p.price_per_unit,
-            'quality_certification': p.quality_certification,
-            'available_from': p.available_from,
-            'available_until': p.available_until,
+            'quantity': p.stock.quantity,
+            'unit': p.stock.unit,
+            'price_per_unit': p.stock.price_per_unit,
+            'quality_certification': p.stock.quality_certification,
+            'available_from': p.stock.available_from,
+            'available_until': p.stock.available_until,
             'image': p.image.url if p.image else None,
         }
         return StandardResponse.success(data=data, message='Product retrieved successfully')
@@ -211,8 +211,8 @@ class PublicProductInquireView(APIView):
     @extend_schema(tags=['Public Market Hub'], summary='Submit purchase inquiry', request=PublicInquirySerializer)
     def post(self, request, pk):
         try:
-            product = Product.objects.select_related('fpo', 'commodity').get(
-                pk=pk, status=Product.Status.ACTIVE, is_public=True, is_deleted=False,
+            product = Product.objects.select_related('fpo', 'commodity', 'stock').get(
+                pk=pk, stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
             )
         except Product.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=status.HTTP_404_NOT_FOUND)

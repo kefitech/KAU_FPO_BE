@@ -28,7 +28,7 @@ from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models import Product
+from apps.database.models import Product, ProductStock
 from apps.marketplace.serializers import BuyerProductSerializer
 from apps.marketplace.services import _get_buyer_row
 
@@ -53,10 +53,10 @@ class BuyerProductListView(APIView):
             )
 
         queryset = Product.objects.filter(
-            status=Product.Status.ACTIVE,
-            is_public=True,
+            stock__status=ProductStock.Status.ACTIVE,
+            stock__is_public=True,
             is_deleted=False,
-        ).select_related('commodity', 'fpo').order_by('-created_at')
+        ).select_related('commodity', 'fpo', 'stock').order_by('-created_at')
 
         # FPO-as-buyer shouldn't see its own products in this catalog —
         # only external buyers or genuinely "other" FPOs' listings.
@@ -85,11 +85,11 @@ class BuyerProductListView(APIView):
 
         price_min = request.query_params.get('price_min')
         if price_min:
-            queryset = queryset.filter(price_per_unit__gte=price_min)
+            queryset = queryset.filter(stock__price_per_unit__gte=price_min)
 
         price_max = request.query_params.get('price_max')
         if price_max:
-            queryset = queryset.filter(price_per_unit__lte=price_max)
+            queryset = queryset.filter(stock__price_per_unit__lte=price_max)
 
         # Date range filter — overlap logic. A product's availability window
         # (available_from -> available_until) overlaps the requested range if:
@@ -103,9 +103,9 @@ class BuyerProductListView(APIView):
         if date_from and date_until:
             from django.db.models import Q as DateQ
             queryset = queryset.filter(
-                available_from__lte=date_until,
+                stock__available_from__lte=date_until,
             ).filter(
-                DateQ(available_until__isnull=True) | DateQ(available_until__gte=date_from)
+                DateQ(stock__available_until__isnull=True) | DateQ(stock__available_until__gte=date_from)
             )
 
         paginator = self.pagination_class()
@@ -114,6 +114,7 @@ class BuyerProductListView(APIView):
         serializer = BuyerProductSerializer(page, many=True, context={'lang': lang})
 
         return paginator.get_paginated_response(serializer.data)
+
 
 class BuyerRecommendedProductsView(APIView):
     """
@@ -145,11 +146,11 @@ class BuyerRecommendedProductsView(APIView):
             return StandardResponse.success(data=[], message='No commodity interests set')
 
         queryset = Product.objects.filter(
-            status=Product.Status.ACTIVE,
-            is_public=True,
+            stock__status=ProductStock.Status.ACTIVE,
+            stock__is_public=True,
             is_deleted=False,
             commodity__code__in=interested,
-        ).select_related('commodity', 'fpo').order_by('-created_at')
+        ).select_related('commodity', 'fpo', 'stock').order_by('-created_at')
 
         if buyer.fpo_id:
             queryset = queryset.exclude(fpo_id=buyer.fpo_id)
