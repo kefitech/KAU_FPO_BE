@@ -8,6 +8,7 @@ from apps.recommendations.api.recommendations import (
     RequestRecommendationView,
     RecommendationFeedbackView,
     CropPackageOfPracticesDetailView,
+    MLModelActiveInternalView,
 )
 
 urlpatterns = [
@@ -15,4 +16,6 @@ urlpatterns = [
     path('me/request/', RequestRecommendationView.as_view(), name='request-recommendation'),
     path('me/feedback/', RecommendationFeedbackView.as_view(), name='recommendation-feedback'),
     path('pop/', CropPackageOfPracticesDetailView.as_view(), name='fpo-crop-pop'),
+    # Service-to-service (ml_service startup sync), token-protected -- not FPO-facing
+    path('internal/active-model/', MLModelActiveInternalView.as_view(), name='internal-active-model'),
 ]

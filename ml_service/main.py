@@ -1,5 +1,17 @@
 """
-KAU-FPO Crop Recommendation Service -- multiclass model version (v4).
+KAU-FPO Crop Recommendation Service.
+
+v5 UPDATE: same multiclass RF architecture and serving flow as v4 below, but
+the model is now trained from the LIVE CropZoneProfile knowledge base (the
+zone_profiles CSV format -- see retrain_pipeline._build_rows_from_zone_profiles's
+docstring): admin-maintained temp/pH ranges plus the structured `seasons` and
+`suitable_soils` fields drive the training labels, training rows cover ALL 6
+soil categories in EVERY zone (so any GIS soil-map zone/soil pair is
+in-distribution), and soil_ph_mid means the same thing at train and serve time
+(the PLACE's soil pH, not the crop's preferred pH). Request soil types from
+the GIS soil map resolve through data_access_v3.GIS_SOIL_ALIASES.
+
+---- v4 (historical) ----
 
 Same Pydantic request/response contract, same `/predict/crops/` endpoint
 path, same `/health`, `/reload-model/`, `/model-status/` and
@@ -50,11 +62,15 @@ Run:
     pip install -r requirements.txt
     uvicorn main:app --reload --port 8001
 """
+import gc
 import json
 import logging
 import os
 import tempfile
+import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -87,9 +103,16 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI(title="KAU-FPO Crop Recommendation Service")
 
-SERVED_MODEL_VERSION = "v4.0.0-rf-multiclass"  # updated at runtime by /reload-model/ on a successful swap
+SERVED_MODEL_VERSION = "v5.0.0-rf-zoneprofiles"  # updated at runtime by /reload-model/ on a successful swap
 
-MODEL_PATH = "model/crop_suitability_rf_v4.joblib"
+# Built-in fallback model: loaded at startup only when ML_MODELS_DIR has no
+# admin-activated version recorded (see _restore_active_model()). Anchored to
+# this file rather than the CWD so it resolves the same however uvicorn is
+# launched; override with ML_DEFAULT_MODEL_PATH to ship a different default.
+MODEL_PATH = Path(os.environ.get(
+    "ML_DEFAULT_MODEL_PATH",
+    Path(__file__).resolve().parent / "model" / "crop_suitability_rf_v5.joblib",
+))
 # v4: FEATURES are environmental factors only -- crop_name/crop_group are
 # deliberately NOT features here, crop_name is the model's predicted TARGET.
 # See this module's docstring and retrain_pipeline.py's for why.
@@ -297,19 +320,29 @@ _kb: Optional[CropKnowledgeBase] = None
 @app.on_event("startup")
 def load_artifacts():
     global _model, _kb
-    pipe, problems, warns = load_model_checked(MODEL_PATH)
-    for w in warns:
-        logger.warning("startup model warning: %s", w)
-    if problems:
-        # Refuse to start rather than come up "healthy" and 500 on the first
-        # real prediction. The message names the exact mismatch.
-        logger.error("startup failed: default model at %s is incompatible: %s", MODEL_PATH, " | ".join(problems))
-        raise RuntimeError(
-            f"Default model at {MODEL_PATH} is not compatible with this service: " + " | ".join(problems)
-        )
-    _model = pipe
+    # Prefer the version an admin last activated, so a container restart
+    # doesn't silently fall back to the built-in model while Django's DB
+    # still says something else is active.
+    if not _restore_active_model():
+        pipe, problems, warns = load_model_checked(MODEL_PATH)
+        for w in warns:
+            logger.warning("startup model warning: %s", w)
+        if problems:
+            # Refuse to start rather than come up "healthy" and 500 on the first
+            # real prediction. The message names the exact mismatch.
+            logger.error("startup failed: default model at %s is incompatible: %s", MODEL_PATH, " | ".join(problems))
+            raise RuntimeError(
+                f"Default model at {MODEL_PATH} is not compatible with this service: " + " | ".join(problems)
+            )
+        _model = pipe
+        logger.info("startup: loaded default model %s as model_version=%s", MODEL_PATH, SERVED_MODEL_VERSION)
     _kb = CropKnowledgeBase()
-    logger.info("startup complete: loaded %s as model_version=%s", MODEL_PATH, SERVED_MODEL_VERSION)
+    logger.info("startup complete: model_version=%s", SERVED_MODEL_VERSION)
+
+    if DJANGO_INTERNAL_URL and ML_SERVICE_INTERNAL_TOKEN:
+        threading.Thread(target=_sync_active_model_from_django, name="active-model-sync", daemon=True).start()
+    else:
+        logger.info("active-model sync disabled: set DJANGO_INTERNAL_URL and ML_SERVICE_INTERNAL_TOKEN to enable it")
 
 
 def build_reasoning(crop_name: str, zone: str, season: str, climate: dict, confidence: float,
@@ -364,6 +397,22 @@ def estimated_yield_for(crop_name: str, kb: CropKnowledgeBase) -> str:
 
 @app.post("/predict/crops/", response_model=RecommendationResponse)
 def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
+    response, _resolved = _predict(payload, _model, payload.model_version or SERVED_MODEL_VERSION)
+    return response
+
+
+def _predict(payload: RecommendationRequest, pipe, model_version: str,
+             climate_override: Optional[dict] = None) -> tuple[RecommendationResponse, dict]:
+    """
+    The whole recommendation pipeline, against whichever fitted model `pipe`
+    is -- the live one for /predict/crops/, or a not-yet-active version for
+    /predict/test/. Also returns the inputs as actually resolved (zone/season
+    fallbacks, soil categories, pH, climate, matched commodities) so an admin
+    test can show what the model really saw.
+
+    climate_override (admin tests only) replaces some of the zone's seasonal
+    climate averages, e.g. with today's measured temperature/humidity.
+    """
     zone = payload.agro_zone if payload.agro_zone in VALID_ZONES else None
     season = payload.season if payload.season in VALID_SEASONS else None
 
@@ -390,14 +439,19 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
     # `score += 0.07` for a crop the FPO already handles) -- this no longer
     # touches which crops are eligible, only how they're scored once eligible.
     resolved_requested = set()
+    unmatched_commodities = []
     for c in payload.commodities:
         name = _kb.resolve_crop(c)
         if name:
             resolved_requested.add(name)
+        else:
+            unmatched_commodities.append(c)
 
     effective_zone = zone or "coastal_zone"  # need *some* zone to fetch climate for scoring/fallback
     effective_season = season or "dry_season"
     climate = _kb.representative_climate(effective_zone, effective_season)
+    if climate_override:
+        climate = {**climate, **climate_override}
 
     # Resolve the request's free-text soil_type to one of the 6 trained soil categories.
     # If it can't be resolved (missing, or doesn't match any known category), fall back to
@@ -422,10 +476,9 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
     if reported_ph is not None:
         soil_note += f" Using your reported soil pH ({reported_ph:g})."
 
-    # v4: ONE feature row per soil category being considered (not one per
-    # candidate crop -- crop_name isn't a feature anymore, see this module's
-    # docstring), then ONE predict_proba() call returns a probability across
-    # ALL known crops at once for that environment.
+    # ONE feature row per soil category being considered (not one per candidate
+    # crop -- crop_name is the TARGET, never a feature), then ONE
+    # predict_proba() call returns a probability across ALL known crops.
     feature_rows = []
     for soil_cat in soil_categories:
         if reported_ph is not None:
@@ -439,21 +492,19 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
             "humidity_pct": climate["humidity_pct"], "soil_ph_mid": soil_ph_mid,
         })
     feat_df = pd.DataFrame(feature_rows)
-    proba_matrix = _model.predict_proba(feat_df[FEATURE_CATEGORICAL + FEATURE_NUMERIC])
+    proba_matrix = pipe.predict_proba(feat_df[FEATURE_CATEGORICAL + FEATURE_NUMERIC])
     # average across soil categories (a no-op when only 1 row, i.e. soil was resolved)
     avg_proba = proba_matrix.mean(axis=0)
-    raw_confidence_by_crop = dict(zip(_model.classes_, avg_proba))
+    raw_confidence_by_crop = dict(zip(pipe.classes_, avg_proba))
 
-    # The model's raw probabilities are a distribution over ALL ~149 known
-    # crops, most of which aren't even documented for this zone -- so a crop
+    # The model's raw probabilities are a distribution over ALL known crops,
+    # most of which aren't even documented for this zone -- so a crop
     # genuinely well suited here can still show a small-looking raw share
-    # (e.g. 0.06) just because probability mass is spread across many valid
-    # options for a generic environment. Restrict to this zone's documented
-    # candidates and rescale so the top candidate reads as 1.0 (100% match)
-    # and the rest are proportional to it -- an honest RELATIVE confidence
-    # ("how strong a match is this, compared to your best option here"),
-    # not a claim that the model is more or less certain in an absolute
-    # sense than it actually is.
+    # just because probability mass is spread across many valid options.
+    # Restrict to this zone's documented candidates and rescale so the top
+    # candidate reads as 1.0 (100% match) and the rest are proportional to it
+    # -- an honest RELATIVE confidence ("how strong a match is this, compared
+    # to your best option here").
     candidate_mass = {name: raw_confidence_by_crop.get(name, 0.0) for name in candidates}
     best_mass = max(candidate_mass.values()) if candidate_mass else 0.0
     per_crop_confidence = (
@@ -465,9 +516,8 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
 
     scored = []
     for name in candidates:
-        raw_confidence = per_crop_confidence[name]
         already_grown = name in resolved_requested
-        confidence = raw_confidence
+        confidence = per_crop_confidence[name]
         if already_grown:
             confidence += COMMODITY_MATCH_BONUS
         confidence = max(0.0, min(confidence, 1.0))
@@ -490,16 +540,26 @@ def predict_crops(payload: RecommendationRequest) -> RecommendationResponse:
     scored.sort(key=lambda t: -t[0])
     top_results = [item for _, item in scored]
 
-    return RecommendationResponse(
-        recommendations=top_results,
-        model_version=payload.model_version or SERVED_MODEL_VERSION,
-    )
+    resolved = {
+        "zone": effective_zone,
+        "zone_defaulted": zone is None,
+        "season": effective_season,
+        "season_defaulted": season is None,
+        "soil_categories": soil_categories,
+        "soil_ph_used": [round(float(r["soil_ph_mid"]), 2) for r in feature_rows],
+        "climate": {k: round(float(climate[k]), 1) for k in ("temperature_avg_C", "rainfall_mm", "humidity_pct")},
+        "climate_overridden": sorted(climate_override or {}),
+        "matched_commodities": sorted(resolved_requested),
+        "unmatched_commodities": unmatched_commodities,
+        "n_candidates": len(candidates),
+    }
+    return RecommendationResponse(recommendations=top_results, model_version=model_version), resolved
 
 
 @app.get("/health")
 def health():
     """Simple liveness check -- useful for confirming the service is up during dev."""
-    return {"status": "ok", "service": "crop-recommendation-rf-v4", "model_version": SERVED_MODEL_VERSION}
+    return {"status": "ok", "service": "crop-recommendation-rf-v5", "model_version": SERVED_MODEL_VERSION}
 
 
 # ---------------------------------------------------------------------------
@@ -514,6 +574,151 @@ _active_model_state = {
     "model_file_path": None,
     "file_exists": None,
 }
+
+# Written after every successful /reload-model/ and read back at startup, so
+# the activated version survives restarts. Lives in the shared ML_MODELS_DIR
+# volume next to the model files it points at.
+ACTIVE_MODEL_POINTER = ML_MODELS_DIR / "active_model.json"
+
+
+def _write_active_pointer(version_code: str, model_file_path: str) -> None:
+    try:
+        ML_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = ACTIVE_MODEL_POINTER.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"version_code": version_code, "model_file_path": model_file_path}))
+        tmp.replace(ACTIVE_MODEL_POINTER)  # atomic, so a crash never leaves a half-written pointer
+    except OSError as exc:
+        # The swap itself already succeeded; only restart-persistence is lost.
+        logger.warning("could not write %s (%s); activated model won't survive a restart", ACTIVE_MODEL_POINTER, exc)
+
+
+def _restore_active_model() -> bool:
+    """
+    Loads the version recorded in ACTIVE_MODEL_POINTER, with the same
+    validation /reload-model/ applies. Returns False (caller falls back to
+    MODEL_PATH) if there's no pointer or the recorded file is missing/invalid.
+    """
+    if not ACTIVE_MODEL_POINTER.is_file():
+        return False
+    try:
+        pointer = json.loads(ACTIVE_MODEL_POINTER.read_text())
+        version_code, model_file_path = pointer["version_code"], pointer["model_file_path"]
+    except (OSError, ValueError, KeyError) as exc:
+        logger.warning("startup: ignoring unreadable %s: %s", ACTIVE_MODEL_POINTER, exc)
+        return False
+
+    pipe, full_path, problems, warns = _load_version_file(model_file_path)
+    for w in warns:
+        logger.warning("startup model warning (%s): %s", version_code, w)
+    if problems:
+        logger.warning("startup: activated version %s rejected (%s); using default model",
+                       version_code, " | ".join(problems))
+        return False
+
+    _swap_in(pipe, version_code, model_file_path)
+    logger.info("startup: restored activated version %s from %s", version_code, full_path)
+    return True
+
+
+def _load_version_file(model_file_path: str) -> tuple[object, Path, list[str], list[str]]:
+    """Resolves model_file_path under ML_MODELS_DIR and loads + validates it.
+    Returns (pipe_or_None, full_path, problems, warnings)."""
+    full_path = ML_MODELS_DIR / model_file_path
+    if not full_path.is_file():
+        return None, full_path, [f"File not found at {full_path}"], []
+    pipe, problems, warns = load_model_checked(full_path)
+    return pipe, full_path, problems, warns
+
+
+def _swap_in(pipe, version_code: str, model_file_path: str) -> None:
+    global _model, SERVED_MODEL_VERSION
+    _model = pipe
+    SERVED_MODEL_VERSION = version_code  # /health and predict responses now report the truth
+    _active_model_state.update(version_code=version_code, model_file_path=model_file_path,
+                               file_exists=True, loaded=True)
+
+
+# ---------------------------------------------------------------------------
+# Startup sync with Django's active version. Django's DB is the source of
+# truth for which version is active, but this service can't block on Django
+# at startup: in docker-compose `web` depends on `ml-service`, so Django
+# normally comes up AFTER this. So startup serves from ACTIVE_MODEL_POINTER /
+# MODEL_PATH immediately, and a background thread asks Django (retrying until
+# it answers) and swaps in the DB's active version if it differs.
+# ---------------------------------------------------------------------------
+
+DJANGO_INTERNAL_URL = os.environ.get("DJANGO_INTERNAL_URL", "http://localhost:8000").rstrip("/")
+ML_SERVICE_INTERNAL_TOKEN = os.environ.get("ML_SERVICE_INTERNAL_TOKEN", "")
+ACTIVE_VERSION_ENDPOINT = "/api/recommendations/internal/active-model/"
+SYNC_MAX_RETRY_DELAY_S = 60
+
+# Bumped by every successful /reload-model/. If an admin activates a version
+# while the sync thread is still waiting on Django, the sync's (older) answer
+# is dropped instead of overwriting the admin's choice.
+_swap_lock = threading.Lock()
+_reload_generation = 0
+
+
+def _fetch_django_active_version() -> Optional[tuple[str, str]]:
+    """(version_code, model_file_path) Django has active, or None if none is.
+    Raises urllib.error.URLError / OSError / ValueError when Django can't be asked."""
+    req = urllib.request.Request(
+        DJANGO_INTERNAL_URL + ACTIVE_VERSION_ENDPOINT,
+        headers={"X-Internal-Token": ML_SERVICE_INTERNAL_TOKEN},
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        data = json.load(resp).get("data")
+    return (data["version_code"], data["model_file_path"]) if data else None
+
+
+def _sync_active_model_from_django() -> None:
+    start_generation = _reload_generation
+    delay, attempt = 2, 0
+    while True:
+        attempt += 1
+        try:
+            active = _fetch_django_active_version()
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403, 404):
+                # Wrong token or endpoint missing -- a config problem, not an
+                # outage, so retrying won't help.
+                logger.error("active-model sync: Django refused (HTTP %s); check ML_SERVICE_INTERNAL_TOKEN "
+                             "matches on both sides. Keeping %s.", exc.code, SERVED_MODEL_VERSION)
+                return
+            reason = f"HTTP {exc.code}"
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            reason = str(exc)
+        if attempt == 1 or attempt % 10 == 0:
+            logger.warning("active-model sync: Django not answering yet (%s); retry #%d in %ds",
+                           reason, attempt, delay)
+        time.sleep(delay)
+        delay = min(delay * 2, SYNC_MAX_RETRY_DELAY_S)
+
+    if active is None:
+        logger.info("active-model sync: Django has no active version; keeping %s", SERVED_MODEL_VERSION)
+        return
+    version_code, model_file_path = active
+    if version_code == SERVED_MODEL_VERSION:
+        logger.info("active-model sync: already serving Django's active version %s", version_code)
+        return
+
+    pipe, full_path, problems, warns = _load_version_file(model_file_path)
+    for w in warns:
+        logger.warning("active-model sync model warning (%s): %s", version_code, w)
+    if problems:
+        logger.error("active-model sync: Django's active version %s rejected (%s); keeping %s",
+                     version_code, " | ".join(problems), SERVED_MODEL_VERSION)
+        return
+
+    with _swap_lock:
+        if _reload_generation != start_generation:
+            logger.info("active-model sync: an admin activation happened meanwhile; discarding %s", version_code)
+            return
+        previous_version = SERVED_MODEL_VERSION
+        _swap_in(pipe, version_code, model_file_path)
+    _write_active_pointer(version_code, model_file_path)
+    logger.info("active-model sync: %s -> %s (%s)", previous_version, version_code, full_path)
 
 
 class ReloadModelRequest(BaseModel):
@@ -534,7 +739,7 @@ def reload_model(payload: ReloadModelRequest):
     clean activation. (Previously this returned 200 "acknowledged" even on
     failure, so Django showed success while the old model kept serving.)
     """
-    global _model, SERVED_MODEL_VERSION
+    global _reload_generation
     full_path = ML_MODELS_DIR / payload.model_file_path
     file_exists = full_path.is_file()
 
@@ -563,10 +768,11 @@ def reload_model(payload: ReloadModelRequest):
             "warnings": warns,
         })
 
-    previous_version = SERVED_MODEL_VERSION
-    _model = pipe
-    SERVED_MODEL_VERSION = payload.version_code  # /health and predict responses now report the truth
-    _active_model_state["loaded"] = True
+    with _swap_lock:
+        previous_version = SERVED_MODEL_VERSION
+        _swap_in(pipe, payload.version_code, payload.model_file_path)
+        _reload_generation += 1
+    _write_active_pointer(payload.version_code, payload.model_file_path)
     logger.info("reload-model succeeded: %s -> %s (%s)", previous_version, payload.version_code, full_path)
 
     return {
@@ -584,6 +790,108 @@ def reload_model(payload: ReloadModelRequest):
 def model_status():
     """Quick way to check what Django last told this service to activate."""
     return _active_model_state
+
+
+# ---------------------------------------------------------------------------
+# Admin test predictions: run the same pipeline as /predict/crops/ against ANY
+# registered version -- including one that isn't active -- with hand-picked
+# inputs, without touching the live model FPOs are served from.
+# ---------------------------------------------------------------------------
+
+
+
+# Testing a non-active version loads its model file just for that request and
+# frees it right after; this lock keeps concurrent tests from stacking several
+# extra copies on a small server.
+_test_load_lock = threading.Lock()
+
+
+class TestPredictRequest(RecommendationRequest):
+    version_code: str
+    model_file_path: str  # relative to ML_MODELS_DIR, same as /reload-model/
+    # Optional stand-ins for the zone's seasonal averages (e.g. current
+    # weather at a map location). Rainfall has no override on purpose: the
+    # model was trained on monthly totals, which current readings can't match.
+    temperature_override: Optional[float] = None
+    humidity_override: Optional[float] = None
+
+
+class TestPredictResponse(RecommendationResponse):
+    resolved_inputs: dict
+    used_live_model: bool
+
+
+@app.post("/predict/test/", response_model=TestPredictResponse)
+def predict_test(payload: TestPredictRequest):
+    """
+    Unlike /predict/crops/ (which silently falls back to a default zone/season
+    so an FPO always gets something), inputs here are validated strictly: a
+    test on a value the model doesn't know would be misleading. Returns 422
+    with the reasons for bad inputs.
+    """
+    problems = []
+    if payload.agro_zone not in VALID_ZONES:
+        problems.append(f"Unknown zone {payload.agro_zone!r}; expected one of {sorted(VALID_ZONES)}.")
+    if payload.season not in VALID_SEASONS:
+        problems.append(f"Unknown season {payload.season!r}; expected one of {sorted(VALID_SEASONS)}.")
+    if payload.temperature_override is not None and not -10 <= payload.temperature_override <= 50:
+        problems.append(f"Temperature override {payload.temperature_override} °C is outside -10..50.")
+    if payload.humidity_override is not None and not 0 <= payload.humidity_override <= 100:
+        problems.append(f"Humidity override {payload.humidity_override}% is outside 0..100.")
+    if payload.soil_type and not resolve_soil_category(payload.soil_type):
+        problems.append(f"Soil type {payload.soil_type!r} doesn't match any known soil category.")
+    if problems:
+        raise HTTPException(status_code=422, detail={"note": "Invalid test inputs.", "problems": problems})
+
+    climate_override = {}
+    if payload.temperature_override is not None:
+        climate_override["temperature_avg_C"] = payload.temperature_override
+    if payload.humidity_override is not None:
+        climate_override["humidity_pct"] = payload.humidity_override
+
+    if payload.version_code == SERVED_MODEL_VERSION:
+        response, resolved = _predict(payload, _model, payload.version_code, climate_override)
+        used_live_model = True
+    else:
+        with _test_load_lock:
+            pipe, full_path, problems, warns = _load_version_file(payload.model_file_path)
+            if problems:
+                logger.warning("predict-test: version %s rejected: %s", payload.version_code, " | ".join(problems))
+                raise HTTPException(status_code=422, detail={
+                    "note": "Model file rejected.", "problems": problems, "warnings": warns,
+                })
+            try:
+                response, resolved = _predict(payload, pipe, payload.version_code, climate_override)
+            finally:
+                del pipe
+                gc.collect()  # hand the test model's memory back before the next request
+        used_live_model = False
+
+    logger.info("predict-test: version=%s zone=%s season=%s live_model=%s",
+                payload.version_code, payload.agro_zone, payload.season, used_live_model)
+    return TestPredictResponse(**response.model_dump(), resolved_inputs=resolved, used_live_model=used_live_model)
+
+
+@app.get("/predict/resolve-soil/")
+def predict_resolve_soil(soil_type: str):
+    """Which trained soil category a free-text soil type (e.g. a GIS soil
+    region's) maps to, or null -- in which case a prediction averages the
+    zone's soil mix, same as for an FPO."""
+    return {"soil_type": soil_type, "category": resolve_soil_category(soil_type)}
+
+
+@app.get("/predict/options/")
+def predict_options():
+    """The values /predict/test/ accepts, for building the admin test form."""
+    return {
+        "zones": ["coastal_zone", "southern_zone", "central_zone", "northern_zone", "high_ranges"],
+        "seasons": ["southwest_monsoon", "northeast_monsoon", "dry_season"],
+        "soil_types": [
+            {"value": cat, "ph_lo": float(row["ph_lo"]), "ph_hi": float(row["ph_hi"])}
+            for cat, row in _kb.soil_ref.iterrows()
+        ],
+        "tiers": sorted(TIER_GUIDANCE),
+    }
 
 
 @app.post("/reload-knowledge-base/")

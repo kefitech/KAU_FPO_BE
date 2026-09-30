@@ -213,6 +213,19 @@ class CropZoneProfile(BaseModel):
         blank=True, default='',
         help_text="Free-text season/planting-window description shown in a recommendation's reasoning."
     )
+    seasons = models.JSONField(
+        default=list, blank=True,
+        help_text="Structured service seasons this crop suits here, e.g. "
+                   "['southwest_monsoon']. Empty = not specified (scorer treats all "
+                   "seasons as mildly suitable). Drives the season component of "
+                   "ml_service's fit scorer; seasons_text stays as display text."
+    )
+    suitable_soils = models.JSONField(
+        default=list, blank=True,
+        help_text="Soil categories (ml_service's 6 canonical names) this crop suits "
+                   "here. Empty = not specified (all soils mildly suitable). Drives "
+                   "the soil component of ml_service's fit scorer."
+    )
     temp_is_real = models.BooleanField(
         default=True,
         help_text="False if temp_lo/hi is a zone-default fallback rather than the book's own stated range."

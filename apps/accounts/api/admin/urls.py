@@ -153,6 +153,10 @@ from apps.recommendations.api.recommendations import (
     MLModelVersionActivateView,
     MLModelVersionDetailView,
     MLModelRetrainView,
+    MLServiceStatusView,
+    MLModelTestView,
+    MLModelTestOptionsView,
+    MLModelTestLocationView,
     RecommendationFeedbackAdminViewSet,
 )
 from apps.gis_module.api.zones import (
@@ -330,6 +334,10 @@ urlpatterns = [
     path('ml-models/<int:pk>/',            MLModelVersionDetailView.as_view(),   name='admin-ml-models-detail'),
     path('ml-models/<int:pk>/activate/',   MLModelVersionActivateView.as_view(), name='admin-ml-models-activate'),
     path('ml-models/retrain/',             MLModelRetrainView.as_view(),         name='admin-ml-models-retrain'),
+    path('ml-models/service-status/',      MLServiceStatusView.as_view(),        name='admin-ml-models-service-status'),
+    path('ml-models/test-options/',        MLModelTestOptionsView.as_view(),     name='admin-ml-models-test-options'),
+    path('ml-models/test-location/',       MLModelTestLocationView.as_view(),    name='admin-ml-models-test-location'),
+    path('ml-models/<int:pk>/test/',       MLModelTestView.as_view(),            name='admin-ml-models-test'),
     path('recommendations/feedback/',      RecommendationFeedbackAdminViewSet.as_view({'get': 'list'}), name='admin-recommendations-feedback'),
     # GIS admin
     path('gis/zone-versions/',                          ZoneBoundaryVersionListView.as_view(),     name='admin-gis-zone-versions'),

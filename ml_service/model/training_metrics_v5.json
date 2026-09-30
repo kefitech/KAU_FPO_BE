@@ -1,0 +1,52 @@
+{
+  "random_80_20_split": {
+    "accuracy": 0.0020299416391778738,
+    "top_5_hit_rate": 1.0,
+    "n_train": 15763,
+    "n_test": 3941,
+    "n_classes": 143
+  },
+  "leave_one_zone_out_cv": [
+    {
+      "held_out_zone": "central_zone",
+      "top_5_hit_rate": 1.0,
+      "n_test": 4531
+    },
+    {
+      "held_out_zone": "southern_zone",
+      "top_5_hit_rate": 1.0,
+      "n_test": 4452
+    },
+    {
+      "held_out_zone": "northern_zone",
+      "top_5_hit_rate": 1.0,
+      "n_test": 4435
+    },
+    {
+      "held_out_zone": "coastal_zone",
+      "top_5_hit_rate": 1.0,
+      "n_test": 4210
+    },
+    {
+      "held_out_zone": "high_ranges",
+      "top_5_hit_rate": 0.9710982658959537,
+      "n_test": 2076
+    }
+  ],
+  "feature_importance_by_field": {
+    "soil_type": 0.2381104018088166,
+    "temperature_avg_C": 0.1936210498265549,
+    "zone": 0.13080147551349403,
+    "rainfall_mm": 0.1302306050150533,
+    "humidity_pct": 0.11918754482718422,
+    "season": 0.11002887408622114,
+    "soil_ph_mid": 0.07802004892267572
+  },
+  "n_rows_total": 19704,
+  "n_crops": 143,
+  "crops_with_no_positive_label": 6,
+  "caveat": "Multiclass model: features are environmental factors ONLY (zone, soil_type, season, temperature, rainfall, humidity, soil_ph) -- crop_name is the predicted target, never an input feature, so crop identity cannot be memorized as a suitability shortcut the way it could in the prior binary-classifier version. Training rows are still rule-derived from KAU's PoP book requirements matched against real zone climate (not an observed real-world outcome) -- see this module's docstring for the label rule. 'accuracy' is a strict single-label match and will look low/near-zero -- expected, since dozens of crops are typically ALL valid for the same (zone, soil_type, season) bucket (~87 on average) and this metric only credits the one specific crop a given row happened to hold. 'top_5_hit_rate' is the metric that actually matters: it checks the model's top-5 predictions against the FULL set of crops documented valid for that bucket, not just the single held-out row.",
+  "validation_warnings": [],
+  "source_format": "zone_profiles",
+  "source_csv": "crop_profiles_service_zones.csv (CropZoneProfile export)"
+}

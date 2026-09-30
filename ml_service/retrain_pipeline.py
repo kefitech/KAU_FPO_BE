@@ -524,57 +524,71 @@ def _stage3_build_training_rows(profiles: pd.DataFrame, climate: pd.DataFrame) -
 # ---------------- zone_profiles format: build training rows directly from CropZoneProfile's
 # own export shape, skipping stages 1-2 entirely ----------------
 
+def _parse_list_cell(value) -> list:
+    """';'-joined cell -> list. Missing column/empty cell -> [] (= unspecified)."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return []
+    text = str(value).strip()
+    if not text or text.lower() == "nan":
+        return []
+    return [p.strip() for p in text.split(";") if p.strip()]
+
+
+ALL_SOIL_CATEGORIES = list(SOIL_PH)  # the 6 canonical categories, canonical order
+
+
 def _build_rows_from_zone_profiles(df: pd.DataFrame, climate_path: str = CLIMATE_PATH) -> pd.DataFrame:
     """
-    Builds pre-expanded training rows from CropZoneProfile's export shape
-    (crop_profiles_service_zones.csv -- see ZONE_PROFILES_REQUIRED_COLUMNS and
-    apps/recommendations/api/crop_zone_profile_admin.py's EXPORT_CSV_COLUMNS),
-    instead of the rule_based format's free-text book crosswalk.
+    v5: builds pre-expanded training rows from CropZoneProfile's export shape
+    (crop_profiles_service_zones.csv). Three deliberate changes from the v4
+    version of this function:
 
-    Stages 1-2 (_stage1_parse_bounds, _stage2_aggregate_profiles) don't apply
-    here: this format's temp_lo/temp_hi/ph_lo/ph_hi are already real numbers an
-    admin entered directly, not free text to regex-parse, and the rows are
-    already expanded to one row per (crop, service_zone) -- no KAU-zone
-    crosswalk needed either.
+    1. EVERY zone gets rows for ALL 6 soil categories, not just the 2 in
+       ZONE_SOIL_TYPES. The live GIS soil map can place any soil type in any
+       zone (measured: ~58% of mapped land fell on zone/soil pairs the v4
+       training never contained), so the model must have seen every pair.
 
-    is_suitable is temp_ok ONLY, unlike stage 3's temp_ok AND (season_ok OR
-    soilkw_ok). A CropZoneProfile row already represents an admin's
-    affirmative "this crop is eligible in this zone" -- there is no "not
-    suitable" CropZoneProfile row the way the rule_based book crosswalk lists
-    both suitable and unsuitable candidates for a zone -- so there's nothing
-    to re-derive zone/season eligibility FROM via keyword matching (no
-    soil_text on this model at all, and season eligibility is already implied
-    by the row's existence). temp_ok still does real work: it's what decides
-    WHICH of the zone's climate months this crop's documented temperature
-    range actually covers, since a crop can be broadly eligible for a zone yet
-    still miss a specific month's real climate.
+    2. soil_ph_mid is the PLACE's pH -- the soil category's book pH-range
+       midpoint -- exactly what predict_crops() feeds the model at serve time
+       (or the FPO's measured value). v4 fed the CROP's own preferred-pH
+       midpoint here, which made the feature mean different things at train
+       and serve time.
 
-    soil_ph_mid/temperature_avg_C use this crop's own ph_lo/ph_hi/temp_lo/
-    temp_hi midpoint directly -- same convention _stage3_build_training_rows()
-    uses for the rule_based format (see its own comments), except here it's
-    never a fallback: every row in this format has a real, admin-entered
-    range, so there's no "no bounds parsed" case to fall back from.
+    3. The label uses the structured `seasons` and `suitable_soils` columns
+       (backfilled from the PoP book, admin-editable per profile):
+           is_suitable = temp_ok AND ph_ok AND season_ok AND soil_ok
+       where season_ok/soil_ok are True when the profile's list is empty
+       (= not specified) or contains the row's season/soil category, temp_ok
+       allows +-2 C beyond the documented range, and ph_ok allows +-0.75 pH
+       beyond it. Older exports without the two columns degrade gracefully:
+       both default to "unspecified", reducing to roughly the v4 rule.
     """
     climate = pd.read_csv(climate_path)
+    has_seasons = "seasons" in df.columns
+    has_soils = "suitable_soils" in df.columns
     rows = []
     for _, p in df.iterrows():
         service_zone = p["service_zone"]
         if service_zone not in ZONE_SOIL_TYPES:
             continue  # unrecognized zone -- already flagged as a warning by validate_zone_profiles_csv()
-        soil_ph_mid = (p["ph_lo"] + p["ph_hi"]) / 2
-        temperature_avg_C = (p["temp_lo"] + p["temp_hi"]) / 2
+        crop_seasons = _parse_list_cell(p["seasons"]) if has_seasons else []
+        crop_soils = _parse_list_cell(p["suitable_soils"]) if has_soils else []
         for _, zc in climate[climate["zone"] == service_zone].iterrows():
             temp_ok = not (zc["temperature_avg_C"] < p["temp_lo"] - 2 or zc["temperature_avg_C"] > p["temp_hi"] + 2)
-            is_suitable = int(temp_ok)
-            for soil_category in ZONE_SOIL_TYPES[service_zone]:
+            season_ok = (not crop_seasons) or (zc["season"] in crop_seasons)
+            for soil_category in ALL_SOIL_CATEGORIES:
+                ph_lo_soil, ph_hi_soil = SOIL_PH[soil_category]
+                place_ph = (ph_lo_soil + ph_hi_soil) / 2
+                ph_ok = (p["ph_lo"] - 0.75) <= place_ph <= (p["ph_hi"] + 0.75)
+                soil_ok = (not crop_soils) or (soil_category in crop_soils)
                 rows.append({
                     "zone": service_zone, "month": zc["month"], "season": zc["season"],
-                    "soil_type": soil_category, "soil_ph_mid": soil_ph_mid,
-                    "temperature_avg_C": temperature_avg_C, "rainfall_mm": zc["rainfall_mm"],
+                    "soil_type": soil_category, "soil_ph_mid": place_ph,
+                    "temperature_avg_C": zc["temperature_avg_C"], "rainfall_mm": zc["rainfall_mm"],
                     "humidity_pct": zc["humidity_pct"],
                     "crop_name": p["crop_name"], "crop_group": p["crop_group"],
                     "kau_zone_source": p["kau_zone_source"],
-                    "is_suitable": is_suitable,
+                    "is_suitable": int(temp_ok and ph_ok and season_ok and soil_ok),
                 })
     return pd.DataFrame(rows)
 
