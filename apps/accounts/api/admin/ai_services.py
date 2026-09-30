@@ -2,7 +2,8 @@
 AI Services — Admin CRUD for per-feature provider config + budget cap.
 
 Per KAU RCD reply B.5 + operational readiness (2026-09-03):
-    Every AI feature (DPR narratives, chatbot, marketing, translate) has one
+    Every AI feature (DPR narratives, chatbot, marketing, translate,
+    business plan) has one
     AIServiceConfig row driving its behaviour. Admin can:
       - enable / disable the feature
       - pick the LLM provider (Anthropic / OpenAI / Google / mock)
@@ -21,7 +22,7 @@ Audit: every mutation writes AuditLog(DPR_CONFIG_CHANGE) — the same action
        central-admin controls.
 
 Endpoints (mounted at /api/admin/ai-services/):
-    GET    /                       — list all 4 service rows
+    GET    /                       — list all service rows (one per Service choice)
     GET    /<pk>/                  — retrieve one
     PATCH  /<pk>/                  — update provider / model / key / cap / enabled
     POST   /<pk>/reset-usage/      — reset current-month totals (admin recovery)
@@ -141,7 +142,7 @@ class AIServiceListView(APIView):
     permission_classes = [IsAuthenticated, IsSuperAdminOrReadOnly]
 
     def get(self, request):
-        # Ensure a row exists for each declared Service — admin sees all 4
+        # Ensure a row exists for each declared Service — admin sees every
         # rows even on a fresh DB.
         for choice, _ in AIServiceConfig.Service.choices:
             AIServiceConfig.objects.get_or_create(

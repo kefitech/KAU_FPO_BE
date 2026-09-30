@@ -38,11 +38,21 @@ Author: Athul Gopan (Kefi Tech Solutions)
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
 
 from apps.database.models import AIServiceConfig
+
+
+logger = logging.getLogger(__name__)
+
+# Provider HTTP statuses worth retrying: rate limit + transient server-side
+# overload (Gemini returns 503 "model is experiencing high demand").
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class LLMError(Exception):
@@ -118,6 +128,9 @@ def call_llm(
     prompt: str,
     max_tokens: int = 1500,
     system: Optional[str] = None,
+    *,
+    response_mime_type: Optional[str] = None,
+    max_retries: int = 0,
 ) -> LLMResponse:
     """Dispatch to the configured LLM provider.
 
@@ -132,6 +145,15 @@ def call_llm(
         max_tokens: Maximum output tokens.
         system: Optional system message. Providers that don't support system
                 messages get it prepended to the prompt.
+        response_mime_type: Optional output format hint, e.g.
+                'application/json' for structured output (business plans).
+                Honoured by Google (native JSON mode) and mock (returns a
+                JSON stub); other providers ignore it, so callers must
+                still parse defensively.
+        max_retries: Extra attempts on transient provider errors (429 / 5xx,
+                e.g. Gemini's "model is experiencing high demand" 503), with
+                exponential backoff (2s, 4s, …). Default 0 keeps latency-
+                sensitive callers (chatbot) fail-fast.
 
     Returns:
         LLMResponse — text + token counts + computed cost + provenance.
@@ -144,13 +166,13 @@ def call_llm(
     model = _resolve_model(provider, config.model_name)
 
     if provider == AIServiceConfig.Provider.MOCK:
-        return _call_mock(prompt, model)
+        return _call_mock(prompt, model, response_mime_type)
     if provider == AIServiceConfig.Provider.ANTHROPIC:
         return _call_anthropic(config, prompt, model, max_tokens, system)
     if provider == AIServiceConfig.Provider.OPENAI:
         return _call_openai(config, prompt, model, max_tokens, system)
     if provider == AIServiceConfig.Provider.GOOGLE:
-        return _call_google(config, prompt, model, max_tokens, system)
+        return _call_google(config, prompt, model, max_tokens, system, response_mime_type, max_retries)
 
     raise LLMError(f'Unsupported provider: {provider}')
 
@@ -159,7 +181,7 @@ def call_llm(
 # Mock — used by Phase 5 until a real key is configured
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _call_mock(prompt: str, model: str) -> LLMResponse:
+def _call_mock(prompt: str, model: str, response_mime_type: Optional[str] = None) -> LLMResponse:
     """Deterministic placeholder — returns a hash-tagged echo of the prompt.
 
     Used when `provider='mock'`. The full narrative shape (chapter title +
@@ -168,7 +190,12 @@ def _call_mock(prompt: str, model: str) -> LLMResponse:
     so the mock stays symmetric with real provider calls.
     """
     seed = hashlib.sha256(prompt.encode()).hexdigest()[:8]
-    text = f'[MOCK v{seed}] {prompt[:200]}…'
+    if response_mime_type == 'application/json':
+        # Structured callers parse the output — return valid JSON so the
+        # whole flow can be exercised locally without a real key.
+        text = json.dumps({'mock': True, 'title': f'[MOCK v{seed}]', 'prompt_excerpt': prompt[:200]})
+    else:
+        text = f'[MOCK v{seed}] {prompt[:200]}…'
     input_tokens = len(prompt) // 4
     output_tokens = len(text) // 4
     return LLMResponse(
@@ -290,6 +317,8 @@ def _call_google(
     model: str,
     max_tokens: int,
     system: Optional[str],
+    response_mime_type: Optional[str] = None,
+    max_retries: int = 0,
 ) -> LLMResponse:
     """Call the Google Gemini API using the new google-genai SDK.
 
@@ -321,15 +350,29 @@ def _call_google(
         max_output_tokens=max_tokens,
         system_instruction=system if system else None,
         thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+        response_mime_type=response_mime_type,
+        # We never pass tools — disabling AFC skips the SDK's per-call
+        # "AFC is enabled" log line and deprecation warning.
+        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
     )
-    try:
-        resp = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=gen_config,
-        )
-    except genai_errors.APIError as e:
-        raise LLMError(f'Google Gemini API failure: {e}') from e
+    for attempt in range(max_retries + 1):
+        try:
+            resp = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=gen_config,
+            )
+            break
+        except genai_errors.APIError as e:
+            if e.code in _RETRYABLE_STATUS_CODES and attempt < max_retries:
+                delay = 2 ** (attempt + 1)
+                logger.warning(
+                    'Gemini %s returned %s (attempt %d/%d) — retrying in %ss',
+                    model, e.code, attempt + 1, max_retries + 1, delay,
+                )
+                time.sleep(delay)
+                continue
+            raise LLMError(f'Google Gemini API failure: {e}') from e
 
     text = getattr(resp, 'text', '') or ''
     usage = getattr(resp, 'usage_metadata', None)

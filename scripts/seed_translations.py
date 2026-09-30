@@ -5463,6 +5463,12 @@ def seed_recommendations_translations(languages):
         ('zone_profile_duplicate',      "A profile for '{{crop_name}}' in '{{kau_zone}}' already exists.", "'{{kau_zone}}' എന്ന മേഖലയിൽ '{{crop_name}}' എന്നതിനുള്ള പ്രൊഫൈൽ ഇതിനകം നിലവിലുണ്ട്."),
         ('zone_profile_temp_range',     'Must be greater than or equal to temp_lo.',             'temp_lo-യേക്കാൾ വലുതോ തുല്യമോ ആയിരിക്കണം.'),
         ('zone_profile_ph_range',       'Must be greater than or equal to ph_lo.',               'ph_lo-യേക്കാൾ വലുതോ തുല്യമോ ആയിരിക്കണം.'),
+        # AI Business Plan (apps/recommendations/api/business_plan.py)
+        ('business_plan_retrieved',          'Business plan retrieved successfully',                'ബിസിനസ് പ്ലാൻ ലഭ്യമാക്കി'),
+        ('business_plan_generated',          'Business plan generated successfully',                'ബിസിനസ് പ്ലാൻ വിജയകരമായി തയ്യാറാക്കി'),
+        ('business_plan_no_commodity',       'Add at least one primary commodity to your FPO profile to generate a business plan.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കാൻ നിങ്ങളുടെ FPO പ്രൊഫൈലിൽ കുറഞ്ഞത് ഒരു പ്രാഥമിക ഉൽപ്പന്നമെങ്കിലും ചേർക്കുക.'),
+        ('business_plan_service_unavailable', 'Business plan generation is currently unavailable. Please try again later.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കൽ ഇപ്പോൾ ലഭ്യമല്ല. പിന്നീട് വീണ്ടും ശ്രമിക്കുക.'),
+        ('business_plan_generation_failed',  'Could not generate the business plan. Please try again.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.'),
     ]
 
     count = 0

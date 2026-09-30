@@ -250,3 +250,48 @@ class CropZoneProfile(BaseModel):
 
     def __str__(self):
         return f"{self.crop_name} ({self.kau_zone})"
+
+class BusinessPlan(BaseModel):
+    """AI-generated business plan for an FPO (Gemini via llm_gateway).
+
+    Grounded in the FPO's primary/secondary commodities and registered
+    location. One row per FPO per language — regenerating overwrites it.
+    Generated synchronously by apps/recommendations/business_plan.py.
+    """
+
+    class Language(models.TextChoices):
+        ENGLISH = 'en', 'English'
+        MALAYALAM = 'ml', 'Malayalam'
+
+    fpo = models.ForeignKey(
+        'database.FPO', on_delete=models.CASCADE, related_name='business_plans'
+    )
+    language = models.CharField(
+        max_length=5, choices=Language.choices, default=Language.ENGLISH
+    )
+    financial_year = models.CharField(max_length=10, help_text='e.g. 2026-27')
+    input_snapshot = models.JSONField(
+        default=dict,
+        help_text='Commodities, location, zone, soil, members and tier the plan was grounded in'
+    )
+    content = models.JSONField(
+        default=dict,
+        help_text='Structured plan sections as returned by the LLM (see business_plan.REQUIRED_KEYS)'
+    )
+    provider = models.CharField(max_length=20, blank=True, default='')
+    model_used = models.CharField(max_length=100, blank=True, default='')
+    generated_at = models.DateTimeField(null=True, blank=True)
+    generated_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='generated_business_plans'
+    )
+
+    class Meta:
+        verbose_name = 'Business Plan'
+        verbose_name_plural = 'Business Plans'
+        constraints = [
+            models.UniqueConstraint(fields=['fpo', 'language'], name='businessplan_fpo_language_unique'),
+        ]
+
+    def __str__(self):
+        return f"{self.fpo} — business plan ({self.language})"
