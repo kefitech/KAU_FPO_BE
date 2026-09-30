@@ -10,11 +10,14 @@ Endpoints:
     POST /api/admin/ml-models/retrain/         — upload a dataset CSV; returns 202, a Celery task trains it
     POST /api/admin/ml-models/{id}/activate/   — set as active model (ready versions only)
     GET  /api/admin/recommendations/feedback/  — list every farmer feedback submission (history)
+    GET  /api/admin/recommendations/feedback/export/ — same list as an .xlsx download
 
     GET  /api/recommendations/internal/active-model/ — ML service only (shared token): active version
 """
 import hmac
+import io
 import json
+import re
 import uuid
 from pathlib import Path
 from django.utils import timezone
@@ -28,6 +31,11 @@ from drf_spectacular.utils import extend_schema
 
 from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.db.models import Q
+from django.http import HttpResponse
+from rest_framework.decorators import action
+import openpyxl
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 from apps.core.views import TranslatedViewSet
 from apps.core.utils.responses import StandardResponse
@@ -1223,6 +1231,76 @@ class RecommendationFeedbackSerializer(serializers.ModelSerializer):
         ]
 
 
+_FEEDBACK_EXPORT_COLUMNS = [
+    # (header, width)
+    ('Submitted At', 20), ('FPO', 30), ('Financial Year', 14), ('Model Version', 16),
+    ('Rating (1-5)', 12), ('Comment', 45), ('Crops Recommended', 45),
+    ('Farm Address', 40), ('Latitude', 12), ('Longitude', 12),
+    ('Boundary Drawn', 15), ('Boundary Area (ha)', 18), ('Boundary (GeoJSON)', 50),
+]
+_EXCEL_CELL_LIMIT = 32767  # max characters Excel allows in one cell
+
+
+def _feedback_boundary_columns(location):
+    """[address, lat, lng, drawn, area_ha, geojson] for one feedback's location_snapshot."""
+    location = location or {}
+    polygon = location.get('area_polygon')
+    area_ha = None
+    geojson = ''
+    if polygon:
+        geojson = json.dumps(polygon)
+        if len(geojson) > _EXCEL_CELL_LIMIT:
+            geojson = '(too large for one cell -- view it on the feedback page)'
+        try:
+            area_ha = _compute_hectares(GEOSGeometry(json.dumps(polygon), srid=4326))
+        except (GEOSException, ValueError):
+            area_ha = None
+    return [
+        location.get('address') or '',
+        location.get('lat'),
+        location.get('lng'),
+        'Yes' if polygon else 'No',
+        area_ha,
+        geojson,
+    ]
+
+
+def _generate_feedback_excel(entries):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Feedback'
+
+    ws.append([header for header, _ in _FEEDBACK_EXPORT_COLUMNS])
+    for cell in ws[1]:
+        cell.fill = PatternFill(start_color='2E7D32', end_color='2E7D32', fill_type='solid')
+        cell.font = Font(bold=True, color='FFFFFF', size=11)
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    ws.row_dimensions[1].height = 20
+
+    for entry in entries:
+        ws.append([
+            timezone.localtime(entry.created_at).strftime('%Y-%m-%d %H:%M'),
+            entry.fpo.name,
+            entry.financial_year,
+            entry.model_version.version_code,
+            entry.rating,
+            entry.comment,
+            ', '.join(entry.crops or []),
+            *_feedback_boundary_columns(entry.location_snapshot),
+        ])
+        for cell in ws[ws.max_row]:
+            cell.alignment = Alignment(vertical='top', wrap_text=cell.column_letter in ('F', 'G', 'H'))
+
+    for idx, (_, width) in enumerate(_FEEDBACK_EXPORT_COLUMNS, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = width
+    ws.freeze_panes = 'A2'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
 class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     """
     GET /api/admin/recommendations/feedback/ — every feedback submission,
@@ -1259,3 +1337,23 @@ class RecommendationFeedbackAdminViewSet(TranslatedViewSet):
     @extend_schema(tags=["Admin - Recommendations"])
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(tags=["Admin - Recommendations"])
+    @action(detail=False, methods=['get'])
+    def export(self, request, *args, **kwargs):
+        """Same rows as list() (model_version/search filters apply), unpaginated, as .xlsx."""
+        entries = self.filter_queryset(self.get_queryset())
+        buf = _generate_feedback_excel(entries)
+
+        model_version = request.query_params.get('model_version')
+        version = MLModelVersion.objects.filter(pk=model_version).first() if model_version else None
+        stamp = timezone.localtime().strftime('%Y%m%d_%H%M%S')
+        label = re.sub(r'[^A-Za-z0-9._-]+', '_', version.version_code) if version else 'all'
+        filename = f"recommendation_feedback_{label}_{stamp}.xlsx"
+
+        response = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
