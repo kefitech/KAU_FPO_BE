@@ -184,7 +184,37 @@ class Partner(BaseModel):
 
     def __str__(self):
         return self.name
+# ─────────────────────────────────────────────────────────────────────────────
+# Header logos — logos shown at the start of the landing-page header.
+# Uploads are trimmed + resized to 160px height (max 960px wide) by the admin
+# serializer, so any size the admin uploads fits the header.
+# ─────────────────────────────────────────────────────────────────────────────
 
+def _header_logo_path(instance, filename):
+    ext = os.path.splitext(filename)[1]
+    return f'cms/header-logos/{uuid.uuid4()}{ext}'
+
+
+class HeaderLogo(BaseModel):
+    name        = models.CharField(max_length=200, help_text='Shown as alt text — e.g. "GOK Logo"')
+    logo        = models.FileField(upload_to=_header_logo_path,
+                                   help_text='FileField (not ImageField) so SVG logos are allowed')
+    is_platform = models.BooleanField(default=False,
+                                      help_text='KAU–FPO platform logo — only one allowed, always shown first')
+    order       = models.PositiveSmallIntegerField(default=0, help_text='Display order — lower first')
+    is_active   = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-is_platform', 'order', 'id']
+
+    def save(self, *args, **kwargs):
+        # Only one platform logo at a time: marking this one demotes the others.
+        if self.is_platform:
+            HeaderLogo.objects.exclude(pk=self.pk).filter(is_platform=True).update(is_platform=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 class YoutubePlaylist(BaseModel):
     title        = models.JSONField(default=dict, blank=True,
