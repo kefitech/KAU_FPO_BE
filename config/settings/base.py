@@ -58,6 +58,9 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 # Site URL for email links, etc.
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 ML_SERVICE_URL = config('ML_SERVICE_URL', default='http://localhost:8001')
+# Shared secret the ML service sends (X-Internal-Token) to read the active model
+# version on startup. Empty disables that endpoint. Must match ml_service's env.
+ML_SERVICE_INTERNAL_TOKEN = config('ML_SERVICE_INTERNAL_TOKEN', default='')
 CHATBOT_SERVICE_URL = config('CHATBOT_SERVICE_URL', default='http://localhost:8002')
 ML_MODELS_DIR = config('ML_MODELS_DIR', default=str(BASE_DIR.parent / 'ml_models'))
 ML_SERVICE_DATA_DIR = config('ML_SERVICE_DATA_DIR', default=str(BASE_DIR / 'ml_service' / 'data'))

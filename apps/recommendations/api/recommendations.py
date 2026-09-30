@@ -10,7 +10,11 @@ Endpoints:
     POST /api/admin/ml-models/retrain/         — upload a dataset CSV; returns 202, a Celery task trains it
     POST /api/admin/ml-models/{id}/activate/   — set as active model (ready versions only)
     GET  /api/admin/recommendations/feedback/  — list recommendations that have farmer feedback
+
+    GET  /api/recommendations/internal/active-model/ — ML service only (shared token): active version
 """
+import hmac
+import json
 import uuid
 from pathlib import Path
 from django.utils import timezone
@@ -19,9 +23,10 @@ from django.conf import settings
 from rest_framework import serializers, status, filters
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
+from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.db.models import Q
 
 from apps.core.views import TranslatedViewSet
@@ -40,7 +45,15 @@ from apps.recommendations.services import (
     get_current_financial_year,
     build_recommendation_payload,
 )
-from apps.gis_module.services import resolve_fpo_zone
+from apps.gis_module.api.cultivation_area import _compute_hectares
+from apps.gis_module.services import (
+    find_soil_region_for_point,
+    find_zone_for_point,
+    get_current_season,
+    get_weather_for_point,
+    resolve_fpo_zone,
+    reverse_geocode_address,
+)
 from apps.recommendations.tasks import (
     generate_crop_recommendation_task,
     retrain_model_task,
@@ -704,6 +717,24 @@ class MLModelRetrainView(APIView):
         lang = request.language
 
         dataset_file = request.FILES.get('dataset_file')
+        trained_from_profiles = False
+        if not dataset_file and (request.data.get('source') or '').strip() == 'zone_profiles':
+            # Train straight from the CURRENT active crop zone profiles -- the
+            # same knowledge base predict_crops() filters candidates with, so
+            # the model and the eligibility filter can't drift apart. Built
+            # server-side (admins have no file to download/re-upload), then
+            # follows the identical validate/save/dispatch path as an upload.
+            from django.core.files.uploadedfile import SimpleUploadedFile
+
+            from apps.recommendations.api.crop_zone_profile_admin import build_zone_profiles_csv_bytes
+            csv_bytes, n_rows = build_zone_profiles_csv_bytes()
+            if n_rows == 0:
+                return StandardResponse.error(
+                    t('recommendations.no_active_zone_profiles', lang),
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            dataset_file = SimpleUploadedFile('crop_zone_profiles.csv', csv_bytes, content_type='text/csv')
+            trained_from_profiles = True
         if not dataset_file:
             return StandardResponse.error(
                 t('recommendations.dataset_file_required', lang),
@@ -765,7 +796,10 @@ class MLModelRetrainView(APIView):
         # 4. Create the row in 'training' and hand off. deployed_at is when the
         #    admin submitted it -- the list orders by this, so the new row
         #    appears at the top straight away.
-        description = (request.data.get('description') or '').strip() or TRAINING_DESCRIPTION_PLACEHOLDER
+        description = (request.data.get('description') or '').strip()
+        if not description and trained_from_profiles:
+            description = 'Trained from the current active crop zone profiles.'
+        description = description or TRAINING_DESCRIPTION_PLACEHOLDER
         version = MLModelVersion.objects.create(
             version_code=version_code,
             description=description,
@@ -780,7 +814,8 @@ class MLModelRetrainView(APIView):
             action=AuditLog.Action.CREATE,
             instance=version,
             request=request,
-            changes={'version_code': version.version_code, 'trigger': 'retrain', 'dataset_file': dataset_file.name},
+            changes={'version_code': version.version_code, 'trigger': 'retrain',
+                     'dataset_file': 'current zone profiles' if trained_from_profiles else dataset_file.name},
         )
 
         retrain_model_task.delay(version.pk)
@@ -804,23 +839,20 @@ class MLModelRetrainView(APIView):
 class MLModelVersionActivateView(APIView):
     """
     POST /api/admin/ml-models/{id}/activate/
-    Sets this version active. MLModelVersion.save() already deactivates
-    every other version, so no extra logic needed for that part.
-
-    Also notifies the FastAPI service (POST {ML_SERVICE_URL}/reload-model/)
-    so it actually loads the newly activated model file — without this,
-    activating a version here would only update Django's own records
-    and never affect what FastAPI actually predicts with. Notification
-    failure does NOT block activation — matches the same graceful-
-    degradation philosophy used elsewhere (e.g. recommendation
-    fallback): Django's record of "which model is active" is the
-    source of truth even if FastAPI is temporarily unreachable.
+    Asks the FastAPI service to load this version (POST
+    {ML_SERVICE_URL}/reload-model/) FIRST, and only marks it active here once
+    the service confirms it's serving it -- so this DB never claims a model
+    is active that isn't actually being used for predictions.
 
     /reload-model/ validates the file before swapping it in and returns
     HTTP 422 (with the reason) if it's missing, won't load, or doesn't fit
-    the service's feature schema -- the previous model keeps serving on
-    the ML side in that case. The reason is passed through in `warning`
-    so the admin sees what actually went wrong.
+    the service's feature schema. That becomes a 400 here with the reason in
+    the message, and nothing changes on either side. If the service is
+    unreachable or times out, activation is refused with a 503 -- there's no
+    way to confirm the model is usable (the admin page shows the outage via
+    MLServiceStatusView).
+
+    On success MLModelVersion.save() deactivates every other version.
 
     Only a version in status=ready can be activated: a 'training' row has
     no model file yet and a 'failed' row never will.
@@ -844,6 +876,36 @@ class MLModelVersionActivateView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        try:
+            response = httpx.post(
+                f"{settings.ML_SERVICE_URL}/reload-model/",
+                json={
+                    'model_file_path': version.model_file_path,
+                    'version_code': version.version_code,
+                },
+                # Generous: the service loads + smoke-tests the whole model
+                # file before answering. Giving up early could leave it
+                # serving the new model while this DB still says the old one.
+                timeout=30.0,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            # 422 from /reload-model/: {detail: {note, problems, ...}}
+            message = t('recommendations.model_activation_rejected', lang)
+            try:
+                detail = exc.response.json().get('detail') or {}
+                extra = ' '.join([detail.get('note', '')] + (detail.get('problems') or [])).strip()
+                if extra:
+                    message = f"{message} {extra}"
+            except Exception:  # noqa: BLE001 -- body may not be JSON
+                pass
+            return StandardResponse.error(message, status_code=status.HTTP_400_BAD_REQUEST)
+        except httpx.HTTPError:  # unreachable, timeout, etc.
+            return StandardResponse.error(
+                t('recommendations.model_activation_service_down', lang),
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         version.is_active = True
         version.save()  # triggers the model's own save() deactivation logic
 
@@ -855,39 +917,261 @@ class MLModelVersionActivateView(APIView):
             changes={'activated_version': version.version_code},
         )
 
-        reload_warning = None
+        return StandardResponse.success(
+            data=MLModelVersionSerializer(version).data,
+            message=t('recommendations.model_activated', lang),
+        )
+
+
+class MLServiceStatusView(APIView):
+    """
+    GET /api/admin/ml-models/service-status/
+    Whether the FastAPI ML service is reachable right now, and which version
+    it's serving. The ML models admin page polls this to show a warning above
+    the table while the service is down (activation is refused then -- see
+    MLModelVersionActivateView).
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin - ML Models"])
+    def get(self, request, *args, **kwargs):
+        try:
+            response = httpx.get(f"{settings.ML_SERVICE_URL}/health", timeout=3.0)
+            response.raise_for_status()
+            data = {'reachable': True, 'served_version': response.json().get('model_version')}
+        except (httpx.HTTPError, ValueError):
+            data = {'reachable': False, 'served_version': None}
+        return StandardResponse.success(
+            data=data,
+            message=t('recommendations.ml_service_status_retrieved', request.language),
+        )
+
+
+class _ModelTestSerializer(serializers.Serializer):
+    """
+    Hand-picked inputs for an admin test prediction. Zone, season and soil
+    type values are checked strictly by the ML service (/predict/test/),
+    which owns those vocabularies -- see MLModelTestOptionsView.
+    """
+    agro_zone = serializers.CharField()
+    season = serializers.CharField()
+    soil_type = serializers.CharField(required=False, allow_blank=True, default='')
+    soil_ph = serializers.FloatField(required=False, allow_null=True, default=None, min_value=3.0, max_value=10.0)
+    commodities = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    tier = serializers.ChoiceField(choices=['A', 'B', 'C', 'D'], required=False, allow_null=True, default=None)
+    # Replace the zone's seasonal averages for this test only (e.g. with the
+    # current weather from MLModelTestLocationView). No rainfall override:
+    # the model's rainfall is a monthly total, current readings aren't.
+    temperature_override = serializers.FloatField(
+        required=False, allow_null=True, default=None, min_value=-10.0, max_value=50.0)
+    humidity_override = serializers.FloatField(
+        required=False, allow_null=True, default=None, min_value=0.0, max_value=100.0)
+
+
+class MLModelTestView(APIView):
+    """
+    POST /api/admin/ml-models/{id}/test/
+    Runs a crop prediction with this version and admin-chosen inputs, so a
+    model can be tried before (or after) activating it. The live model FPOs
+    use is not changed, and nothing is saved -- the result is only returned.
+
+    The ML service loads a non-active version's file just for the request
+    (a few seconds); testing the active version uses the loaded model.
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin - ML Models"], request=_ModelTestSerializer)
+    def post(self, request, pk, *args, **kwargs):
+        lang = request.language
+        try:
+            version = MLModelVersion.objects.get(pk=pk)
+        except MLModelVersion.DoesNotExist:
+            return StandardResponse.error(
+                t('recommendations.model_not_found', lang),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        if version.status != MLModelVersion.Status.READY:
+            return StandardResponse.error(
+                t('recommendations.model_not_ready', lang),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = _ModelTestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         try:
             response = httpx.post(
-                f"{settings.ML_SERVICE_URL}/reload-model/",
+                f"{settings.ML_SERVICE_URL}/predict/test/",
                 json={
-                    'model_file_path': version.model_file_path,
+                    **serializer.validated_data,
+                    'soil_type': serializer.validated_data['soil_type'] or None,
                     'version_code': version.version_code,
+                    'model_file_path': version.model_file_path,
                 },
-                timeout=10.0,
+                timeout=60.0,  # may load the version's model file first
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            # 422 from /reload-model/: {detail: {note, problems, ...}}
-            reload_warning = t('recommendations.model_reload_failed', lang)
+            # 422 from /predict/test/: {detail: {note, problems, ...}}
+            message = t('recommendations.model_test_failed', lang)
             try:
                 detail = exc.response.json().get('detail') or {}
                 extra = ' '.join([detail.get('note', '')] + (detail.get('problems') or [])).strip()
                 if extra:
-                    reload_warning = f"{reload_warning} {extra}"
+                    message = f"{message} {extra}"
             except Exception:  # noqa: BLE001 -- body may not be JSON
                 pass
-        except Exception:  # noqa: BLE001 -- unreachable, timeout, etc.
-            reload_warning = t('recommendations.model_reload_failed', lang)
-
-        serializer = MLModelVersionSerializer(version)
-        data = serializer.data
-        if reload_warning:
-            data['warning'] = reload_warning
+            return StandardResponse.error(message, status_code=status.HTTP_400_BAD_REQUEST)
+        except httpx.HTTPError:
+            return StandardResponse.error(
+                t('recommendations.service_unavailable', lang),
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return StandardResponse.success(
-            data=data,
-            message=t('recommendations.model_activated', lang),
+            data=response.json(),
+            message=t('recommendations.model_test_completed', lang),
         )
+
+
+class _TestLocationSerializer(serializers.Serializer):
+    """A dropped pin (lat/lng) OR a drawn polygon (GeoJSON geometry)."""
+    lat = serializers.FloatField(required=False, min_value=-90, max_value=90)
+    lng = serializers.FloatField(required=False, min_value=-180, max_value=180)
+    polygon = serializers.JSONField(required=False)
+
+    def validate(self, attrs):
+        if 'polygon' in attrs:
+            try:
+                geom = GEOSGeometry(json.dumps(attrs['polygon']), srid=4326)
+            except (GEOSException, ValueError, TypeError) as exc:
+                raise serializers.ValidationError({'polygon': f'Not a valid GeoJSON geometry: {exc}'})
+            if geom.geom_type != 'Polygon' or not geom.valid:
+                raise serializers.ValidationError({'polygon': 'Expected a single valid, non-self-intersecting polygon.'})
+            attrs['point'] = geom.centroid  # same as resolve_fpo_location() does for a cultivation area
+            attrs['geom'] = geom
+        elif 'lat' in attrs and 'lng' in attrs:
+            attrs['point'] = None
+        else:
+            raise serializers.ValidationError('Send either lat and lng, or a polygon.')
+        return attrs
+
+
+class MLModelTestLocationView(APIView):
+    """
+    POST /api/admin/ml-models/test-location/
+    For the admin model-test page's map: given a dropped pin or a drawn
+    polygon (its centroid is used, as for an FPO's cultivation area), returns
+    what the FPO recommendation flow would derive for that spot -- GIS zone,
+    GIS soil region and the soil category the model matches it to -- plus the
+    current weather, address and season. Nothing is saved.
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin - ML Models"], request=_TestLocationSerializer)
+    def post(self, request, *args, **kwargs):
+        serializer = _TestLocationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        point = serializer.validated_data['point']
+        if point is not None:
+            lat, lng = point.y, point.x
+        else:
+            lat, lng = serializer.validated_data['lat'], serializer.validated_data['lng']
+
+        geom = serializer.validated_data.get('geom')
+        zone = find_zone_for_point(lat, lng)
+        soil_region = find_soil_region_for_point(lat, lng)
+
+        # The GIS soil wording differs from the model's soil categories; the
+        # ML service owns that matching. None = unmatched (the zone's soil mix
+        # is averaged, as for an FPO); checked=False = service unreachable.
+        soil_category, soil_checked = None, False
+        if soil_region:
+            try:
+                response = httpx.get(
+                    f"{settings.ML_SERVICE_URL}/predict/resolve-soil/",
+                    params={'soil_type': soil_region.soil_type},
+                    timeout=5.0,
+                )
+                response.raise_for_status()
+                soil_category, soil_checked = response.json().get('category'), True
+            except (httpx.HTTPError, ValueError):
+                pass
+
+        data = {
+            'lat': round(lat, 6),
+            'lng': round(lng, 6),
+            # Same calculation as an FPO's saved cultivation area; None for a pin.
+            'area_hectares': _compute_hectares(geom) if geom else None,
+            'address': reverse_geocode_address(lat, lng),
+            'zone': {'code': zone.code, 'name': zone.name_en} if zone else None,
+            'soil_region': {'soil_type': soil_region.soil_type, 'name': soil_region.name_en} if soil_region else None,
+            'soil_category': soil_category,
+            'soil_category_checked': soil_checked,
+            'season': get_current_season(),
+            'weather': get_weather_for_point(lat, lng),
+        }
+        return StandardResponse.success(
+            data=data,
+            message=t('recommendations.model_test_location_resolved', request.language),
+        )
+
+
+class MLModelTestOptionsView(APIView):
+    """
+    GET /api/admin/ml-models/test-options/
+    Zones, seasons, soil types and tiers the ML service accepts, for the
+    admin test form's dropdowns (straight from the service, so they can't
+    drift from what the model was trained on).
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin - ML Models"])
+    def get(self, request, *args, **kwargs):
+        lang = request.language
+        try:
+            response = httpx.get(f"{settings.ML_SERVICE_URL}/predict/options/", timeout=5.0)
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return StandardResponse.error(
+                t('recommendations.service_unavailable', lang),
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return StandardResponse.success(
+            data=response.json(),
+            message=t('recommendations.model_test_options_retrieved', lang),
+        )
+
+
+class MLModelActiveInternalView(APIView):
+    """
+    GET /api/recommendations/internal/active-model/
+    Service-to-service, not for browsers: the ML service calls this after it
+    (re)starts to learn which version is active here, so a restart doesn't
+    leave it serving its built-in fallback while this DB says otherwise.
+
+    Authenticated by the shared settings.ML_SERVICE_INTERNAL_TOKEN in the
+    X-Internal-Token header instead of JWT. Answers 404 (not 401/403) on a
+    missing/wrong token or when the setting is empty, so the endpoint isn't
+    discoverable from outside.
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(exclude=True)
+    def get(self, request, *args, **kwargs):
+        expected = settings.ML_SERVICE_INTERNAL_TOKEN
+        supplied = request.headers.get('X-Internal-Token', '')
+        if not expected or not hmac.compare_digest(supplied.encode(), expected.encode()):
+            return StandardResponse.error('Not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        version = MLModelVersion.objects.filter(
+            is_active=True, status=MLModelVersion.Status.READY,
+        ).first()
+        data = None
+        if version:
+            data = {'version_code': version.version_code, 'model_file_path': version.model_file_path}
+        return StandardResponse.success(data=data)
 
 
 # ---------------------------------------------------------------------------

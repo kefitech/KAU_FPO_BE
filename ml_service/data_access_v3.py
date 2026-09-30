@@ -31,6 +31,28 @@ SOIL_KEYWORDS = {
     "Forest loam / hill soil (acidic, high organic matter)": ["forest loam", "hill soil", "humus", "high ranges", "high-range"],
 }
 
+# Explicit mapping for soil-type NAMES that appear in the GIS SoilRegion layer
+# (admin-uploaded GeoJSON). Checked before the keyword matcher, so a known GIS
+# name resolves deterministically instead of depending on substring luck --
+# e.g. "Shallow hill/rocky soil" contains neither "hill soil" nor "forest
+# loam" and used to silently fall through to the zone-mix average. Keys are
+# compared lowercased. Extend this table when a new soil map introduces a new
+# name; /predict/resolve-soil/ shows what any given name resolves to.
+GIS_SOIL_ALIASES = {
+    "sandy coastal soil": "Coastal sandy / laterite patches",
+    "sandy, alluvial coastal soil": "Coastal alluvium / sandy, backwater-adjacent",
+    # Kuttanad-type kari/peat soils sit in the backwater belt.
+    "peat soil, waterlogged": "Coastal alluvium / sandy, backwater-adjacent",
+    "peaty marsh": "Coastal alluvium / sandy, backwater-adjacent",
+    "laterite": "Laterite",
+    "red loam": "Black soil (Chittoor black soil) / red loam",
+    "forest loam, high organic content": "Forest loam / hill soil (acidic, high organic matter)",
+    "shallow hill/rocky soil": "Forest loam / hill soil (acidic, high organic matter)",
+}
+
+# The 3 service seasons -- single source for season vocab on this side.
+SERVICE_SEASONS = ["southwest_monsoon", "northeast_monsoon", "dry_season"]
+
 
 def resolve_soil_category(requested_soil_type: str):
     """Map a free-text soil_type request field to one of the 6 training categories.
@@ -39,6 +61,9 @@ def resolve_soil_category(requested_soil_type: str):
     if not requested_soil_type or not requested_soil_type.strip():
         return None
     text = requested_soil_type.strip().lower()
+    # known GIS soil-map name -> deterministic mapping, no keyword guessing
+    if text in GIS_SOIL_ALIASES:
+        return GIS_SOIL_ALIASES[text]
     # exact/near-exact match against a canonical category name first
     for cat in SOIL_KEYWORDS:
         if text == cat.lower():
@@ -109,6 +134,28 @@ class CropKnowledgeBase:
         if row.empty:
             return False
         return bool((row["kau_zone_source"] != "General (all zones)").any())
+
+    def _profile_list_field(self, crop_name: str, zone: str, column: str) -> list:
+        """Reads a ';'-joined list column off this crop's profile row for the zone.
+        [] when the column is missing (older export CSV) or the cell is empty --
+        callers treat [] as 'not specified', never as 'nothing allowed'."""
+        if column not in self.profiles.columns:
+            return []
+        row = self.crop_zone_profile(crop_name, zone)
+        if row is None:
+            return []
+        raw = str(row.get(column, "") or "")
+        if raw.lower() == "nan":
+            return []
+        return [p.strip() for p in raw.split(";") if p.strip()]
+
+    def crop_suitable_soils(self, crop_name: str, zone: str) -> list:
+        """Soil categories the admin marked suitable; [] = not specified (all)."""
+        return self._profile_list_field(crop_name, zone, "suitable_soils")
+
+    def crop_seasons(self, crop_name: str, zone: str) -> list:
+        """Service seasons the admin marked; [] = not specified (all)."""
+        return self._profile_list_field(crop_name, zone, "seasons")
 
     def soil_ph_range(self, soil_category: str):
         row = self.soil_ref.loc[soil_category]

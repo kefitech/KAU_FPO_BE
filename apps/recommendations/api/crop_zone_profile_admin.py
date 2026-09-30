@@ -20,6 +20,7 @@ MLModelVersionAdminView takes for a brand new predictive artifact -- this is
 documentation content, not a new model).
 """
 import csv
+import io
 import logging
 from pathlib import Path
 
@@ -56,7 +57,41 @@ KAU_TO_SERVICE_ZONE = {
 EXPORT_CSV_COLUMNS = [
     'crop_name', 'agro_zone', 'crop_group', 'temp_lo', 'temp_hi', 'ph_lo', 'ph_hi',
     'seasons_text', 'ph_is_real', 'temp_is_real', 'service_zone', 'kau_zone_source',
+    # Structured lists for the rule-fit scorer, ';'-joined ('' = unspecified).
+    # Appended AFTER the original columns so retrain_pipeline.py's
+    # required-subset header check still matches older files either way.
+    'seasons', 'suitable_soils',
 ]
+
+
+def _zone_profile_export_rows() -> list[dict]:
+    """Every active CropZoneProfile row, expanded per service zone via
+    KAU_TO_SERVICE_ZONE, in EXPORT_CSV_COLUMNS shape. Shared by the ml_service
+    knowledge-base export below and MLModelRetrainView's train-from-profiles."""
+    rows = []
+    profiles = CropZoneProfile.objects.filter(is_active=True, is_deleted=False).order_by('crop_name', 'kau_zone')
+    for p in profiles:
+        for service_zone in KAU_TO_SERVICE_ZONE.get(p.kau_zone, []):
+            rows.append({
+                'crop_name': p.crop_name, 'agro_zone': p.kau_zone, 'crop_group': p.crop_group,
+                'temp_lo': p.temp_lo, 'temp_hi': p.temp_hi, 'ph_lo': p.ph_lo, 'ph_hi': p.ph_hi,
+                'seasons_text': p.seasons_text, 'ph_is_real': p.ph_is_real, 'temp_is_real': p.temp_is_real,
+                'service_zone': service_zone, 'kau_zone_source': p.kau_zone,
+                'seasons': ';'.join(p.seasons or []), 'suitable_soils': ';'.join(p.suitable_soils or []),
+            })
+    return rows
+
+
+def build_zone_profiles_csv_bytes() -> tuple[bytes, int]:
+    """The zone-profile export as in-memory CSV bytes, for training a model
+    directly from the current knowledge base (no file upload). Returns
+    (csv_bytes, n_rows)."""
+    rows = _zone_profile_export_rows()
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=EXPORT_CSV_COLUMNS)
+    writer.writeheader()
+    writer.writerows(rows)
+    return buf.getvalue().encode('utf-8'), len(rows)
 
 
 def export_and_notify():
@@ -68,16 +103,7 @@ def export_and_notify():
     unreachable ml_service is logged, not surfaced to the caller, since the DB
     write (the source of truth) already succeeded by the time this runs.
     """
-    rows = []
-    profiles = CropZoneProfile.objects.filter(is_active=True, is_deleted=False).order_by('crop_name', 'kau_zone')
-    for p in profiles:
-        for service_zone in KAU_TO_SERVICE_ZONE.get(p.kau_zone, []):
-            rows.append({
-                'crop_name': p.crop_name, 'agro_zone': p.kau_zone, 'crop_group': p.crop_group,
-                'temp_lo': p.temp_lo, 'temp_hi': p.temp_hi, 'ph_lo': p.ph_lo, 'ph_hi': p.ph_hi,
-                'seasons_text': p.seasons_text, 'ph_is_real': p.ph_is_real, 'temp_is_real': p.temp_is_real,
-                'service_zone': service_zone, 'kau_zone_source': p.kau_zone,
-            })
+    rows = _zone_profile_export_rows()
 
     try:
         out_dir = Path(settings.ML_SERVICE_DATA_DIR)
@@ -106,9 +132,31 @@ class CropZoneProfileSerializer(serializers.ModelSerializer):
         model = CropZoneProfile
         fields = [
             'id', 'crop_name', 'crop_group', 'kau_zone', 'temp_lo', 'temp_hi', 'ph_lo', 'ph_hi',
-            'seasons_text', 'temp_is_real', 'ph_is_real', 'is_active', 'created_at', 'updated_at',
+            'seasons_text', 'seasons', 'suitable_soils', 'temp_is_real', 'ph_is_real',
+            'is_active', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    VALID_SEASONS = {'southwest_monsoon', 'northeast_monsoon', 'dry_season'}
+    # ml_service's 6 canonical soil categories (data/soil_type_reference.csv)
+    VALID_SOILS = {
+        'Coastal sandy / laterite patches', 'Coastal alluvium / sandy, backwater-adjacent',
+        'Laterite', 'Lateritic loam (transitional)',
+        'Black soil (Chittoor black soil) / red loam',
+        'Forest loam / hill soil (acidic, high organic matter)',
+    }
+
+    def validate_seasons(self, value):
+        bad = [v for v in (value or []) if v not in self.VALID_SEASONS]
+        if bad:
+            raise serializers.ValidationError(f"Unknown season(s): {bad}. Allowed: {sorted(self.VALID_SEASONS)}")
+        return value
+
+    def validate_suitable_soils(self, value):
+        bad = [v for v in (value or []) if v not in self.VALID_SOILS]
+        if bad:
+            raise serializers.ValidationError(f"Unknown soil categor(ies): {bad}. Allowed: {sorted(self.VALID_SOILS)}")
+        return value
 
     def validate_crop_name(self, value):
         value = value.strip()
