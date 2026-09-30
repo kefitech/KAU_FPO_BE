@@ -9,6 +9,7 @@ from apps.database.models import (
     Inquiry,
     MarketPrice,
     Product,
+    ProductStock,
 )
 
 _PRODUCT_IMAGE_MAX_SIZE  = 2 * 1024 * 1024  # 2 MB — hard limit before compression is even attempted
@@ -61,16 +62,58 @@ def _compress_product_image(file):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    """
+    FPO's own product CRUD. The API's JSON shape is intentionally UNCHANGED
+    from before the master/stock split — quantity/price/status/etc. all
+    still appear flat on the product object. Internally, though, they're
+    read from and written to the related ProductStock row (Product.stock),
+    not stored on Product itself.
+
+    has_stock=False means this product currently has no stock batch (its
+    previous batch expired/sold and was deleted) — quantity/price/etc. will
+    be None/blank in that case; the frontend should show a "No active
+    stock — Add Stock" state instead.
+    """
+    quantity = serializers.DecimalField(
+        max_digits=12, decimal_places=2, source='stock.quantity',
+        required=False, allow_null=True,
+    )
+    unit = serializers.ChoiceField(
+        choices=ProductStock.Unit.choices, source='stock.unit',
+        required=False, allow_null=True,
+    )
+    price_per_unit = serializers.DecimalField(
+        max_digits=10, decimal_places=2, source='stock.price_per_unit',
+        required=False, allow_null=True,
+    )
+    quality_certification = serializers.CharField(
+        source='stock.quality_certification',
+        required=False, allow_blank=True, allow_null=True,
+    )
+    available_from = serializers.DateField(
+        source='stock.available_from', required=False, allow_null=True,
+    )
+    available_until = serializers.DateField(
+        source='stock.available_until', required=False, allow_null=True,
+    )
+    is_ondc_listed = serializers.BooleanField(source='stock.is_ondc_listed', read_only=True)
+    ondc_product_id = serializers.CharField(source='stock.ondc_product_id', read_only=True)
+    is_public = serializers.BooleanField(source='stock.is_public', read_only=True)
+    status = serializers.CharField(source='stock.status', read_only=True)
+    has_stock = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = [
             'id', 'fpo', 'name', 'commodity', 'description', 'quantity', 'unit',
             'price_per_unit', 'quality_certification', 'available_from', 'available_until',
-            'is_ondc_listed', 'ondc_product_id', 'is_public', 'status', 'image',
+            'is_ondc_listed', 'ondc_product_id', 'is_public', 'status', 'has_stock', 'image',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'fpo', 'is_ondc_listed', 'ondc_product_id', 'status',
-                             'created_at', 'updated_at']
+        read_only_fields = ['id', 'fpo', 'created_at', 'updated_at']
+
+    def get_has_stock(self, obj):
+        return hasattr(obj, 'stock') and obj.stock is not None
 
     def validate_image(self, value):
         if value is None:
@@ -78,8 +121,24 @@ class ProductSerializer(serializers.ModelSerializer):
         return _compress_product_image(value)
 
     def create(self, validated_data):
+        stock_data = validated_data.pop('stock', {})
         validated_data['fpo'] = self.context['request'].user.fpo
-        return super().create(validated_data)
+        product = super().create(validated_data)
+        ProductStock.objects.create(product=product, **stock_data)
+        return product
+
+    def update(self, instance, validated_data):
+        stock_data = validated_data.pop('stock', {})
+        product = super().update(instance, validated_data)
+        if stock_data:
+            stock, created = ProductStock.objects.get_or_create(
+                product=product, defaults=stock_data
+            )
+            if not created:
+                for field, value in stock_data.items():
+                    setattr(stock, field, value)
+                stock.save()
+        return product
 
 
 class BuyerDirectorySerializer(serializers.ModelSerializer):
@@ -137,6 +196,12 @@ class BuyerProductSerializer(serializers.ModelSerializer):
     fpo_name = serializers.CharField(source='fpo.name', read_only=True)
     commodity_code = serializers.CharField(source='commodity.code', read_only=True)
     commodity_name = serializers.SerializerMethodField()
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, source='stock.quantity', read_only=True)
+    unit = serializers.CharField(source='stock.unit', read_only=True)
+    price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2, source='stock.price_per_unit', read_only=True)
+    quality_certification = serializers.CharField(source='stock.quality_certification', read_only=True)
+    available_from = serializers.DateField(source='stock.available_from', read_only=True)
+    available_until = serializers.DateField(source='stock.available_until', read_only=True)
 
     class Meta:
         model = Product
@@ -170,9 +235,9 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('Quantity requested must be greater than 0.')
         product = self.context.get('product')
-        if product is not None and value > product.quantity:
+        if product is not None and value > product.stock.quantity:
             raise serializers.ValidationError(
-                f'Quantity requested cannot exceed available stock ({product.quantity} {product.unit}).'
+                f'Quantity requested cannot exceed available stock ({product.stock.quantity} {product.stock.unit}).'
             )
         return value
 

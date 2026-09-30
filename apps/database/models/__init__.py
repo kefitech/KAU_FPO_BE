@@ -244,7 +244,7 @@ from .expert_booking import ExpertAvailability, ExpertTimeSlot, ExpertBooking, E
 from .analytics import AnalyticsSnapshot
 
 # Phase 2 — Marketplace
-from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice, Inquiry
+from .marketplace import Product, ProductStock, BuyerDirectory, BuyerSellerMatch, MarketPrice, Inquiry
 
 # Phase 2 — AI Marketing
 from .marketing import MarketingStrategy
@@ -453,6 +453,7 @@ __all__ = [
     'ChatMessage',
     # Phase 2 — Marketplace
     'Product',
+    'ProductStock',
     'BuyerDirectory',
     'BuyerSellerMatch',
     'MarketPrice',

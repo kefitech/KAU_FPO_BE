@@ -19,9 +19,48 @@ def _product_image_path(instance, filename):
     # same as before), but the filename itself is preserved so the FPO
     # sees their own original file name in the UI instead of a raw UUID.
     return f'marketplace/products/{uuid.uuid4()}/{filename}'
-#====================
+
 
 class Product(BaseModel):
+    """
+    Product MASTER — the FPO's product identity (name, commodity, image,
+    description). Does NOT carry quantity/price/availability — that lives
+    on ProductStock (see below). A product can exist with zero stock
+    (e.g. right after its stock batch expired and was removed) or with
+    exactly one active stock batch at a time.
+    """
+
+    fpo = models.ForeignKey(
+        'database.FPO', on_delete=models.CASCADE, related_name='products'
+    )
+    name = models.JSONField(help_text='{"en":"Organic Rice","ml":"ഓർഗാനിക് അരി"}')
+    commodity = models.ForeignKey(
+        'core.MasterLookup', on_delete=models.PROTECT, related_name='products'
+    )
+    description = models.JSONField(default=dict, help_text='{"en":"...","ml":"..."}')
+    image = models.ImageField(
+        upload_to=_product_image_path, null=True, blank=True,
+        help_text='Product photo shown on FPO products page and public Market Hub'
+    )
+
+    class Meta:
+        verbose_name = 'Product'
+        verbose_name_plural = 'Products'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        name = self.name.get('en', '') if isinstance(self.name, dict) else str(self.name)
+        return f"{name} — {self.fpo}"
+
+
+class ProductStock(BaseModel):
+    """
+    A single stock/listing batch for a Product. At most ONE stock row can
+    exist per product at a time (enforced by OneToOneField below) — once a
+    batch expires it is genuinely deleted (see apps.marketplace.tasks.
+    expire_products_and_notify), and the FPO uses "Add Stock" to create the
+    next one against the same product master.
+    """
 
     class Unit(models.TextChoices):
         KG = 'kg', 'Kilogram'
@@ -36,14 +75,9 @@ class Product(BaseModel):
         SOLD = 'sold', 'Sold'
         EXPIRED = 'expired', 'Expired'
 
-    fpo = models.ForeignKey(
-        'database.FPO', on_delete=models.CASCADE, related_name='products'
+    product = models.OneToOneField(
+        Product, on_delete=models.CASCADE, related_name='stock'
     )
-    name = models.JSONField(help_text='{"en":"Organic Rice","ml":"ഓർഗാനിക് അരി"}')
-    commodity = models.ForeignKey(
-        'core.MasterLookup', on_delete=models.PROTECT, related_name='products'
-    )
-    description = models.JSONField(default=dict, help_text='{"en":"...","ml":"..."}')
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     unit = models.CharField(max_length=20, choices=Unit.choices)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
@@ -63,19 +97,18 @@ class Product(BaseModel):
         help_text='Visible on public Market Hub (P2-12)'
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
-    image = models.ImageField(
-        upload_to=_product_image_path, null=True, blank=True,
-        help_text='Product photo shown on FPO products page and public Market Hub'
-    )
+    # 3-day-before-expiry reminder should fire exactly once per stock batch —
+    # this flag prevents the daily Celery task from re-sending it every day
+    # between the 3-day mark and actual expiry.
+    expiry_reminder_sent = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name = 'Product'
-        verbose_name_plural = 'Products'
+        verbose_name = 'Product Stock'
+        verbose_name_plural = 'Product Stock'
         ordering = ['-created_at']
 
     def __str__(self):
-        name = self.name.get('en', '') if isinstance(self.name, dict) else str(self.name)
-        return f"{name} — {self.fpo}"
+        return f"{self.product} — {self.quantity}{self.unit} ({self.status})"
 
 
 class BuyerDirectory(BaseModel):

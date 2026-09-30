@@ -132,6 +132,12 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute=0),  # Every hour
     },
 
+    # P2-11 Marketplace — notify FPO 3 days before a stock batch expires (Arunima)
+    'send-stock-expiry-reminders-daily': {
+        'task': 'apps.marketplace.tasks.send_expiry_reminders',
+        'schedule': crontab(hour=0, minute=15),  # 00:15 UTC daily, before expiry deletion runs
+    },
+
     # P2-11 Marketplace — mark products past available_until as expired (Arunima)
     'expire-products-daily': {
         'task': 'apps.marketplace.tasks.expire_products',

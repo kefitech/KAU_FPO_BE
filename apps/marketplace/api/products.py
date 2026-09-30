@@ -15,7 +15,7 @@ from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.views import TranslatedViewSet
-from apps.database.models import Product
+from apps.database.models import Product, ProductStock
 from apps.marketplace.permissions import IsApprovedFPO
 from apps.marketplace.serializers import ProductSerializer
 from apps.marketplace.services import run_matching
@@ -69,7 +69,7 @@ class ProductViewSet(TranslatedViewSet):
         # FPO only sees their own products; exclude soft-deleted rows
         fpo = self.request.user.fpo
         queryset = Product.objects.filter(fpo=fpo, is_deleted=False).select_related(
-            'commodity', 'fpo'
+            'commodity', 'fpo', 'stock'
         ).order_by('-created_at')
 
         search = self.request.query_params.get('search', '').strip()
@@ -79,8 +79,8 @@ class ProductViewSet(TranslatedViewSet):
             )
 
         status = self.request.query_params.get('status')
-        if status in (Product.Status.DRAFT, Product.Status.ACTIVE, Product.Status.SOLD, Product.Status.EXPIRED):
-            queryset = queryset.filter(status=status)
+        if status in (ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE, ProductStock.Status.SOLD, ProductStock.Status.EXPIRED):
+            queryset = queryset.filter(stock__status=status)
         return queryset
 
     # update()/destroy() are NOT overridden — per house convention, business
@@ -103,7 +103,12 @@ class ProductViewSet(TranslatedViewSet):
 
     def perform_update(self, serializer):
         product = serializer.instance
-        if product.status not in (Product.Status.DRAFT, Product.Status.ACTIVE):
+        stock = getattr(product, 'stock', None)
+        # A product with no stock at all (e.g. its batch expired and was
+        # removed) has nothing to protect — editing is always allowed in
+        # that case, since the FPO is likely re-adding stock via this same
+        # PATCH. If stock exists, only DRAFT/ACTIVE batches stay editable.
+        if stock and stock.status not in (ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE):
             raise BusinessLogicError(
                 message=t('marketplace.product_not_editable', self.get_language()),
                 code='product_not_editable',
@@ -114,7 +119,8 @@ class ProductViewSet(TranslatedViewSet):
     def perform_destroy(self, instance):
         # Soft delete — draft only. BaseModel provides .soft_delete(), which
         # sets is_deleted=True instead of removing the row.
-        if instance.status != Product.Status.DRAFT:
+        stock = getattr(instance, 'stock', None)
+        if stock and stock.status != ProductStock.Status.DRAFT:
             raise BusinessLogicError(
                 message=t('marketplace.only_draft_deletable', self.get_language()),
                 code='only_draft_deletable',
@@ -127,13 +133,14 @@ class ProductViewSet(TranslatedViewSet):
     def publish(self, request, pk=None):
         """draft -> active, then runs buyer-seller matching."""
         product = self.get_object()
-        if product.status != Product.Status.DRAFT:
+        stock = getattr(product, 'stock', None)
+        if stock is None or stock.status != ProductStock.Status.DRAFT:
             raise BusinessLogicError(
                 message=t('marketplace.only_draft_publishable', self.get_language()),
                 code='only_draft_publishable',
             )
-        product.status = Product.Status.ACTIVE
-        product.save()
+        stock.status = ProductStock.Status.ACTIVE
+        stock.save()
 
         run_matching(product)
         _clear_public_market_cache()
@@ -147,13 +154,14 @@ class ProductViewSet(TranslatedViewSet):
     @action(detail=True, methods=['post'], url_path='mark-sold')
     def mark_sold(self, request, pk=None):
         product = self.get_object()
-        if product.status != Product.Status.ACTIVE:
+        stock = getattr(product, 'stock', None)
+        if stock is None or stock.status != ProductStock.Status.ACTIVE:
             raise BusinessLogicError(
                 message=t('marketplace.only_active_can_be_sold', self.get_language()),
                 code='only_active_can_be_sold',
             )
-        product.status = Product.Status.SOLD
-        product.save()
+        stock.status = ProductStock.Status.SOLD
+        stock.save()
         _clear_public_market_cache()
         return StandardResponse.success(
             data=ProductSerializer(product).data,
