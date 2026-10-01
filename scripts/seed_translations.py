@@ -380,10 +380,15 @@ def seed_ui_translations(languages):
         ('login.forgot_password',       'Forgot password?',                         'രഹസ്യവാക്ക് മറന്നോ?'),
         ('login.signing_in',            'Signing in...',                            'സൈൻ ഇൻ ചെയ്യുന്നു...'),
         # New keys for the split-card sign-up call-to-action on /v1/login
-        ('login.new_here',              'New to KAU-FPO',                           'KAU-FPO പുതിയവർക്ക്'),
+        ('login.existing_user',         'Already a user? Login',                    'ഇതിനകം ഉപയോക്താവാണോ? ലോഗിൻ ചെയ്യുക'),
+        ('login.new_here',              'New User? Register',                       'പുതിയ ഉപയോക്താവാണോ? രജിസ്റ്റർ ചെയ്യുക'),
         ('login.sign_up_headline',      'Register your FPO in a few simple steps',  'ഏതാനും ഘട്ടങ്ങളിലൂടെ നിങ്ങളുടെ FPO രജിസ്റ്റർ ചെയ്യുക'),
         ('login.sign_up_subtext',       "Join Kerala's official FPO platform to access training, schemes, market linkages and Detailed Project Reports.", 'പരിശീലനങ്ങൾ, പദ്ധതികൾ, മാർക്കറ്റ് ബന്ധം, വിശദമായ പദ്ധതി റിപ്പോർട്ടുകൾ എന്നിവയ്ക്കായി കേരളത്തിന്റെ ഔദ്യോഗിക FPO പ്ലാറ്റ്‌ഫോമിൽ ചേരുക.'),
         ('login.sign_up_cta',           'Create a new account',                     'പുതിയ അക്കൗണ്ട് സൃഷ്ടിക്കുക'),
+        ('login.buyer_register_prompt', 'External buyer?',                          'പുറത്തുനിന്നുള്ള ക്രേതാവാണോ?'),
+        ('login.register_as_buyer',     'Buyer Registration',                       'ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക'),
+        ('login.official_register_prompt', 'Government or CBBO/NGO official?',      'സർക്കാർ അല്ലെങ്കിൽ CBBO/NGO ഉദ്യോഗസ്ഥനാണോ?'),
+        ('login.official_register_link',   'Register here',                         'ഇവിടെ രജിസ്റ്റർ ചെയ്യുക'),
         
         # ── forgot_password — /forgot-password ─────────────────────────────
         ('forgot_password.email_label',           'Email address',                                    'ഇമെയിൽ വിലാസം'),
