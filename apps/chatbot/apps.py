@@ -5,3 +5,7 @@ class ChatbotConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.chatbot"
     verbose_name = "Chatbot"
+
+    def ready(self):
+        # Register signal handlers on app load (post_save/post_delete on POP).
+        from apps.chatbot import signals  # noqa: F401

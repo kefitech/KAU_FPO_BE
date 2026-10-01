@@ -183,7 +183,7 @@ class ChatMessageView(APIView):
             refusal, append the caller's district KVK + sub-admin contact info so
             the user has somewhere to go next.
             """
-            reply_text = augment_fallback(reply_text, request.user, district_hint, lang)
+            reply_text = augment_fallback(reply_text, request.user, district_hint, lang, user_message=message)
             save_turn(
                 conversation,
                 role='assistant',

@@ -1,17 +1,20 @@
 """
-District-aware fallback contacts for the chatbot — KAU suggestion #2.
+Fallback augmentation for the chatbot — KAU suggestion #2.
 
 When the chatbot can't answer (no KB match, or Gemini's refusal template
-fires), we append a short footer directing the user to:
+fires), rewrite the generic refusal into something useful:
 
-  1. The KVK of their district (KVKLink row with matching district code).
-  2. The name of any active sub-admin(s) covering their district.
+  1. Detect the user's INTENT from the original message (product,
+     scheme, registration, expert, training, weather, ...).
+  2. Replace the generic "contact KAU support" line with an intent-
+     specific pointer to the platform page that actually handles it.
+  3. Append a district footer (KVK + sub-admin) if we know the caller's
+     district — either from their profile or an FE hint.
 
-If we can't determine a district (anonymous public user with no hint),
-we skip the district-specific block and keep the generic KAU support line.
+If we can't determine an intent OR a district, we degrade to the
+original generic refusal so the reply is never worse than what Gemini
+produced.
 """
-
-import re
 
 from apps.core.utils.constants import get_district_name
 
@@ -34,6 +37,136 @@ def _looks_like_refusal(text: str) -> bool:
         return False
     lower = text.lower()
     return any(marker in lower for marker in _REFUSAL_MARKERS)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Intent detection — cheap keyword match against the user's message.
+# First match wins, so keep the more specific intents at the top.
+# ─────────────────────────────────────────────────────────────────────
+
+_INTENTS = [
+    # Scheme first — its keywords are more specific than product's "available".
+    ('scheme', {
+        'keywords': (
+            'scheme', 'subsidy', 'subsidies', 'grant', 'grants',
+            'financial support', 'funding', 'loan',
+        ),
+        'en': (
+            "Sorry, I couldn't find a scheme that matches. "
+            "Browse the Schemes & Subsidies hub for the latest KAU-listed programs."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, പൊരുത്തപ്പെടുന്ന പദ്ധതി കണ്ടെത്താൻ കഴിഞ്ഞില്ല. "
+            "KAU-യുടെ Schemes & Subsidies പേജിൽ പുതിയ പദ്ധതികൾ കാണാം."
+        ),
+    }),
+    ('product', {
+        'keywords': (
+            # explicit product / trade terms
+            'product', 'buy', 'sell', 'sale', 'sold', 'stock',
+            'listing', 'listed', 'market hub', 'kg', 'quintal',
+            'seller', 'buyer', 'wholesale', 'purchase',
+            # buy-side idioms
+            'who has', 'who sells', 'who is selling', 'anyone selling',
+            'looking for', 'want to buy', 'need to buy',
+            'availability', 'in stock',
+        ),
+        'en': (
+            "Sorry, I couldn't find a matching product listing. "
+            "Browse the Market Hub or the FPO Products page to see what's available right now."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, ഈ ഉൽപ്പന്നത്തിനുള്ള ലിസ്റ്റിംഗ് കണ്ടെത്താൻ കഴിഞ്ഞില്ല. "
+            "നിലവിലുള്ള ഉൽപ്പന്നങ്ങൾ കാണാൻ Market Hub അല്ലെങ്കിൽ FPO Products പേജ് സന്ദർശിക്കുക."
+        ),
+    }),
+    ('expert', {
+        'keywords': (
+            'expert', 'agronomist', 'consultant', 'advisor', 'advice',
+            'specialist', 'consultation', 'book an expert',
+        ),
+        'en': (
+            "Sorry, I couldn't find a matching expert. "
+            "Search the Expert Directory to book a KAU-approved specialist."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, പൊരുത്തപ്പെടുന്ന വിദഗ്ധനെ കണ്ടെത്താൻ കഴിഞ്ഞില്ല. "
+            "KAU-അംഗീകൃത വിദഗ്ധരെ ബുക്ക് ചെയ്യാൻ Expert Directory സന്ദർശിക്കുക."
+        ),
+    }),
+    ('training', {
+        'keywords': (
+            'training', 'workshop', 'course', 'class', 'session',
+            'learn', 'teach', 'lesson',
+        ),
+        'en': (
+            "Sorry, I couldn't find a matching training. "
+            "Check the Trainings page on your dashboard for upcoming CBBO/KAU sessions."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, പൊരുത്തപ്പെടുന്ന പരിശീലനം കണ്ടെത്താൻ കഴിഞ്ഞില്ല. "
+            "വരാനിരിക്കുന്ന സെഷനുകൾക്ക് Trainings പേജ് പരിശോധിക്കുക."
+        ),
+    }),
+    ('registration', {
+        'keywords': (
+            'register', 'registration', 'sign up', 'signup', 'apply',
+            'application', 'join', 'onboard', 'create fpo', 'new fpo',
+        ),
+        'en': (
+            "Sorry, I couldn't answer that from what I know. "
+            "For FPO registration, use the Register FPO wizard on the platform."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. "
+            "FPO രജിസ്ട്രേഷനായി Register FPO wizard ഉപയോഗിക്കുക."
+        ),
+    }),
+    ('tier', {
+        'keywords': ('tier', 'assessment', 'rating', 'grade', 'upgrade tier'),
+        'en': (
+            "Sorry, I couldn't find an answer. "
+            "Head to the Tier Assessment page on your FPO dashboard to see or take the yearly assessment."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, ഉത്തരം കണ്ടെത്താൻ കഴിഞ്ഞില്ല. "
+            "വാർഷിക അസസ്‌മെന്റ് കാണാൻ FPO Dashboard-ലെ Tier Assessment പേജിലേക്ക് പോകുക."
+        ),
+    }),
+    ('dpr', {
+        'keywords': ('dpr', 'project report', 'detailed project report', 'business plan'),
+        'en': (
+            "Sorry, I couldn't answer that from KAU content. "
+            "For DPR generation, open the DPR Projects page on your FPO dashboard."
+        ),
+        'ml': (
+            "ക്ഷമിക്കണം, ഉത്തരം കണ്ടെത്താൻ കഴിഞ്ഞില്ല. "
+            "DPR-നായി FPO Dashboard-ലെ DPR Projects പേജ് സന്ദർശിക്കുക."
+        ),
+    }),
+]
+
+
+def _detect_intent(message: str) -> dict | None:
+    """Return the intent-info dict for the first matching intent, or None."""
+    if not message:
+        return None
+    lower = message.lower()
+    for _name, info in _INTENTS:
+        if any(k in lower for k in info['keywords']):
+            return info
+    return None
+
+
+def _rewrite_refusal_line(reply_text: str, intent_line: str) -> str:
+    """Replace the whole refusal block with `intent_line`.
+
+    Assumption: when Gemini or the extractive fallback returns a refusal,
+    the ENTIRE reply is the refusal template — not one sentence of a
+    longer answer. That's how our prompt is structured (case C). So it's
+    safe to swap the full text for the intent line.
+    """
+    return intent_line.strip()
 
 
 def _user_district(user, hint: str = '') -> str | None:
@@ -132,15 +265,31 @@ def build_footer(district_code: str, lang: str) -> str:
     return '\n'.join(lines) if len(lines) > 1 else ''
 
 
-def augment_reply(reply_text: str, user, hint: str, lang: str) -> str:
-    """If `reply_text` looks like a refusal, append the district footer."""
+def augment_reply(reply_text: str, user, hint: str, lang: str, user_message: str = '') -> str:
+    """Rewrite a refusal reply into something actionable.
+
+    1. If the reply doesn't look like a refusal, return unchanged.
+    2. Detect the user's INTENT from `user_message` and replace the
+       generic refusal sentence with an intent-specific pointer.
+    3. Append the district footer (KVK + sub-admin) if a district can
+       be resolved from the user's profile or `hint`.
+    """
     if not _looks_like_refusal(reply_text):
         return reply_text
+
+    result = reply_text
+
+    # Step 1 — intent rewrite
+    intent = _detect_intent(user_message)
+    if intent:
+        line = intent.get(lang) or intent['en']
+        result = _rewrite_refusal_line(result, line)
+
+    # Step 2 — district footer
     district = _user_district(user, hint=hint)
-    if not district:
-        return reply_text
-    footer = build_footer(district, lang)
-    if not footer:
-        return reply_text
-    # Preserve one blank line between the original reply and the footer.
-    return f'{reply_text.rstrip()}\n\n{footer}'
+    if district:
+        footer = build_footer(district, lang)
+        if footer:
+            result = f'{result.rstrip()}\n\n{footer}'
+
+    return result
