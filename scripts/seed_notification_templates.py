@@ -42,6 +42,9 @@ TEMPLATE_CODES = [
     ('fpo_email_otp',               'email', 'OTP to verify FPO office email before submission',   ['user_name', 'otp']),
     ('fpo_phone_otp',               'sms',   'OTP to verify FPO office phone before submission',   ['otp']),
     ('admin_new_fpo_application',   'email',  'Notify admin when a new FPO application is submitted', ['fpo_name', 'application_id', 'district']),
+    #arunima 17 sep 2026
+    ('verified_buyer_inquiry',     'email', 'Notify FPO when a verified buyer sends an inquiry',     ['fpo_name', 'product_name']),
+    #====================================
     ('application_approved',        'in_app', 'In-app notification when FPO is approved',             ['user_name', 'application_id']),
     ('application_rejected',        'in_app', 'In-app notification when FPO is rejected',             ['user_name', 'rejection_reason']),
     ('info_requested',              'in_app', 'In-app notification when admin requests more info',     ['user_name', 'request_message']),
