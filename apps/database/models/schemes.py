@@ -4,7 +4,21 @@ Schemes & Subsidies and Expert Directory Models
 """
 
 from django.db import models
+from django.utils import timezone
 from apps.core.models.base import BaseModel
+
+
+def validate_scheme_deadline(value, instance=None):
+    """
+    "Valid till" can't be set to a past date. An existing past date that isn't
+    being changed is accepted, so an expired scheme can still be edited.
+    Returns an error message, or None when the value is fine.
+    """
+    if value is None or (instance is not None and value == instance.deadline):
+        return None
+    if value < timezone.localdate():
+        return 'Valid till date cannot be in the past.'
+    return None
 
 
 # ─── Schemes ─────────────────────────────────────────────────────────────────

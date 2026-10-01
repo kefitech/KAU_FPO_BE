@@ -18,7 +18,7 @@ from django.db.models import Q
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.schemes import Scheme, SchemeCategory
+from apps.database.models.schemes import Scheme, SchemeCategory, validate_scheme_deadline
 
 
 def _is_admin(user):
@@ -64,6 +64,10 @@ class SchemeSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data['category_display'] = instance.get_category_display()
+        # Same shape as the government scheme API — the table shows the name, or "You"
+        creator = instance.created_by
+        data['created_by'] = instance.created_by_id
+        data['created_by_name'] = (creator.get_full_name() or creator.email) if creator else None
         return data
 
 
@@ -101,6 +105,12 @@ class SchemeWriteSerializer(serializers.ModelSerializer):
             'objective', 'eligibility', 'benefit_details', 'application_process',
             'official_link', 'last_updated', 'deadline', 'is_active', 'order',
         ]
+
+    def validate_deadline(self, value):
+        error = validate_scheme_deadline(value, self.instance)
+        if error:
+            raise serializers.ValidationError(error)
+        return value
 
     def validate_category(self, value):
         valid = [c.value for c in SchemeCategory]
@@ -144,7 +154,7 @@ class SchemeListView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        qs = Scheme.objects.filter(is_deleted=False).order_by('order', 'name_en')
+        qs = Scheme.objects.filter(is_deleted=False).select_related('created_by').order_by('order', 'name_en')
 
         search = request.query_params.get('search')
         if search:

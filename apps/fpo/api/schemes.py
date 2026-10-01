@@ -24,7 +24,7 @@ class SchemePublicSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'name_en', 'name_ml', 'administering_body', 'category',
             'category_display', 'objective', 'eligibility', 'benefit_details',
-            'application_process', 'official_link', 'last_updated',
+            'application_process', 'official_link', 'last_updated', 'deadline',
         ]
 
     def get_category_display(self, obj):

@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.schemes import Scheme, SchemeCategory
+from apps.database.models.schemes import Scheme, SchemeCategory, validate_scheme_deadline
 
 from apps.government.api.scoping import is_government_user
 
@@ -21,7 +21,7 @@ class SchemeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name_en', 'name_ml', 'administering_body', 'category',
             'objective', 'eligibility', 'benefit_details', 'application_process',
-            'official_link', 'last_updated', 'is_active', 'order',
+            'official_link', 'last_updated', 'deadline', 'is_active', 'order',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -30,7 +30,9 @@ class SchemeSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         data['category_display'] = instance.get_category_display()
         data['created_by'] = instance.created_by_id
-        data['created_by_name'] = instance.created_by.get_full_name() if instance.created_by else None
+        creator = instance.created_by
+        # Fall back to the email so an account without a name doesn't show a blank badge
+        data['created_by_name'] = (creator.get_full_name() or creator.email) if creator else None
         return data
 
 
@@ -40,8 +42,14 @@ class SchemeWriteSerializer(serializers.ModelSerializer):
         fields = [
             'name_en', 'name_ml', 'administering_body', 'category',
             'objective', 'eligibility', 'benefit_details', 'application_process',
-            'official_link', 'last_updated', 'is_active', 'order',
+            'official_link', 'last_updated', 'deadline', 'is_active', 'order',
         ]
+
+    def validate_deadline(self, value):
+        error = validate_scheme_deadline(value, self.instance)
+        if error:
+            raise serializers.ValidationError(error)
+        return value
 
     def validate_category(self, value):
         valid = [c.value for c in SchemeCategory]
@@ -54,7 +62,7 @@ class GovernmentSchemeListView(APIView):
     def get(self, request):
         if not is_government_user(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-        qs = Scheme.objects.filter(is_deleted=False).order_by('order', 'name_en')
+        qs = Scheme.objects.filter(is_deleted=False).select_related('created_by').order_by('order', 'name_en')
         search = request.query_params.get('search')
         if search:
             qs = qs.filter(
