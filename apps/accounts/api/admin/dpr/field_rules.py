@@ -26,7 +26,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
+from apps.core.permissions.rbac import IsDPRAdmin
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import DPRComponent, DPRFieldRule
 
@@ -136,7 +136,7 @@ class FieldRuleSerializer(serializers.ModelSerializer):
 @extend_schema(tags=['Admin - DPR Field Rules'])
 class FieldRuleListCreateView(APIView):
     """GET list (filterable by section / field / recipe_type) + POST create."""
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request):
         qs = DPRFieldRule.objects.all().prefetch_related('required_components')
@@ -168,7 +168,7 @@ class FieldRuleListCreateView(APIView):
 @extend_schema(tags=['Admin - DPR Field Rules'])
 class FieldRuleDetailView(APIView):
     """GET retrieve + PATCH update + DELETE for a single field rule."""
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request, pk):
         rule = get_object_or_404(DPRFieldRule, pk=pk)
@@ -202,7 +202,7 @@ class FieldRuleSchemaView(APIView):
     that list is huge, per-section, and better handled by a text input on
     the FE (the admin knows which field they're targeting).
     """
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     # Skip these bookkeeping fields when introspecting a section model for
     # auto-complete — they're on TimeStampedModel / AuditModel and never

@@ -22,6 +22,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
+from apps.chatbot.services.fallback_contacts import augment_reply as augment_fallback
 from apps.chatbot.services.gemini_answer import generate_answer as gemini_generate
 from apps.chatbot.services.history import ensure_conversation, recent_turns, save_turn
 from apps.chatbot.services.qa_client import ask as qa_ask
@@ -83,6 +84,16 @@ class _MessageRequestSerializer(serializers.Serializer):
                   "it. Same session_id → same ChatConversation → multi-turn "
                   "context passed to Gemini.",
     )
+    district = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default='',
+        max_length=5,
+        help_text="Optional district code hint (e.g. 'TSR'). Used only for the "
+                  "chatbot fallback message when we can't infer the district "
+                  "from the caller's profile — mostly relevant for anonymous "
+                  "users on the public widget.",
+    )
 
 
 class ChatMessageView(APIView):
@@ -130,6 +141,7 @@ class ChatMessageView(APIView):
         message = ser.validated_data['message'].strip()
         current_path = ser.validated_data.get('current_path') or ''
         client_session_id = ser.validated_data.get('session_id') or ''
+        district_hint = (ser.validated_data.get('district') or '').strip().upper()
         user_role = _resolve_role(request.user)
 
         # Preferred language — used for both small-talk lookup below and
@@ -165,7 +177,13 @@ class ChatMessageView(APIView):
         save_turn(conversation, role='user', content=message)
 
         def _reply(reply_text, generator, sources=None, confidence=1.0, extra=None):
-            """Persist the assistant turn + build the standard response."""
+            """Persist the assistant turn + build the standard response.
+
+            KAU suggestion #2 — if the reply looks like a "can't help / off-topic"
+            refusal, append the caller's district KVK + sub-admin contact info so
+            the user has somewhere to go next.
+            """
+            reply_text = augment_fallback(reply_text, request.user, district_hint, lang, user_message=message)
             save_turn(
                 conversation,
                 role='assistant',

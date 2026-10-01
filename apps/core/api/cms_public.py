@@ -32,6 +32,7 @@ from apps.database.models.language import Language
 from apps.database.models.schemes import Expert
 from apps.core.utils.constants import FPOStatus, UserRole
 from django.db.models import Count, Q
+from apps.database.models.cms import HeaderLogo
 
 def _lang(request):
     return getattr(request, 'language', 'en')
@@ -607,3 +608,25 @@ class PublicVisitorTrackView(APIView):
 
         VisitorCount.increment()
         return StandardResponse.success(data={'total_visitors': count})
+
+
+class PublicHeaderLogoListView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(tags=['Public - CMS'], summary='Active header logos (platform logo first)')
+    def get(self, request):
+        data = cache.get('public:header_logos')
+        if data is None:
+            data = [
+                {
+                    'id':          obj.id,
+                    'name':        obj.name,
+                    'logo_url':    request.build_absolute_uri(obj.logo.url) if obj.logo else None,
+                    'is_platform': obj.is_platform,
+                    'order':       obj.order,   # 0-2 = header positions, 3 = mobile menu logo
+                }
+                for obj in HeaderLogo.objects.filter(is_active=True)
+            ]
+            cache.set('public:header_logos', data, 60 * 60)
+        return StandardResponse.success(data=data)

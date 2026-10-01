@@ -13,7 +13,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
+from apps.core.permissions.rbac import IsDPRAdmin
 from apps.core.utils.pagination import StandardPagination
 from apps.database.models import DPRProject
 
@@ -33,7 +33,7 @@ from apps.database.models import DPRProject
     ],
 )
 class DPRProjectAdminListView(APIView):
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request):
         qs = (

@@ -25,16 +25,41 @@ def _is_admin(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
+def _is_super_admin(user):
+    return user.groups.filter(name=UserRole.SUPER_ADMIN).exists()
+
+
+def _can_manage_schemes(user):
+    """Super admin always, sub-admin only with `can_manage_schemes`."""
+    if _is_super_admin(user):
+        return True
+    if user.groups.filter(name=UserRole.SUB_ADMIN).exists():
+        return user.has_perm('accounts.can_manage_schemes')
+    return False
+
+
+def _can_edit_this_scheme(user, scheme):
+    """Ownership rule: super admin edits anything; sub-admin only their own rows."""
+    if _is_super_admin(user):
+        return True
+    return _can_manage_schemes(user) and scheme.created_by_id == user.id
+
+
 class SchemeSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.SerializerMethodField()
+
     class Meta:
         model = Scheme
         fields = [
             'id', 'name_en', 'name_ml', 'administering_body', 'category',
             'objective', 'eligibility', 'benefit_details', 'application_process',
-            'official_link', 'last_updated', 'is_active', 'order',
-            'created_at', 'updated_at',
+            'official_link', 'last_updated', 'deadline', 'is_active', 'order',
+            'created_by_email', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by_email', 'created_at', 'updated_at']
+
+    def get_created_by_email(self, obj):
+        return obj.created_by.email if obj.created_by else None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -74,7 +99,7 @@ class SchemeWriteSerializer(serializers.ModelSerializer):
         fields = [
             'name_en', 'name_ml', 'administering_body', 'category',
             'objective', 'eligibility', 'benefit_details', 'application_process',
-            'official_link', 'last_updated', 'is_active', 'order',
+            'official_link', 'last_updated', 'deadline', 'is_active', 'order',
         ]
 
     def validate_category(self, value):
@@ -150,15 +175,18 @@ class SchemeListView(APIView):
         responses={201: SchemeSerializer},
     )
     def post(self, request):
-        if not _is_admin(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        if not _can_manage_schemes(request.user):
+            return StandardResponse.error(
+                'Permission denied. Sub-admins need can_manage_schemes to create schemes.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         serializer = SchemeWriteSerializer(data=request.data)
         if not serializer.is_valid():
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        scheme = serializer.save()
+        scheme = serializer.save(created_by=request.user)
         return StandardResponse.success(
             data=SchemeSerializer(scheme).data,
             message='Scheme created.',
@@ -188,29 +216,35 @@ class SchemeDetailView(APIView):
 
     @extend_schema(tags=['Admin - Schemes'], summary='Update a scheme', request=SchemeWriteSerializer)
     def patch(self, request, pk):
-        if not _is_admin(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-
         scheme = self._get_scheme(pk)
         if not scheme:
             return StandardResponse.error('Scheme not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_edit_this_scheme(request.user, scheme):
+            return StandardResponse.error(
+                'Permission denied. Sub-admins can only edit schemes they created.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         serializer = SchemeWriteSerializer(scheme, data=request.data, partial=True)
         if not serializer.is_valid():
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        serializer.save()
+        serializer.save(updated_by=request.user)
         return StandardResponse.success(data=SchemeSerializer(scheme).data, message='Scheme updated.')
 
     @extend_schema(tags=['Admin - Schemes'], summary='Delete a scheme')
     def delete(self, request, pk):
-        if not _is_admin(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-
         scheme = self._get_scheme(pk)
         if not scheme:
             return StandardResponse.error('Scheme not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_edit_this_scheme(request.user, scheme):
+            return StandardResponse.error(
+                'Permission denied. Sub-admins can only delete schemes they created.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         scheme.soft_delete()
         return StandardResponse.success(message='Scheme deleted.')
@@ -221,13 +255,16 @@ class SchemeActivateView(APIView):
 
     @extend_schema(tags=['Admin - Schemes'], summary='Activate a scheme')
     def post(self, request, pk):
-        if not _is_admin(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-
         try:
             scheme = Scheme.objects.get(pk=pk, is_deleted=False)
         except Scheme.DoesNotExist:
             return StandardResponse.error('Scheme not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_edit_this_scheme(request.user, scheme):
+            return StandardResponse.error(
+                'Permission denied. Sub-admins can only edit schemes they created.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         scheme.is_active = True
         scheme.save(update_fields=['is_active'])
@@ -239,13 +276,16 @@ class SchemeDeactivateView(APIView):
 
     @extend_schema(tags=['Admin - Schemes'], summary='Deactivate a scheme')
     def post(self, request, pk):
-        if not _is_admin(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-
         try:
             scheme = Scheme.objects.get(pk=pk, is_deleted=False)
         except Scheme.DoesNotExist:
             return StandardResponse.error('Scheme not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        if not _can_edit_this_scheme(request.user, scheme):
+            return StandardResponse.error(
+                'Permission denied. Sub-admins can only edit schemes they created.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         scheme.is_active = False
         scheme.save(update_fields=['is_active'])

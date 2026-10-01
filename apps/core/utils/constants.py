@@ -68,6 +68,43 @@ DISTRICTS_BILINGUAL = {
 }
 
 
+# Historical / colloquial / alternate spellings used by anyone typing a
+# district name. Included in search-keyword indices (chatbot KB, FAQ search)
+# so "Trivandrum" hits "Thiruvananthapuram" even though FTS stemming won't
+# unify them. Malayalam names + district codes are also useful search
+# synonyms so they live here too. Anywhere that needs a district search
+# vocabulary imports from this dict.
+DISTRICT_ALIASES = {
+    "TVM": ["Trivandrum", "Anantapuri"],
+    "KLM": ["Quilon"],
+    "PTA": [],
+    "ALP": ["Alleppey"],
+    "KTM": [],
+    "IDK": [],
+    "EKM": ["Kochi", "Cochin"],
+    "TSR": ["Trichur"],
+    "PKD": [],
+    "MLP": [],
+    "KZD": ["Calicut"],
+    "WYD": [],
+    "KNR": ["Cannanore"],
+    "KSD": ["Kasargod"],
+}
+
+
+def get_district_search_terms(code: str) -> list[str]:
+    """Return every string a searcher might type for one district.
+
+    Includes: 3-letter code, English name, Malayalam name, all aliases.
+    Consumers (chatbot zone_sync, KB search, notification template macros)
+    use this to build FTS-friendly keyword strings without hard-coding the
+    variants per site.
+    """
+    en, ml = DISTRICTS_BILINGUAL.get(code, ('', ''))
+    aliases = DISTRICT_ALIASES.get(code, [])
+    return [code] + [t for t in [en, ml, *aliases] if t]
+
+
 def get_district_name(code: str, language: str = 'en') -> str:
     """
     Get district name in specified language.
@@ -128,11 +165,16 @@ ROLE_HIERARCHY = {
 # Format: (codename, description)
 # Add new entries here as new features are built.
 SUB_ADMIN_PERMISSIONS = [
-    ('can_approve_fpo',      'Can approve or reject FPO applications'),
-    ('can_view_all_fpos',    'Can view all FPO profiles'),
-    ('can_request_info',     'Can request additional info from FPO'),
-    ('can_verify_documents', 'Can mark FPO documents as verified'),
-    ('can_generate_reports', 'Can export FPO summary reports'),
+    ('can_approve_fpo',                  'Can approve or reject FPO applications'),
+    ('can_view_all_fpos',                'Can view all FPO profiles'),
+    ('can_request_info',                 'Can request additional info from FPO'),
+    ('can_verify_documents',             'Can mark FPO documents as verified'),
+    ('can_generate_reports',             'Can export FPO summary reports'),
+    ('can_use_dpr_facilities',           'Can access the DPR generation module'),
+    ('can_approve_govt_official_logins', 'Can approve or reject government official applications'),
+    ('can_approve_cbbo_logins',          'Can approve or reject CBBO officer applications'),
+    ('can_manage_schemes',               'Can create/edit/delete own schemes (read-only otherwise)'),
+    ('can_manage_trainings',             'Can create/edit/delete own trainings (read-only otherwise)'),
 ]
 
 

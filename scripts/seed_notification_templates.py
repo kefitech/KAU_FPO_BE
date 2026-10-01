@@ -42,6 +42,9 @@ TEMPLATE_CODES = [
     ('fpo_email_otp',               'email', 'OTP to verify FPO office email before submission',   ['user_name', 'otp']),
     ('fpo_phone_otp',               'sms',   'OTP to verify FPO office phone before submission',   ['otp']),
     ('admin_new_fpo_application',   'email',  'Notify admin when a new FPO application is submitted', ['fpo_name', 'application_id', 'district']),
+    #arunima 17 sep 2026
+    ('verified_buyer_inquiry',     'email', 'Notify FPO when a verified buyer sends an inquiry',     ['fpo_name', 'product_name']),
+    #====================================
     ('application_approved',        'in_app', 'In-app notification when FPO is approved',             ['user_name', 'application_id']),
     ('application_rejected',        'in_app', 'In-app notification when FPO is rejected',             ['user_name', 'rejection_reason']),
     ('info_requested',              'in_app', 'In-app notification when admin requests more info',     ['user_name', 'request_message']),
@@ -94,6 +97,12 @@ TEMPLATE_CODES = [
     # FPO Training Sessions (Jobin — P2-08)
     ('fpo_training_scheduled',              'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
     ('fpo_training_scheduled',              'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
+   #30 sep arunima
+    # Product Stock Expiry (P2-11 Marketplace)
+    ('product_stock_expiring_soon',  'email',  'Notify FPO 3 days before a product stock batch expires',        ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
+    ('product_stock_expiring_soon',  'in_app', 'In-app: product stock batch expiring in 3 days',                 ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
+    ('product_stock_expired',        'email',  'Notify FPO that a product stock batch expired and was removed', ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
+    ('product_stock_expired',        'in_app', 'In-app: product stock batch expired and was removed',           ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
 ]
 
 
@@ -971,6 +980,60 @@ TEMPLATES = [
         'Training Session Scheduled',
         'A training on "{{topic}}" has been scheduled for {{date}} at {{time}}, venue: {{venue}}, conducted by {{trainer_name}}.',
     ),
+    #sep 30 arunimma
+
+    # ── Product Stock Expiring Soon (P2-11 Marketplace) ────────────────────
+    (
+        'product_stock_expiring_soon', 'email', 'en',
+        'Your stock is expiring soon — {{product_name}}',
+        '''<p>Dear <strong>{{fpo_name}}</strong>,</p>
+<p>Your stock listing for <strong>{{product_name}}</strong> ({{quantity}} {{unit}}) will expire on <strong>{{available_until}}</strong> — just 3 days from now.</p>
+<p>Once it expires, this stock batch will be automatically removed from your products. If you still have this product available, please update the availability date or add a new stock batch before it expires.</p>''',
+    ),
+    (
+        'product_stock_expiring_soon', 'email', 'ml',
+        'നിങ്ങളുടെ സ്റ്റോക്ക് ഉടൻ കാലഹരണപ്പെടും — {{product_name}}',
+        '''<p>പ്രിയ <strong>{{fpo_name}}</strong>,</p>
+<p><strong>{{product_name}}</strong> ({{quantity}} {{unit}}) എന്ന സ്റ്റോക്ക് ലിസ്റ്റിംഗ് <strong>{{available_until}}</strong> തീയതിയിൽ കാലഹരണപ്പെടും — ഇനി വെറും 3 ദിവസം മാത്രം.</p>
+<p>കാലഹരണപ്പെട്ടാൽ ഈ സ്റ്റോക്ക് ബാച്ച് സ്വയമേവ നീക്കം ചെയ്യപ്പെടും. ഈ ഉൽപ്പന്നം ഇപ്പോഴും ലഭ്യമാണെങ്കിൽ, ലഭ്യത തീയതി പുതുക്കുകയോ പുതിയ സ്റ്റോക്ക് ചേർക്കുകയോ ചെയ്യുക.</p>''',
+    ),
+    (
+        'product_stock_expiring_soon', 'in_app', 'en',
+        'Stock Expiring Soon — {{product_name}}',
+        'Your stock of <strong>{{product_name}}</strong> ({{quantity}} {{unit}}) expires on {{available_until}}. Add new stock before it is removed.',
+    ),
+    (
+        'product_stock_expiring_soon', 'in_app', 'ml',
+        'സ്റ്റോക്ക് ഉടൻ കാലഹരണപ്പെടും — {{product_name}}',
+        '<strong>{{product_name}}</strong> ({{quantity}} {{unit}}) {{available_until}} തീയതിയിൽ കാലഹരണപ്പെടും. നീക്കം ചെയ്യുന്നതിന് മുൻപ് പുതിയ സ്റ്റോക്ക് ചേർക്കുക.',
+    ),
+
+    # ── Product Stock Expired (P2-11 Marketplace) ───────────────────────────
+    (
+        'product_stock_expired', 'email', 'en',
+        'Your stock has expired and was removed — {{product_name}}',
+        '''<p>Dear <strong>{{fpo_name}}</strong>,</p>
+<p>Your stock listing for <strong>{{product_name}}</strong> ({{quantity}} {{unit}}) reached its availability end date on <strong>{{available_until}}</strong> and has now been automatically removed from your products.</p>
+<p>Your product details (name, description, image) are still saved — you can add a new stock batch for this product anytime from your FPO portal.</p>''',
+    ),
+    (
+        'product_stock_expired', 'email', 'ml',
+        'നിങ്ങളുടെ സ്റ്റോക്ക് കാലഹരണപ്പെട്ട് നീക്കം ചെയ്തു — {{product_name}}',
+        '''<p>പ്രിയ <strong>{{fpo_name}}</strong>,</p>
+<p><strong>{{product_name}}</strong> ({{quantity}} {{unit}}) എന്ന സ്റ്റോക്ക് ലിസ്റ്റിംഗ് <strong>{{available_until}}</strong> തീയതിയിൽ ലഭ്യതാ കാലാവധി പൂർത്തിയാക്കി, ഇപ്പോൾ സ്വയമേവ നീക്കം ചെയ്യപ്പെട്ടിരിക്കുന്നു.</p>
+<p>നിങ്ങളുടെ ഉൽപ്പന്ന വിവരങ്ങൾ (പേര്, വിവരണം, ചിത്രം) ഇപ്പോഴും സേവ് ചെയ്തിട്ടുണ്ട് — എപ്പോൾ വേണമെങ്കിലും FPO പോർട്ടലിൽ നിന്ന് ഈ ഉൽപ്പന്നത്തിന് പുതിയ സ്റ്റോക്ക് ചേർക്കാം.</p>''',
+    ),
+    (
+        'product_stock_expired', 'in_app', 'en',
+        'Stock Expired — {{product_name}}',
+        'Your stock of <strong>{{product_name}}</strong> ({{quantity}} {{unit}}) expired on {{available_until}} and was removed. Add new stock to relist it.',
+    ),
+    (
+        'product_stock_expired', 'in_app', 'ml',
+        'സ്റ്റോക്ക് കാലഹരണപ്പെട്ടു — {{product_name}}',
+        '<strong>{{product_name}}</strong> ({{quantity}} {{unit}}) {{available_until}} തീയതിയിൽ കാലഹരണപ്പെട്ട് നീക്കം ചെയ്തു. വീണ്ടും ലിസ്റ്റ് ചെയ്യാൻ പുതിയ സ്റ്റോക്ക് ചേർക്കുക.',
+    ),
+    #--------------------
 ]
 
 

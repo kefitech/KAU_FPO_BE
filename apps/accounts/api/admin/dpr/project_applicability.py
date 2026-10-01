@@ -3,7 +3,7 @@ Admin — DPR Project Applicability preview (Phase 6e).
 
 Admin-scoped read of the rule engine's decisions for any FPO's project.
 Mirrors the FPO-facing `applicability` endpoint but permission-checks for
-`IsSubAdminOrSuperAdmin` so KAU staff can inspect + validate rules during
+`IsDPRAdmin` so KAU staff can inspect + validate rules during
 UAT without needing to log in as the FPO.
 
 Endpoint:
@@ -22,7 +22,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
+from apps.core.permissions.rbac import IsDPRAdmin
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import (
     DPRComponentApplicability,
@@ -36,7 +36,7 @@ from apps.fpo.services.dpr import rule_engine
 class AdminProjectApplicabilityView(APIView):
     """GET applicability decision + rule provenance for one project."""
 
-    permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsDPRAdmin]
 
     def get(self, request, project_uuid):
         try:

@@ -357,6 +357,45 @@ class HasSubAdminPermission(BasePermission):
         return False
 
 
+class IsDPRAdmin(BasePermission):
+    """Super admin OR sub-admin with `can_use_dpr_facilities` — KAU suggestion #1.
+
+    Anyone else is denied. Use on any /admin/dpr/* view.
+    """
+    message = t('common.permission_denied')
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
+            return True
+        if request.user.groups.filter(name=UserRole.SUB_ADMIN).exists():
+            return request.user.has_perm('accounts.can_use_dpr_facilities')
+        return False
+
+
+def require_sub_admin_perm(user, codename: str) -> bool:
+    """Small helper for per-action gating inside a ViewSet.
+
+    Returns True when the user is super_admin, or a sub_admin holding
+    `codename`. False otherwise. Callers translate False to a 403 response.
+
+    Example:
+        @action(detail=True, methods=['post'])
+        def approve_registration(self, request, pk=None):
+            if not require_sub_admin_perm(request.user, 'can_approve_cbbo_logins'):
+                return StandardResponse.error('Permission denied.', status_code=403)
+            ...
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
+        return True
+    if user.groups.filter(name=UserRole.SUB_ADMIN).exists():
+        return user.has_perm(f'accounts.{codename}')
+    return False
+
+
 class IsFPOManager(BasePermission):
     """FPO manager, admin, or super admin allowed."""
     message = t('common.permission_denied')

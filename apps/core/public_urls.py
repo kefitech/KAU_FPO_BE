@@ -25,6 +25,8 @@ from .api.cms_public import (
     PublicDocumentLibraryView,
     PublicFeedbackView,
     PublicVisitorTrackView,
+    PublicQuickLinksView,
+    PublicHeaderLogoListView, 
 )
 
 # Public Market Hub (Arunima — P2-12)
@@ -56,6 +58,9 @@ urlpatterns = [
     path('documents/',                PublicDocumentLibraryView.as_view(),  name='public-documents'),
     path('feedback/',                 PublicFeedbackView.as_view(),         name='public-feedback'),
     path('visitor/',                  PublicVisitorTrackView.as_view(),     name='public-visitor'),
+    #for logo edit
+    path('quick-links/',              PublicQuickLinksView.as_view(),       name='public-quick-links'),
+    path('header-logos/',             PublicHeaderLogoListView.as_view(),   name='public-header-logos'),   # ← add this
     # Public Market Hub (Arunima — P2-12)
     path('market/commodities/',                 PublicCommodityListView.as_view(),   name='public-market-commodities'),
     path('market/opportunities/',               PublicOpportunitiesView.as_view(),   name='public-market-opportunities'),

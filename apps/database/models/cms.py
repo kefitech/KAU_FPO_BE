@@ -144,6 +144,21 @@ class KVKLink(BaseModel):
     logo      = models.ImageField(upload_to=_kvk_logo_path, null=True, blank=True)
     order     = models.PositiveSmallIntegerField(default=0, help_text='Sort order on the public page (ascending)')
     is_active = models.BooleanField(default=True)
+    # KAU suggestion #2 — chatbot fallback needs to route users to their
+    # district's KVK. Nullable so admins can leave it blank on non-KVK links
+    # that happen to share this model (there are only 14 KVKs total).
+    district  = models.CharField(
+        max_length=5, blank=True, default='',
+        help_text='3-letter Kerala district code (TSR, PKD, ...) for chatbot fallback routing.',
+    )
+    contact_email = models.EmailField(
+        blank=True, default='',
+        help_text='Direct contact email shown in the chatbot fallback message.',
+    )
+    contact_phone = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='Direct contact phone shown in the chatbot fallback message.',
+    )
 
     class Meta:
         ordering = ['order', 'id']
@@ -169,7 +184,37 @@ class Partner(BaseModel):
 
     def __str__(self):
         return self.name
+# ─────────────────────────────────────────────────────────────────────────────
+# Header logos — logos shown at the start of the landing-page header.
+# Uploads are trimmed + resized to 160px height (max 960px wide) by the admin
+# serializer, so any size the admin uploads fits the header.
+# ─────────────────────────────────────────────────────────────────────────────
 
+def _header_logo_path(instance, filename):
+    ext = os.path.splitext(filename)[1]
+    return f'cms/header-logos/{uuid.uuid4()}{ext}'
+
+
+class HeaderLogo(BaseModel):
+    name        = models.CharField(max_length=200, help_text='Shown as alt text — e.g. "GOK Logo"')
+    logo        = models.FileField(upload_to=_header_logo_path,
+                                   help_text='FileField (not ImageField) so SVG logos are allowed')
+    is_platform = models.BooleanField(default=False,
+                                      help_text='KAU–FPO platform logo — only one allowed, always shown first')
+    order       = models.PositiveSmallIntegerField(default=0, help_text='Display order — lower first')
+    is_active   = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-is_platform', 'order', 'id']
+
+    def save(self, *args, **kwargs):
+        # Only one platform logo at a time: marking this one demotes the others.
+        if self.is_platform:
+            HeaderLogo.objects.exclude(pk=self.pk).filter(is_platform=True).update(is_platform=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 class YoutubePlaylist(BaseModel):
     title        = models.JSONField(default=dict, blank=True,

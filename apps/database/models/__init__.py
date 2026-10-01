@@ -102,7 +102,12 @@ from .cbbo_profile import CBBOOfficerProfile
 from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
 
 # Phase 2 — Sub-admin FPO assignment (Jobin)
-from .subadmin import SubAdminFPOAssignment
+from .subadmin import (
+    SubAdminFPOAssignment,
+    SubAdminDistrictAssignment,
+    SubAdminDistrictTransfer,
+    SubAdminConfig,
+)
 
 # Phase 2 — GIS (requires PostGIS + django.contrib.gis in INSTALLED_APPS)
 from .gis import (
@@ -240,7 +245,7 @@ from .expert_booking import ExpertAvailability, ExpertTimeSlot, ExpertBooking, E
 from .analytics import AnalyticsSnapshot
 
 # Phase 2 — Marketplace
-from .marketplace import Product, BuyerDirectory, BuyerSellerMatch, MarketPrice, Inquiry
+from .marketplace import Product, ProductStock, BuyerDirectory, BuyerSellerMatch, MarketPrice, Inquiry
 
 # Phase 2 — AI Marketing
 from .marketing import MarketingStrategy
@@ -313,6 +318,9 @@ __all__ = [
     'TrainingSession',
     'TrainingAttendance',
     'SubAdminFPOAssignment',
+    'SubAdminDistrictAssignment',
+    'SubAdminDistrictTransfer',
+    'SubAdminConfig',
     # Phase 2 — GIS
     'AgroClimaticZone',
     'DistrictBoundary',
@@ -447,6 +455,7 @@ __all__ = [
     'ChatMessage',
     # Phase 2 — Marketplace
     'Product',
+    'ProductStock',
     'BuyerDirectory',
     'BuyerSellerMatch',
     'MarketPrice',

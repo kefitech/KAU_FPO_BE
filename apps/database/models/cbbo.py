@@ -116,6 +116,10 @@ class TrainingSession(BaseModel):
         max_length=300, blank=True,
         help_text='Free text — frontend shows combobox with common venues'
     )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Auto-hidden by Celery task N days after date (training_expiry_days).',
+    )
 
     class Meta:
         verbose_name = 'Training Session'

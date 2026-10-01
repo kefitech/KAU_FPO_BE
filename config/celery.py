@@ -101,6 +101,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(day_of_month=1, hour=3, minute=0),
     },
 
+    # KAU suggestion #1 — nightly auto-expire schemes + trainings past their
+    # deadline. Threshold days configurable via SubAdminConfig.
+    'expire-stale-schemes-and-trainings': {
+        'task': 'apps.accounts.tasks.expire_stale_schemes_and_trainings',
+        'schedule': crontab(hour=1, minute=30),
+    },
+
     # Sync FPO data with external systems (if applicable)
     'sync-external-data': {
         'task': 'apps.fpo.tasks.sync_external_data',
@@ -123,6 +130,12 @@ app.conf.beat_schedule = {
     'expert-booking-mark-completed': {
         'task': 'apps.experts.tasks.mark_completed_bookings',
         'schedule': crontab(minute=0),  # Every hour
+    },
+
+    # P2-11 Marketplace — notify FPO 3 days before a stock batch expires (Arunima)
+    'send-stock-expiry-reminders-daily': {
+        'task': 'apps.marketplace.tasks.send_expiry_reminders',
+        'schedule': crontab(hour=0, minute=15),  # 00:15 UTC daily, before expiry deletion runs
     },
 
     # P2-11 Marketplace — mark products past available_until as expired (Arunima)

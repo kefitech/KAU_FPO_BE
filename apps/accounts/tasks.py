@@ -95,3 +95,51 @@ def auto_translate_task(self, language_code: str, category_code: str | None = No
         "failed": len(failed_keys),
         "failed_keys": failed_keys,
     }
+
+# =============================================================================
+# KAU suggestion #1 — Schemes / Trainings auto-expiry
+# =============================================================================
+
+from datetime import date, timedelta
+
+
+@shared_task(name='apps.accounts.tasks.expire_stale_schemes_and_trainings')
+def expire_stale_schemes_and_trainings():
+    """Deactivate schemes/trainings whose deadline is more than N days in the past.
+
+    N comes from SubAdminConfig (`scheme_expiry_days`, `training_expiry_days`).
+    Runs nightly via Celery Beat. Idempotent: rows already inactive are skipped.
+    """
+    from apps.database.models import Scheme
+    from apps.database.models.cbbo import TrainingSession
+    from apps.core.services.subadmin_district import _config_map
+
+    cfg = _config_map()
+    scheme_days   = int(cfg.get('scheme_expiry_days', 5))
+    training_days = int(cfg.get('training_expiry_days', 5))
+    today = date.today()
+
+    scheme_cutoff   = today - timedelta(days=scheme_days)
+    training_cutoff = today - timedelta(days=training_days)
+
+    schemes_expired = Scheme.objects.filter(
+        is_active=True, is_deleted=False,
+        deadline__isnull=False, deadline__lt=scheme_cutoff,
+    ).update(is_active=False)
+
+    trainings_expired = TrainingSession.objects.filter(
+        is_active=True, is_deleted=False,
+        date__lt=training_cutoff,
+    ).update(is_active=False)
+
+    logger.info(
+        f'Auto-expiry — schemes deactivated: {schemes_expired}, '
+        f'trainings deactivated: {trainings_expired} '
+        f'(scheme_cutoff={scheme_cutoff}, training_cutoff={training_cutoff})'
+    )
+    return {
+        'schemes_expired':   schemes_expired,
+        'trainings_expired': trainings_expired,
+        'scheme_cutoff':     scheme_cutoff.isoformat(),
+        'training_cutoff':   training_cutoff.isoformat(),
+    }

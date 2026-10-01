@@ -105,6 +105,13 @@ def seed_menu():
         order     = 4,
     )
     seed_item(
+        label_key = 'menu.sub_admin_settings',
+        path      = '/admin/sub-admin-settings',
+        icon      = 'settings',
+        roles     = [super_admin_group],
+        order     = 4,
+    )
+    seed_item(
         label_key = 'menu.fpo_actions',
         path      = '/admin/fpo-permissions?tab=actions',
         icon      = 'zap',
