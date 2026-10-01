@@ -21,6 +21,7 @@ from apps.core.utils.constants import UserRole, FPOStatus
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.schemes import Expert
 from apps.database.models.expert_booking import ExpertAvailability, ExpertTimeSlot, ExpertBooking, ExpertWeeklyDefault
+from apps.core.services.fpo_permission import has_fpo_permission
 from apps.database.models.fpo import FPO, FPOUserMembership
 from apps.notifications.services import send_notification
 
@@ -229,6 +230,8 @@ class CreateBookingView(APIView):
         fpo = _get_fpo(request.user)
         if not fpo or fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error('Your FPO must be approved to book experts.', status_code=status.HTTP_403_FORBIDDEN)
+        if not has_fpo_permission(request.user, fpo, 'can_book_experts'):
+            return StandardResponse.error('You do not have permission to book experts.', status_code=status.HTTP_403_FORBIDDEN)
 
         if ExpertBooking.objects.filter(fpo=fpo, status=ExpertBooking.Status.PENDING, is_deleted=False).exists():
             return StandardResponse.error(
@@ -295,6 +298,8 @@ class CancelBookingView(APIView):
         booking = ExpertBooking.objects.filter(pk=pk, fpo=fpo, is_deleted=False).first()
         if not booking:
             return StandardResponse.error('Booking not found.', status_code=status.HTTP_404_NOT_FOUND)
+        if not has_fpo_permission(request.user, fpo, 'can_book_experts'):
+            return StandardResponse.error('You do not have permission to cancel bookings.', status_code=status.HTTP_403_FORBIDDEN)
 
         if booking.status not in (ExpertBooking.Status.PENDING, ExpertBooking.Status.CONFIRMED):
             return StandardResponse.error('This booking cannot be cancelled.', status_code=status.HTTP_400_BAD_REQUEST)

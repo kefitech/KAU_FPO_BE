@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libffi-dev \
     shared-mime-info \
+    fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/ requirements/

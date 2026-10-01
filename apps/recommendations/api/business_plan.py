@@ -3,9 +3,12 @@ AI Business Plan API — FPO "Business Plan Guidance" tab.
 Endpoints:
     GET  /api/recommendations/business-plan/me/            — cached plan (request language) + profile
     POST /api/recommendations/business-plan/me/generate/   — generate / regenerate via Gemini (sync)
+    GET  /api/recommendations/business-plan/me/pdf/        — download the plan as PDF (DPR report look)
+    GET  /api/recommendations/business-plan/me/docx/       — download the plan as an editable Word file
 
 Both return {plan, profile, is_outdated}; `plan` is null until generated.
 """
+from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
@@ -14,13 +17,18 @@ from rest_framework.views import APIView
 from apps.core.services.translation import t
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BusinessPlan
-from apps.recommendations.api.recommendations import _get_fpo_or_404
+from apps.recommendations.api.recommendations import _get_fpo_or_404, _require_fpo_action
 from apps.recommendations.business_plan import (
     BusinessPlanError,
     build_profile,
     generate_business_plan,
     is_outdated,
     normalise_language,
+)
+from apps.recommendations.business_plan_export import (
+    build_filename,
+    render_business_plan_docx,
+    render_business_plan_pdf,
 )
 
 
@@ -82,6 +90,12 @@ class GenerateBusinessPlanView(APIView):
         fpo, err = _get_fpo_or_404(request.user, lang)
         if err:
             return err
+        err = _require_fpo_action(
+            request.user, fpo, 'can_generate_business_plan',
+            'You do not have permission to generate a business plan.',
+        )
+        if err:
+            return err
 
         try:
             plan = generate_business_plan(fpo, request.user, lang)
@@ -93,3 +107,66 @@ class GenerateBusinessPlanView(APIView):
             data=_payload(fpo, plan, lang),
             message=t('recommendations.business_plan_generated', lang),
         )
+
+
+class _BusinessPlanDownloadView(APIView):
+    """
+    Download the saved plan (request language) as a file. Any member of the
+    FPO can download — it's a read of the plan already shown on the tab.
+    Subclasses set `ext`, `content_type` and `render`.
+    """
+    permission_classes = [IsAuthenticated]
+    ext = ''
+    content_type = ''
+
+    def render(self, plan) -> bytes:
+        raise NotImplementedError
+
+    def get(self, request, *args, **kwargs):
+        lang = request.language
+
+        fpo, err = _get_fpo_or_404(request.user, lang)
+        if err:
+            return err
+
+        plan = (
+            BusinessPlan.objects.select_related('fpo')
+            .filter(fpo=fpo, language=normalise_language(lang)).first()
+        )
+        if not plan or not plan.content:
+            return StandardResponse.error(
+                'Generate a business plan before downloading it.',
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = self.render(plan)
+        response = HttpResponse(data, content_type=self.content_type)
+        response['Content-Disposition'] = f'attachment; filename="{build_filename(plan, self.ext)}"'
+        response['Content-Length'] = str(len(data))
+        return response
+
+
+class BusinessPlanPdfView(_BusinessPlanDownloadView):
+    """GET /api/recommendations/business-plan/me/pdf/"""
+    ext = 'pdf'
+    content_type = 'application/pdf'
+
+    def render(self, plan):
+        return render_business_plan_pdf(plan)
+
+    @extend_schema(tags=["Recommendations"], summary='Download the business plan (PDF)', responses={200: bytes})
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+class BusinessPlanDocxView(_BusinessPlanDownloadView):
+    """GET /api/recommendations/business-plan/me/docx/"""
+    ext = 'docx'
+    content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+    def render(self, plan):
+        return render_business_plan_docx(plan)
+
+    @extend_schema(tags=["Recommendations"], summary='Download the business plan (Word)', responses={200: bytes})
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)

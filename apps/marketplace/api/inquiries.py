@@ -23,6 +23,8 @@ from rest_framework.views import APIView
 from rest_framework import mixins, viewsets
 
 from apps.core.permissions.rbac import IsFPOManager
+from apps.core.services.fpo_permission import get_member_fpo
+from apps.marketplace.permissions import CanManageProducts
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BuyerSellerMatch, Inquiry, Product
@@ -102,13 +104,13 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     GET /api/marketplace/inquiries/ — seller's own incoming inquiries.
     Scoped to inquiries on products belonging to the logged-in FPO, same
-    scoping pattern as ProductViewSet.get_queryset() (request.user.fpo).
+    scoping pattern as ProductViewSet.get_queryset() (get_member_fpo).
 
     POST .../mark-contacted/ and .../mark-resolved/ — one-way status
     progression only (pending -> contacted -> resolved), matching the
     confirmed requirement. No reverse transitions, no "resolved -> pending".
     """
-    permission_classes = [IsFPOManager]
+    permission_classes = [IsFPOManager, CanManageProducts]
     pagination_class = StandardPagination
     serializer_class = InquirySerializer
 
@@ -116,7 +118,7 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         from django.db.models import Q
 
         queryset = Inquiry.objects.filter(
-            product__fpo=self.request.user.fpo,
+            product__fpo=get_member_fpo(self.request.user),
             is_deleted=False,
         ).select_related('product', 'buyer', 'buyer__fpo', 'contact_user').order_by('-created_at')
 
@@ -196,7 +198,7 @@ class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     PublicProductInquireView's anonymous BuyerDirectory rows; every
     verified buyer (FPO-as-buyer or external) always has one of these set.
     """
-    permission_classes = [IsFPOManager]
+    permission_classes = [IsFPOManager, CanManageProducts]
     pagination_class = StandardPagination
     serializer_class = MarketHubInquirySerializer
 
@@ -204,7 +206,7 @@ class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         from django.db.models import Q
 
         queryset = BuyerSellerMatch.objects.filter(
-            product__fpo=self.request.user.fpo,
+            product__fpo=get_member_fpo(self.request.user),
             buyer__fpo__isnull=True,
             buyer__user__isnull=True,
             is_deleted=False,

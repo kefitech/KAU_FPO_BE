@@ -3,6 +3,7 @@
 
 from rest_framework import serializers
 
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models import (
     BuyerDirectory,
     BuyerSellerMatch,
@@ -122,7 +123,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         stock_data = validated_data.pop('stock', {})
-        validated_data['fpo'] = self.context['request'].user.fpo
+        validated_data['fpo'] = get_member_fpo(self.context['request'].user)
         product = super().create(validated_data)
         ProductStock.objects.create(product=product, **stock_data)
         return product

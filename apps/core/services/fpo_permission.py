@@ -99,17 +99,18 @@ def has_fpo_permission(user, fpo, action_code):
     Returns True if user is allowed to perform action_code within fpo.
     Primary users always pass (they own the FPO).
     """
-    if not user or not user.is_authenticated:
+    if not user or not user.is_authenticated or fpo is None:
         return False
+
+    # FPO owner bypasses the matrix — they own the FPO. Checked before the
+    # membership lookup because the owner has no membership row.
+    if fpo.primary_user_id == user.id:
+        from apps.database.models.fpo import FPOAction
+        return FPOAction.objects.filter(code=action_code, is_active=True).exists()
 
     membership = get_user_membership(user, fpo)
     if not membership or not membership.role:
         return False
-
-    # FPO owner bypasses the matrix — they own the FPO
-    if fpo.primary_user_id == user.id:
-        from apps.database.models.fpo import FPOAction
-        return FPOAction.objects.filter(code=action_code, is_active=True).exists()
 
     # Step 1: check system ceiling
     ceiling_allows = get_role_permission(membership.role, action_code)
@@ -168,3 +169,59 @@ def get_effective_permissions(membership):
         result[code] = override_map.get(code, True)
 
     return result
+
+
+# Basics every team member keeps — never offered as toggles to the primary user.
+ALWAYS_ON_ACTIONS = {'can_view_dashboard', 'can_edit_profile'}
+
+
+def get_grantable_actions(role):
+    """
+    Active actions the primary user may switch on/off for a member of `role`:
+    those the role ceiling (RoleActionPermission) allows, minus ALWAYS_ON_ACTIONS.
+    """
+    from apps.database.models.fpo import FPOAction
+    return (
+        FPOAction.objects
+        .filter(is_active=True, role_permissions__role=role, role_permissions__is_allowed=True)
+        .exclude(code__in=ALWAYS_ON_ACTIONS)
+        .select_related('menu_item')
+        .order_by('menu_item__order', 'code')
+        .distinct()
+    )
+
+
+def set_member_permissions(membership, codes, mode='replace'):
+    """
+    Store the primary user's choices as FPOMemberOverride rows.
+
+    mode='replace' — grant exactly `codes`, revoke every other grantable action
+    mode='add'     — grant `codes`, leave the rest unchanged
+    mode='remove'  — revoke `codes`, leave the rest unchanged
+
+    Codes outside get_grantable_actions() are ignored (callers validate first).
+    """
+    from apps.database.models.fpo import FPOMemberOverride
+
+    codes = set(codes)
+    for action in get_grantable_actions(membership.role):
+        if mode == 'replace':
+            allowed = action.code in codes
+        elif action.code not in codes:
+            continue
+        else:
+            allowed = mode == 'add'
+        FPOMemberOverride.objects.update_or_create(
+            membership=membership, action=action, defaults={'is_allowed': allowed},
+        )
+
+
+def require_fpo_permission(user, action_code):
+    """
+    The user's FPO if they may perform `action_code` in it, else None.
+    Shorthand for endpoints a team member can use with the right permission.
+    """
+    fpo = get_member_fpo(user)
+    if fpo is not None and has_fpo_permission(user, fpo, action_code):
+        return fpo
+    return None

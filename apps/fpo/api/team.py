@@ -10,6 +10,10 @@ POST  /api/fpo/me/team/bulk-invite-file/     — invite multiple via Excel/CSV
 POST  /api/fpo/me/team/bulk-activate/        — activate multiple by user_ids
 POST  /api/fpo/me/team/bulk-deactivate/      — deactivate multiple by user_ids
 POST  /api/fpo/me/team/{id}/deactivate/      — deactivate single user
+GET   /api/fpo/me/team/available-permissions/ — actions the primary can grant a member
+GET   /api/fpo/me/team/{id}/permissions/     — a member's permissions
+POST  /api/fpo/me/team/{id}/permissions/     — add/remove/replace a member's permissions
+POST  /api/fpo/me/team/bulk-permissions/     — grant/revoke permissions for many members
 
 Rules:
 - FPO must be APPROVED before inviting members
@@ -17,6 +21,9 @@ Rules:
 - No secondary user limit (KAU confirmed)
 - Invited users are auto-activated (no approval step)
 - Invited users must change password on first login
+- Member permissions: the super admin's role ceiling (RoleActionPermission)
+  limits what the primary can grant; the primary's choices are stored as
+  FPOMemberOverride rows. Members without overrides get the role defaults.
 """
 
 import csv
@@ -39,6 +46,9 @@ import openpyxl
 from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService as AuditLogService
+from apps.core.services.fpo_permission import (
+    get_effective_permissions, get_grantable_actions, set_member_permissions,
+)
 from apps.core.services.translation import t
 from apps.core.utils.constants import FPOStatus, UserRole
 from apps.core.utils.responses import StandardResponse
@@ -85,11 +95,64 @@ class TeamInviteSerializer(serializers.Serializer):
     last_name  = serializers.CharField(max_length=150)
     email      = serializers.EmailField()
     phone      = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    permissions = serializers.ListField(
+        child=serializers.CharField(), required=False,
+        help_text='Action codes to grant. Omit to give the role defaults; any grantable code left out is revoked.',
+    )
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('A user with this email already exists.')
         return value.lower()
+
+    def validate_permissions(self, value):
+        return _validate_grantable(value)
+
+
+def _secondary_group():
+    return Group.objects.get(name='secondary')
+
+
+def _validate_grantable(codes, role=None):
+    """Reject codes the primary is not allowed to grant (outside the role ceiling)."""
+    grantable = set(get_grantable_actions(role or _secondary_group()).values_list('code', flat=True))
+    invalid = sorted(set(codes) - grantable)
+    if invalid:
+        raise serializers.ValidationError(f'These permissions cannot be granted: {", ".join(invalid)}.')
+    return list(dict.fromkeys(codes))
+
+
+class MemberPermissionSerializer(serializers.Serializer):
+    action      = serializers.ChoiceField(choices=['replace', 'add', 'remove'], default='replace')
+    permissions = serializers.ListField(child=serializers.CharField(), allow_empty=True)
+
+
+class BulkMemberPermissionSerializer(serializers.Serializer):
+    user_ids = serializers.ListField(child=serializers.IntegerField(), min_length=1)
+    grant    = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    revoke   = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+
+    def validate(self, attrs):
+        if not attrs['grant'] and not attrs['revoke']:
+            raise serializers.ValidationError('Nothing to change — send `grant` and/or `revoke`.')
+        if set(attrs['grant']) & set(attrs['revoke']):
+            raise serializers.ValidationError('A permission cannot be granted and revoked at once.')
+        return attrs
+
+
+def _permission_rows(role, lang, effective=None):
+    """Grantable actions as [{code, label, description, page, is_allowed}] for the team UI."""
+    rows = []
+    for action in get_grantable_actions(role):
+        rows.append({
+            'code':        action.code,
+            'label':       action.get_label(lang),
+            'description': action.description,
+            'page':        action.menu_item.path if action.menu_item else None,
+            # Role default is "allowed" — the ceiling already allows every grantable action
+            'is_allowed':  True if effective is None else effective.get(action.code, False),
+        })
+    return rows
 
 
 class FPOTeamMemberSerializer(serializers.ModelSerializer):
@@ -142,9 +205,19 @@ class TeamListView(APIView):
         ).select_related('user', 'user__profile', 'role')
         # The primary manages the team, so they don't list themselves;
         # team members see their own row as well.
-        if fpo.primary_user_id == request.user.id:
+        is_primary = fpo.primary_user_id == request.user.id
+        if is_primary:
             memberships = memberships.exclude(user=request.user)
+        memberships = list(memberships)
         data = FPOTeamMemberSerializer(memberships, many=True).data
+
+        # The primary manages permissions, so they also get each member's granted
+        # actions (only those they can toggle) for the team table and bulk edit.
+        if is_primary:
+            grantable = set(get_grantable_actions(_secondary_group()).values_list('code', flat=True))
+            for row, membership in zip(data, memberships):
+                effective = get_effective_permissions(membership) if membership.role else {}
+                row['permissions'] = [c for c, ok in effective.items() if ok and c in grantable]
 
         # The FPO owner has no membership row, so a team member wouldn't see
         # them. Prepend the owner in the same shape.
@@ -237,6 +310,10 @@ class TeamInviteView(APIView):
                 created_by=request.user,
             )
 
+            # No list sent → role defaults (no overrides)
+            if 'permissions' in data:
+                set_member_permissions(membership, data['permissions'])
+
         # Send welcome notification
         lang = getattr(request, 'language', 'en')
         send_notification(
@@ -260,6 +337,7 @@ class TeamInviteView(APIView):
             changes={
                 'invited_user':  data['email'],
                 'invited_name':  f'{data["first_name"]} {data["last_name"]}',
+                **({'permissions': data['permissions']} if 'permissions' in data else {}),
             },
         )
 
@@ -271,6 +349,162 @@ class TeamInviteView(APIView):
                 'last_name':  user.last_name,
             },
             message='Team member invited successfully. A welcome email with login credentials has been sent.',
+        )
+
+
+class TeamAvailablePermissionsView(APIView):
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Team'],
+        summary='Permissions the primary user can grant',
+        description=(
+            'Actions the super admin allows for secondary users (the role ceiling), with '
+            'translated labels. `is_allowed` is the role default a new member gets.'
+        ),
+        responses={200: None},
+    )
+    def get(self, request):
+        if not _get_primary_fpo(request.user):
+            return StandardResponse.error(
+                'Only the primary user can manage member permissions.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        lang = getattr(request, 'language', 'en')
+        return StandardResponse.success(_permission_rows(_secondary_group(), lang), 'Permissions retrieved.')
+
+
+class TeamMemberPermissionsView(APIView):
+    permission_classes = [IsFPOManager]
+
+    def _membership(self, request, user_id):
+        fpo = _get_primary_fpo(request.user)
+        if not fpo:
+            return None, StandardResponse.error(
+                'Only the primary user can manage member permissions.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        membership = (
+            FPOUserMembership.objects.select_related('role', 'user')
+            .filter(fpo=fpo, user_id=user_id, is_deleted=False)
+            .exclude(user_id=fpo.primary_user_id)  # the owner always has every permission
+            .first()
+        )
+        if not membership or not membership.role:
+            return None, StandardResponse.error('Team member not found.', status_code=status.HTTP_404_NOT_FOUND)
+        return membership, None
+
+    def _response(self, request, membership, message):
+        lang = getattr(request, 'language', 'en')
+        rows = _permission_rows(membership.role, lang, get_effective_permissions(membership))
+        return StandardResponse.success({'user_id': membership.user_id, 'permissions': rows}, message)
+
+    @extend_schema(tags=['FPO - Team'], summary="A member's permissions", responses={200: None, 404: None})
+    def get(self, request, user_id):
+        membership, error = self._membership(request, user_id)
+        if error:
+            return error
+        return self._response(request, membership, 'Permissions retrieved.')
+
+    @extend_schema(
+        tags=['FPO - Team'],
+        summary="Update a member's permissions",
+        description=(
+            '**action: replace** (default) — grant exactly the given list, revoke the rest\n\n'
+            '**action: add** — grant the given permissions\n\n'
+            '**action: remove** — revoke the given permissions\n\n'
+            'Only actions the role ceiling allows can be granted.'
+        ),
+        request=MemberPermissionSerializer,
+        responses={200: None, 400: None, 404: None},
+    )
+    def post(self, request, user_id):
+        membership, error = self._membership(request, user_id)
+        if error:
+            return error
+        serializer = MemberPermissionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return StandardResponse.validation_error(errors=serializer.errors)
+        try:
+            codes = _validate_grantable(serializer.validated_data['permissions'], membership.role)
+        except serializers.ValidationError as exc:
+            return StandardResponse.validation_error(errors={'permissions': exc.detail})
+
+        mode = serializer.validated_data['action']
+        with transaction.atomic():
+            set_member_permissions(membership, codes, mode)
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=membership,
+            request=request,
+            changes={'permissions': {'action': mode, 'codes': codes}},
+        )
+        return self._response(request, membership, 'Permissions updated.')
+
+
+class TeamBulkPermissionsView(APIView):
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Team'],
+        summary='Bulk update member permissions',
+        description=(
+            'Apply the same change to several members at once.\n\n'
+            '**grant** — permissions every selected member gets\n\n'
+            '**revoke** — permissions every selected member loses\n\n'
+            'Permissions in neither list are left as they are for each member. '
+            'Members not in this FPO are reported in `errors`; the rest are updated.'
+        ),
+        request=BulkMemberPermissionSerializer,
+        responses={200: None, 400: None},
+    )
+    def post(self, request):
+        fpo = _get_primary_fpo(request.user)
+        if not fpo:
+            return StandardResponse.error(
+                'Only the primary user can manage member permissions.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = BulkMemberPermissionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return StandardResponse.validation_error(errors=serializer.errors)
+        data = serializer.validated_data
+        try:
+            grant  = _validate_grantable(data['grant'])
+            revoke = _validate_grantable(data['revoke'])
+        except serializers.ValidationError as exc:
+            return StandardResponse.validation_error(errors={'permissions': exc.detail})
+
+        memberships = {
+            m.user_id: m
+            for m in FPOUserMembership.objects.select_related('user', 'role')
+            .filter(fpo=fpo, user_id__in=data['user_ids'], is_deleted=False)
+        }
+        success, failed = [], []
+        with transaction.atomic():
+            for uid in dict.fromkeys(data['user_ids']):
+                if uid == fpo.primary_user_id:
+                    failed.append({'user_id': uid, 'reason': 'The primary user always has every permission.'})
+                    continue
+                membership = memberships.get(uid)
+                if not membership or not membership.role:
+                    failed.append({'user_id': uid, 'reason': 'Team member not found.'})
+                    continue
+                set_member_permissions(membership, grant, 'add')
+                set_member_permissions(membership, revoke, 'remove')
+                success.append({'user_id': uid, 'name': membership.user.get_full_name()})
+                AuditLogService.log(
+                    user=request.user,
+                    action=AuditLog.Action.UPDATE,
+                    instance=membership,
+                    request=request,
+                    changes={'permissions': {'grant': grant, 'revoke': revoke}},
+                )
+
+        return StandardResponse.success(
+            data={'success': len(success), 'failed': len(failed), 'results': success, 'errors': failed},
+            message=f'Permissions updated for {len(success)} member(s), {len(failed)} failed.',
         )
 
 

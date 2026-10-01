@@ -28,7 +28,8 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.views import TranslatedViewSet
 from apps.database.models import Product, ProductStock
-from apps.marketplace.permissions import IsApprovedFPO
+from apps.core.services.fpo_permission import get_member_fpo
+from apps.marketplace.permissions import CanManageProducts, IsApprovedFPO
 from apps.marketplace.serializers import ProductSerializer
 from apps.marketplace.services import run_matching
 
@@ -168,7 +169,7 @@ class ProductViewSet(TranslatedViewSet):
     """
 
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated, IsFPOManager, IsApprovedFPO]
+    permission_classes = [IsAuthenticated, IsFPOManager, IsApprovedFPO, CanManageProducts]
     pagination_class = StandardPagination
 
     list_message = 'marketplace.products_retrieved'
@@ -179,8 +180,8 @@ class ProductViewSet(TranslatedViewSet):
     def get_queryset(self):
         from django.db.models import Q
 
-        # FPO only sees their own products; exclude soft-deleted rows
-        fpo = self.request.user.fpo
+        # FPO members only see their own FPO's products; exclude soft-deleted rows
+        fpo = get_member_fpo(self.request.user)
         queryset = Product.objects.filter(fpo=fpo, is_deleted=False).select_related(
             'commodity', 'fpo', 'stock'
         ).order_by('-created_at')
@@ -385,7 +386,7 @@ class ProductViewSet(TranslatedViewSet):
         can fix just those and re-upload. Mirrors the pattern used by the
         team bulk-invite-file endpoint (apps/fpo/api/team.py).
         """
-        fpo = request.user.fpo
+        fpo = get_member_fpo(request.user)
 
         file = request.FILES.get('file')
         if not file:
