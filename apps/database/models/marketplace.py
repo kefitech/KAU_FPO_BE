@@ -112,6 +112,12 @@ class ProductStock(BaseModel):
         max_length=200, blank=True,
         help_text='Free text — e.g. FSSAI, NPOP Organic, ISO 22000'
     )
+    contact_phone = models.CharField(
+        max_length=20, blank=True,
+        help_text='Direct seller phone for this batch — buyers see a tel: link '
+                  'on the product card. Blank means "no direct line, inquiries '
+                  'route via the Market Hub form only".'
+    )
     available_from = models.DateField()
     available_until = models.DateField(null=True, blank=True)
     is_ondc_listed = models.BooleanField(default=False)

@@ -82,6 +82,7 @@ class ProductStockSerializer(serializers.ModelSerializer):
             'id', 'product', 'quantity', 'unit', 'price_per_unit',
             'quality_certification', 'available_from', 'available_until',
             'is_ondc_listed', 'ondc_product_id', 'is_public', 'status',
+            'contact_phone',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
@@ -324,6 +325,7 @@ class BuyerProductSerializer(serializers.ModelSerializer):
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
             'available_from', 'available_until',
             'fpo', 'fpo_name', 'image',
+            'contact_phone',
             'in_grace_period', 'grace_message',
         ]
         read_only_fields = fields
