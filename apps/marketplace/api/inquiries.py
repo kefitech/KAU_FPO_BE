@@ -24,11 +24,11 @@ from rest_framework import mixins, viewsets
 
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.fpo_permission import get_member_fpo
-from apps.marketplace.permissions import CanManageProducts
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BuyerSellerMatch, Inquiry, Product, ProductStock
 from apps.marketplace.api.buyers import _resolve_buyer_user
+from apps.marketplace.permissions import CanManageProducts
 from apps.marketplace.serializers import InquiryCreateSerializer, InquirySerializer, MarketHubInquirySerializer
 from apps.marketplace.services import _get_buyer_row
 

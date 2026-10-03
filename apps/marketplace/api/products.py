@@ -27,8 +27,8 @@ from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.views import TranslatedViewSet
-from apps.database.models import Product, ProductStock
 from apps.core.services.fpo_permission import get_member_fpo
+from apps.database.models import Product, ProductStock
 from apps.marketplace.permissions import CanManageProducts, IsApprovedFPO
 from apps.marketplace.serializers import ProductSerializer
 from apps.marketplace.services import run_matching
