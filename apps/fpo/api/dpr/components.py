@@ -9,6 +9,7 @@ Routes (mounted at /api/fpo/dpr/):
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -29,7 +30,7 @@ def _get_or_create_section(project, user):
 
 @extend_schema(tags=['FPO - DPR §2.3.2 Project Components'])
 class DPRComponentsSectionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     @extend_schema(summary='Retrieve Project Components section')
     def get(self, request, project_uuid):
@@ -70,7 +71,7 @@ class DPRComponentsSectionView(APIView):
     description='At least one component; "Others (Specify)" text required when a group\'s "_other" component is picked.',
 )
 class DPRComponentsSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

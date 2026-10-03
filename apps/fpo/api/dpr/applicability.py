@@ -28,6 +28,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 """
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -54,7 +55,7 @@ SEED_SECTION_KEYS = ('identification', 'components')
                 'filter the wizard sidebar. Cheap to call — 2 queries.',
 )
 class DPRProjectApplicabilityView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

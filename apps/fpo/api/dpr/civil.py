@@ -2,6 +2,7 @@
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -22,7 +23,7 @@ def _get_or_create_section(project, user):
 
 @extend_schema(tags=['FPO - DPR §2.3.14 Civil Works'])
 class DPRCivilSectionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     @extend_schema(summary='Retrieve Civil Works section')
     def get(self, request, project_uuid):
@@ -52,7 +53,7 @@ class DPRCivilSectionView(APIView):
 
 @extend_schema(tags=['FPO - DPR §2.3.14 Civil Works'], summary='Run validators (no save)')
 class DPRCivilSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

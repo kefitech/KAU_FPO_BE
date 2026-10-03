@@ -4,6 +4,7 @@ DPR §2.3.6 Proposed Project Location — section endpoints.
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -24,7 +25,7 @@ def _get_or_create_section(project, user):
 
 @extend_schema(tags=['FPO - DPR §2.3.6 Project Location'])
 class DPRLocationSectionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     @extend_schema(summary='Retrieve Project Location section')
     def get(self, request, project_uuid):
@@ -57,7 +58,7 @@ class DPRLocationSectionView(APIView):
     summary='Run validators (no save)',
 )
 class DPRLocationSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

@@ -33,6 +33,7 @@ import hashlib
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.models.generic import AuditLog
@@ -140,7 +141,7 @@ def _get_row(project, chapter: str) -> tuple[DPRAIContent | None, object | None]
 class AIContentListView(APIView):
     """GET all 11 chapter rows for a project — ensures rows exist on first read."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -158,7 +159,7 @@ class AIContentListView(APIView):
 class AIContentDetailView(APIView):
     """GET one chapter; PATCH to in-place edit `user_edited`."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid, chapter):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -192,7 +193,7 @@ class AIContentDetailView(APIView):
 class AIContentGenerateView(APIView):
     """POST → produce a candidate narrative for this chapter."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def post(self, request, project_uuid, chapter):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -214,7 +215,7 @@ class AIContentGenerateView(APIView):
 class AIContentAcceptView(APIView):
     """POST → promote candidate_regen into user_edited (active)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def post(self, request, project_uuid, chapter):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -246,7 +247,7 @@ class AIContentAcceptView(APIView):
 class AIContentKeepView(APIView):
     """POST → discard candidate, keep existing user_edited untouched."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def post(self, request, project_uuid, chapter):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -276,7 +277,7 @@ class AIContentKeepView(APIView):
 class AIContentMergeView(APIView):
     """POST body {text: str} → user-merged text becomes active, candidate cleared."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def post(self, request, project_uuid, chapter):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -322,7 +323,7 @@ class AIContentKBPreviewView(APIView):
     admins wanting to trace grounding without paying for a regen.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid, chapter):
         project, err = get_project_or_error(request.user, project_uuid)

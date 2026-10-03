@@ -206,7 +206,10 @@ def seed_fpo_permissions():
             'can_edit_profile':   True,   # own personal profile — always on
             'can_view_dashboard': True,   # always on
             'can_submit_claim':   False,
-            'can_edit_tier_assessment': True,
+            # KAU §8.1 — secondary users must NOT take the Tier Classification
+            # assessment. View stays open; editing is gated by this permission
+            # in apps/fpo/api/tier_assessment.py.
+            'can_edit_tier_assessment': False,
             'can_manage_products':      True,
             'can_book_experts':         True,
             'can_generate_recommendations': True,

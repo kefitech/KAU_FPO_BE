@@ -410,6 +410,29 @@ class IsFPOManager(BasePermission):
         )
 
 
+class IsFPOPrimaryUser(BasePermission):
+    """
+    FPO primary user only — the one `FPO.primary_user` points at.
+    Secondary team members (reachable via FPOUserMembership) are rejected.
+
+    Used to hard-gate the three KAU-restricted areas:
+      - Tier Classification Assessment (edit/submit)
+      - DPR Generation
+      - FPO registration / profile edit
+    These are policy decisions, not permissions the primary can delegate.
+    """
+    message = t('common.permission_denied')
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        # Primary user has FPO.primary_user → self. Lazy import to avoid
+        # circular reference between rbac.py and the database app.
+        from apps.database.models.fpo import FPO
+        return FPO.objects.filter(primary_user=user, is_deleted=False).exists()
+
+
 class IsGovernmentOfficial(BasePermission):
     """Government officials allowed."""
     message = t('common.permission_denied')
