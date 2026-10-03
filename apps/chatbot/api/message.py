@@ -272,6 +272,7 @@ class ChatMessageView(APIView):
             current_path=current_path,
             lang=lang,
             prior_turns=prior,
+            user_role=user_role or 'public',
         )
         if gemini_result is not None:
             return _reply(

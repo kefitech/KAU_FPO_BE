@@ -91,19 +91,22 @@ C) A REAL FACTUAL QUESTION that is genuinely off-topic (weather, recipes,
      Please rephrase your question, or contact KAU support at de@kau.in
      for help."
 
-D1) ROLE-RESERVED ACTIONS: If the user asks whether THEY can perform an
-    action (approve, suspend, reject, delete, configure, manage):
-    - If the CONTEXT explicitly addresses the question — e.g. a KB entry
-      says "CBBOs do NOT approve applications; approval is automated"
-      or "FPO users cannot delete other members; the primary user does
-      that at /fpo/team" — answer as CASE B using that grounding. Say
-      no, state briefly who does it or how it is handled, and point to
-      the right page if the context has one.
-    - If the CONTEXT is SILENT on the question (no entry addresses whether
-      the user can do it) — treat as CASE C and refuse. Do NOT invent a
-      mechanic ("it is auto-approved") or list who else can do it when
-      the KB has not told you so. Just refuse with the standard refusal
-      string.
+D1) ROLE-RESERVED ACTIONS. The user's role is given in the USER ROLE line
+    of the prompt. If the user asks whether THEY personally can perform
+    an admin-reserved verb (approve, suspend, reject, delete, configure,
+    manage), the DEFAULT behaviour is CASE C refusal. Two narrow
+    exceptions:
+    - USER ROLE is 'super_admin' or 'sub_admin' AND the CONTEXT confirms
+      the mechanic → CASE B grounded answer explaining how.
+    - USER ROLE is 'cbbo' AND the question is about APPROVING an FPO
+      application AND the CONTEXT says "CBBOs do NOT approve" → CASE B
+      explaining CBBOs verify (not approve), approval is automated,
+      point to /cbbo/verifications.
+    For every other role + verb combination — including FPO users asking
+    "Can I approve / suspend / reject / delete / configure X?" — route
+    to CASE C refusal, regardless of what the CONTEXT entries say about
+    the mechanic. Testers were explicit: FPO users should see the
+    canonical refusal, not a grounded explanation.
 
 D) CROP QUESTIONS — special sub-cases:
    → If the question is about GROWING / CULTIVATING the crop (varieties,
@@ -155,13 +158,17 @@ C) പ്ലാറ്റ്‌ഫോമുമായി ബന്ധമില്�
    → കൃത്യമായി മറുപടി പറയുക: "ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. \
    ദയവായി മറ്റൊരു രീതിയിൽ ചോദിക്കുക, അല്ലെങ്കിൽ de@kau.in-ൽ KAU സപ്പോർട്ടിനെ ബന്ധപ്പെടുക."
 
-D1) റോൾ-റിസർവ്ഡ് ആക്ഷനുകൾ: user "ഞാൻ ഇത് approve/suspend/reject/delete \
-    ചെയ്യാമോ" എന്ന് ചോദിച്ചാൽ:
-    - CONTEXT ആ ചോദ്യത്തെ നേരിട്ട് addressing ചെയ്യുന്നുണ്ടെങ്കിൽ (ഉദാ. "CBBO-കൾ approve \
-      ചെയ്യുന്നില്ല; approval auto ആണ്") → CASE B ആയി grounded answer നൽകുക. \
-      no പറയുക, ചുരുക്കത്തിൽ ആരാണ് ചെയ്യുന്നതെന്ന് വിശദീകരിക്കുക, context-ൽ ഉള്ള page-ലേക്ക് point ചെയ്യുക.
-    - CONTEXT ആ ചോദ്യം address ചെയ്യുന്നില്ലെങ്കിൽ → CASE C ആയി നിരാകരിക്കുക. mechanic \
-      invent ചെയ്യരുത്, KB പറയാത്ത ആരെങ്കിലും ചെയ്യുന്നുവെന്ന് listing ചെയ്യരുത്.
+D1) റോൾ-റിസർവ്ഡ് ആക്ഷനുകൾ. USER ROLE line-ൽ user-ന്റെ role തന്നിട്ടുണ്ട്. User \
+    personally admin-reserved verb (approve/suspend/reject/delete/configure/manage) \
+    ചെയ്യാമോ എന്ന് ചോദിച്ചാൽ, DEFAULT CASE C refusal. രണ്ട് narrow exceptions:
+    - USER ROLE 'super_admin' / 'sub_admin' AND CONTEXT mechanic confirm \
+      ചെയ്യുന്നുവെങ്കിൽ → CASE B grounded answer.
+    - USER ROLE 'cbbo' AND question CBBO approve FPO AND CONTEXT "CBBOs do NOT \
+      approve" എന്ന് പറയുന്നുവെങ്കിൽ → CASE B — CBBOs verify ആണ് (approve അല്ല), \
+      approval auto ആണ്, /cbbo/verifications-ലേക്ക് point ചെയ്യുക.
+    മറ്റെല്ലാ role + verb combinations — FPO users "Can I approve / suspend / \
+    reject?" ഉൾപ്പെടെ — CASE C refusal ആയി route ചെയ്യുക, CONTEXT entries മെക്കാനിക് \
+    പറഞ്ഞാലും. Testers explicitly: FPO users canonical refusal മാത്രം കാണണം.
 
 D) ക്രോപ്പ് ചോദ്യങ്ങൾ — ഉപ-കേസുകൾ:
    → ക്രോപ്പ് വളർത്തുന്നതിനെക്കുറിച്ചാണെങ്കിൽ (വിത്ത്, ഇടയകലം, വളപ്രയോഗം, \
@@ -191,6 +198,7 @@ def _build_prompt(
     entries: list,
     current_path: str,
     prior_turns: list | None = None,
+    user_role: str | None = None,
 ) -> str:
     """Assemble the user prompt with retrieved KB context.
 
@@ -199,15 +207,18 @@ def _build_prompt(
 
     `prior_turns` — last N exchanges from the same ChatConversation, oldest
     first. Included so Gemini can handle "yes, and what about X?"
-    follow-ups. Passed as a "PREVIOUS CONVERSATION" block above the
-    current question; the grounded system prompt still forces answers to
-    stay within the CONTEXT.
+    follow-ups.
+
+    `user_role` — the caller's Django Group name (or 'public' for anon).
+    Needed by D1 (ROLE-RESERVED ACTIONS) so Gemini can scope the "explain
+    the mechanic" branch to admin / CBBO and refuse for everyone else.
     """
     context_lines = []
     for i, e in enumerate(entries, 1):
         context_lines.append(f'[{i}] {e.topic}\n{e.body_en}')
     context = '\n\n'.join(context_lines) or '(no relevant entries found)'
 
+    role_line = f'USER ROLE: {user_role or "public"}\n'
     page_hint = f'The user is currently on the page: {current_path}\n' if current_path else ''
 
     history_block = ''
@@ -219,6 +230,7 @@ def _build_prompt(
         history_block = 'PREVIOUS CONVERSATION:\n' + '\n'.join(history_lines) + '\n\n'
 
     return (
+        f'{role_line}'
         f'{page_hint}'
         f'{history_block}'
         f'USER QUESTION: {question}\n\n'
@@ -238,6 +250,7 @@ def generate_answer(
     current_path: str = '',
     lang: str = 'en',
     prior_turns: list | None = None,
+    user_role: str | None = None,
 ) -> Optional[dict]:
     """Try to answer via Gemini using the retrieved KB context.
 
@@ -262,7 +275,7 @@ def generate_answer(
         return None
 
     system = _SYSTEM_PROMPT_ML if lang == 'ml' else _SYSTEM_PROMPT_EN
-    prompt = _build_prompt(question, entries, current_path, prior_turns)
+    prompt = _build_prompt(question, entries, current_path, prior_turns, user_role)
 
     try:
         # 500 tokens is plenty for a 2-4 sentence chatbot reply and keeps
