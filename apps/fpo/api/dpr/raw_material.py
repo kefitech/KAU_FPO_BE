@@ -11,6 +11,7 @@ Ownership enforced via get_project_or_error() — same rules as DPR project deta
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -33,7 +34,7 @@ def _get_or_create_section(project, user):
 @extend_schema(tags=['FPO - DPR §2.3.10 Raw Material'])
 class DPRRawMaterialSectionView(APIView):
     """GET (retrieve) + PATCH (update, full-replace nested lists)."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     @extend_schema(summary='Retrieve Raw Material section for a project')
     def get(self, request, project_uuid):
@@ -75,7 +76,7 @@ class DPRRawMaterialSectionView(APIView):
     description='Returns errors, warnings, and is_complete flag per KAU spec §2.3.10 rules.',
 )
 class DPRRawMaterialSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

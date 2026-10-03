@@ -21,6 +21,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions.rbac import IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -71,7 +72,7 @@ class DPRCapitalTrancheSerializer(serializers.ModelSerializer):
 class DPRCapitalTrancheListView(APIView):
     """GET + POST for a project's tranches (FPO-scoped)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -100,7 +101,7 @@ class DPRCapitalTrancheListView(APIView):
 class DPRCapitalTrancheDetailView(APIView):
     """GET / PATCH / DELETE a single tranche (FPO-scoped)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
 
     def _get_obj(self, user, project_uuid, pk):
         project, err = get_project_or_error(user, project_uuid)
