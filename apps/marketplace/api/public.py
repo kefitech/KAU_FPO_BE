@@ -325,6 +325,25 @@ class PublicProductInquireView(APIView):
             except Exception:
                 pass  # Inquiry already saved — don't fail the request if notification dispatch fails
 
+            # In-app (FPO inbox + dashboard). `link` opens the Market Hub
+            # Inquiries tab on /fpo/products. Names are HTML-escaped — in-app
+            # bodies are rendered as HTML and substituted verbatim.
+            try:
+                from django.utils.html import escape
+
+                send_notification(
+                    user=primary_user,
+                    code='inquiry_received_public',
+                    channel='in_app',
+                    context={
+                        'buyer_name': escape(data['name']),
+                        'product_name': escape(product.name.get('en', '')),
+                        'link': '/fpo/products?view=market-hub-inquiries',
+                    },
+                )
+            except Exception:
+                pass  # Inquiry already saved — don't fail the request if notification dispatch fails
+
         return StandardResponse.success(
             data={'inquiry_id': match.id},
             message='Inquiry submitted successfully',

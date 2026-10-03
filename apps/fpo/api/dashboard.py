@@ -121,12 +121,18 @@ def _notifications_summary(user, lang: str):
     previews = []
     for notif in qs[:3]:
         title, body = _render_notification(notif, lang)
+        # Optional in-app destination set by the sender (e.g. new inquiries →
+        # '/fpo/products?view=inquiries'). Internal paths only — never a URL.
+        link = ((notif.log.context or {}).get('link') if notif.log else None) or None
+        if not (isinstance(link, str) and link.startswith('/') and not link.startswith('//')):
+            link = None
         previews.append({
             'id':         notif.id,
             'title':      title,
             'body':       body,
             'is_read':    notif.is_read,
             'created_at': notif.created_at.isoformat(),
+            'link':       link,
         })
     return {'unread_count': unread_count, 'recent': previews}
 

@@ -103,6 +103,9 @@ TEMPLATE_CODES = [
     ('product_stock_expiring_soon',  'in_app', 'In-app: product stock batch expiring in 3 days',                 ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
     ('product_stock_expired',        'email',  'Notify FPO that a product stock batch expired and was removed', ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
     ('product_stock_expired',        'in_app', 'In-app: product stock batch expired and was removed',           ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
+    # Marketplace inquiries → FPO inbox (link opens the matching tab on /fpo/products)
+    ('inquiry_received', 'in_app', "In-app: a verified buyer sent an inquiry on one of the FPO's products", ['buyer_name', 'product_name', 'quantity', 'unit', 'link']),
+    ('inquiry_received_public', 'in_app', 'In-app: a visitor sent an inquiry from the public Market Hub', ['buyer_name', 'product_name', 'link']),
 ]
 
 
@@ -1034,6 +1037,27 @@ TEMPLATES = [
         '<strong>{{product_name}}</strong> ({{quantity}} {{unit}}) {{available_until}} തീയതിയിൽ കാലഹരണപ്പെട്ട് നീക്കം ചെയ്തു. വീണ്ടും ലിസ്റ്റ് ചെയ്യാൻ പുതിയ സ്റ്റോക്ക് ചേർക്കുക.',
     ),
     #--------------------
+    # Marketplace inquiries (in-app → FPO)
+    (
+        'inquiry_received', 'in_app', 'en',
+        'New inquiry — {{product_name}}',
+        '<strong>{{buyer_name}}</strong> has requested {{quantity}} {{unit}} of <strong>{{product_name}}</strong>. Open Inquiries to view their contact details and respond.',
+    ),
+    (
+        'inquiry_received', 'in_app', 'ml',
+        'പുതിയ അന്വേഷണം — {{product_name}}',
+        '<strong>{{buyer_name}}</strong> <strong>{{product_name}}</strong> {{quantity}} {{unit}} ആവശ്യപ്പെട്ടിരിക്കുന്നു. ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ കാണാനും മറുപടി നൽകാനും അന്വേഷണങ്ങൾ തുറക്കുക.',
+    ),
+    (
+        'inquiry_received_public', 'in_app', 'en',
+        'New Market Hub inquiry — {{product_name}}',
+        '<strong>{{buyer_name}}</strong> sent an inquiry about <strong>{{product_name}}</strong> from the public Market Hub. Open Market Hub Inquiries to view and respond.',
+    ),
+    (
+        'inquiry_received_public', 'in_app', 'ml',
+        'പുതിയ മാർക്കറ്റ് ഹബ് അന്വേഷണം — {{product_name}}',
+        '<strong>{{buyer_name}}</strong> പൊതു മാർക്കറ്റ് ഹബ്ബിൽ നിന്ന് <strong>{{product_name}}</strong> സംബന്ധിച്ച് അന്വേഷണം അയച്ചു. കാണാനും മറുപടി നൽകാനും മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ തുറക്കുക.',
+    ),
 ]
 
 
