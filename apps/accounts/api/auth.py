@@ -210,10 +210,11 @@ def _build_fpo_access(user):
         .select_related('role')
         .first()
     )
-    if membership:
-        perms = get_effective_permissions(membership)
-    elif FPO.objects.filter(primary_user=user, is_deleted=False).exists():
+    # Owner first — some owners also have a membership row, which must not limit them
+    if FPO.objects.filter(primary_user=user, is_deleted=False).exists():
         perms = {c: True for c in FPOAction.objects.filter(is_active=True).values_list('code', flat=True)}
+    elif membership:
+        perms = get_effective_permissions(membership)
     else:
         return None
 

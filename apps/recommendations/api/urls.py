@@ -13,6 +13,8 @@ from apps.recommendations.api.recommendations import (
 from apps.recommendations.api.business_plan import (
     MyBusinessPlanView,
     GenerateBusinessPlanView,
+    BusinessPlanPdfView,
+    BusinessPlanDocxView,
 )
 
 urlpatterns = [
@@ -22,6 +24,8 @@ urlpatterns = [
     path('pop/', CropPackageOfPracticesDetailView.as_view(), name='fpo-crop-pop'),
     path('business-plan/me/', MyBusinessPlanView.as_view(), name='my-business-plan'),
     path('business-plan/me/generate/', GenerateBusinessPlanView.as_view(), name='generate-business-plan'),
+    path('business-plan/me/pdf/', BusinessPlanPdfView.as_view(), name='business-plan-pdf'),
+    path('business-plan/me/docx/', BusinessPlanDocxView.as_view(), name='business-plan-docx'),
     # Service-to-service (ml_service startup sync), token-protected -- not FPO-facing
     path('internal/active-model/', MLModelActiveInternalView.as_view(), name='internal-active-model'),
 ]

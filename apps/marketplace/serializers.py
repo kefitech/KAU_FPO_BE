@@ -3,6 +3,7 @@
 
 from rest_framework import serializers
 
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models import (
     BuyerDirectory,
     BuyerSellerMatch,
@@ -224,7 +225,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         stock_data = self._pop_initial_stock_fields(validated_data)
-        validated_data['fpo'] = self.context['request'].user.fpo
+        validated_data['fpo'] = get_member_fpo(self.context['request'].user)
         product = super().create(validated_data)
         # Only create the first batch if the FPO actually sent stock details.
         # Omitting them is fine — the product sits as "No active stock" until

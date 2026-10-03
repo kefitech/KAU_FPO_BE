@@ -127,6 +127,30 @@ def seed_fpo_permissions():
             'ml':          'ഉടമസ്ഥാവകാശ അവകാശവാദം സമർപ്പിക്കുക',
             'description': 'Submit a claim for an existing FPO',
         },
+        {
+            'code':        'can_manage_products',
+            'en':          'Manage Products',
+            'ml':          'ഉൽപ്പന്നങ്ങൾ കൈകാര്യം ചെയ്യുക',
+            'description': 'Add, edit, publish and delete marketplace products (view-only without this)',
+        },
+        {
+            'code':        'can_book_experts',
+            'en':          'Book Experts',
+            'ml':          'വിദഗ്ധരെ ബുക്ക് ചെയ്യുക',
+            'description': 'Request and cancel expert consultation bookings',
+        },
+        {
+            'code':        'can_generate_recommendations',
+            'en':          'Generate AI Recommendations',
+            'ml':          'AI ശുപാർശകൾ സൃഷ്ടിക്കുക',
+            'description': 'Request new AI crop recommendations (view-only without this)',
+        },
+        {
+            'code':        'can_generate_business_plan',
+            'en':          'Generate Business Plan',
+            'ml':          'ബിസിനസ് പ്ലാൻ സൃഷ്ടിക്കുക',
+            'description': 'Generate or regenerate the AI business plan (view-only without this)',
+        },
     ]
 
     action_objects = {}
@@ -165,18 +189,28 @@ def seed_fpo_permissions():
             'can_view_dashboard': True,
             'can_submit_claim':   True,
             'can_edit_tier_assessment': True,
+            'can_manage_products':      True,
+            'can_book_experts':         True,
+            'can_generate_recommendations': True,
+            'can_generate_business_plan':   True,
         },
+        # Secondary ceiling = what the primary user can grant a team member.
+        # The application (submit/documents) and the team stay primary-only.
         'secondary': {
             'can_submit':         False,
-            'can_upload_docs':    True,
+            'can_upload_docs':    False,
             'can_delete_docs':    False,
             'can_invite_team':    False,
             'can_manage_team':    False,
-            'can_view_docs':      True,
-            'can_edit_profile':   True,   # RCD: secondary can do data entry
-            'can_view_dashboard': True,
+            'can_view_docs':      False,
+            'can_edit_profile':   True,   # own personal profile — always on
+            'can_view_dashboard': True,   # always on
             'can_submit_claim':   False,
-            'can_edit_tier_assessment': False,
+            'can_edit_tier_assessment': True,
+            'can_manage_products':      True,
+            'can_book_experts':         True,
+            'can_generate_recommendations': True,
+            'can_generate_business_plan':   True,
         },
     }
 
@@ -213,6 +247,10 @@ def seed_fpo_permissions():
         'can_manage_team':    '/fpo/settings',
         'can_submit_claim':   '/fpo/applications',
         'can_edit_tier_assessment': '/fpo/tier-assessment',
+        'can_manage_products':      '/fpo/products',
+        'can_book_experts':         '/fpo/experts',
+        'can_generate_recommendations': '/fpo/recommendations',
+        'can_generate_business_plan':   '/fpo/recommendations',
     }
 
     page_cache = {}

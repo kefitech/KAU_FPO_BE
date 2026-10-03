@@ -274,12 +274,17 @@ def seed_menu():
 
     fpo_manager_group, _ = Group.objects.get_or_create(name='fpo_manager')
     fpo_roles = [fpo_manager_group]
+    secondary_group, _ = Group.objects.get_or_create(name='secondary')
+    # Invited team members see only these pages (the 'fpo_manager' group is
+    # ignored for them in the /me menu). Edit rights come from the
+    # permission matrix, not from this list.
+    fpo_roles_with_secondary = [fpo_manager_group, secondary_group]
 
     seed_item(
         label_key = 'menu.fpo_dashboard',
         path      = '/fpo/dashboard',
         icon      = 'layout-dashboard',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 1,
     )
     seed_item(
@@ -307,14 +312,14 @@ def seed_menu():
         label_key = 'menu.fpo_recommendations',
         path      = '/fpo/recommendations',
         icon      = 'sparkles',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 5,
     )
     seed_item(
         label_key = 'menu.fpo_products',
         path      = '/fpo/products',
         icon      = 'package',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 6,
     )
     seed_item(
@@ -328,42 +333,42 @@ def seed_menu():
         label_key = 'menu.fpo_schemes',
         path      = '/fpo/schemes',
         icon      = 'book-open',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 8,
     )
     seed_item(
         label_key = 'menu.fpo_experts',
         path      = '/fpo/experts',
         icon      = 'user-check',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 9,
     )
     seed_item(
         label_key = 'menu.fpo_tier_assessment',
         path      = '/fpo/tier-assessment',
         icon      = 'bar-chart-2',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 10,
     )
     seed_item(
         label_key = 'menu.fpo_team',
         path      = '/fpo/team',
         icon      = 'users',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 11,
     )
     seed_item(
         label_key = 'menu.fpo_inbox',
         path      = '/fpo/inbox',
         icon      = 'inbox',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 12,
     )
     seed_item(
         label_key = 'menu.fpo_settings',
         path      = '/fpo/settings',
         icon      = 'settings',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 13,
     )
     # FPO-as-buyer entry (Arunima — P2-11)
@@ -522,7 +527,7 @@ def seed_menu():
         label_key = 'menu.master_data',
         path      = '/admin/master-data',
         icon      = 'database',
-        roles     = [super_admin_group, sub_admin_group],
+        roles     = [super_admin_group],
         order     = 15,
     )
 

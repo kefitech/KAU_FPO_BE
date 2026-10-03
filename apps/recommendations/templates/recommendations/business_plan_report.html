@@ -1,0 +1,209 @@
+{% comment %}
+Business plan PDF — same look as the DPR report (apps/fpo/templates/dpr/report.html):
+KAU navy #1F3864 + orange #E86C1A, FPO-first cover, boxed disclaimer, navy-header
+tables, running header/footer. Rendered by apps/recommendations/business_plan_export.py.
+
+Written in the plan's language (L = labels for en / ml). Sections with no content
+are skipped and the numbering closes up (num.<key>).
+{% endcomment %}<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <title>{{ L.doc_title }} — {{ fpo_name }}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 16mm 14mm 18mm 14mm;
+      @top-left      { content: "{{ fpo_name|addslashes }} — {{ L.doc_title|addslashes }}"; font-size: 8pt; color: #444; font-weight: 600; }
+      @top-right     { content: "{{ L.financial_year|addslashes }} {{ plan.financial_year|addslashes }}"; font-size: 8pt; color: #666; }
+      @bottom-left   { content: "{{ L.generated_on|addslashes }} {{ generated_at }}"; font-size: 7.5pt; color: #666; }
+      @bottom-center { content: "{{ L.attribution|addslashes }}"; font-size: 7.5pt; color: #999; font-style: italic; }
+      @bottom-right  { content: "{{ L.page|addslashes }} " counter(page) " {{ L.of|addslashes }} " counter(pages); font-size: 7.5pt; color: #666; }
+    }
+    /* No running header/footer on the cover */
+    @page :first { @top-left { content: none; } @top-right { content: none; } @bottom-left { content: none; } @bottom-center { content: none; } @bottom-right { content: none; } }
+
+    * { box-sizing: border-box; }
+    body { font-family: "Times New Roman", Times, "Noto Serif Malayalam", "Noto Sans Malayalam", serif; font-size: 10pt; color: #222; line-height: 1.45; }
+    h2 { font-size: 14pt; color: #1F3864; margin: 7mm 0 3mm 0; border-bottom: 2px solid #E86C1A; padding-bottom: 2mm; page-break-after: avoid; }
+    h3 { font-size: 10.5pt; color: #1F3864; margin: 3mm 0 1.5mm 0; page-break-after: avoid; }
+    p { margin: 0 0 2.5mm 0; }
+    ul, ol { margin: 1mm 0 3mm 0; padding-left: 6mm; }
+    li { margin: 0 0 1.5mm 0; }
+
+    table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; font-size: 9.5pt; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    th, td { border: 1px solid #ccc; padding: 2mm 2.5mm; text-align: left; vertical-align: top; }
+    th { background: #1F3864; color: #fff; font-weight: 600; }
+    td.k { font-weight: 600; color: #1F3864; }
+    td ul { margin: 0; padding-left: 4mm; }
+
+    /* Key/value box — DPR "Project at a Glance" style */
+    table.glance-table td { border: 1px solid #999; padding: 2mm 3mm; }
+    table.glance-table td.k { width: 60mm; background: #f2f2f2; }
+
+    /* Cover — 1:1 with the DPR cover */
+    .cover { padding: 10mm 0 0 0; text-align: center; page-break-after: always; }
+    .cover .fpo-name { font-size: 22pt; color: #1F3864; font-weight: 700; margin: 0 0 2mm 0; letter-spacing: 0.3pt; }
+    .cover .fpo-loc { font-size: 12pt; color: #666; margin: 0 0 10mm 0; font-style: italic; }
+    .cover .title { font-size: 32pt; color: #1F3864; font-weight: 700; margin: 0 0 4mm 0; }
+    .cover .subtitle { font-size: 13pt; color: #444; margin: 0 0 12mm 0; }
+    .cover .plan-name { font-size: 15pt; color: #E86C1A; font-weight: 600; margin: 0 10mm 10mm 10mm; }
+    .cover .meta-block { display: inline-block; text-align: left; margin: 4mm auto; padding: 4mm 8mm; border: 1px solid #ddd; border-radius: 2mm; background: #fafafa; max-width: 150mm; }
+    .cover .meta { font-size: 10.5pt; margin: 1.5mm 0; color: #333; }
+    .cover .meta strong { color: #1F3864; display: inline-block; min-width: 48mm; }
+    .cover .platform-attribution { margin-top: 8mm; font-size: 9pt; color: #999; font-style: italic; }
+    .cover .disclaimer-box { margin: 6mm 10mm 0 10mm; page-break-inside: avoid; padding: 4mm; border: 1px solid #E86C1A; background: #fff7ed; border-radius: 2mm; font-size: 8.5pt; color: #78350f; text-align: left; }
+    .cover .disclaimer-title { font-weight: 700; color: #9a3412; margin-bottom: 1.5mm; text-transform: uppercase; letter-spacing: 0.5pt; font-size: 8pt; }
+
+    /* AI narrative — same provenance marker as DPR AI chapters */
+    .ai-narrative-label { font-size: 7.5pt; color: #E86C1A; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 1.5mm; }
+    .narrative { font-size: 10.5pt; line-height: 1.55; text-align: justify; }
+    .badge { padding: 0.5mm 2mm; border-radius: 1.5mm; font-size: 8pt; font-weight: 600; white-space: nowrap; }
+    .badge-primary { background: #eef2ff; color: #1F3864; }
+    .badge-secondary { background: #f3f4f6; color: #555; }
+  </style>
+</head>
+<body>
+
+  {# ── Cover ─────────────────────────────────────────────────────────── #}
+  <section class="cover">
+    <div class="fpo-name">{{ fpo_name }}</div>
+    <div class="fpo-loc">{{ fpo_location }}</div>
+
+    <div class="title">{{ L.doc_title }}</div>
+    <div class="subtitle">{{ L.subtitle }}</div>
+
+    <div class="plan-name">{{ title }}</div>
+
+    <div class="meta-block">
+      <div class="meta"><strong>{{ L.financial_year }}:</strong> {{ plan.financial_year }}</div>
+      <div class="meta"><strong>{{ L.generated_on }}:</strong> {{ generated_at }}</div>
+      {% if primary_commodities %}<div class="meta"><strong>{{ L.primary_commodities }}:</strong> {{ primary_commodities }}</div>{% endif %}
+      {% if secondary_commodities %}<div class="meta"><strong>{{ L.secondary_commodities }}:</strong> {{ secondary_commodities }}</div>{% endif %}
+      {% if location %}<div class="meta"><strong>{{ L.location }}:</strong> {{ location }}</div>{% endif %}
+    </div>
+
+    <div class="platform-attribution">{{ L.attribution }}</div>
+
+    <div class="disclaimer-box">
+      <div class="disclaimer-title">{{ L.disclaimer_title }}</div>
+      {{ L.disclaimer }}
+    </div>
+  </section>
+
+  <div class="ai-narrative-label">{{ L.ai_label }}</div>
+
+  {% if num.executive_summary %}
+    <h2>{{ num.executive_summary }}. {{ L.executive_summary }}</h2>
+    <div class="narrative">{{ c.executive_summary|linebreaks }}</div>
+  {% endif %}
+
+  {% if num.commodity_focus %}
+    <h2>{{ num.commodity_focus }}. {{ L.commodity_focus }}</h2>
+    <table>
+      <colgroup><col style="width:38mm"><col style="width:24mm"><col></colgroup>
+      <thead><tr><th>{{ L.commodity }}</th><th>{{ L.role }}</th><th>{{ L.opportunity }}</th></tr></thead>
+      <tbody>
+        {% for f in c.commodity_focus %}
+        <tr>
+          <td class="k">{{ f.commodity }}</td>
+          <td>{% if f.role == "primary" %}<span class="badge badge-primary">{{ L.role_primary }}</span>{% else %}<span class="badge badge-secondary">{{ L.role_secondary }}</span>{% endif %}</td>
+          <td>{{ f.opportunity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {% if num.location_advantages %}
+    <h2>{{ num.location_advantages }}. {{ L.location_advantages }}</h2>
+    <div class="narrative">{{ c.location_advantages|linebreaks }}</div>
+  {% endif %}
+
+  {% if num.business_activities %}
+    <h2>{{ num.business_activities }}. {{ L.business_activities }}</h2>
+    <table>
+      <colgroup><col style="width:50mm"><col></colgroup>
+      <thead><tr><th>{{ L.activity }}</th><th>{{ L.description }}</th></tr></thead>
+      <tbody>
+        {% for a in c.business_activities %}
+        <tr><td class="k">{{ a.name }}</td><td>{{ a.description }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {% if num.market_strategy %}
+    <h2>{{ num.market_strategy }}. {{ L.market_strategy }}</h2>
+    {% if c.market_strategy.target_markets %}
+      <h3>{{ L.target_markets }}</h3>
+      <ul>{% for m in c.market_strategy.target_markets %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if c.market_strategy.channels %}
+      <h3>{{ L.channels }}</h3>
+      <ul>{% for m in c.market_strategy.channels %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if c.market_strategy.branding %}
+      <h3>{{ L.branding }}</h3>
+      <p>{{ c.market_strategy.branding }}</p>
+    {% endif %}
+  {% endif %}
+
+  {% if num.operations_plan %}
+    <h2>{{ num.operations_plan }}. {{ L.operations_plan }}</h2>
+    <div class="narrative">{{ c.operations_plan|linebreaks }}</div>
+  {% endif %}
+
+  {% if num.financial_outline %}
+    <h2>{{ num.financial_outline }}. {{ L.financial_outline }}</h2>
+    {% if c.financial_outline.estimated_investment or c.financial_outline.working_capital %}
+    <table class="glance-table">
+      <tbody>
+        {% if c.financial_outline.estimated_investment %}<tr><td class="k">{{ L.estimated_investment }}</td><td>{{ c.financial_outline.estimated_investment }}</td></tr>{% endif %}
+        {% if c.financial_outline.working_capital %}<tr><td class="k">{{ L.working_capital }}</td><td>{{ c.financial_outline.working_capital }}</td></tr>{% endif %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if c.financial_outline.revenue_streams %}
+      <h3>{{ L.revenue_streams }}</h3>
+      <ul>{% for m in c.financial_outline.revenue_streams %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if c.financial_outline.funding_sources %}
+      <h3>{{ L.funding_sources }}</h3>
+      <ul>{% for m in c.financial_outline.funding_sources %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+  {% endif %}
+
+  {% if num.risks %}
+    <h2>{{ num.risks }}. {{ L.risks }}</h2>
+    <table>
+      <colgroup><col style="width:60mm"><col></colgroup>
+      <thead><tr><th>{{ L.risk }}</th><th>{{ L.mitigation }}</th></tr></thead>
+      <tbody>
+        {% for r in c.risks %}<tr><td class="k">{{ r.risk }}</td><td>{{ r.mitigation }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {% if num.action_plan %}
+    <h2>{{ num.action_plan }}. {{ L.action_plan }}</h2>
+    <table>
+      <colgroup><col style="width:38mm"><col></colgroup>
+      <thead><tr><th>{{ L.period }}</th><th>{{ L.activities }}</th></tr></thead>
+      <tbody>
+        {% for s in c.action_plan %}
+        <tr><td class="k">{{ s.period }}</td><td><ul>{% for a in s.activities %}<li>{{ a }}</li>{% endfor %}</ul></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {% if num.key_recommendations %}
+    <h2>{{ num.key_recommendations }}. {{ L.key_recommendations }}</h2>
+    <ol>{% for k in c.key_recommendations %}<li>{{ k }}</li>{% endfor %}</ol>
+  {% endif %}
+
+</body>
+</html>

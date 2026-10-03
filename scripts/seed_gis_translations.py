@@ -109,14 +109,12 @@ def seed_gis_translations():
         # ── FPO: recommendations page chrome (title, tabs, section headings) ──
         'fpo_recommendations': {
             'page_title':                ('AI Recommendations', 'AI ശുപാർശകൾ'),
-            'page_description':          ('Get AI-powered crop recommendations, business plan guidance, and DPR generation.', 'AI പ്രവർത്തിത വിള ശുപാർശകൾ, ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശം, DPR നിർമ്മാണം എന്നിവ നേടുക.'),
+            'page_description':          ('Get AI-powered crop recommendations and business plan guidance.', 'AI പ്രവർത്തിത വിള ശുപാർശകളും ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശവും നേടുക.'),
             'tab_crop_recommendation':   ('Crop Recommendation', 'വിള ശുപാർശ'),
             'tab_business_plan':         ('Business Plan Guidance', 'ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശം'),
-            'tab_dpr_generation':        ('DPR Generation', 'DPR നിർമ്മാണം'),
             'farm_boundary_heading':     ('Your Farm Boundary', 'നിങ്ങളുടെ കൃഷിയിടത്തിന്റെ അതിര്'),
             'farm_boundary_description': ('Mark your cultivation area on the map — this helps us tailor crop recommendations to your farm.', 'മാപ്പിൽ നിങ്ങളുടെ കൃഷിസ്ഥലം അടയാളപ്പെടുത്തുക — ഇത് നിങ്ങളുടെ കൃഷിയിടത്തിന് അനുയോജ്യമായ വിള ശുപാർശകൾ നൽകാൻ സഹായിക്കുന്നു.'),
             'business_plan_coming_soon': ('Business Plan Guidance — coming soon.', 'ബിസിനസ് പ്ലാൻ മാർഗ്ഗനിർദ്ദേശം — ഉടൻ വരുന്നു.'),
-            'dpr_coming_soon':           ('DPR Generation — coming soon.', 'DPR നിർമ്മാണം — ഉടൻ വരുന്നു.'),
 
             # ── AI Business Plan (business-plan-display.tsx) ──
             'bp_title':                  ('AI Business Plan', 'AI ബിസിനസ് പ്ലാൻ'),
@@ -136,6 +134,9 @@ def seed_gis_translations():
             'bp_error_load':             ('Could not load your business plan.', 'നിങ്ങളുടെ ബിസിനസ് പ്ലാൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.'),
             'bp_error_generic':          ('Could not generate the business plan. Please try again.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.'),
             'bp_generated_on':           ('Generated on {date}', '{date}-ന് തയ്യാറാക്കിയത്'),
+            'bp_download_pdf':           ('Download PDF', 'PDF ഡൗൺലോഡ് ചെയ്യുക'),
+            'bp_download_word':          ('Download Word', 'Word ഡൗൺലോഡ് ചെയ്യുക'),
+            'bp_download_failed':        ('Could not download the business plan. Please try again.', 'ബിസിനസ് പ്ലാൻ ഡൗൺലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.'),
             'bp_executive_summary':      ('Executive Summary', 'സംഗ്രഹം'),
             'bp_commodity_focus':        ('Commodity Focus', 'ഉൽപ്പന്ന ശ്രദ്ധ'),
             'bp_role_primary':           ('Primary', 'പ്രാഥമികം'),

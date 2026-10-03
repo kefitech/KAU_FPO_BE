@@ -32,6 +32,7 @@ from .team import (
     TeamBulkInviteView, TeamBulkInviteFileView,
     TeamBulkActivateView, TeamBulkDeactivateView,
     TeamResetPasswordView,
+    TeamAvailablePermissionsView, TeamMemberPermissionsView, TeamBulkPermissionsView,
 )
 from .tier_assessment import (
     TierAssessmentView,
@@ -102,6 +103,9 @@ urlpatterns = [
     path('me/team/bulk-deactivate/',            TeamBulkDeactivateView.as_view(), name='fpo-team-bulk-deactivate'),
     path('me/team/<int:user_id>/deactivate/',     TeamDeactivateView.as_view(),     name='fpo-team-deactivate'),
     path('me/team/<int:user_id>/reset-password/', TeamResetPasswordView.as_view(),  name='fpo-team-reset-password'),
+    path('me/team/available-permissions/',        TeamAvailablePermissionsView.as_view(), name='fpo-team-available-permissions'),
+    path('me/team/bulk-permissions/',             TeamBulkPermissionsView.as_view(),      name='fpo-team-bulk-permissions'),
+    path('me/team/<int:user_id>/permissions/',    TeamMemberPermissionsView.as_view(),    name='fpo-team-member-permissions'),
     # Tier Assessment
     path('me/tier-assessment/',                         TierAssessmentView.as_view(),        name='fpo-tier-assessment'),
     path('me/tier-assessment/history/',                 TierAssessmentHistoryView.as_view(), name='fpo-tier-assessment-history'),

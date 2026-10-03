@@ -45,7 +45,7 @@ from apps.core.permissions.rbac import IsAdmin
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 
-from apps.core.services.fpo_permission import get_member_fpo
+from apps.core.services.fpo_permission import get_member_fpo, has_fpo_permission
 from apps.database.models import (
     FPO, MLModelVersion, CropRecommendation, CropPackageOfPractices, RecommendationFeedback,
 )
@@ -84,6 +84,13 @@ def _get_fpo_or_404(user, lang):
             t('recommendations.fpo_not_found', lang),
             status_code=status.HTTP_404_NOT_FOUND,
         )
+
+
+def _require_fpo_action(user, fpo, action_code, message):
+    """403 response unless the user may perform `action_code` in this FPO (primary always may)."""
+    if has_fpo_permission(user, fpo, action_code):
+        return None
+    return StandardResponse.error(message, status_code=status.HTTP_403_FORBIDDEN)
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +233,12 @@ class RequestRecommendationView(APIView):
         lang = request.language
 
         fpo, err = _get_fpo_or_404(request.user, lang)
+        if err:
+            return err
+        err = _require_fpo_action(
+            request.user, fpo, 'can_generate_recommendations',
+            'You do not have permission to generate AI recommendations.',
+        )
         if err:
             return err
 
