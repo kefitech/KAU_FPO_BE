@@ -130,6 +130,33 @@ def _get_buyer_row(user):
     return None
 
 
+def buyer_catalogue_queryset(buyer):
+    """
+    Stock batches this buyer can see in the catalogue — the same rules as
+    BuyerProductListView: public, not deleted, ACTIVE or EXPIRED but still
+    inside the PRODUCT_GRACE_DAYS window, and never the buyer's own FPO's
+    listings. Used for the buyer dashboard counts so they match the catalogue.
+    """
+    from datetime import timedelta
+
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from apps.database.models import ProductStock
+    from apps.marketplace.tasks import PRODUCT_GRACE_DAYS
+
+    grace_cutoff = timezone.now().date() - timedelta(days=PRODUCT_GRACE_DAYS)
+    qs = ProductStock.objects.filter(
+        is_public=True, is_deleted=False, product__is_deleted=False,
+    ).filter(
+        Q(status=ProductStock.Status.ACTIVE)
+        | Q(status=ProductStock.Status.EXPIRED, available_until__gte=grace_cutoff)
+    )
+    if buyer.fpo_id:
+        qs = qs.exclude(product__fpo_id=buyer.fpo_id)
+    return qs
+
+
 def get_buyer_redirect(user):
     """
     Return redirect status dict for buyer users (external or FPO-as-buyer).

@@ -298,7 +298,7 @@ def seed_menu():
         label_key = 'menu.fpo_applications',
         path      = '/fpo/applications',
         icon      = 'folder',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,  # members view it read-only
         order     = 3,
     )
     seed_item(
@@ -434,12 +434,21 @@ def seed_menu():
         order     = 3,
     )
     seed_item(
+        label_key = 'menu.cbbo_market_linkage',
+        path      = '/cbbo/market-linkage',
+        icon      = 'link',
+        roles     = [cbbo_group],
+        order     = 4,
+    )
+    seed_item(
         label_key = 'menu.cbbo_profile',
         path      = '/cbbo/profile',
         icon      = 'user',
         roles     = [cbbo_group],
-        order     = 4,
+        order     = 5,
     )
+    # seed_item only sets order on create — keep My Profile last on existing DBs
+    MenuItem.objects.filter(label_key='menu.cbbo_profile').update(order=5)
 
     # ── Government portal pages (Jobin) ───────────────────────────────────────
 

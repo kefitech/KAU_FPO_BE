@@ -100,6 +100,29 @@ class InquiryCreateView(APIView):
             except Exception:
                 pass  # Inquiry already saved — don't fail the request if notification dispatch fails
 
+            # In-app (FPO inbox + dashboard). `link` makes the dashboard
+            # notification open the Inquiries tab on /fpo/products.
+            # Names are HTML-escaped: in-app bodies are rendered as HTML and the
+            # template engine substitutes values verbatim.
+            try:
+                from django.utils.html import escape
+
+                quantity = inquiry.quantity_requested
+                send_notification(
+                    user=seller_user,
+                    code='inquiry_received',
+                    channel='in_app',
+                    context={
+                        'buyer_name': escape(buyer.name),
+                        'product_name': escape(product.name.get('en', '') if product.name else ''),
+                        'quantity': f'{quantity.normalize():f}' if quantity is not None else '',
+                        'unit': stock.unit,
+                        'link': '/fpo/products?view=inquiries',
+                    },
+                )
+            except Exception:
+                pass  # Inquiry already saved — don't fail the request if notification dispatch fails
+
         return StandardResponse.success(
             data={'inquiry_id': inquiry.id},
             message='Inquiry submitted successfully',
