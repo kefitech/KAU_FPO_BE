@@ -26,8 +26,19 @@ from rest_framework.views import APIView
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BuyerDirectory, BuyerSellerMatch, MarketPrice, Product, ProductStock
+from apps.marketplace.tasks import PRODUCT_GRACE_DAYS
 
 CACHE_TTL = 60 * 60  # 1h — spec says shorter than CMS's 24h, since prices/stock change faster
+
+
+# KAU suggestion #3 — "Validity is over" banner shown during the 3-day
+# grace window after a listing's available_until passes.
+_GRACE_MESSAGE_EN = 'Validity is over — but please contact the buyer to know if it\'s restocked.'
+_GRACE_MESSAGE_ML = 'സാധുത കഴിഞ്ഞു — പക്ഷേ വീണ്ടും സ്റ്റോക്ക് വന്നിട്ടുണ്ടോ എന്നറിയാൻ വിൽപ്പനക്കാരനെ ബന്ധപ്പെടുക.'
+
+
+def _grace_message(lang: str) -> str:
+    return _GRACE_MESSAGE_ML if lang == 'ml' else _GRACE_MESSAGE_EN
 
 
 def _lang(request):
@@ -48,8 +59,10 @@ class PublicCommodityListView(APIView):
 
 
         # One commodity per public product currently listed, with its latest price.
+        # ProductStock FK means a product with multiple batches is joined once
+        # per batch — set() dedupes the commodity codes.
         commodity_codes = set(Product.objects.filter(
-            stock__is_public=True, stock__status=ProductStock.Status.ACTIVE, is_deleted=False,
+            stocks__is_public=True, stocks__status=ProductStock.Status.ACTIVE, is_deleted=False,
         ).values_list('commodity__code', flat=True))
 
         data = []
@@ -91,7 +104,11 @@ class PublicOpportunitiesView(APIView):
 
 
 class PublicProductListView(APIView):
-    """GET /api/public/market/products/ — publicly opted-in FPO product listings. FPO contact info never exposed."""
+    """
+    GET /api/public/market/products/ — publicly opted-in FPO product
+    listings. One card per **stock batch** so a product with two batches
+    live surfaces as two cards. FPO contact info never exposed.
+    """
     permission_classes = [AllowAny]
     pagination_class = StandardPagination
 
@@ -104,35 +121,56 @@ class PublicProductListView(APIView):
         cache_key = f'public:market:products:{lang}:{search or "-"}:{commodity or "-"}'
         cached = cache.get(cache_key)
         if cached is None:
-            queryset = Product.objects.filter(
-                stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
-            ).select_related('commodity', 'fpo', 'stock').order_by('-created_at')
+            from datetime import timedelta
+            from django.db.models import Q
+            from django.utils import timezone
+
+            today = timezone.now().date()
+            grace_cutoff = today - timedelta(days=PRODUCT_GRACE_DAYS)
+
+            # KAU #3 — include ACTIVE stock + EXPIRED stock still within the
+            # 3-day grace window so buyers see "Validity is over" listings.
+            queryset = ProductStock.objects.filter(
+                is_public=True, is_deleted=False,
+                product__is_deleted=False,
+            ).filter(
+                Q(status=ProductStock.Status.ACTIVE)
+                | Q(
+                    status=ProductStock.Status.EXPIRED,
+                    available_until__gte=grace_cutoff,
+                )
+            ).select_related('product', 'product__commodity', 'product__fpo').order_by('-created_at')
 
             if search:
-                from django.db.models import Q
-                queryset = queryset.filter(Q(name__en__icontains=search) | Q(name__ml__icontains=search))
+                queryset = queryset.filter(
+                    Q(product__name__en__icontains=search) | Q(product__name__ml__icontains=search)
+                )
             if commodity:
-                queryset = queryset.filter(commodity__code=commodity)
+                queryset = queryset.filter(product__commodity__code=commodity)
 
-            cached = [
-                {
-                    'id': p.id,
+            cached = []
+            for s in queryset:
+                p = s.product
+                in_grace = s.status == ProductStock.Status.EXPIRED
+                cached.append({
+                    'id': s.id,
+                    'product_id': p.id,
                     'name': p.name,
                     'description': p.description,
                     'commodity_code': p.commodity.code,
                     'commodity_name': p.commodity.get_name(lang),
-                    'quantity': p.stock.quantity,
-                    'unit': p.stock.unit,
-                    'price_per_unit': p.stock.price_per_unit,
-                    'quality_certification': p.stock.quality_certification,
-                    'available_from': p.stock.available_from,
-                    'available_until': p.stock.available_until,
+                    'quantity': s.quantity,
+                    'unit': s.unit,
+                    'price_per_unit': s.price_per_unit,
+                    'quality_certification': s.quality_certification,
+                    'available_from': s.available_from,
+                    'available_until': s.available_until,
                     'image': p.image.url if p.image else None,
+                    'in_grace_period': in_grace,
+                    'grace_message':   _grace_message(lang) if in_grace else None,
                     # NOTE: fpo_name intentionally omitted per Business Rule #2 —
                     # "FPO contact details not exposed in public listing."
-                }
-                for p in queryset
-            ]
+                })
             cache.set(cache_key, cached, timeout=CACHE_TTL)
 
         paginator = self.pagination_class()
@@ -141,32 +179,55 @@ class PublicProductListView(APIView):
 
 
 class PublicProductDetailView(APIView):
-    """GET /api/public/market/products/{id}/ — single public product detail."""
+    """
+    GET /api/public/market/products/{id}/ — single public listing detail.
+    `id` is a **ProductStock** id (matches the id surfaced by the public
+    list endpoint). FPO contact info never exposed.
+    """
     permission_classes = [AllowAny]
 
     @extend_schema(tags=['Public Market Hub'], summary='Public product detail')
     def get(self, request, pk):
+        from datetime import timedelta
+        from django.db.models import Q
+        from django.utils import timezone
+
         lang = _lang(request)
+        today = timezone.now().date()
+        grace_cutoff = today - timedelta(days=PRODUCT_GRACE_DAYS)
+
         try:
-            p = Product.objects.select_related('commodity', 'stock').get(
-                pk=pk, stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
-            )
-        except Product.DoesNotExist:
+            # KAU #3 — fetch ACTIVE or EXPIRED-in-grace stock.
+            s = ProductStock.objects.select_related('product__commodity', 'product__fpo').filter(
+                pk=pk, is_public=True, is_deleted=False, product__is_deleted=False,
+            ).filter(
+                Q(status=ProductStock.Status.ACTIVE)
+                | Q(
+                    status=ProductStock.Status.EXPIRED,
+                    available_until__gte=grace_cutoff,
+                )
+            ).get()
+        except ProductStock.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=status.HTTP_404_NOT_FOUND)
 
+        p = s.product
+        in_grace = s.status == ProductStock.Status.EXPIRED
         data = {
-            'id': p.id,
+            'id': s.id,
+            'product_id': p.id,
             'name': p.name,
             'description': p.description,
             'commodity_code': p.commodity.code,
             'commodity_name': p.commodity.get_name(lang),
-            'quantity': p.stock.quantity,
-            'unit': p.stock.unit,
-            'price_per_unit': p.stock.price_per_unit,
-            'quality_certification': p.stock.quality_certification,
-            'available_from': p.stock.available_from,
-            'available_until': p.stock.available_until,
+            'quantity': s.quantity,
+            'unit': s.unit,
+            'price_per_unit': s.price_per_unit,
+            'quality_certification': s.quality_certification,
+            'available_from': s.available_from,
+            'available_until': s.available_until,
             'image': p.image.url if p.image else None,
+            'in_grace_period': in_grace,
+            'grace_message':   _grace_message(lang) if in_grace else None,
         }
         return StandardResponse.success(data=data, message='Product retrieved successfully')
 
@@ -210,12 +271,17 @@ class PublicProductInquireView(APIView):
 
     @extend_schema(tags=['Public Market Hub'], summary='Submit purchase inquiry', request=PublicInquirySerializer)
     def post(self, request, pk):
+        # `pk` here is a ProductStock id — the public list surfaces one
+        # card per batch, so the inquiry locks onto the specific batch
+        # the visitor saw.
         try:
-            product = Product.objects.select_related('fpo', 'commodity', 'stock').get(
-                pk=pk, stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
+            stock = ProductStock.objects.select_related('product__fpo', 'product__commodity').get(
+                pk=pk, status=ProductStock.Status.ACTIVE, is_public=True,
+                is_deleted=False, product__is_deleted=False,
             )
-        except Product.DoesNotExist:
+        except ProductStock.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=status.HTTP_404_NOT_FOUND)
+        product = stock.product
 
         serializer = PublicInquirySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

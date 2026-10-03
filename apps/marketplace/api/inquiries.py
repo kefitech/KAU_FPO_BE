@@ -55,16 +55,21 @@ class InquiryCreateView(APIView):
                 status_code=http_status.HTTP_403_FORBIDDEN,
             )
 
+        # `pk` is a ProductStock id — the buyer catalog surfaces one card
+        # per batch, and that card's `id` is the stock id. The inquiry
+        # therefore locks onto the specific batch the buyer saw, not the
+        # product master.
         try:
-            # status / is_public live on the product's current stock batch
-            # (same filter as BuyerProductListView's catalogue).
-            product = Product.objects.select_related('fpo', 'stock').get(
-                pk=pk, stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
+            stock = ProductStock.objects.select_related('product__fpo').get(
+                pk=pk, status=ProductStock.Status.ACTIVE,
+                is_public=True, is_deleted=False, product__is_deleted=False,
             )
-        except Product.DoesNotExist:
+        except ProductStock.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=http_status.HTTP_404_NOT_FOUND)
 
-        serializer = InquiryCreateSerializer(data=request.data, context={'product': product})
+        product = stock.product
+
+        serializer = InquiryCreateSerializer(data=request.data, context={'stock': stock})
         serializer.is_valid(raise_exception=True)
 
         contact_user = _resolve_buyer_user(buyer)

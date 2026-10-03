@@ -52,14 +52,41 @@ class Product(BaseModel):
         name = self.name.get('en', '') if isinstance(self.name, dict) else str(self.name)
         return f"{name} — {self.fpo}"
 
+    @property
+    def latest_stock(self):
+        """
+        The batch to surface in the flat/legacy serializer fields: most
+        recent ACTIVE batch if any, else most recent batch of any status,
+        else None. Soft-deleted stocks are always skipped — a batch the
+        FPO removed should never resurface in the detail header.
+
+        Walks any prefetched `stocks` cache so a page of products hitting
+        ProductSerializer doesn't N+1 the DB.
+        """
+        cache = getattr(self, '_prefetched_objects_cache', None)
+        if cache and 'stocks' in cache:
+            all_stocks = [s for s in cache['stocks'] if not s.is_deleted]
+        else:
+            all_stocks = list(
+                self.stocks.filter(is_deleted=False).order_by('-created_at')
+            )
+
+        for s in all_stocks:
+            if s.status == ProductStock.Status.ACTIVE:
+                return s
+        return all_stocks[0] if all_stocks else None
+
 
 class ProductStock(BaseModel):
     """
-    A single stock/listing batch for a Product. At most ONE stock row can
-    exist per product at a time (enforced by OneToOneField below) — once a
-    batch expires it is genuinely deleted (see apps.marketplace.tasks.
-    expire_products_and_notify), and the FPO uses "Add Stock" to create the
-    next one against the same product master.
+    A stock/listing batch for a Product. **Multiple batches per product are
+    allowed** — the same Organic Rice product can have a 100kg batch @ ₹85
+    plus a 500kg batch @ ₹82 live simultaneously. Each batch has its own
+    quantity, price, availability window, and lifecycle (DRAFT → ACTIVE →
+    EXPIRED → hard-deleted after KAU #3 3-day grace).
+
+    The Product (master) carries the identity: name, commodity, image,
+    description. Stocks are the sellable units.
     """
 
     class Unit(models.TextChoices):
@@ -75,8 +102,8 @@ class ProductStock(BaseModel):
         SOLD = 'sold', 'Sold'
         EXPIRED = 'expired', 'Expired'
 
-    product = models.OneToOneField(
-        Product, on_delete=models.CASCADE, related_name='stock'
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='stocks'
     )
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     unit = models.CharField(max_length=20, choices=Unit.choices)

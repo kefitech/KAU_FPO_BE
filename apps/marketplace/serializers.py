@@ -62,84 +62,184 @@ def _compress_product_image(file):
     )
 
 
+class ProductStockSerializer(serializers.ModelSerializer):
+    """
+    One stock/listing batch under a Product. Managed via the nested
+    /api/marketplace/products/{product_id}/stocks/ endpoint — a product can
+    have multiple batches live at the same time (e.g. 100kg @ ₹85 + 500kg
+    @ ₹82).
+
+    `status` and `is_public` are writable so the FPO can create a batch
+    directly in ACTIVE state ("publish immediately") and/or opt the batch
+    into the public Market Hub in one request. Sold/expired transitions
+    still go through the dedicated mark-sold / expiry task — this
+    serializer validates status to {draft, active} only.
+    """
+
+    class Meta:
+        model = ProductStock
+        fields = [
+            'id', 'product', 'quantity', 'unit', 'price_per_unit',
+            'quality_certification', 'available_from', 'available_until',
+            'is_ondc_listed', 'ondc_product_id', 'is_public', 'status',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'product', 'is_ondc_listed', 'ondc_product_id',
+            'created_at', 'updated_at',
+        ]
+
+    def validate_status(self, value):
+        # Sold/expired are set via dedicated actions (publish/mark-sold) or
+        # the daily expiry task — not through raw PATCH. Restricting the
+        # choices here keeps the lifecycle predictable even though the
+        # underlying field accepts all four values.
+        allowed = [ProductStock.Status.DRAFT.value, ProductStock.Status.ACTIVE.value]
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"status must be one of {allowed} — use the mark-sold action "
+                "or wait for the expiry task for other transitions."
+            )
+        return value
+
+
 class ProductSerializer(serializers.ModelSerializer):
     """
-    FPO's own product CRUD. The API's JSON shape is intentionally UNCHANGED
-    from before the master/stock split — quantity/price/status/etc. all
-    still appear flat on the product object. Internally, though, they're
-    read from and written to the related ProductStock row (Product.stock),
-    not stored on Product itself.
+    FPO's own product CRUD. A product is now PURELY the master identity
+    (name, commodity, image, description). Its sellable stock batches live
+    on ProductStock — one Product can have many stocks — and are managed
+    through the nested /products/{id}/stocks/ endpoint.
 
-    has_stock=False means this product currently has no stock batch (its
-    previous batch expired/sold and was deleted) — quantity/price/etc. will
-    be None/blank in that case; the frontend should show a "No active
-    stock — Add Stock" state instead.
+    For backward compat with the pre-multi-batch frontend, the "latest"
+    stock batch's fields are also surfaced flat on the product payload:
+      - On READ: flat fields reflect `product.latest_stock` (most recent
+        ACTIVE batch; fallback to most recent of any status).
+      - On POST (product create): flat stock fields are accepted and used
+        to create the FIRST batch alongside the product in one request —
+        preserves the old "Add Product" wizard UX.
+      - On PATCH (product update): flat stock fields are IGNORED. Stock
+        edits go through /products/{id}/stocks/{stock_id}/.
+
+    `stocks` (nested array) is the authoritative list of batches for the
+    new multi-batch UI.
     """
+    # Nested, authoritative list of batches — soft-deleted stocks are
+    # filtered out so a removed draft doesn't inflate total_batches or
+    # resurface anywhere on the FPO UI.
+    stocks = serializers.SerializerMethodField()
+
+    # Backward-compat flat fields — writable only during product create
+    # (used to seed the first batch).
     quantity = serializers.DecimalField(
-        max_digits=12, decimal_places=2, source='stock.quantity',
-        required=False, allow_null=True,
+        max_digits=12, decimal_places=2,
+        required=False, allow_null=True, write_only=True,
     )
     unit = serializers.ChoiceField(
-        choices=ProductStock.Unit.choices, source='stock.unit',
-        required=False, allow_null=True,
+        choices=ProductStock.Unit.choices,
+        required=False, allow_null=True, write_only=True,
     )
     price_per_unit = serializers.DecimalField(
-        max_digits=10, decimal_places=2, source='stock.price_per_unit',
-        required=False, allow_null=True,
+        max_digits=10, decimal_places=2,
+        required=False, allow_null=True, write_only=True,
     )
     quality_certification = serializers.CharField(
-        source='stock.quality_certification',
-        required=False, allow_blank=True, allow_null=True,
+        required=False, allow_blank=True, allow_null=True, write_only=True,
     )
     available_from = serializers.DateField(
-        source='stock.available_from', required=False, allow_null=True,
+        required=False, allow_null=True, write_only=True,
     )
     available_until = serializers.DateField(
-        source='stock.available_until', required=False, allow_null=True,
+        required=False, allow_null=True, write_only=True,
     )
-    is_ondc_listed = serializers.BooleanField(source='stock.is_ondc_listed', read_only=True)
-    ondc_product_id = serializers.CharField(source='stock.ondc_product_id', read_only=True)
-    is_public = serializers.BooleanField(source='stock.is_public', read_only=True)
-    status = serializers.CharField(source='stock.status', read_only=True)
+    # Lifecycle + visibility shortcuts for the first batch — let the FPO
+    # create a product with a batch already in ACTIVE state and/or opted
+    # into the public Market Hub in one request.
+    is_public = serializers.BooleanField(required=False, write_only=True)
+    status = serializers.ChoiceField(
+        choices=[ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE],
+        required=False, write_only=True,
+    )
+
+    # Read-only flat view of the latest batch (keeps the old FE working).
+    latest_stock = serializers.SerializerMethodField()
     has_stock = serializers.SerializerMethodField()
+    # Human-readable commodity labels so the FE doesn't have to resolve
+    # MasterLookup ids against a separate dropdown fetch just to render a
+    # product row. Language-sensitive — uses MasterLookup.get_name().
+    commodity_code = serializers.CharField(source='commodity.code', read_only=True)
+    commodity_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'fpo', 'name', 'commodity', 'description', 'quantity', 'unit',
-            'price_per_unit', 'quality_certification', 'available_from', 'available_until',
-            'is_ondc_listed', 'ondc_product_id', 'is_public', 'status', 'has_stock', 'image',
+            'id', 'fpo', 'name', 'commodity', 'commodity_code', 'commodity_name',
+            'description', 'image',
+            'stocks', 'latest_stock', 'has_stock',
+            # Write-only shortcut fields for creating the first batch
+            'quantity', 'unit', 'price_per_unit', 'quality_certification',
+            'available_from', 'available_until', 'is_public', 'status',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'fpo', 'created_at', 'updated_at']
 
+    def get_commodity_name(self, obj):
+        if not obj.commodity_id:
+            return ''
+        lang = self.context.get('lang') or getattr(self.context.get('request'), 'language', 'en')
+        return obj.commodity.get_name(lang) or obj.commodity.code
+
+    def get_stocks(self, obj):
+        cache = getattr(obj, '_prefetched_objects_cache', None)
+        if cache and 'stocks' in cache:
+            stocks = [s for s in cache['stocks'] if not s.is_deleted]
+        else:
+            stocks = obj.stocks.filter(is_deleted=False).order_by('-created_at')
+        return ProductStockSerializer(stocks, many=True, context=self.context).data
+
+    def get_latest_stock(self, obj):
+        s = obj.latest_stock
+        return ProductStockSerializer(s).data if s else None
+
     def get_has_stock(self, obj):
-        return hasattr(obj, 'stock') and obj.stock is not None
+        cache = getattr(obj, '_prefetched_objects_cache', None)
+        if cache and 'stocks' in cache:
+            return len(cache['stocks']) > 0
+        return obj.stocks.exists()
 
     def validate_image(self, value):
         if value is None:
             return value
         return _compress_product_image(value)
 
+    def _pop_initial_stock_fields(self, validated_data):
+        """Pop the write-only flat stock fields out of validated_data so
+        they don't get passed to Product.objects.create()."""
+        return {
+            field: validated_data.pop(field)
+            for field in (
+                'quantity', 'unit', 'price_per_unit', 'quality_certification',
+                'available_from', 'available_until', 'is_public', 'status',
+            )
+            if field in validated_data
+        }
+
     def create(self, validated_data):
-        stock_data = validated_data.pop('stock', {})
+        stock_data = self._pop_initial_stock_fields(validated_data)
         validated_data['fpo'] = get_member_fpo(self.context['request'].user)
         product = super().create(validated_data)
-        ProductStock.objects.create(product=product, **stock_data)
+        # Only create the first batch if the FPO actually sent stock details.
+        # Omitting them is fine — the product sits as "No active stock" until
+        # a batch is added via POST /products/{id}/stocks/.
+        if stock_data.get('quantity') is not None and stock_data.get('price_per_unit') is not None:
+            ProductStock.objects.create(product=product, **stock_data)
         return product
 
     def update(self, instance, validated_data):
-        stock_data = validated_data.pop('stock', {})
-        product = super().update(instance, validated_data)
-        if stock_data:
-            stock, created = ProductStock.objects.get_or_create(
-                product=product, defaults=stock_data
-            )
-            if not created:
-                for field, value in stock_data.items():
-                    setattr(stock, field, value)
-                stock.save()
-        return product
+        # Stock edits don't flow through the product endpoint anymore —
+        # drop any flat stock fields silently so an old FE's PATCH still
+        # updates the master fields instead of 400'ing on them.
+        self._pop_initial_stock_fields(validated_data)
+        return super().update(instance, validated_data)
 
 
 class BuyerDirectorySerializer(serializers.ModelSerializer):
@@ -194,38 +294,66 @@ class MarketPriceSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 class BuyerProductSerializer(serializers.ModelSerializer):
-    fpo_name = serializers.CharField(source='fpo.name', read_only=True)
-    commodity_code = serializers.CharField(source='commodity.code', read_only=True)
+    """
+    One card per **stock batch** on the buyer-facing catalog (NOT per
+    Product). A single Product with two active batches surfaces as two
+    cards — different quantities/prices/validity — so buyers can inquire
+    on the specific batch they want.
+
+    `id` is the ProductStock id (what the inquiry endpoint expects).
+    `product_id` is kept alongside for buyer-side "view all batches of
+    this product" navigation.
+    """
+    product_id   = serializers.IntegerField(source='product.id', read_only=True)
+    name         = serializers.JSONField(source='product.name', read_only=True)
+    description  = serializers.JSONField(source='product.description', read_only=True)
+    image        = serializers.ImageField(source='product.image', read_only=True)
+    fpo          = serializers.IntegerField(source='product.fpo_id', read_only=True)
+    fpo_name     = serializers.CharField(source='product.fpo.name', read_only=True)
+    commodity_code = serializers.CharField(source='product.commodity.code', read_only=True)
     commodity_name = serializers.SerializerMethodField()
-    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, source='stock.quantity', read_only=True)
-    unit = serializers.CharField(source='stock.unit', read_only=True)
-    price_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2, source='stock.price_per_unit', read_only=True)
-    quality_certification = serializers.CharField(source='stock.quality_certification', read_only=True)
-    available_from = serializers.DateField(source='stock.available_from', read_only=True)
-    available_until = serializers.DateField(source='stock.available_until', read_only=True)
+    # KAU #3 — "Validity is over" grace window flags for the buyer UI.
+    in_grace_period = serializers.SerializerMethodField()
+    grace_message   = serializers.SerializerMethodField()
 
     class Meta:
-        model = Product
+        model = ProductStock
         fields = [
-            'id', 'name', 'description', 'commodity_code', 'commodity_name',
+            'id', 'product_id', 'name', 'description',
+            'commodity_code', 'commodity_name',
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
-            'available_from', 'available_until', 'fpo', 'fpo_name', 'image',
+            'available_from', 'available_until',
+            'fpo', 'fpo_name', 'image',
+            'in_grace_period', 'grace_message',
         ]
         read_only_fields = fields
 
     def get_commodity_name(self, obj):
         lang = self.context.get('lang', 'en')
-        return obj.commodity.get_name(lang) if obj.commodity_id else ''
+        commodity = obj.product.commodity if obj.product_id else None
+        return commodity.get_name(lang) if commodity else ''
+
+    def get_in_grace_period(self, obj):
+        return obj.status == ProductStock.Status.EXPIRED
+
+    def get_grace_message(self, obj):
+        if not self.get_in_grace_period(obj):
+            return None
+        lang = self.context.get('lang', 'en')
+        if lang == 'ml':
+            return 'സാധുത കഴിഞ്ഞു — പക്ഷേ വീണ്ടും സ്റ്റോക്ക് വന്നിട്ടുണ്ടോ എന്നറിയാൻ വിൽപ്പനക്കാരനെ ബന്ധപ്പെടുക.'
+        return "Validity is over — but please contact the buyer to know if it's restocked."
 
 
 class InquiryCreateSerializer(serializers.ModelSerializer):
     """
     Used when a verified buyer (FPO-as-buyer or external buyer) submits a
-    purchase inquiry on a product. `product` comes from the URL, not the
-    request body — same reasoning as `buyer`/`contact_user` being resolved
-    server-side rather than trusted from client input. The product itself
-    is passed via serializer context (not validated_data) so we can check
-    the requested quantity against its available stock.
+    purchase inquiry on a specific stock batch of a product. `stock` comes
+    from the URL (the `pk` is a ProductStock id), not the request body —
+    same reasoning as `buyer`/`contact_user` being resolved server-side
+    rather than trusted from client input. The stock batch is passed via
+    serializer context so we can validate requested quantity against its
+    available quantity.
     """
     class Meta:
         model = Inquiry
@@ -235,10 +363,10 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
     def validate_quantity_requested(self, value):
         if value <= 0:
             raise serializers.ValidationError('Quantity requested must be greater than 0.')
-        product = self.context.get('product')
-        if product is not None and value > product.stock.quantity:
+        stock = self.context.get('stock')
+        if stock is not None and value > stock.quantity:
             raise serializers.ValidationError(
-                f'Quantity requested cannot exceed available stock ({product.stock.quantity} {product.stock.unit}).'
+                f'Quantity requested cannot exceed available stock ({stock.quantity} {stock.unit}).'
             )
         return value
 

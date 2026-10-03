@@ -16,10 +16,20 @@ step here before this goes live with real data.
 from decimal import Decimal
 
 
-def run_matching(product):
-    """Find verified buyers interested in this product's commodity and quantity range."""
+def run_matching(stock):
+    """
+    Find verified buyers interested in this stock batch's product commodity
+    and quantity range.
+
+    Takes a ProductStock (the batch that just went ACTIVE), not a Product —
+    different batches of the same product can have different quantities and
+    therefore different match scores. BuyerSellerMatch is still keyed on
+    (product, buyer) so matching the same product twice from two batches
+    only ever creates one row.
+    """
     from apps.database.models import BuyerDirectory, BuyerSellerMatch
 
+    product = stock.product
     buyers = BuyerDirectory.objects.filter(
         is_verified=True,
         commodities_interested__contains=[product.commodity.code],
@@ -34,9 +44,9 @@ def run_matching(product):
         # Simple score — 1.0 if quantity fits buyer's stated range, 0.5 otherwise.
         # match_score is DecimalField(max_digits=4, decimal_places=3) -> use Decimal.
         score = Decimal('1.000')
-        if buyer.min_quantity and product.quantity < buyer.min_quantity:
+        if buyer.min_quantity and stock.quantity < buyer.min_quantity:
             score = Decimal('0.500')
-        if buyer.max_quantity and product.quantity > buyer.max_quantity:
+        if buyer.max_quantity and stock.quantity > buyer.max_quantity:
             score = Decimal('0.500')
 
         match = BuyerSellerMatch.objects.create(

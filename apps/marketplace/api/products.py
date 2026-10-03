@@ -68,6 +68,24 @@ def _parse_decimal(value, field_name):
     return parsed
 
 
+def _parse_bool(value, default: bool) -> bool:
+    """
+    Parse a loosely-formatted boolean cell. Accepts common Yes/No, True/False,
+    1/0, Y/N variants (case-insensitive) and treats blank as `default` so
+    older template downloads (which omit this column) keep working.
+    """
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text == "":
+        return default
+    if text in {"true", "yes", "y", "1"}:
+        return True
+    if text in {"false", "no", "n", "0"}:
+        return False
+    raise ValueError(f"must be Yes/No (got '{value}')")
+
+
 def _parse_date(value, field_name, required=False):
     """
     Parse a date cell. openpyxl hands back a real datetime/date object for
@@ -131,6 +149,12 @@ def _create_bulk_product(fpo, row):
     available_from = _parse_date(row.get('available_from'), 'available_from', required=True)
     available_until = _parse_date(row.get('available_until'), 'available_until', required=False)
 
+    # Optional is_public column — default True so bulk-imported batches are
+    # discoverable on the public Market Hub right away (matches the default
+    # the Add Product form picks). The FPO can set FALSE / NO / 0 in the
+    # cell to opt a specific row out.
+    is_public = _parse_bool(row.get('is_public'), default=True)
+
     product = Product.objects.create(
         fpo=fpo,
         name={'en': name_en, 'ml': name_ml},
@@ -146,6 +170,7 @@ def _create_bulk_product(fpo, row):
         available_from=available_from,
         available_until=available_until,
         status=ProductStock.Status.ACTIVE,
+        is_public=is_public,
     )
     return product
 
@@ -180,11 +205,16 @@ class ProductViewSet(TranslatedViewSet):
     def get_queryset(self):
         from django.db.models import Q
 
-        # FPO members only see their own FPO's products; exclude soft-deleted rows
+        # FPO members only see their own FPO's products; exclude soft-deleted rows.
+        # get_member_fpo() resolves to the FPO for both primary + secondary
+        # users (via FPOUserMembership) so team members can also browse.
         fpo = get_member_fpo(self.request.user)
-        queryset = Product.objects.filter(fpo=fpo, is_deleted=False).select_related(
-            'commodity', 'fpo', 'stock'
-        ).order_by('-created_at')
+        queryset = (
+            Product.objects.filter(fpo=fpo, is_deleted=False)
+            .select_related('commodity', 'fpo')
+            .prefetch_related('stocks')
+            .order_by('-created_at')
+        )
 
         search = self.request.query_params.get('search', '').strip()
         if search:
@@ -193,8 +223,14 @@ class ProductViewSet(TranslatedViewSet):
             )
 
         status = self.request.query_params.get('status')
-        if status in (ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE, ProductStock.Status.SOLD, ProductStock.Status.EXPIRED):
-            queryset = queryset.filter(stock__status=status)
+        if status in (
+            ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE,
+            ProductStock.Status.SOLD, ProductStock.Status.EXPIRED,
+        ):
+            # Any batch in the requested status qualifies the product. distinct()
+            # because the inner JOIN duplicates products with multiple matching
+            # batches.
+            queryset = queryset.filter(stocks__status=status).distinct()
         return queryset
 
     # update()/destroy() are NOT overridden — per house convention, business
@@ -216,25 +252,20 @@ class ProductViewSet(TranslatedViewSet):
         _clear_public_market_cache()
 
     def perform_update(self, serializer):
-        product = serializer.instance
-        stock = getattr(product, 'stock', None)
-        # A product with no stock at all (e.g. its batch expired and was
-        # removed) has nothing to protect — editing is always allowed in
-        # that case, since the FPO is likely re-adding stock via this same
-        # PATCH. If stock exists, only DRAFT/ACTIVE batches stay editable.
-        if stock and stock.status not in (ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE):
-            raise BusinessLogicError(
-                message=t('marketplace.product_not_editable', self.get_language()),
-                code='product_not_editable',
-            )
+        # Product-master edits (name / commodity / description / image) are
+        # always safe — stock lifecycle restrictions live on the nested
+        # /stocks/ endpoint instead.
         serializer.save()
         _clear_public_market_cache()
 
     def perform_destroy(self, instance):
-        # Soft delete — draft only. BaseModel provides .soft_delete(), which
-        # sets is_deleted=True instead of removing the row.
-        stock = getattr(instance, 'stock', None)
-        if stock and stock.status != ProductStock.Status.DRAFT:
+        # Soft delete — only if no non-draft stock batches exist. BaseModel
+        # provides .soft_delete(), which sets is_deleted=True instead of
+        # removing the row. A product with ACTIVE/SOLD/EXPIRED batches
+        # can't be deleted — those must be ended through the stock endpoint
+        # first.
+        non_draft = instance.stocks.exclude(status=ProductStock.Status.DRAFT).exists()
+        if non_draft:
             raise BusinessLogicError(
                 message=t('marketplace.only_draft_deletable', self.get_language()),
                 code='only_draft_deletable',
@@ -245,18 +276,25 @@ class ProductViewSet(TranslatedViewSet):
     @extend_schema(tags=['Marketplace - Products'])
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
-        """draft -> active, then runs buyer-seller matching."""
+        """
+        Legacy convenience action — publishes the product's single DRAFT
+        batch. Only works when the product has exactly one DRAFT stock
+        (the common case right after Product+Stock were created together
+        via POST /products/). For multi-batch workflows, use the nested
+        POST /products/{id}/stocks/{stock_id}/publish/ action instead.
+        """
         product = self.get_object()
-        stock = getattr(product, 'stock', None)
-        if stock is None or stock.status != ProductStock.Status.DRAFT:
+        drafts = list(product.stocks.filter(status=ProductStock.Status.DRAFT))
+        if len(drafts) != 1:
             raise BusinessLogicError(
                 message=t('marketplace.only_draft_publishable', self.get_language()),
                 code='only_draft_publishable',
             )
+        stock = drafts[0]
         stock.status = ProductStock.Status.ACTIVE
         stock.save()
 
-        run_matching(product)
+        run_matching(stock)
         _clear_public_market_cache()
 
         return StandardResponse.success(
@@ -267,13 +305,20 @@ class ProductViewSet(TranslatedViewSet):
     @extend_schema(tags=['Marketplace - Products'])
     @action(detail=True, methods=['post'], url_path='mark-sold')
     def mark_sold(self, request, pk=None):
+        """
+        Legacy convenience action — marks the product's single ACTIVE
+        batch as SOLD. Only works when exactly one ACTIVE batch exists.
+        For multi-batch workflows, use the nested
+        POST /products/{id}/stocks/{stock_id}/mark-sold/ action instead.
+        """
         product = self.get_object()
-        stock = getattr(product, 'stock', None)
-        if stock is None or stock.status != ProductStock.Status.ACTIVE:
+        actives = list(product.stocks.filter(status=ProductStock.Status.ACTIVE))
+        if len(actives) != 1:
             raise BusinessLogicError(
                 message=t('marketplace.only_active_can_be_sold', self.get_language()),
                 code='only_active_can_be_sold',
             )
+        stock = actives[0]
         stock.status = ProductStock.Status.SOLD
         stock.save()
         _clear_public_market_cache()
@@ -301,7 +346,7 @@ class ProductViewSet(TranslatedViewSet):
         headers = [
             'name_en', 'name_ml', 'commodity_code', 'description_en', 'description_ml',
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
-            'available_from', 'available_until',
+            'available_from', 'available_until', 'is_public',
         ]
         header_font = Font(bold=True, color='FFFFFF')
         header_fill = PatternFill(start_color='2563EB', end_color='2563EB', fill_type='solid')
@@ -339,6 +384,7 @@ class ProductViewSet(TranslatedViewSet):
             ('quality_certification  -> Free text, e.g. FSSAI, NPOP Organic', False),
             ('available_from         -> Date in YYYY-MM-DD format (required)', False),
             ('available_until        -> Date in YYYY-MM-DD format, leave blank if open-ended', False),
+            ('is_public              -> Yes/No — show on the public Market Hub (default Yes if blank)', False),
             ('', False),
             ('All products created from this sheet go live (Active) immediately.', True),
             ('Product photos cannot be added here — add them by editing each product afterward.', True),
@@ -447,8 +493,12 @@ class ProductViewSet(TranslatedViewSet):
                 })
 
         if created_products:
+            # Bulk-import creates exactly one ACTIVE stock per product
+            # (see _create_bulk_product), so matching happens on that batch.
             for product in created_products:
-                run_matching(product)
+                batch = product.stocks.filter(status=ProductStock.Status.ACTIVE).first()
+                if batch:
+                    run_matching(batch)
             _clear_public_market_cache()
 
         return StandardResponse.success(
