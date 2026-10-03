@@ -13,7 +13,7 @@ from django.core.files.base import ContentFile
 from drf_spectacular.utils import extend_schema, OpenApiTypes
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -44,7 +44,7 @@ def _get_or_create_section(project, user):
 
 @extend_schema(tags=['FPO - DPR §2.3.5 Products & Services'])
 class DPRProductsSectionView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
     # Accept both JSON (default section-save path) and multipart (new: lets
     # clients atomically save a new product row + its image in one PATCH).
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -148,7 +148,7 @@ class DPRProductsSectionView(APIView):
     summary='Run validators (no save)',
 )
 class DPRProductsSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -178,7 +178,7 @@ class DPRProductsSectionReadinessView(APIView):
     }},
 )
 class DPRProductsImportFromMarketplaceView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     def post(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)
@@ -273,7 +273,7 @@ class DPRProductItemImageView(APIView):
     Rendered in the DPR PDF's products chapter + as the cover hero image
     (first product with a photo).
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
     parser_classes = [MultiPartParser, FormParser]
 
     def _get_item(self, request, project_uuid, item_id):

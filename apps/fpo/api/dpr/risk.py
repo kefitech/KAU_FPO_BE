@@ -2,7 +2,7 @@
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from dataclasses import asdict
@@ -35,7 +35,7 @@ def _attach_auto_pulled(data: dict, project) -> dict:
 
 @extend_schema(tags=['FPO - DPR §2.3.22 Risk Assessment'])
 class DPRRiskSectionView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(summary='Retrieve Risk Assessment section')
     def get(self, request, project_uuid):
@@ -70,7 +70,7 @@ class DPRRiskSectionView(APIView):
 
 @extend_schema(tags=['FPO - DPR §2.3.22 Risk Assessment'], summary='Run validators (no save)')
 class DPRRiskSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

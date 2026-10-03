@@ -223,8 +223,20 @@ def _convert_drf_response(exc, response: Response, language: str) -> Response:
         message = t('common.unauthorized', language)
 
     elif isinstance(exc, DRFPermissionDenied):
-        code = "permission_denied"
-        message = t('common.permission_denied', language)
+        # Preserve a custom `code` set on the permission class
+        # (e.g. HasSubmittedTierAssessment uses code='tier_assessment_required')
+        # so the FE can branch on specific denials. Falls back to the generic
+        # 'permission_denied' when the permission class doesn't override it.
+        raw_codes = exc.get_codes()
+        if isinstance(raw_codes, str) and raw_codes != 'permission_denied':
+            code = raw_codes
+            # Use the permission class's own message string instead of the
+            # generic 'permission denied' translation — it's typically
+            # action-specific ("Complete your Tier Assessment first…").
+            message = str(exc.detail) if exc.detail else t('common.permission_denied', language)
+        else:
+            code = "permission_denied"
+            message = t('common.permission_denied', language)
 
     elif isinstance(exc, NotFound):
         code = "not_found"

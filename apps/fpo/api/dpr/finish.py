@@ -17,7 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.services.audit import AuditService
@@ -34,7 +34,7 @@ from .projects import get_project_or_error
 class DPRProjectFinishView(APIView):
     """POST /projects/<uuid>/finish/ — flip IN_PROGRESS → SUBMITTED."""
 
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary="Mark the DPR as submitted (Finish click)",

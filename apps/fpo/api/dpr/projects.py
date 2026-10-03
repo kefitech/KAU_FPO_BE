@@ -11,7 +11,7 @@ Ownership: user must be primary owner or an active secondary member of the FPO.
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -56,7 +56,7 @@ def get_project_or_error(user, project_uuid):
 @extend_schema(tags=['FPO - DPR Projects'])
 class DPRProjectListCreateView(APIView):
     """List DPR projects for the current FPO, or create a new one."""
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(summary='List DPR projects for the current FPO')
     def get(self, request):
@@ -101,7 +101,7 @@ class DPRProjectDetailView(APIView):
     GET  returns full detail (all §2.2 fields + status meta).
     PATCH updates any subset of §2.2 fields (validated on submit only, not on save).
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(summary='Retrieve DPR project (§2.2 Project Identification)')
     def get(self, request, project_uuid):
@@ -134,7 +134,7 @@ class DPRProjectDetailView(APIView):
     description='Dry-run validator. Returns errors + warnings + is_complete flag. No writes.',
 )
 class DPRProjectIdentificationReadinessView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     def get(self, request, project_uuid):
         from apps.fpo.services.dpr import identification_validators

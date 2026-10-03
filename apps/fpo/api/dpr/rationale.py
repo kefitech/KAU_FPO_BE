@@ -2,7 +2,7 @@
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -23,7 +23,7 @@ def _get_or_create_section(project, user):
 
 @extend_schema(tags=['FPO - DPR §2.3.7 Project Rationale'])
 class DPRRationaleSectionView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(summary='Retrieve Project Rationale section')
     def get(self, request, project_uuid):
@@ -59,7 +59,7 @@ class DPRRationaleSectionView(APIView):
     summary='Run validators (no save)',
 )
 class DPRRationaleSectionReadinessView(APIView):
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     def get(self, request, project_uuid):
         project, err = get_project_or_error(request.user, project_uuid)

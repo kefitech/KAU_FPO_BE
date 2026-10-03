@@ -37,7 +37,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 """
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -54,7 +54,7 @@ class DPRPreFlightView(APIView):
     Side-effect-free — just runs the same _pre_final_validation as Generate
     but returns the list instead of raising. Safe to poll from the FE."""
 
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='Pre-flight check for DPR generation',

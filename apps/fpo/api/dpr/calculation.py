@@ -27,7 +27,7 @@ from django.http import FileResponse, HttpResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from apps.core.permissions.rbac import IsFPOPrimaryUser
+from apps.core.permissions.rbac import HasSubmittedTierAssessment, IsFPOPrimaryUser
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
@@ -84,7 +84,7 @@ class DPRCalculationView(APIView):
     Decimals are serialised as strings so the FE can parse without
     precision loss.
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(summary='Get 10-year financial calculation for a DPR project')
     def get(self, request, project_uuid):
@@ -125,7 +125,7 @@ class DPRPdfDownloadView(APIView):
     │ Migration path: ~1 day — see DPR_V2_BUILD_PLAN.md § "Deferred".     │
     └─────────────────────────────────────────────────────────────────────┘
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='Download the generated DPR PDF',
@@ -160,7 +160,7 @@ class DPRDocxDownloadView(APIView):
     Sync execution mirrors the PDF endpoint. python-docx is faster than
     WeasyPrint (~1-2s typical) so the timing profile is better, not worse.
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='Download the generated DPR as an editable Word file',
@@ -217,7 +217,7 @@ class DPRDocumentGenerateView(APIView):
     older versions past the retention cap are soft-archived (`is_archived=True`),
     never deleted.
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='Generate a new versioned DPR PDF',
@@ -267,7 +267,7 @@ class DPRDocumentListView(APIView):
     plus the status label (Draft / User-edited / Final) so the FPO can
     distinguish successive drafts at a glance.
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='List generated DPR documents for a project',
@@ -298,7 +298,7 @@ class DPRFinancialsExcelView(APIView):
     so they can plug them into their own model without re-typing. This is a
     read-only view over the same calc engine result the PDF renders.
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='Download the projected DPR financials as an Excel workbook',
@@ -341,7 +341,7 @@ class DPRDocumentDownloadView(APIView):
     it recorded. If the on-disk file is missing (e.g. media-volume wipe on
     a deploy), returns 410 Gone.
     """
-    permission_classes = [IsAuthenticated, IsFPOPrimaryUser]
+    permission_classes = [IsAuthenticated, IsFPOPrimaryUser, HasSubmittedTierAssessment]
 
     @extend_schema(
         summary='Download a specific version of a generated DPR PDF',
