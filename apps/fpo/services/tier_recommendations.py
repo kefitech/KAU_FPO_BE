@@ -148,11 +148,19 @@ def get_recommendations(
         for a in assessment.answers.select_related('question__criterion').all()
     }
 
-    tips = (
+    # Order by (priority ASC, closer tier first).
+    # String ASC on `target_tier` would give A→B→C — reverse of what we want
+    # (an FPO's next step is the closest tier above them, which is the one
+    # with the SMALLEST _TIER_RANK number). So we fetch unordered-by-tier
+    # and sort in Python.
+    tips_qs = (
         TierUpgradeTip.objects
         .select_related('question', 'criterion')
         .filter(is_active=True, target_tier__in=eligible_tiers)
-        .order_by('priority', 'id')
+    )
+    tips = sorted(
+        tips_qs,
+        key=lambda t: (t.priority, _TIER_RANK.get(t.target_tier, 99), t.id),
     )
 
     matches = []
