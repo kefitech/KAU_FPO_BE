@@ -27,7 +27,7 @@ from apps.core.services.fpo_permission import get_member_fpo
 from apps.marketplace.permissions import CanManageProducts
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models import BuyerSellerMatch, Inquiry, Product
+from apps.database.models import BuyerSellerMatch, Inquiry, Product, ProductStock
 from apps.marketplace.api.buyers import _resolve_buyer_user
 from apps.marketplace.serializers import InquiryCreateSerializer, InquirySerializer, MarketHubInquirySerializer
 from apps.marketplace.services import _get_buyer_row
@@ -48,7 +48,7 @@ class InquiryCreateView(APIView):
 
     @extend_schema(tags=['Marketplace - Inquiries'], summary='Submit a purchase inquiry', request=InquiryCreateSerializer)
     def post(self, request, pk):
-        buyer = _get_buyer_row(request.user)
+        buyer = _get_buyer_row(request.user, include_members=True)
         if buyer is None or buyer.status != 'verified':
             return StandardResponse.error(
                 message='Only verified buyers can submit inquiries',
@@ -56,8 +56,10 @@ class InquiryCreateView(APIView):
             )
 
         try:
-            product = Product.objects.select_related('fpo').get(
-                pk=pk, status=Product.Status.ACTIVE, is_public=True, is_deleted=False,
+            # status / is_public live on the product's current stock batch
+            # (same filter as BuyerProductListView's catalogue).
+            product = Product.objects.select_related('fpo', 'stock').get(
+                pk=pk, stock__status=ProductStock.Status.ACTIVE, stock__is_public=True, is_deleted=False,
             )
         except Product.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=http_status.HTTP_404_NOT_FOUND)

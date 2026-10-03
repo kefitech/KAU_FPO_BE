@@ -5040,6 +5040,9 @@ def seed_fpo_buyer_directory_translations(languages):
          'ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക'),
         ('fpo_buyer_directory.btn_registering', 'Registering…',
          'രജിസ്റ്റർ ചെയ്യുന്നു…'),
+        ('fpo_buyer_directory.member_register_note',
+         "Only your FPO's primary user can register the FPO as a buyer.",
+         'FPO-യെ ക്രേതാവായി രജിസ്റ്റർ ചെയ്യാൻ നിങ്ങളുടെ FPO-യുടെ പ്രാഥമിക ഉപയോക്താവിന് മാത്രമേ കഴിയൂ.'),
 
         # ── Pending state ──
         ('fpo_buyer_directory.pending_title', 'Request Pending',

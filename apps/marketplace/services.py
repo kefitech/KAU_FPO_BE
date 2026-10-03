@@ -105,13 +105,23 @@ def compute_opportunities():
 
     return sorted(opportunities, key=lambda o: o['interested_buyer_count'], reverse=True)
 
-def _get_buyer_row(user):
-    """Resolve the BuyerDirectory row for this user, whichever way they're linked."""
+def _get_buyer_row(user, include_members=False):
+    """Resolve the BuyerDirectory row for this user, whichever way they're linked.
+
+    include_members: also resolve an FPO-as-buyer through the user's active
+    FPOUserMembership, so secondary users can browse the catalogue and send
+    inquiries from the FPO portal's Buyer Directory on behalf of their FPO.
+    Off by default — buyer profile / dashboard / login redirect stay
+    owner-only.
+    """
     buyer = getattr(user, 'buyer_profile', None)
     if buyer is not None:
         return buyer
 
     fpo = getattr(user, 'fpo', None)
+    if fpo is None and include_members:
+        from apps.core.services.fpo_permission import get_member_fpo
+        fpo = get_member_fpo(user)
     if fpo is not None:
         buyer = fpo.buyer_registration.first()
         if buyer is not None:

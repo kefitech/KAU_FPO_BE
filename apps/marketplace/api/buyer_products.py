@@ -45,7 +45,7 @@ class BuyerProductListView(APIView):
     pagination_class = StandardPagination
 
     def get(self, request):
-        buyer = _get_buyer_row(request.user)
+        buyer = _get_buyer_row(request.user, include_members=True)
         if buyer is None or buyer.status != 'verified':
             return StandardResponse.error(
                 message='Only verified buyers can browse the product catalog',
@@ -134,7 +134,7 @@ class BuyerRecommendedProductsView(APIView):
     RECOMMENDED_LIMIT = 8
 
     def get(self, request):
-        buyer = _get_buyer_row(request.user)
+        buyer = _get_buyer_row(request.user, include_members=True)
         if buyer is None or buyer.status != 'verified':
             return StandardResponse.error(
                 message='Only verified buyers can browse the product catalog',

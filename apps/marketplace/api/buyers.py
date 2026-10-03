@@ -297,10 +297,11 @@ class FPOBuyerListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
         Returns the requesting FPO's own BuyerDirectory row, if any.
         Drives the 3-state UI: not registered / pending / verified.
+        Works for the primary user and active team members.
         """
-        from apps.database.models import FPO
+        from apps.core.services.fpo_permission import get_member_fpo
 
-        fpo = FPO.objects.filter(primary_user=request.user).first()
+        fpo = get_member_fpo(request.user)
         if not fpo:
             return StandardResponse.error(
                 'No FPO found for this user.',
@@ -329,10 +330,12 @@ class FPOBuyerListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
         Primary User only. Registers the requesting FPO as a buyer —
         creates a pending BuyerDirectory row awaiting KAU verification.
+        Team members resolve to their FPO so they get the 403 below rather
+        than a misleading "No FPO found".
         """
-        from apps.database.models import FPO
+        from apps.core.services.fpo_permission import get_member_fpo
 
-        fpo = FPO.objects.filter(primary_user=request.user).first()
+        fpo = get_member_fpo(request.user)
         if not fpo:
             return StandardResponse.error(
                 'No FPO found for this user.',
