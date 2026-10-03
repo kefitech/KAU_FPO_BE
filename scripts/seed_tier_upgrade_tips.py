@@ -100,6 +100,57 @@ _TIPS = [
     (28, 'score_below_max', {}, 'A', 3,
         'Access convergence schemes — apply for support under PM-KISAN FPO, NABARD, SFAC, and state agriculture schemes.',
         'PM-KISAN FPO, NABARD, SFAC, സംസ്ഥാന കാർഷിക പദ്ധതികളിലേക്ക് അപേക്ഷിക്കുക.'),
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Tier C tips — basic-compliance jumps for Tier D FPOs (D → C step).
+    # Thresholds are deliberately lower than the existing Tier B/A set so
+    # a Tier D FPO sees achievable short-term actions first.
+    # ─────────────────────────────────────────────────────────────────────
+
+    # Domain I — Governance
+    (2, 'value_below_threshold', {'threshold': 1}, 'C', 1,
+        'Add at least 1 woman director to the Board — a basic representation requirement for Tier C.',
+        'ടയർ C-ക്ക് ബോർഡിൽ കുറഞ്ഞത് 1 വനിതാ ഡയറക്ടറെ ഉൾപ്പെടുത്തുക.'),
+    (3, 'value_below_threshold', {'threshold': 2}, 'C', 2,
+        'Have at least 2 Small and Marginal Farmer directors on the Board to reflect your membership base.',
+        'ബോർഡിൽ കുറഞ്ഞത് 2 ചെറുകിട-നാമമാത്ര കർഷക ഡയറക്ടർമാരെ ഉൾപ്പെടുത്തുക.'),
+    (4, 'value_below_threshold', {'threshold': 2}, 'C', 1,
+        'Hold at least 2 Board Meetings in the financial year (one every six months) — the minimum for Tier C.',
+        'ടയർ C-ക്ക് ഒരു സാമ്പത്തിക വർഷത്തിൽ കുറഞ്ഞത് 2 ബോർഡ് മീറ്റിംഗുകൾ (ആറ് മാസത്തിലൊരിക്കൽ) നടത്തുക.'),
+
+    # Domain II — Human Resources
+    (7, 'answer_not_in', {'values': ['fulltime_ceo', 'parttime_ceo']}, 'C', 2,
+        'Appoint at least a part-time CEO or Manager to coordinate FPO activities — a basic Tier C requirement.',
+        'ടയർ C-ക്ക് ഒരു പാർട്ട്-ടൈം CEO/മാനേജർ നിയമിക്കുക.'),
+
+    # Domain III — Membership
+    (13, 'value_below_threshold', {'threshold': 50}, 'C', 1,
+        'Reach at least 50 active members for Tier C — enrol through village meetings and member-referral drives.',
+        'ടയർ C-ക്ക് കുറഞ്ഞത് 50 സജീവ അംഗങ്ങൾ എത്തിക്കുക.'),
+
+    # Domain IV — Financials
+    (16, 'value_below_threshold', {'threshold': 50000}, 'C', 1,
+        'Mobilise at least ₹50,000 in share capital — ask every member to purchase at least one share.',
+        'ടയർ C-ക്ക് കുറഞ്ഞത് ₹50,000 ഷെയർ ക്യാപിറ്റൽ സമാഹരിക്കുക.'),
+    (17, 'value_below_threshold', {'threshold': 200000}, 'C', 1,
+        'Cross ₹2 lakh annual turnover for Tier C — start regular transactions with buyers and establish steady revenue.',
+        'ടയർ C-ക്ക് വാർഷിക വരുമാനം ₹2 ലക്ഷം കടക്കുക.'),
+
+    # Domain V — Infrastructure
+    (21, 'answer_not_in', {'values': ['own_office', 'rented_office', 'shared_office']}, 'C', 2,
+        'Arrange at least a shared office space — have a basic operating base to meet Tier C.',
+        'ടയർ C-ക്ക് കുറഞ്ഞത് ഒരു പങ്കിട്ട ഓഫീസ് ഇടം ഏർപ്പെടുത്തുക.'),
+
+    # Domain VI — Market & Planning
+    (26, 'score_below_max', {}, 'C', 2,
+        'Use at least 2 market channels (e.g. local market + direct-to-consumer) — basic diversification for Tier C.',
+        'ടയർ C-ക്ക് കുറഞ്ഞത് 2 വിപണന ചാനലുകൾ ഉപയോഗിക്കുക.'),
+    (27, 'answer_not_in', {'values': ['3year_plan', 'annual_plan']}, 'C', 1,
+        'Prepare at least an Annual Business Plan — basic planning is required for Tier C.',
+        'ടയർ C-ക്ക് കുറഞ്ഞത് ഒരു വാർഷിക ബിസിനസ് പ്ലാൻ തയ്യാറാക്കുക.'),
+    (28, 'score_below_max', {}, 'C', 2,
+        'Apply to at least 1 convergence scheme — PM-KISAN FPO, NABARD, or a state agriculture scheme.',
+        'ടയർ C-ക്ക് കുറഞ്ഞത് 1 കൺവർജൻസ് സ്കീമിലേക്ക് അപേക്ഷിക്കുക.'),
 ]
 
 
