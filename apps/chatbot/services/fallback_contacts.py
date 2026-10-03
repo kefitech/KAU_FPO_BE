@@ -289,26 +289,27 @@ def build_footer(district_code: str, lang: str) -> str:
 
 
 def augment_reply(reply_text: str, user, hint: str, lang: str, user_message: str = '') -> str:
-    """Rewrite a refusal reply into something actionable.
+    """Attach a district footer (KVK + sub-admin) to refusals when the
+    user's district is known.
 
     1. If the reply doesn't look like a refusal, return unchanged.
-    2. Detect the user's INTENT from `user_message` and replace the
-       generic refusal sentence with an intent-specific pointer.
-    3. Append the district footer (KVK + sub-admin) if a district can
+    2. Append the district footer (KVK + sub-admin) if a district can
        be resolved from the user's profile or `hint`.
+
+    Intent-based rewriting (replacing "Sorry, I couldn't…" with a
+    product/scheme/expert pointer) is intentionally disabled — testers
+    (BUG-12 retest, 2026-10-03) wanted one uniform refusal across every
+    off-topic / can't-help path. The intent helpers (`_detect_intent`,
+    the `_INTENTS` table) are kept in-file for reference but no longer
+    wired here. Reintroducing them means swapping both the keyword table
+    for ambiguous terms like "stock" and ensuring the new wording still
+    reads as a refusal to `_looks_like_refusal`.
     """
     if not _looks_like_refusal(reply_text):
         return reply_text
 
     result = reply_text
 
-    # Step 1 — intent rewrite
-    intent = _detect_intent(user_message)
-    if intent:
-        line = intent.get(lang) or intent['en']
-        result = _rewrite_refusal_line(result, line)
-
-    # Step 2 — district footer
     district = _user_district(user, hint=hint)
     if district:
         footer = build_footer(district, lang)
