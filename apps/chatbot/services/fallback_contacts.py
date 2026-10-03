@@ -19,16 +19,39 @@ produced.
 from apps.core.utils.constants import get_district_name
 
 
+# Single canonical refusal — used by _fallback_reply(), the Gemini prompt
+# (case C), and anywhere else the chatbot has to say "I don't know". Three
+# different wordings pre-fix (BUG-12) made the UX feel inconsistent.
+SUPPORT_EMAIL = 'de@kau.in'
+
+GENERIC_REFUSAL_EN = (
+    "Sorry, I couldn't answer that from what I know. "
+    "Please rephrase your question, or contact KAU support at "
+    f"{SUPPORT_EMAIL} for help."
+)
+GENERIC_REFUSAL_ML = (
+    "ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. "
+    "ദയവായി മറ്റൊരു രീതിയിൽ ചോദിക്കുക, അല്ലെങ്കിൽ "
+    f"{SUPPORT_EMAIL}-ൽ KAU സപ്പോർട്ടിനെ ബന്ധപ്പെടുക."
+)
+
+
+def generic_refusal(lang: str = 'en') -> str:
+    return GENERIC_REFUSAL_ML if lang == 'ml' else GENERIC_REFUSAL_EN
+
+
 # Text that we consider a "refusal / can't help" reply. We match on any of
 # these phrases so the augmentation still triggers whether Gemini or the
 # extractive fallback produced the reply. Case-insensitive.
 _REFUSAL_MARKERS = (
     "that's not something i can help",
     "i couldn't find an answer",
+    "i couldn't answer that",
     "please rephrase",
-    'de@kau.in',
+    SUPPORT_EMAIL,
     'kau സപ്പോർട്ട്',
     'സഹായിക്കാൻ കഴിയാത്ത',
+    'ഉത്തരം തരാൻ കഴിഞ്ഞില്ല',
 )
 
 

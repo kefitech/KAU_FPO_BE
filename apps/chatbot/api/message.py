@@ -184,6 +184,15 @@ class ChatMessageView(APIView):
             the user has somewhere to go next.
             """
             reply_text = augment_fallback(reply_text, request.user, district_hint, lang, user_message=message)
+            # BUG-15 — refusals shouldn't carry sources. The retrieved entries
+            # didn't actually answer the question, so citing them is noise
+            # (testers reported seeing e.g. "How to register an FPO" sources
+            # attached to a feature-flag refusal). Strip after augment_fallback
+            # so the detector sees the final text, including intent-aware
+            # rewrites. Also drop sources on explicit low-confidence replies.
+            from apps.chatbot.services.fallback_contacts import _looks_like_refusal
+            if _looks_like_refusal(reply_text) or confidence < 0.5:
+                sources = []
             save_turn(
                 conversation,
                 role='assistant',
@@ -251,7 +260,7 @@ class ChatMessageView(APIView):
         )
 
         if not entries:
-            return _reply(_fallback_reply(), generator='none', confidence=0.0)
+            return _reply(_fallback_reply(lang), generator='none', confidence=0.0)
 
         # Primary path — Gemini via the shared LLM gateway. Returns None if
         # the service is disabled, over budget, or the call errors — in any
@@ -283,7 +292,7 @@ class ChatMessageView(APIView):
             # Low-confidence: fall back to the top-ranked entry's body_en
             # verbatim. Still grounded in retrieved KB (no hallucination)
             # and usually more useful than a bland fallback.
-            reply = entries[0].body_en if entries else _fallback_reply()
+            reply = entries[0].body_en if entries else _fallback_reply(lang)
 
         return _reply(
             reply,
@@ -293,12 +302,10 @@ class ChatMessageView(APIView):
         )
 
 
-def _fallback_reply() -> str:
-    """Static message when we can't find anything useful.
-
-    Post-UAT: swap for a translated version via TranslationService.
-    """
-    return (
-        "I couldn't find an answer to that. Please rephrase your question, "
-        "or contact KAU support at de@kau.in for help."
-    )
+def _fallback_reply(lang: str = 'en') -> str:
+    """Static message when we can't find anything useful. Pulls the
+    canonical wording from fallback_contacts so EN + ML stay in sync and
+    the three generic-refusal paths (Gemini case C, extractive, no-KB)
+    all read the same (BUG-12)."""
+    from apps.chatbot.services.fallback_contacts import generic_refusal
+    return generic_refusal(lang)
