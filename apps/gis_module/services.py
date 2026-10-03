@@ -36,15 +36,17 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-OPENWEATHERMAP_URL = "https://api.openweathermap.org/data/2.5/weather"
+OPENWEATHERMAP_URL = "https://api.openweathermap.org/data/2.5/weather"  # used when the entry's API URL is blank
 NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
 
-def _get_weather_api_key() -> str | None:
+def _get_weather_api_settings() -> tuple[str, str] | None:
     """
     Looks up the active weather_api credential from ExternalAPISettings.
-    Returns None if no entry exists, it's inactive, or has no api_key —
-    any of which triggers the simulated fallback in get_weather_for_point().
+    Returns (api_key, url), url being the entry's API URL or
+    OPENWEATHERMAP_URL when that is blank. Returns None if no entry
+    exists, it's inactive, or has no api_key — any of which triggers
+    the simulated fallback in get_weather_for_point().
     """
     from apps.database.models import ExternalAPISettings
     from apps.notifications.utils import decrypt_config
@@ -55,8 +57,10 @@ def _get_weather_api_key() -> str | None:
     if not settings_obj or not settings_obj.config:
         return None
 
-    config = decrypt_config(settings_obj.config)
-    return config.get('api_key') or None
+    api_key = decrypt_config(settings_obj.config).get('api_key')
+    if not api_key:
+        return None
+    return api_key, (settings_obj.api_url or '').strip() or OPENWEATHERMAP_URL
 
 
 def find_zone_for_point(lat: float, lng: float):
@@ -252,13 +256,14 @@ def _fetch_real_weather(lat: float, lng: float) -> dict | None:
     when False, vs. "illustrative seasonal estimate" when True. Don't
     conflate the two when interpreting stored FPOWeatherSnapshot rows.
     """
-    api_key = _get_weather_api_key()
-    if not api_key:
+    api = _get_weather_api_settings()
+    if not api:
         return None
+    api_key, url = api
 
     try:
         response = httpx.get(
-            OPENWEATHERMAP_URL,
+            url,
             params={'lat': lat, 'lon': lng, 'appid': api_key, 'units': 'metric'},
             timeout=5.0,
         )

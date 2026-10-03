@@ -16,7 +16,12 @@ Config shapes per service:
     pan_verification   → { api_key, client_id, base_url }
     gstin_verification → { api_key, client_id, base_url }
     cin_verification   → { api_key, client_id, base_url }
-    youtube_api        → { api_key }  (api_url: https://www.googleapis.com/youtube/v3)
+    weather_api        → { api_key }  (api_url optional, blank uses https://api.openweathermap.org/data/2.5/weather)
+    youtube_api        → { api_key }  (api_url optional, blank uses https://www.googleapis.com/youtube/v3)
+
+Services listed in REQUIRED_CONFIG_KEYS cannot be saved or activated without
+those keys, since their integrations read them by exact name. Services in
+DEFAULT_URL_SERVICES can be activated with a blank api_url.
 
 Sensitive fields (encrypted at rest, masked as •••••••• in responses):
     api_key, client_id, password, secret
@@ -38,6 +43,31 @@ from apps.notifications.utils import encrypt_config, decrypt_config
 logger = logging.getLogger(__name__)
 
 SENSITIVE_FIELDS = {'api_key', 'client_id', 'password', 'secret'}
+
+# Config keys each integration reads by exact name (apps/gis_module/services.py,
+# apps/core/services/youtube.py). Missing ones silently disable the integration,
+# so they are enforced here. Keep in sync with the admin External API dialog.
+REQUIRED_CONFIG_KEYS = {
+    ExternalAPISettings.SERVICE_WEATHER: ['api_key'],
+    ExternalAPISettings.SERVICE_YOUTUBE: ['api_key'],
+}
+
+# Integrations that use a built-in URL when api_url is blank (OPENWEATHERMAP_URL,
+# youtube.API_BASE_URL), so activating them does not need one.
+DEFAULT_URL_SERVICES = {ExternalAPISettings.SERVICE_WEATHER, ExternalAPISettings.SERVICE_YOUTUBE}
+
+
+def _missing_config_keys(service: str, config: dict) -> list:
+    return [k for k in REQUIRED_CONFIG_KEYS.get(service, []) if not str(config.get(k) or '').strip()]
+
+
+def _missing_config_error(service: str, missing: list):
+    label = dict(ExternalAPISettings.SERVICE_CHOICES).get(service, service)
+    return StandardResponse.error(
+        message=f'{label} requires config field(s): {", ".join(missing)}.',
+        errors={'config': {k: 'This field is required.' for k in missing}},
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 def _mask_config(config: dict) -> dict:
@@ -151,6 +181,10 @@ class ExternalAPISettingsListView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        missing = _missing_config_keys(service, data.get('config', {}))
+        if missing:
+            return _missing_config_error(service, missing)
+
         obj = ExternalAPISettings.objects.create(
             service = service,
             api_url = data.get('api_url', ''),
@@ -193,13 +227,17 @@ class ExternalAPISettingsDetailView(APIView):
 
         data = serializer.validated_data
 
+        config = decrypt_config(obj.config or {})
+        config.update(data.get('config', {}))
+        missing = _missing_config_keys(obj.service, config)
+        if missing:
+            return _missing_config_error(obj.service, missing)
+
         if 'api_url' in data:
             obj.api_url = data['api_url']
 
         if 'config' in data:
-            existing = decrypt_config(obj.config or {})
-            existing.update(data['config'])
-            obj.config = encrypt_config(existing)
+            obj.config = encrypt_config(config)
 
         obj.save()
         return StandardResponse.success(
@@ -214,13 +252,14 @@ class ExternalAPISettingsActivateView(APIView):
     @extend_schema(
         tags=['Admin - External APIs'],
         summary='Activate external API',
-        description='Enables live API verification. Requires api_url and config to be set first.',
+        description='Enables live API verification. Requires config, and api_url except for '
+                    'weather_api / youtube_api, which fall back to their default URL.',
         responses={200: OpenApiResponse(description='Activated')},
     )
     def post(self, request, pk):
         obj = _get_obj(pk)
 
-        if not obj.api_url:
+        if not obj.api_url and obj.service not in DEFAULT_URL_SERVICES:
             return StandardResponse.error(
                 message='Set api_url before activating.',
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -231,6 +270,10 @@ class ExternalAPISettingsActivateView(APIView):
                 message='Set credentials (config) before activating.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+
+        missing = _missing_config_keys(obj.service, decrypt_config(obj.config))
+        if missing:
+            return _missing_config_error(obj.service, missing)
 
         obj.is_active = True
         obj.save(update_fields=['is_active', 'updated_at'])

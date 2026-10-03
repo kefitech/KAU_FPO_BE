@@ -39,7 +39,7 @@ from apps.database.models.cms import (
 )
 from apps.database.models.language import Language
 from apps.core.services.youtube import (
-    YOUTUBE_CHANNEL_BLOCK, extract_playlist_id, fetch_playlist_feed, get_youtube_channel_url,
+    YOUTUBE_CHANNEL_BLOCK, YouTubeLookupError, extract_playlist_id, fetch_playlist_feed, get_youtube_channel_url,
 )
 
 
@@ -2472,7 +2472,10 @@ class YoutubePlaylistSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         playlist_id = getattr(self, '_playlist_id', None)
         if playlist_id and (self.instance is None or self.instance.playlist_id != playlist_id):
-            feed = fetch_playlist_feed(playlist_id, use_cache=False)
+            try:
+                feed = fetch_playlist_feed(playlist_id, use_cache=False, strict=True)
+            except YouTubeLookupError as exc:
+                raise serializers.ValidationError({'playlist_url': str(exc)}) from exc
             if feed is None:
                 raise serializers.ValidationError(
                     {'playlist_url': 'Playlist not found or is private. Make sure it is public on YouTube.'}
