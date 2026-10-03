@@ -31,6 +31,7 @@ import io
 import secrets
 import re
 
+from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import transaction
@@ -64,6 +65,19 @@ EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _welcome_cta_context():
+    """
+    Common extras added to every secondary-user welcome email so the HTML
+    template renders a "Login to KAU-FPO" button that opens the login page
+    in one click. Settings.FRONTEND_URL defaults to '' — if unset, the
+    email template skips the button block cleanly.
+    """
+    return {
+        'button_link': getattr(django_settings, 'FRONTEND_URL', ''),
+        'button_text': 'Login to KAU-FPO',
+    }
+
 
 def _get_primary_fpo(user):
     """Return FPO only if this user is the primary user."""
@@ -321,9 +335,10 @@ class TeamInviteView(APIView):
             code='welcome',
             channel='email',
             context={
-                'user_name':    f'{data["first_name"]} {data["last_name"]}',
-                'email':        data['email'],
+                'user_name':     f'{data["first_name"]} {data["last_name"]}',
+                'email':         data['email'],
                 'temp_password': temp_password,
+                **_welcome_cta_context(),
             },
             lang=lang,
         )
@@ -624,6 +639,7 @@ class TeamResetPasswordView(APIView):
                 'user_name':     membership.user.get_full_name(),
                 'email':         membership.user.email,
                 'temp_password': temp_password,
+                **_welcome_cta_context(),
             },
             lang=lang,
         )
@@ -712,6 +728,7 @@ def _create_member(fpo, row, inviter, lang):
             'user_name':     f'{first_name} {last_name}',
             'email':         email,
             'temp_password': temp_password,
+            **_welcome_cta_context(),
         },
         lang=lang,
     )
