@@ -47,6 +47,11 @@ def _audience_filter(user_role: Optional[str]) -> Q:
     return Q(audiences__contains=[AUDIENCE_ALL]) | Q(audiences__contains=[user_role])
 
 
+def _has_malayalam(text: str) -> bool:
+    """True if the string contains any Malayalam Unicode codepoints."""
+    return any('ഀ' <= c <= 'ൿ' for c in text)
+
+
 def retrieve(
     query: str,
     user_role: Optional[str] = None,
@@ -69,13 +74,28 @@ def retrieve(
     if not query or not query.strip():
         return []
 
-    ts_query = SearchQuery(query, config='english', search_type='websearch')
+    # Postgres text search needs a config matching the query language. The
+    # English parser stems/lower-cases/removes English stopwords — it does
+    # the wrong thing with Malayalam text and often matches on accidental
+    # fragments ('ha', 'ki', ...) returning irrelevant generic entries
+    # (KAU #4 QA bug — Malayalam queries got "Public market hub", "What
+    # is KAU-FPO Platform", "Switch language"). For Malayalam queries use
+    # `simple` which keeps tokens literal — most of the KB is English so
+    # we'll usually return an empty list → fallback refusal fires, which
+    # is a correct failure, not a confusing one.
+    config = 'simple' if _has_malayalam(query) else 'english'
+    ts_query = SearchQuery(query, config=config, search_type='websearch')
+    vector = _SEARCH_VECTOR if config == 'english' else (
+        SearchVector('topic',    weight='A', config='simple')
+        + SearchVector('keywords', weight='B', config='simple')
+        + SearchVector('body_en',  weight='C', config='simple')
+    )
 
     qs = (
         ChatKnowledgeEntry.objects
         .filter(is_active=True, is_deleted=False)
         .filter(_audience_filter(user_role))
-        .annotate(rank=SearchRank(_SEARCH_VECTOR, ts_query))
+        .annotate(rank=SearchRank(vector, ts_query))
         # NB: we oversample here (3x) then re-rank client-side by page match.
         # Cheap because the FTS index makes the shortlist fast.
         .filter(rank__gt=0.0)
