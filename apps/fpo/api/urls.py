@@ -29,7 +29,7 @@ from .claim import FPOClaimView, FPOClaimRespondView, FPOClaimDocumentUploadView
 from .schemes import SchemeListPublicView, SchemeDetailPublicView
 from .team import (
     TeamListView, TeamInviteView, TeamDeactivateView,
-    TeamBulkInviteView, TeamBulkInviteFileView,
+    TeamBulkInviteView, TeamBulkInviteFileView, TeamBulkInviteTemplateView,
     TeamBulkActivateView, TeamBulkDeactivateView,
     TeamResetPasswordView,
     TeamAvailablePermissionsView, TeamMemberPermissionsView, TeamBulkPermissionsView,
@@ -99,6 +99,7 @@ urlpatterns = [
     path('me/team/invite/',                     TeamInviteView.as_view(),         name='fpo-team-invite'),
     path('me/team/bulk-invite/',                TeamBulkInviteView.as_view(),     name='fpo-team-bulk-invite'),
     path('me/team/bulk-invite-file/',           TeamBulkInviteFileView.as_view(), name='fpo-team-bulk-invite-file'),
+    path('me/team/bulk-invite-template/',       TeamBulkInviteTemplateView.as_view(), name='fpo-team-bulk-invite-template'),
     path('me/team/bulk-activate/',              TeamBulkActivateView.as_view(),   name='fpo-team-bulk-activate'),
     path('me/team/bulk-deactivate/',            TeamBulkDeactivateView.as_view(), name='fpo-team-bulk-deactivate'),
     path('me/team/<int:user_id>/deactivate/',     TeamDeactivateView.as_view(),     name='fpo-team-deactivate'),

@@ -897,6 +897,170 @@ class TeamBulkInviteFileView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Bulk invite template — downloadable .xlsx (3 sheets)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TeamBulkInviteTemplateView(APIView):
+    """
+    GET /api/fpo/me/team/bulk-invite-template/
+
+    Returns a styled .xlsx with:
+      - Instructions sheet (how to fill, column reference, do's/don'ts)
+      - Members sheet (header + 3 sample rows — delete before uploading)
+      - Role Codes sheet (reference — currently all invites create a
+        secondary member, so the sheet documents that explicitly)
+
+    Mirrors the sub-admin bulk-invite-template pattern in
+    apps/accounts/api/sub_admins.py so FPOs get a consistent experience
+    across the two bulk-invite flows.
+    """
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Team'],
+        summary='Download the bulk-invite .xlsx template',
+        description=(
+            'Returns an .xlsx with Instructions / Members / Role Codes sheets. '
+            'Primary user fills the Members sheet and re-uploads via '
+            'POST /api/fpo/me/team/bulk-invite-file/.'
+        ),
+        responses={200: None},
+    )
+    def get(self, request):
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+        fpo = _get_primary_fpo(request.user)
+        if fpo is None:
+            return StandardResponse.error(
+                'Only the FPO primary user can access the bulk-invite template.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        KAU_NAVY   = '1F3864'
+        KAU_ORANGE = 'E86C1A'
+        BG_LIGHT   = 'F5F7FA'
+
+        thin   = Side(border_style='thin', color='D0D5DD')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        wb = openpyxl.Workbook()
+
+        # ── Sheet 1 — Instructions ────────────────────────────────────────
+        info = wb.active
+        info.title = 'Instructions'
+
+        info['A1'] = 'KAU-FPO — Secondary User Bulk Invite Template'
+        info['A1'].font      = Font(name='Calibri', size=16, bold=True, color=KAU_NAVY)
+        info['A1'].alignment = Alignment(horizontal='left', vertical='center')
+        info.row_dimensions[1].height = 28
+
+        info['A3'] = 'How to use this template'
+        info['A3'].font = Font(name='Calibri', size=12, bold=True, color=KAU_ORANGE)
+        instructions = [
+            '1. Open the "Members" sheet.',
+            '2. Fill one row per secondary user under the header row. Remove the sample rows before uploading.',
+            '3. email must be unique and not already in use on the platform.',
+            '4. phone is optional — 10 digits if provided.',
+            '5. All invited users land as secondary members of your FPO; they must change their password on first login.',
+            '6. Save the file (keep it as .xlsx) and upload via FPO Portal → Team → Bulk Invite → Upload File.',
+            '7. Rows that fail validation (duplicate email, invalid phone, missing name, etc.) come back listed in the upload result.',
+        ]
+        for i, line in enumerate(instructions, start=4):
+            info[f'A{i}'] = line
+            info[f'A{i}'].font      = Font(name='Calibri', size=11, color='344054')
+            info[f'A{i}'].alignment = Alignment(wrap_text=True, vertical='top')
+
+        info['A13'] = 'Column reference'
+        info['A13'].font = Font(name='Calibri', size=12, bold=True, color=KAU_ORANGE)
+        col_reference = [
+            ('first_name', 'Required. Secondary user\'s first name.'),
+            ('last_name',  'Optional. Secondary user\'s last name.'),
+            ('email',      'Required. Login email. Must be unique across the platform.'),
+            ('phone',      'Optional. 10-digit Indian mobile number.'),
+        ]
+        for i, (name, desc) in enumerate(col_reference, start=14):
+            info[f'A{i}'] = name
+            info[f'B{i}'] = desc
+            info[f'A{i}'].font      = Font(name='Calibri', size=10, bold=True, color=KAU_NAVY)
+            info[f'B{i}'].font      = Font(name='Calibri', size=10, color='344054')
+            info[f'A{i}'].alignment = Alignment(vertical='top')
+            info[f'B{i}'].alignment = Alignment(wrap_text=True, vertical='top')
+
+        info.column_dimensions['A'].width = 20
+        info.column_dimensions['B'].width = 90
+
+        # ── Sheet 2 — Members (data entry) ────────────────────────────────
+        ws = wb.create_sheet('Members')
+        headers = ['first_name', 'last_name', 'email', 'phone']
+        ws.append(headers)
+
+        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        header_fill = PatternFill('solid', fgColor=KAU_NAVY)
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font      = header_font
+            cell.fill      = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border    = border
+        ws.row_dimensions[1].height = 26
+
+        sample_rows = [
+            ['Rajesh', 'Kumar', 'rajesh@example.com', '9876543210'],
+            ['Priya',  'Nair',  'priya@example.com',  '9876543211'],
+            ['Anil',   'Menon', 'anil@example.com',   ''],
+        ]
+        for r_idx, row in enumerate(sample_rows, start=2):
+            for c_idx, val in enumerate(row, start=1):
+                cell = ws.cell(row=r_idx, column=c_idx, value=val)
+                cell.font      = Font(name='Calibri', size=10, italic=True, color='667085')
+                cell.alignment = Alignment(vertical='center')
+                cell.border    = border
+                if r_idx % 2 == 0:
+                    cell.fill = PatternFill('solid', fgColor=BG_LIGHT)
+
+        ws.freeze_panes = 'A2'
+        for col, w in {'A': 18, 'B': 18, 'C': 36, 'D': 16}.items():
+            ws.column_dimensions[col].width = w
+
+        # ── Sheet 3 — Role Codes reference ────────────────────────────────
+        ref = wb.create_sheet('Role Codes')
+        ref.append(['role', 'description'])
+        for col_idx in (1, 2):
+            cell = ref.cell(row=1, column=col_idx)
+            cell.font      = header_font
+            cell.fill      = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border    = border
+        ref.row_dimensions[1].height = 24
+
+        role_rows = [
+            ('secondary', 'Default role for every row in this template. Secondary users share FPO data but cannot touch Tier Assessment, DPR, or FPO profile edits.'),
+        ]
+        for i, (code, desc) in enumerate(role_rows, start=2):
+            ref.cell(row=i, column=1, value=code).font = Font(name='Calibri', size=10, bold=True, color=KAU_NAVY)
+            ref.cell(row=i, column=2, value=desc).font = Font(name='Calibri', size=10, color='344054')
+            for c_idx in (1, 2):
+                cell = ref.cell(row=i, column=c_idx)
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+                cell.border    = border
+
+        ref.column_dimensions['A'].width = 14
+        ref.column_dimensions['B'].width = 90
+        ref.freeze_panes = 'A2'
+
+        # Save + return
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        response = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="fpo_team_bulk_invite_template.xlsx"'
+        return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Bulk activate / deactivate
 # ─────────────────────────────────────────────────────────────────────────────
 
