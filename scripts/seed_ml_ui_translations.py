@@ -107,6 +107,7 @@ def seed_ml_ui_translations():
             'category_expert':          'വിദഗ്ധ ബുക്കിംഗുകൾ',
             'category_training':        'പരിശീലനം',
             'category_marketplace':     'വിപണി',
+            'category_schemes':         'പദ്ധതികൾ & സബ്‌സിഡികൾ',
             'category_other':           'പൊതുവായവ',
             'empty_category':           '{category} വിഭാഗത്തിൽ അറിയിപ്പുകളൊന്നുമില്ല',
             'category_heading':         'വിഭാഗങ്ങൾ',

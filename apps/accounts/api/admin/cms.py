@@ -190,7 +190,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         model  = Announcement
         fields = [
             'id', 'title', 'body', 'category', 'category_display', 'published_date',
-            'is_active', 'order', 'created_at', 'updated_at',
+            'end_date', 'is_active', 'order', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'category_display', 'created_at', 'updated_at']
 
@@ -565,11 +565,12 @@ class QuickLinkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = QuickLink
-        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'is_active', 'order', 'created_at']
+        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'end_date', 'is_active', 'order', 'created_at']
         extra_kwargs = {
             'logo':      {'write_only': True, 'required': True},
             'is_active': {'default': True},
             'order':     {'required': False},
+            'end_date':  {'required': False, 'allow_null': True},
         }
 
     def get_logo_url(self, obj):
@@ -1394,10 +1395,11 @@ class NewsSourceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = NewsSource
-        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'category', 'is_active', 'created_at']
+        fields = ['id', 'name', 'url', 'logo', 'logo_url', 'category', 'end_date', 'is_active', 'created_at']
         extra_kwargs = {
             'logo':      {'write_only': True, 'required': False},
             'is_active': {'default': True},
+            'end_date':  {'required': False, 'allow_null': True},
         }
 
     def get_logo_url(self, obj):

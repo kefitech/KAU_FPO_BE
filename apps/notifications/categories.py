@@ -23,6 +23,10 @@ CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
     ('expert',          ('expert_',)),
     ('training',        ('fpo_training_', 'training_')),
     ('marketplace',     ('inquiry_',)),
+    # KAU #4 — Schemes & Subsidies bucket. `scheme_` covers approved codes
+    # (scheme_published, scheme_updated, etc.); `subsidy_` reserved for the
+    # subsidy-specific codes planned in the next release.
+    ('schemes',         ('scheme_', 'subsidy_')),
 ]
 
 CATEGORY_KEYS = [key for key, _ in CATEGORIES] + [OTHER]

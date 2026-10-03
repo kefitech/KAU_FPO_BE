@@ -108,6 +108,14 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=1, minute=30),
     },
 
+    # KAU — nightly auto-expire of public CMS content (Announcements,
+    # QuickLinks, NewsSources) whose `end_date` has passed. Flips
+    # is_active=False so the already-filtered public API hides them.
+    'expire-public-cms-content': {
+        'task': 'core.expire_public_cms_content',
+        'schedule': crontab(hour=2, minute=0),
+    },
+
     # Sync FPO data with external systems (if applicable)
     'sync-external-data': {
         'task': 'apps.fpo.tasks.sync_external_data',

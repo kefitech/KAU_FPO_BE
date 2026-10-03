@@ -66,6 +66,11 @@ class Announcement(BaseModel):
     category       = models.CharField(max_length=20, choices=AnnouncementCategory.choices,
                                       default=AnnouncementCategory.ANNOUNCEMENT)
     published_date = models.DateField(null=True, blank=True)
+    end_date       = models.DateField(
+        null=True, blank=True,
+        help_text='Optional expiry date — once passed, expire_public_cms_content flips is_active=False '
+                  'so the item vanishes from public pages. Null = indefinite.',
+    )
     is_active      = models.BooleanField(default=True)
     order          = models.PositiveSmallIntegerField(default=0)
 
@@ -114,6 +119,11 @@ class QuickLink(BaseModel):
     name      = models.CharField(max_length=200, help_text='Admin label — not shown publicly')
     url       = models.URLField(max_length=500)
     logo      = models.ImageField(upload_to=_quick_link_logo_path, null=True, blank=True)
+    end_date  = models.DateField(
+        null=True, blank=True,
+        help_text='Optional expiry date — once passed, expire_public_cms_content flips is_active=False '
+                  'so the link vanishes from public pages. Null = indefinite.',
+    )
     is_active = models.BooleanField(default=True)
     order     = models.PositiveIntegerField(default=0, help_text='Display order — lower first')
 
@@ -247,6 +257,11 @@ class NewsSource(BaseModel):
     logo      = models.ImageField(upload_to=_news_source_logo_path, null=True, blank=True)
     category  = models.CharField(max_length=20, choices=NewsSourceCategory.choices,
                                  default=NewsSourceCategory.NEWSPAPER)
+    end_date  = models.DateField(
+        null=True, blank=True,
+        help_text='Optional expiry date — once passed, expire_public_cms_content flips is_active=False '
+                  'so the source vanishes from public pages. Null = indefinite.',
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
