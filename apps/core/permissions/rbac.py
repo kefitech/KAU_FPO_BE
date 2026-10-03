@@ -433,6 +433,40 @@ class IsFPOPrimaryUser(BasePermission):
         return FPO.objects.filter(primary_user=user, is_deleted=False).exists()
 
 
+class HasSubmittedTierAssessment(BasePermission):
+    """
+    Gate for DPR access — the FPO must have at least one SUBMITTED
+    FPOAssessment (final tier assigned) before any DPR endpoint is
+    reachable. KAU rule: 'If they do the tier assessment, then they can
+    start the DPR.'
+
+    Applied alongside IsFPOPrimaryUser on DPR views. Returns 403 with the
+    tier_assessment_required code so the FE can show a 'Complete your
+    Tier Assessment first' message instead of a generic denial.
+    """
+    # Plain string instead of t('…') at class-definition time — DRF reads the
+    # attribute once per class, and resolving a translation key here before the
+    # Translation table is loaded logs a 'not found' warning on every import.
+    message = 'Complete your Tier Assessment before starting a DPR.'
+    code    = 'tier_assessment_required'
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        from apps.database.models.fpo import FPO, FPOAssessment
+        fpo_ids = FPO.objects.filter(
+            primary_user=user, is_deleted=False,
+        ).values_list('id', flat=True)
+        if not fpo_ids:
+            return False
+        return FPOAssessment.objects.filter(
+            fpo_id__in=fpo_ids,
+            status=FPOAssessment.Status.SUBMITTED,
+            is_deleted=False,
+        ).exists()
+
+
 class IsGovernmentOfficial(BasePermission):
     """Government officials allowed."""
     message = t('common.permission_denied')
