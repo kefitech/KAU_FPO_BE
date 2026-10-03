@@ -188,9 +188,23 @@ def get_recommendations(
             if len(matches) >= limit:
                 break
 
+    # The heading says "How to reach Tier X" — X should be the closest tier
+    # the returned tips actually target. If KAU hasn't seeded tips for the
+    # strict next step (e.g. no 'C' tips for a Tier D FPO), fall back to the
+    # lowest target_tier among the returned tips so the heading matches the
+    # content. Empty matches keep the original next_tier for the maintain
+    # label.
+    if matches:
+        reported_next_tier = min(
+            (m['target_tier'] for m in matches),
+            key=lambda t: _TIER_RANK.get(t, 0),
+        )
+    else:
+        reported_next_tier = target_tier
+
     return {
         'current_tier':    current_tier,
-        'next_tier':       target_tier,
+        'next_tier':       reported_next_tier,
         'score':           float(assessment.total_score or 0),
         'max_score':       100,
         'financial_year':  assessment.financial_year,
