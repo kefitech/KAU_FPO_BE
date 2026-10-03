@@ -24,7 +24,6 @@ from urllib.parse import urlparse
 from django.core.cache import cache
 
 from drf_spectacular.utils import extend_schema, extend_schema_field, OpenApiExample, OpenApiTypes, inline_serializer
-from isort import file
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
