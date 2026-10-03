@@ -23,9 +23,33 @@ from apps.database.models.fpo import (
 # Which tier is one step above the given tier?
 _NEXT_TIER = {'D': 'C', 'C': 'B', 'B': 'A', 'A': 'A'}
 
+# Numeric rank for "better than" comparisons on the tier ladder.
+# A is best (3), D is worst (0). Higher number = better tier.
+_TIER_RANK = {'D': 0, 'C': 1, 'B': 2, 'A': 3}
+
 
 def _next_tier_for(current_tier: str) -> str:
     return _NEXT_TIER.get(current_tier, 'A')
+
+
+def _target_tiers_for(current_tier: str) -> list[str]:
+    """
+    Which `target_tier` values on TierUpgradeTip rows apply to an FPO
+    sitting at `current_tier`? Returns every tier strictly above the
+    FPO's current rank, so a Tier D FPO sees tips targeting C, B, and
+    A (anything that lifts them). Tier A FPOs see the Tier A
+    'maintain-rank' tips.
+    """
+    if not current_tier:
+        # Unknown tier — fall back to showing the A-tier maintain tips.
+        return ['A']
+    current_rank = _TIER_RANK.get(current_tier, 0)
+    if current_tier == 'A':
+        return ['A']
+    return sorted(
+        [tier for tier, rank in _TIER_RANK.items() if rank > current_rank],
+        key=_TIER_RANK.get,
+    )  # closest-tier first (e.g. ['C', 'B', 'A'] for a Tier D FPO)
 
 
 def _get_answer_value(answer_json):
@@ -111,6 +135,12 @@ def get_recommendations(
     """
     current_tier = assessment.tier_assigned or ''
     target_tier  = _next_tier_for(current_tier) if current_tier else 'A'
+    # Admins seed tips keyed to WHICH higher tier the tip helps reach
+    # (target_tier). For a Tier D FPO we need to show tips targeting any
+    # higher tier — otherwise the panel is empty whenever KAU hasn't
+    # seeded a tip for the exact next step (the common case). See
+    # _target_tiers_for() for the full ladder logic.
+    eligible_tiers = _target_tiers_for(current_tier)
 
     # All answers keyed by question — for O(1) lookup during trigger eval.
     answers_by_q = {
@@ -121,7 +151,7 @@ def get_recommendations(
     tips = (
         TierUpgradeTip.objects
         .select_related('question', 'criterion')
-        .filter(is_active=True, target_tier=target_tier)
+        .filter(is_active=True, target_tier__in=eligible_tiers)
         .order_by('priority', 'id')
     )
 
