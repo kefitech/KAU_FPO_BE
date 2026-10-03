@@ -30,12 +30,27 @@ DEFAULT_DISPLAY_ORDER = 470   # a hair above FPO summaries (480) so product hits
 
 
 def _stock_is_listable(stock) -> bool:
-    """Only public + active + non-deleted stock is a chatbot-worthy listing."""
-    if not stock or stock.is_deleted:
+    """Public + non-deleted stock that's either ACTIVE or EXPIRED but still
+    within the KAU-mandated 3-day grace window after available_until."""
+    if not stock or stock.is_deleted or not stock.is_public:
         return False
-    if not stock.is_public or stock.status != 'active':
+    if stock.status == 'active':
+        return True
+    if stock.status == 'expired':
+        return _is_in_grace_window(stock)
+    return False
+
+
+def _is_in_grace_window(stock) -> bool:
+    """EXPIRED stock stays listable for 3 days after available_until."""
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.marketplace.tasks import PRODUCT_GRACE_DAYS
+
+    if not stock.available_until:
         return False
-    return True
+    cutoff = timezone.now().date() - timedelta(days=PRODUCT_GRACE_DAYS)
+    return stock.available_until >= cutoff
 
 
 def _product_name_en(product) -> str:
@@ -84,8 +99,10 @@ def build_product_entry(stock) -> dict | None:
     avail_from  = stock.available_from.isoformat() if stock.available_from else 'unspecified'
     avail_until = stock.available_until.isoformat() if stock.available_until else 'open-ended'
 
+    in_grace = stock.status == 'expired'
+    verb = 'listed (validity recently ended, buyer may still have stock)' if in_grace else 'currently listing'
     parts = [
-        f'{fpo.name} ({district_en}, {tier_line}) is currently listing '
+        f'{fpo.name} ({district_en}, {tier_line}) {verb} '
         f'{stock.quantity} {unit} of {product_name}'
     ]
     if commodity and commodity.lower() not in product_name.lower():
@@ -95,6 +112,10 @@ def build_product_entry(stock) -> dict | None:
     if stock.quality_certification:
         parts.append(f'Quality: {stock.quality_certification}.')
     parts.append(f'Available from {avail_from} to {avail_until}.')
+    if in_grace:
+        parts.append(
+            "Note: Validity is over — but please contact the buyer to know if it's restocked."
+        )
 
     # Malayalam product name in the body so a Malayalam chatbot user can also
     # recognise the listing. Kept short to not bloat the FTS body weight.
@@ -125,33 +146,38 @@ def build_product_entry(stock) -> dict | None:
     ])
 
     return {
-        'topic':    f'Product: {product_name} from {fpo.name} — Active Listing',
+        'topic':    _topic_for(stock, product_name, fpo),
         'body_en':  ' '.join(parts),
         'keywords': ' '.join(t for t in kw if t),
-        # stash for delete-fallback logic
-        '_topic':   f'Product: {product_name} from {fpo.name} — Active Listing',
     }
+
+
+def _topic_for(stock, product_name, fpo) -> str:
+    """One chatbot entry per stock batch. Batch id is part of the topic
+    so two live batches of the same product don't clobber each other."""
+    return f'Product: {product_name} from {fpo.name} — Batch #{stock.id}'
 
 
 def upsert_product_entry(stock) -> tuple[bool, bool]:
     """Sync one stock's chatbot entry. Returns (created, deleted).
 
     When the stock no longer qualifies (draft/sold/expired/private/deleted)
-    the corresponding entry (identified by product + fpo names) is dropped.
+    the corresponding entry (identified by product + fpo names + batch id)
+    is dropped.
     """
     from apps.database.models import ChatKnowledgeEntry
 
     entry = build_product_entry(stock)
     if not entry:
         # Nothing to index. Look up the product/fpo names to remove any
-        # stale entry we may have written previously.
+        # stale entry we may have written previously for THIS batch.
         product = getattr(stock, 'product', None)
         fpo     = getattr(product, 'fpo', None) if product else None
         if product and fpo:
             name = _product_name_en(product)
             if name:
                 deleted = ChatKnowledgeEntry.objects.filter(
-                    topic=f'Product: {name} from {fpo.name} — Active Listing',
+                    topic=_topic_for(stock, name, fpo),
                 ).delete()[0]
                 return (False, bool(deleted))
         return (False, False)
@@ -171,7 +197,7 @@ def upsert_product_entry(stock) -> tuple[bool, bool]:
 
 
 def delete_entry_for_stock(stock) -> bool:
-    """Hard-delete the chatbot entry for this stock's product.
+    """Hard-delete the chatbot entry for this specific stock batch.
     Used from post_delete signals where the instance's flags don't yet
     reflect that the row is gone."""
     from apps.database.models import ChatKnowledgeEntry
@@ -183,18 +209,19 @@ def delete_entry_for_stock(stock) -> bool:
     if not name:
         return False
     deleted = ChatKnowledgeEntry.objects.filter(
-        topic=f'Product: {name} from {fpo.name} — Active Listing',
+        topic=_topic_for(stock, name, fpo),
     ).delete()[0]
     return bool(deleted)
 
 
 def delete_product_entries_for_fpo(fpo_name: str) -> int:
     """Prune every product entry belonging to an FPO — used when the FPO
-    itself is deleted / de-approved."""
+    itself is deleted / de-approved. Matches every batch of every product
+    (topics all contain `from <fpo_name> — Batch #`)."""
     from apps.database.models import ChatKnowledgeEntry
     qs = ChatKnowledgeEntry.objects.filter(
         topic__startswith='Product: ',
-        topic__endswith=f' from {fpo_name} — Active Listing',
+        topic__contains=f' from {fpo_name} — Batch #',
     )
     count = qs.count()
     qs.delete()

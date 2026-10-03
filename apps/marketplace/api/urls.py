@@ -10,6 +10,7 @@ from apps.marketplace.api.inquiries import InquiryCreateView, InquiryViewSet, Ma
 from apps.marketplace.api.market_prices import MarketOpportunitiesView, MarketPriceViewSet
 from apps.marketplace.api.matches import BuyerSellerMatchViewSet
 from apps.marketplace.api.products import ProductViewSet
+from apps.marketplace.api.stocks import ProductStockViewSet
 from apps.marketplace.api.buyer_products import BuyerProductListView, BuyerRecommendedProductsView
 
 # FPO-facing marketplace routes only.
@@ -26,8 +27,15 @@ router.register(r'prices', MarketPriceViewSet, basename='marketplace-price')
 router.register(r'inquiries', InquiryViewSet, basename='marketplace-inquiry')
 router.register(r'market-hub-inquiries', MarketHubInquiryViewSet, basename='marketplace-market-hub-inquiry')
 
+# Nested per-product-stock router — simplejwt-style manual nesting (we don't
+# depend on drf-nested-routers). The viewset reads product_pk from
+# self.kwargs['product_pk'].
+stocks_router = DefaultRouter()
+stocks_router.register(r'stocks', ProductStockViewSet, basename='marketplace-product-stock')
+
 urlpatterns = [
     path('', include(router.urls)),
+    path('products/<int:product_pk>/', include(stocks_router.urls)),
     # Plain APIView, not router-registered — no CRUD, just one GET.
     path('opportunities/', MarketOpportunitiesView.as_view(), name='marketplace-opportunities'),
     # Buyer flow (Arunima — P2-11)

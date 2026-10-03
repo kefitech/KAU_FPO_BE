@@ -195,6 +195,7 @@ class DPRProductsImportFromMarketplaceView(APIView):
         marketplace = (
             Product.objects
             .filter(pk=mp_id, fpo=project.fpo, is_deleted=False)
+            .prefetch_related('stocks')
             .first()
         )
         if not marketplace:
@@ -202,9 +203,18 @@ class DPRProductsImportFromMarketplaceView(APIView):
                 'Marketplace product not found for this FPO.', status_code=404,
             )
 
+        # A Product can now have multiple stock batches — pull its unit/
+        # selling price from the current ACTIVE batch (falling back to the
+        # most recent of any status) via Product.latest_stock. If the
+        # product has no batches at all, these fields stay blank/null and
+        # the FPO can fill them in on the DPR item afterwards.
+        latest = marketplace.latest_stock
+        marketplace_unit = latest.unit if latest else ''
+        marketplace_price = latest.price_per_unit if latest else None
+
         # Best-effort unit mapping — marketplace uses the same codes as
         # DPRCapacityUnit master (kg / quintal / mt / litre / piece).
-        unit = DPRCapacityUnit.objects.filter(code=marketplace.unit).first()
+        unit = DPRCapacityUnit.objects.filter(code=marketplace_unit).first() if marketplace_unit else None
 
         # Name / description are multilang JSON on the marketplace side.
         # DPR uses plain text — take EN and fall back to ML.
@@ -225,7 +235,7 @@ class DPRProductsImportFromMarketplaceView(APIView):
             order=next_order,
             name=_pick_lang(marketplace.name)[:200],
             description=_pick_lang(marketplace.description),
-            selling_price_per_unit=marketplace.price_per_unit,
+            selling_price_per_unit=marketplace_price,
             unit_of_measurement=unit,
             selling_unit=unit,
             created_by=request.user if request.user.is_authenticated else None,

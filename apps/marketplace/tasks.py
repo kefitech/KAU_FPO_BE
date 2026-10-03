@@ -1,4 +1,4 @@
-#Arunima S
+#Arunima S + KAU suggestion #3 grace period
 import logging
 from datetime import timedelta
 
@@ -8,6 +8,24 @@ from django.utils import timezone
 from apps.database.models import Product, ProductStock
 
 logger = logging.getLogger(__name__)
+
+
+# KAU suggestion #3 — product keeps showing in the buyer directory for N
+# days after its `available_until` passes, with a "Validity is over —
+# contact the buyer to know if it's restocked" banner. Only after this
+# grace is the stock row genuinely deleted.
+PRODUCT_GRACE_DAYS = 3
+
+
+def _in_grace_period(stock, today=None) -> bool:
+    """True if this stock row is EXPIRED but still within the public-display
+    grace window (`available_until + PRODUCT_GRACE_DAYS >= today`)."""
+    if not stock or stock.status != ProductStock.Status.EXPIRED:
+        return False
+    if not stock.available_until:
+        return False
+    today = today or timezone.now().date()
+    return stock.available_until + timedelta(days=PRODUCT_GRACE_DAYS) >= today
 
 
 def _notify_fpo(product, code, context):
@@ -76,25 +94,29 @@ def send_expiry_reminders():
 @shared_task
 def expire_products():
     """
-    Daily — for every ACTIVE stock batch past its available_until date:
-      1. Notify the FPO (inbox + email) that the batch has expired.
-      2. Genuinely delete the ProductStock row — per the confirmed product
-         decision, expired stock is removed outright, not soft-deleted or
-         just flagged. The Product (master) row is left untouched, so the
-         FPO can "Add Stock" again against the same product later.
-    The notification is sent BEFORE deletion, since the row's own data
-    (quantity, unit, dates) is needed to build the notification context.
-    A batch with no available_until (open-ended) never auto-expires here,
-    same as before this rewrite.
+    Daily — 2-stage lifecycle per KAU suggestion #3:
+
+      Stage A — Day of expiry: ACTIVE stock past its available_until →
+        mark status=EXPIRED, notify FPO. The row is kept so buyers still
+        see it in the directory with a "Validity is over — contact the
+        buyer to know if it's restocked" banner for the next 3 days.
+
+      Stage B — End of grace: EXPIRED stock whose available_until is
+        more than PRODUCT_GRACE_DAYS old → genuinely delete the row.
+        Product master row is left untouched; FPO can "Add Stock" again.
+
+    Stocks with no available_until (open-ended) never auto-expire.
     """
     today = timezone.now().date()
 
-    stocks = ProductStock.objects.filter(
+    # ── Stage A: ACTIVE → EXPIRED (keep row, send FPO notice) ───────────
+    active_past_due = ProductStock.objects.filter(
         status=ProductStock.Status.ACTIVE,
         available_until__lt=today,
     ).select_related('product', 'product__fpo')
 
-    for stock in stocks:
+    expired_count = 0
+    for stock in active_past_due:
         product = stock.product
         _notify_fpo(
             product,
@@ -107,16 +129,35 @@ def expire_products():
                 'available_until': str(stock.available_until),
             },
         )
+        stock.status = ProductStock.Status.EXPIRED
+        stock.save(update_fields=['status', 'updated_at'])
+        expired_count += 1
+
+    # ── Stage B: EXPIRED past grace → hard-delete ──────────────────────
+    cutoff = today - timedelta(days=PRODUCT_GRACE_DAYS)
+    stale_expired = ProductStock.objects.filter(
+        status=ProductStock.Status.EXPIRED,
+        available_until__lt=cutoff,
+    ).select_related('product')
+
+    deleted_count = stale_expired.count()
+    for stock in stale_expired:
         stock.delete()
+
+    logger.info(
+        'expire_products: %d marked EXPIRED, %d hard-deleted after %d-day grace',
+        expired_count, deleted_count, PRODUCT_GRACE_DAYS,
+    )
+    return {'expired': expired_count, 'deleted': deleted_count}
 
 
 @shared_task
 def run_buyer_seller_matching():
-    """Daily — run matching for every product with a currently active stock batch."""
+    """Daily — run matching for every ACTIVE stock batch."""
     from apps.marketplace.services import run_matching
 
-    for product in Product.objects.filter(stock__status=ProductStock.Status.ACTIVE):
-        run_matching(product)
+    for stock in ProductStock.objects.filter(status=ProductStock.Status.ACTIVE).select_related('product'):
+        run_matching(stock)
 
 
 # Wire later — waiting for AGMARKNET API access

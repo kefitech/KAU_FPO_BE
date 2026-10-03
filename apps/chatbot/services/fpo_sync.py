@@ -27,27 +27,38 @@ DEFAULT_DISPLAY_ORDER = 480    # a hair above the 500 POP entries so FPO summari
 MAX_PRODUCTS_IN_BODY = 8       # cap to keep body compact for Gemini
 
 
-def _product_line(product) -> str | None:
-    """Return a one-liner for a product with its active stock, or None
-    if the stock isn't listable (missing / expired / non-public)."""
-    stock = getattr(product, 'stock', None)
-    if not stock or getattr(stock, 'is_deleted', False):
-        return None
-    if not stock.is_public or stock.status not in ('active',):
-        return None
-
+def _product_lines(product) -> list[str]:
+    """
+    Return one line per listable active stock batch for this product (a
+    product can now have multiple batches live at the same time).
+    Returns [] if the product has nothing public + active to list.
+    """
     name = ''
     if isinstance(product.name, dict):
         name = product.name.get('en') or product.name.get('ml') or ''
     if not name:
-        return None
+        return []
 
-    parts = [name]
-    parts.append(f'{stock.quantity} {stock.unit}')
-    parts.append(f'₹{stock.price_per_unit}/{stock.unit}')
-    if stock.quality_certification:
-        parts.append(stock.quality_certification)
-    return ' — '.join(parts)
+    # Walk prefetched stocks when available to avoid N+1 inside sync loops.
+    cache = getattr(product, '_prefetched_objects_cache', None)
+    if cache and 'stocks' in cache:
+        stocks = list(cache['stocks'])
+    else:
+        stocks = list(product.stocks.filter(is_deleted=False))
+
+    lines = []
+    for stock in stocks:
+        if getattr(stock, 'is_deleted', False):
+            continue
+        if not stock.is_public or stock.status != 'active':
+            continue
+        parts = [name,
+                 f'{stock.quantity} {stock.unit}',
+                 f'₹{stock.price_per_unit}/{stock.unit}']
+        if stock.quality_certification:
+            parts.append(stock.quality_certification)
+        lines.append(' — '.join(parts))
+    return lines
 
 
 def _commodity_labels_for(fpo) -> list[str]:
@@ -82,9 +93,19 @@ def build_fpo_entry(fpo) -> dict | None:
     district_en = get_district_name(fpo.district, language='en') if fpo.district else 'district not set'
     application = fpo.application_id or 'application ID pending'
 
-    # Product summary
-    products    = list(fpo.products.select_related('stock').filter(is_deleted=False)[:MAX_PRODUCTS_IN_BODY])
-    prod_lines  = [line for p in products if (line := _product_line(p))]
+    # Product summary — one line per public ACTIVE stock batch. We cap the
+    # total number of lines in the body (not products) at
+    # MAX_PRODUCTS_IN_BODY so a single product with many batches doesn't
+    # starve the summary.
+    products    = fpo.products.prefetch_related('stocks').filter(is_deleted=False)
+    prod_lines = []
+    for p in products:
+        for line in _product_lines(p):
+            prod_lines.append(line)
+            if len(prod_lines) >= MAX_PRODUCTS_IN_BODY:
+                break
+        if len(prod_lines) >= MAX_PRODUCTS_IN_BODY:
+            break
     total_prods = fpo.products.filter(is_deleted=False).count()
 
     body_parts = [
@@ -172,7 +193,7 @@ def sync_all_approved_fpos() -> dict:
     from apps.core.utils.constants import FPOStatus
     from apps.database.models.fpo import FPO
     created = updated = skipped = 0
-    fpos = FPO.objects.filter(status=FPOStatus.APPROVED, is_deleted=False).prefetch_related('products__stock')
+    fpos = FPO.objects.filter(status=FPOStatus.APPROVED, is_deleted=False).prefetch_related('products__stocks')
     for fpo in fpos:
         c, d = upsert_fpo_entry(fpo)
         if c: created += 1

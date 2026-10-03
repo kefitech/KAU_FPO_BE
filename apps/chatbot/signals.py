@@ -111,9 +111,10 @@ def _sync_fpo_to_chatbot_kb(sender, instance, **kwargs):
             if pruned:
                 logger.info(f'FPO sync: pruned {pruned} product entries for un-approved FPO {instance.name!r}')
         else:
-            for product in instance.products.select_related('stock').filter(is_deleted=False):
-                stock = getattr(product, 'stock', None)
-                if stock:
+            # A product can now have multiple stock batches — refresh every
+            # batch's per-product chatbot entry.
+            for product in instance.products.prefetch_related('stocks').filter(is_deleted=False):
+                for stock in product.stocks.all():
                     upsert_product_entry(stock)
     except Exception:
         logger.exception(f'FPO sync failed for {getattr(instance, "name", "?")}')
