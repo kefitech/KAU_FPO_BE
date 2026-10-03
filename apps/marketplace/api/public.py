@@ -165,6 +165,7 @@ class PublicProductListView(APIView):
                     'quality_certification': s.quality_certification,
                     'available_from': s.available_from,
                     'available_until': s.available_until,
+                    'contact_phone': s.contact_phone or '',
                     'image': p.image.url if p.image else None,
                     'in_grace_period': in_grace,
                     'grace_message':   _grace_message(lang) if in_grace else None,
