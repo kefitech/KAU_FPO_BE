@@ -3,7 +3,8 @@ YouTube playlist feed helper.
 
 Uses the YouTube Data API v3 when an active key is configured in
 ExternalAPISettings (service='youtube_api'), managed from the admin portal's
-External APIs page, the same way as the weather key. The API returns up to
+External APIs page, the same way as the weather key. Requests go to the
+entry's API URL, or API_BASE_URL when that is blank. The API returns up to
 50 videos per playlist and costs 2 quota units per lookup.
 
 Falls back to the public Atom feed
@@ -24,7 +25,7 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 FEED_URL        = 'https://www.youtube.com/feeds/videos.xml'
-API_BASE_URL    = 'https://www.googleapis.com/youtube/v3'
+API_BASE_URL    = 'https://www.googleapis.com/youtube/v3'  # used when the entry's API URL is blank
 API_MAX_RESULTS = 50            # playlistItems.list page size limit
 FEED_CACHE_TTL  = 60 * 60 * 6   # 6 hours
 FAIL_CACHE_TTL  = 60 * 10       # retry a failed feed after 10 minutes
@@ -34,6 +35,24 @@ YOUTUBE_CHANNEL_BLOCK   = 'youtube_channel_url'   # SiteBlock key holding the ch
 DEFAULT_YOUTUBE_CHANNEL = 'https://www.youtube.com/@KauIndia'
 
 _PLAYLIST_ID_RE = re.compile(r'^[A-Za-z0-9_-]{10,64}$')
+
+# Google error reasons (from error.errors[].reason and error.details[].reason)
+# mapped to messages an admin can act on. Anything else shows Google's message.
+_API_ERROR_HINTS = [
+    ({'API_KEY_INVALID', 'keyInvalid'},
+     'The YouTube API key is not valid. Update it under External APIs.'),
+    ({'SERVICE_DISABLED', 'accessNotConfigured'},
+     'YouTube Data API v3 is not enabled for this API key. Enable it in the Google Cloud Console '
+     '(APIs & Services → Library).'),
+    ({'API_KEY_SERVICE_BLOCKED'},
+     "This API key is not allowed to call YouTube Data API v3. Allow it in the key's API restrictions "
+     'in the Google Cloud Console.'),
+    ({'API_KEY_HTTP_REFERRER_BLOCKED', 'API_KEY_IP_ADDRESS_BLOCKED', 'ipRefererBlocked'},
+     "This API key's application restrictions block requests from this server. Allow the server's "
+     'IP address, or remove the website restriction.'),
+    ({'quotaExceeded', 'dailyLimitExceeded'},
+     'The YouTube API daily quota is used up. It resets at midnight Pacific Time.'),
+]
 _NS = {
     'atom':  'http://www.w3.org/2005/Atom',
     'yt':    'http://www.youtube.com/xml/schemas/2015',
@@ -83,8 +102,11 @@ def _parse_feed(xml_text):
     }
 
 
-def _get_youtube_api_key():
-    """Return the active youtube_api key from ExternalAPISettings, or None."""
+def _get_youtube_api_settings():
+    """
+    Return (api_key, base_url) from the active youtube_api entry, base_url
+    being its API URL or API_BASE_URL when that is blank. None without a key.
+    """
     from apps.database.models import ExternalAPISettings
     from apps.notifications.utils import decrypt_config
 
@@ -93,38 +115,77 @@ def _get_youtube_api_key():
     ).first()
     if not settings_obj or not settings_obj.config:
         return None
-    return decrypt_config(settings_obj.config).get('api_key') or None
+    api_key = decrypt_config(settings_obj.config).get('api_key')
+    if not api_key:
+        return None
+    return api_key, (settings_obj.api_url or '').strip().rstrip('/') or API_BASE_URL
 
 
-def _fetch_from_api(playlist_id, api_key):
+class YouTubeLookupError(Exception):
+    """A playlist lookup failure carrying a message an admin can act on."""
+
+
+def _not_youtube_message(base_url, status_code):
+    return (
+        f'{base_url} did not respond like the YouTube Data API (HTTP {status_code}). Check the API URL '
+        f'under External APIs, or leave it blank to use {API_BASE_URL}.'
+    )
+
+
+def _api_error_message(response, base_url):
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    error = body.get('error') if isinstance(body, dict) else None
+    if not isinstance(error, dict):
+        return _not_youtube_message(base_url, response.status_code)
+    reasons = {e.get('reason') for e in error.get('errors') or []}
+    reasons |= {d.get('reason') for d in error.get('details') or []}
+    for codes, hint in _API_ERROR_HINTS:
+        if reasons & codes:
+            return hint
+    return f'YouTube API error (HTTP {response.status_code}): {error.get("message") or response.reason_phrase}'
+
+
+def _api_get(base_url, path, params, api_key):
     # Key goes in a header, not the query string, so it never appears in
     # logged request URLs or exception messages.
-    headers = {'X-Goog-Api-Key': api_key}
+    try:
+        response = httpx.get(
+            f'{base_url}/{path}', params=params, headers={'X-Goog-Api-Key': api_key}, timeout=5.0,
+        )
+    except (httpx.RequestError, httpx.InvalidURL) as exc:
+        raise YouTubeLookupError(
+            f'Could not reach the YouTube API at {base_url}. Check the API URL under External APIs '
+            f"(leave it blank to use {API_BASE_URL}) and the server's internet connection."
+        ) from exc
+    if response.is_error:
+        raise YouTubeLookupError(_api_error_message(response, base_url))
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    # Every Data API response carries kind 'youtube#...'; anything else means a wrong URL
+    if not isinstance(body, dict) or not str(body.get('kind', '')).startswith('youtube#'):
+        raise YouTubeLookupError(_not_youtube_message(base_url, response.status_code))
+    return body
 
-    response = httpx.get(
-        f'{API_BASE_URL}/playlists',
-        params={'part': 'snippet', 'id': playlist_id},
-        headers=headers, timeout=5.0,
-    )
-    response.raise_for_status()
-    items = response.json().get('items') or []
+
+def _fetch_from_api(playlist_id, api_key, base_url):
+    items = _api_get(base_url, 'playlists', {'part': 'snippet', 'id': playlist_id}, api_key).get('items') or []
     if not items:
         return None  # missing or private playlist
     snippet = items[0]['snippet']
 
-    response = httpx.get(
-        f'{API_BASE_URL}/playlistItems',
-        params={
-            'part':       'snippet,contentDetails,status',
-            'playlistId': playlist_id,
-            'maxResults': API_MAX_RESULTS,
-        },
-        headers=headers, timeout=5.0,
-    )
-    response.raise_for_status()
+    playlist_items = _api_get(base_url, 'playlistItems', {
+        'part':       'snippet,contentDetails,status',
+        'playlistId': playlist_id,
+        'maxResults': API_MAX_RESULTS,
+    }, api_key)
 
     videos = []
-    for item in response.json().get('items') or []:
+    for item in playlist_items.get('items') or []:
         # Private and deleted videos stay in playlists as placeholders
         if item.get('status', {}).get('privacyStatus') not in ('public', 'unlisted'):
             continue
@@ -154,12 +215,14 @@ def _fetch_from_feed(playlist_id):
     return _parse_feed(response.text)
 
 
-def fetch_playlist_feed(playlist_id, use_cache=True):
+def fetch_playlist_feed(playlist_id, use_cache=True, strict=False):
     """
     Return {title, channel_url, videos: [{video_id, title, thumbnail, published}]}
     for a playlist, or None when the playlist is missing, private or YouTube
     is unreachable. Tries the Data API first when a key is configured, then
-    the public feed. Best-effort: never raises.
+    the public feed. Best-effort: never raises, unless strict=True (admin
+    validation), where a failing API key or a failed keyless lookup raises
+    YouTubeLookupError with the reason instead of falling back silently.
     """
     cache_key = f'youtube:feed:{playlist_id}'
     if use_cache:
@@ -172,22 +235,30 @@ def fetch_playlist_feed(playlist_id, use_cache=True):
 
     data = None
     try:
-        api_key = _get_youtube_api_key()
+        api = _get_youtube_api_settings()
     except Exception:  # noqa: BLE001 -- a settings lookup failure falls back to the feed
         logger.warning('fetch_playlist_feed: could not read youtube_api settings', exc_info=True)
-        api_key = None
+        api = None
 
-    if api_key:
+    if api:
         try:
-            data = _fetch_from_api(playlist_id, api_key)
-        except Exception:  # noqa: BLE001 -- best-effort, see docstring
+            data = _fetch_from_api(playlist_id, *api)
+        except Exception as exc:  # noqa: BLE001 -- best-effort, see docstring
+            if strict and isinstance(exc, YouTubeLookupError):
+                raise
             logger.warning('fetch_playlist_feed: YouTube API failed for playlist %s', playlist_id, exc_info=True)
 
     if data is None:
         try:
             data = _fetch_from_feed(playlist_id)
-        except Exception:  # noqa: BLE001 -- best-effort, see docstring
+        except Exception as exc:  # noqa: BLE001 -- best-effort, see docstring
             logger.warning('fetch_playlist_feed: could not load feed for playlist %s', playlist_id, exc_info=True)
+            # Without a key the feed is the only source, and it 404s for many public playlists
+            if strict and not api:
+                raise YouTubeLookupError(
+                    'Could not load this playlist from YouTube without an API key. Make sure the playlist '
+                    'is public, then add and activate a YouTube Data API key under External APIs.'
+                ) from exc
 
     try:
         if data is None:
