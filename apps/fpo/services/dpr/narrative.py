@@ -547,18 +547,23 @@ _HARD_RULES = (
     'decision rests with the concerned bank or implementing agency. '
     'Present indicators (DSCR, IRR, NPV, payback) as calculated values '
     'and let the reviewer draw conclusions.\n'
-    '12. STAY ON YOUR CHAPTER\'S TOPIC. The eight headline financial '
-    'indicators (revenue, EBITDA, PAT, IRR, NPV, DSCR, payback, '
-    'break-even) belong to the Financial Analysis chapter — that is the '
-    'only chapter that may list the full set. Executive Summary carries '
-    'at most THREE ratios in a single viability sentence (DSCR + IRR + '
-    'payback). Conclusion carries at most TWO ratios in a single phrase. '
-    'Every other chapter (Promoter / Market / Technical / Implementation '
-    '/ Risk / SWOT / Environmental / Background) may reference ONE ratio '
-    'at most, only when directly relevant to its own topic. Prefer '
-    'specifics from your own section (products / machinery / utilities '
-    '/ promoter details / market context) over quoting ratios the reader '
-    'has already seen in Financial Analysis.\n'
+    '12. HEADLINE-RATIO BUDGET per chapter (STRICT — post-processor will '
+    'strip excess):\n'
+    '    - Financial Analysis: full set of eight indicators (revenue, '
+    'EBITDA, PAT, IRR, NPV, DSCR, payback, break-even).\n'
+    '    - Executive Summary: EXACTLY three ratios in one viability '
+    'sentence (DSCR + IRR + payback). No others.\n'
+    '    - Conclusion: at most TWO ratios in one passing phrase.\n'
+    '    - Market Analysis, SWOT, Implementation Plan, Environmental '
+    'Impact: at most ONE ratio, only when directly relevant.\n'
+    '    - Project Background, Promoter Profile, Technical Feasibility, '
+    'Risk Analysis: ZERO ratios. These chapters MUST NOT mention IRR, '
+    'NPV, DSCR, payback, break-even, Y1 revenue, EBITDA, or PAT at all '
+    '— write about the chapter\'s own topic (sector context, promoter '
+    'identity, process, risks) without quoting financial indicators.\n'
+    '    A post-process scrubber will delete any ratio sentence beyond '
+    'these caps before the narrative ships to the PDF, so staying inside '
+    'the budget is the only way to control which content survives.\n'
     '13. "Not available" HANDLING. If several FACTS fields read "Not '
     'available", mention the gap ONCE in neutral prose ("certain promoter '
     'details are pending") — do not list every missing field separately, '
@@ -985,7 +990,92 @@ def _strip_prompt_echoes(body: str, chapter: str) -> str:
 
     # Collapse 3+ blank lines to 2.
     text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
+    text = text.strip()
+    # DPR Round-3 retest (2026-10-04) — prompt-only ratio caps drifted
+    # between regenerations. Enforce the per-chapter headline-ratio budget
+    # deterministically. Same mechanism as the Rs./₹ normaliser.
+    text = _cap_ratio_sentences(text, chapter)
+    return text
+
+
+# Chapter → maximum number of sentences allowed to carry a headline-ratio
+# mention. Financial Analysis is unlimited (its home chapter). "Executive
+# Summary" allows the single viability sentence that cites DSCR + IRR +
+# payback — three ratios collapse into one sentence, so cap=1 works.
+_RATIO_SENTENCE_CAP = {
+    'financial_analysis':     None,   # no cap — this is where ratios live
+    'executive_summary':      1,      # one viability sentence with ≤3 ratios
+    'conclusion':             1,      # one passing phrase with ≤2 ratios
+    'market_analysis':        1,
+    'swot':                   1,
+    'implementation_plan':    1,
+    'environmental_impact':   1,
+    'project_background':     0,      # zero — write about sector context
+    'promoter_profile':       0,
+    'technical_feasibility':  0,
+    'risk_analysis':          0,
+}
+
+# Signatures that strongly identify a sentence as carrying a headline-ratio
+# mention. We keep the list focused on the eight indicators plus a few
+# phrase variants Gemini actually produced in UAT runs so false positives
+# are rare on prose like "revenue model" or "net present cost".
+_RATIO_SIGNATURE_RE = __import__('re').compile(
+    r'\b('
+    r'IRR|internal\s+rate\s+of\s+return'
+    r'|NPV|net\s+present\s+value'
+    r'|DSCR|debt[\s-]+service(?:\s+coverage)?(?:\s+ratio)?'
+    r'|EBITDA'
+    r'|\bPAT\b|profit\s+after\s+tax'
+    r'|payback\s+(?:period|year)'
+    r'|break[\s-]?even'
+    r'|Y\s*1\s+revenue|year\s+one\s+revenue|annual\s+revenue\s+of'
+    r')\b',
+    __import__('re').IGNORECASE,
+)
+
+
+def _cap_ratio_sentences(text: str, chapter: str) -> str:
+    """Keep the first N sentences that carry a headline-ratio mention,
+    delete the rest.
+
+    N is `_RATIO_SENTENCE_CAP[chapter]`. `None` → no cap (Financial
+    Analysis). `0` → every ratio-carrying sentence stripped. Sentences
+    without any ratio signature are left untouched regardless of cap.
+
+    Sentence splitting is simple — on `.`, `!`, `?` followed by whitespace
+    + capital letter. Good enough for the DPR prose we see; a false merge
+    only means a slightly-too-long sentence survives, which is harmless.
+    """
+    cap = _RATIO_SENTENCE_CAP.get(chapter)
+    if cap is None:
+        return text
+
+    import re
+    # Split keeping delimiters so joining preserves punctuation + spacing.
+    # Pattern: a terminator (. ! ?) followed by whitespace and a capital
+    # letter or end-of-text. Keeps numeric decimals (12.5%) intact because
+    # they lack the capital-letter follower.
+    pieces = re.split(r'(?<=[.!?])\s+(?=[A-Z"\'(])', text)
+
+    kept_ratio = 0
+    out: list[str] = []
+    for sentence in pieces:
+        if _RATIO_SIGNATURE_RE.search(sentence):
+            if kept_ratio < cap:
+                out.append(sentence)
+                kept_ratio += 1
+            # else: drop the extra ratio sentence
+        else:
+            out.append(sentence)
+
+    stripped = ' '.join(s.strip() for s in out if s.strip())
+    # Preserve paragraph breaks that the splitter blurred: wherever the
+    # original had two newlines we re-insert one when the surviving text
+    # had a double newline too. Simpler: run the collapse-blank-lines pass
+    # once more on the output.
+    stripped = re.sub(r'\n{3,}', '\n\n', stripped)
+    return stripped
 
 
 # Per-chapter guidance — what specific sub-topics to cover + target length.
