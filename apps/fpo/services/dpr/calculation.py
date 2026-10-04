@@ -416,12 +416,17 @@ class RiskAssessment:
     Rule:
       - Any category with class == 'high'                            → overall 'high'
       - Else any category with class == 'moderate'                   → overall 'moderate'
-      - All categories 'low' (or no risks at all)                    → overall 'low'
+      - All categories 'low' AND at least one risk scored            → overall 'low'
+      - Risks added but ZERO scored (probability+impact missing)     → overall 'not_assessed'
+      - No risks at all                                              → overall 'low'
     Configurable via `DPRRiskMatrixCell` (admin edits cells at
     /api/admin/dpr/risk-matrix/).
+
+    DPR-05 (UAT): previously an unscored risk silently rated the whole
+    project 'low'. Now it rates 'not_assessed' so a reviewer sees the gap.
     """
     categories: list[RiskCategoryScore]
-    overall_class: str                    # 'low' / 'moderate' / 'high'
+    overall_class: str                    # 'low' / 'moderate' / 'high' / 'not_assessed'
     total_risks_added: int
     total_risks_scored: int               # subset with prob+impact set
     matrix_note: str                      # human-readable "5 cells configured, source: default 3x3"
@@ -1966,7 +1971,13 @@ def build_ratios(
 
 # Precedence used to escalate a category to its worst risk.
 _RISK_ORDER = {'low': 0, 'moderate': 1, 'high': 2}
-_RISK_LABELS = {'low': 'Low', 'moderate': 'Moderate', 'high': 'High'}
+# DPR-05 (UAT) — 'not_assessed' is a fourth class the calc engine sets when
+# risks exist but none have probability+impact; it's not in _RISK_ORDER so
+# it never ranks higher than the three real classes.
+_RISK_LABELS = {
+    'low': 'Low', 'moderate': 'Moderate', 'high': 'High',
+    'not_assessed': 'Not assessed',
+}
 
 # 6 categories from RISK_CATEGORY_CHOICES on DPRRiskItem — mirrored here so
 # the risk section can be empty and we still list categories in the assessment.
@@ -2142,7 +2153,13 @@ def build_risk_assessment(project) -> RiskAssessment:
             class_counts[cls] += 1
             cat_rank = max(cat_rank, _RISK_ORDER.get(cls, 0))
 
-        cat_class = _rank_to_class(cat_rank)
+        # DPR-05 (UAT) — per-category class now mirrors the overall-class
+        # convention: if the category has risks but none scored, the badge
+        # reads "Not assessed" rather than a misleading "Low".
+        if rows and scored_count == 0:
+            cat_class = 'not_assessed'
+        else:
+            cat_class = _rank_to_class(cat_rank)
         total_scored += scored_count
         overall_rank = max(overall_rank, cat_rank)
 
@@ -2171,9 +2188,19 @@ def build_risk_assessment(project) -> RiskAssessment:
         f'{cell_count} matrix cells configured. Admin edits at /api/admin/dpr/risk-matrix/.'
     )
 
+    # DPR-05 (UAT) — if risks were added but NONE have probability+impact
+    # set, overall rating is 'not_assessed' rather than the implicit 'low'
+    # the max-of-zero evaluates to. The PDF renders the fourth class as a
+    # neutral grey badge ("Not assessed") so a reviewer sees the gap
+    # instead of being told the project is low-risk by default.
+    if total_added > 0 and total_scored == 0:
+        overall_class = 'not_assessed'
+    else:
+        overall_class = _rank_to_class(overall_rank)
+
     return RiskAssessment(
         categories=categories,
-        overall_class=_rank_to_class(overall_rank),
+        overall_class=overall_class,
         total_risks_added=total_added,
         total_risks_scored=total_scored,
         matrix_note=matrix_note,

@@ -152,6 +152,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
     .badge-ok { background: #d1fae5; color: #065f46; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
     .badge-warn { background: #fef3c7; color: #92400e; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
     .badge-err { background: #fee2e2; color: #991b1b; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
+    .badge-neutral { background: #e5e7eb; color: #374151; padding: 1mm 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 600; }
     .estimated-note { background: #fff7ed; border-left: 3px solid #E86C1A; padding: 2mm 3mm; font-size: 8pt; color: #78350f; margin: 2mm 0; }
     .page-break { page-break-before: always; }
     .footer-note { font-size: 7pt; color: #999; margin-top: 4mm; text-align: center; font-style: italic; }
@@ -242,6 +243,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       {% if pdf_ai.financial_analysis %}<li><a href="#sec-finance-ai">Financial Analysis (AI)</a></li>{% endif %}
       {% if pdf_ai.implementation_plan %}<li><a href="#sec-impl-ai">Implementation Plan (AI)</a></li>{% endif %}
       {% if pdf_ai.swot %}<li><a href="#sec-swot-ai">SWOT Analysis (AI)</a></li>{% endif %}
+      {% if pdf_ai.risk_analysis %}<li><a href="#sec-risk-ai">Risk Analysis (AI)</a></li>{% endif %}
       {% if pdf_ai.environmental_impact %}<li><a href="#sec-env-ai">Environmental Impact (AI)</a></li>{% endif %}
       {% if pdf_ai.conclusion %}<li><a href="#sec-conclusion-ai">Conclusion</a></li>{% endif %}
       <li><a href="#sec-guidelines">Limitations &amp; Guidelines for Entrepreneurs</a></li>
@@ -319,7 +321,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 
   <p class="footer-note">
     Implementation period: {{ r.capital_schedule.implementation_period_months|default:"—" }} months{% if r.capital_schedule.is_estimated %} (estimated){% endif %}
-    {% if r.risk_assessment %} · Overall project risk: <strong>{{ r.risk_assessment.overall_class|capfirst }}</strong>{% endif %}
+    {% if r.risk_assessment %} · Overall project risk: <strong>{{ r.risk_assessment.overall_class|risk_label }}</strong>{% endif %}
     {% if r.variance.exceeds_threshold %} · <span class="badge-err">Cost/MoF variance {{ r.variance.pct|money }}% exceeds threshold</span>{% elif r.variance.delta != 0 %} · Cost/MoF variance {{ r.variance.pct|money }}%{% else %} · <span class="badge-ok">Cost/MoF balanced ✓</span>{% endif %}
   </p>
 
@@ -708,8 +710,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
     <h2 id="sec-11">11. Risk Assessment</h2>
     <p style="font-size: 9pt; margin-bottom: 3mm;">
       Overall project risk:
-      <span class="{% if r.risk_assessment.overall_class == 'high' %}badge-err{% elif r.risk_assessment.overall_class == 'moderate' %}badge-warn{% else %}badge-ok{% endif %}">
-        {{ r.risk_assessment.overall_class|capfirst }}
+      <span class="{{ r.risk_assessment.overall_class|risk_badge }}">
+        {{ r.risk_assessment.overall_class|risk_label }}
       </span>
       &nbsp;·&nbsp; {{ r.risk_assessment.total_risks_scored }} of {{ r.risk_assessment.total_risks_added }} risks scored via matrix
     </p>
@@ -735,8 +737,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
             <td>{{ cat.class_counts.moderate }}</td>
             <td>{{ cat.class_counts.high }}</td>
             <td>
-              <span class="{% if cat.category_class == 'high' %}badge-err{% elif cat.category_class == 'moderate' %}badge-warn{% else %}badge-ok{% endif %}">
-                {{ cat.category_class|capfirst }}
+              <span class="{{ cat.category_class|risk_badge }}">
+                {{ cat.category_class|risk_label }}
               </span>
             </td>
           </tr>
@@ -865,6 +867,15 @@ Author: Athul Gopan (Kefi Tech Solutions)
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
     {% if pdf_ai_stale.swot %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.swot }}</div>{% endif %}
     <div class="ai-narrative">{{ pdf_ai.swot|linebreaks }}</div>
+  {% endif %}
+  {% if pdf_ai.risk_analysis %}
+    {# DPR-04 (UAT) — Risk Analysis AI chapter. The narrative is generated but
+       was missing from the PDF; this block + its TOC entry + its sec-risk-ai
+       anchor close the gap. #}
+    <h2 id="sec-risk-ai">Risk Analysis</h2>
+    <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
+    {% if pdf_ai_stale.risk_analysis %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.risk_analysis }}</div>{% endif %}
+    <div class="ai-narrative">{{ pdf_ai.risk_analysis|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.environmental_impact %}
     <h2 id="sec-env-ai">Environmental Impact</h2>

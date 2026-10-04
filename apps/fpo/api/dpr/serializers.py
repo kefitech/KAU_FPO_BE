@@ -1383,6 +1383,29 @@ class DPRRiskItemSerializer(serializers.ModelSerializer):
         model = DPRRiskItem
         exclude = _CHILD_EXCLUDE
 
+    def validate(self, attrs):
+        """DPR-05 (UAT) — probability + impact must either BOTH be set or
+        BOTH be empty. Allowing one without the other silently gave the
+        calc engine a partially-scored risk that it ignored, which rolled
+        up to the overall rating as "Low" even though a risk had been
+        entered. The calc engine still treats fully-unscored rows as
+        'not_assessed' so FPOs can draft risks before deciding severity,
+        but once they commit to a probability they must commit to an
+        impact (and vice versa).
+        """
+        prob = attrs.get('probability') if 'probability' in attrs else getattr(self.instance, 'probability', '')
+        imp = attrs.get('impact') if 'impact' in attrs else getattr(self.instance, 'impact', '')
+        prob = (prob or '').strip()
+        imp = (imp or '').strip()
+        if bool(prob) != bool(imp):
+            raise serializers.ValidationError({
+                'probability': (
+                    'Probability and impact must be set together. Fill both to '
+                    'score this risk, or leave both empty to keep it as a draft.'
+                ),
+            })
+        return attrs
+
 
 class DPRSectionRiskSerializer(serializers.ModelSerializer):
     items = DPRRiskItemSerializer(many=True, required=False)

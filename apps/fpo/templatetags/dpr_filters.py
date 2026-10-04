@@ -118,6 +118,39 @@ def compact(value) -> str:
     return f'({out})' if neg else out
 
 
+_RISK_LABEL_MAP = {
+    'low': 'Low',
+    'moderate': 'Moderate',
+    'high': 'High',
+    'not_assessed': 'Not assessed',
+}
+_RISK_BADGE_MAP = {
+    'low': 'badge-ok',
+    'moderate': 'badge-warn',
+    'high': 'badge-err',
+    'not_assessed': 'badge-neutral',
+}
+
+
+@register.filter
+def risk_label(cls: str) -> str:
+    """Render a risk class ('low' / 'moderate' / 'high' / 'not_assessed')
+    as a human-readable label. 'not_assessed' → 'Not assessed' (DPR-05
+    UAT) because `|capfirst` would otherwise render 'Not_assessed'.
+    """
+    return _RISK_LABEL_MAP.get(cls or '', (cls or '').capitalize())
+
+
+@register.filter
+def risk_badge(cls: str) -> str:
+    """Return the CSS badge class for a risk class string. 'not_assessed'
+    maps to a neutral grey badge so the reader sees "the risk hasn't been
+    scored yet" rather than the implicit green of a bogus Low rating
+    (DPR-05 UAT).
+    """
+    return _RISK_BADGE_MAP.get(cls or '', 'badge-ok')
+
+
 @register.filter
 def last_net_block(rows) -> Decimal:
     """Net block of the final year for an AssetClass. Used in the depreciation
