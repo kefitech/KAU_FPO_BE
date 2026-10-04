@@ -880,6 +880,14 @@ def generate_chapter(
     # chapters were incomplete without diffing the text against the prompt.
     text, scrubber_hits = scrub_placeholders(text, chapter=chapter)
 
+    # Round-7 fallback (2026-10-05): make the Executive Summary viability
+    # sentence deterministic. Gemini sometimes drops the DSCR+IRR+payback
+    # line even when the brief says it's mandatory (observed in v18/v20).
+    # If the chapter ships with no headline ratio mention at all, append
+    # a synthesised viability sentence from calc_result so a bank
+    # reviewer always sees the summary.
+    text = _ensure_exec_viability_sentence(text, chapter, calc_result)
+
     # Convert USD → INR using the configured rate, then record + apply the
     # spend against the monthly cap (auto-disables if breached).
     cost_inr = response.cost_usd * cfg.usd_to_inr_rate
@@ -1119,9 +1127,18 @@ _RATIO_SIGNATURE_RE = __import__('re').compile(
     # "of" tether. Added "first (operating) year" / "first year of
     # operation" / "first full year" phrasings — these are all common
     # Gemini synonyms for "Year 1".
-    r'|annual\s+(?:revenue|turnover|EBITDA|sales|income|output|production|profit)\b'
-    r'|first\s+(?:(?:operating|full)\s+year'
-    r'|year\s+of\s+(?:operation|production|sales|business))'
+    r'|(?:annual|total)\s+(?:revenue|turnover|EBITDA|sales|income|output|production|profit)\b'
+    # Round-7 (2026-10-05): widened "first operating year" patterns to
+    # also catch "initial operating year" / "initial year of operation"
+    # — tester flagged these slipping past in v20 SWOT. Also made the
+    # separator tolerant of hyphens so "first-year break-even" / "first-
+    # year revenue" variants are recognised (break-even itself was
+    # already caught via the standalone break-even keyword; this adds
+    # recognition when the ratio phrase lives on a hyphenated noun).
+    r'|(?:first|initial)[\s-]+(?:operating|full)[\s-]+year'
+    r'|(?:first|initial)[\s-]+year[\s-]+of[\s-]+(?:operation|production|sales|business)'
+    # "first-year revenue", "initial-year EBITDA", "first year sales"
+    r'|(?:first|initial)[\s-]+year[\s-]+(?:revenue|EBITDA|PAT|profit|turnover|sales|operating\s+cost|output)'
     r')\b',
     __import__('re').IGNORECASE,
 )
@@ -1194,6 +1211,62 @@ def _cap_ratio_sentences(text: str, chapter: str) -> str:
     return stripped
 
 
+def _ensure_exec_viability_sentence(text: str, chapter: str, calc_result) -> str:
+    """Append a deterministic viability sentence to Executive Summary when
+    the LLM didn't emit one.
+
+    Round-7 (2026-10-05): v18 and v20 shipped Exec Summary chapters with
+    no DSCR / IRR / payback mention at all even though the brief marked
+    it mandatory. The capper can only preserve what Gemini writes; this
+    guard fills the gap deterministically so a bank reviewer always
+    sees the headline numbers.
+
+    Fires only for `executive_summary` and only when `_RATIO_SIGNATURE_RE`
+    finds zero matches in the stripped body. The sentence is derived
+    from the same calc_result the FACTS block used, so numbers reconcile
+    with the Financial Analysis table + §10 Financial Appraisal.
+    """
+    if chapter != 'executive_summary' or calc_result is None:
+        return text
+    if _RATIO_SIGNATURE_RE.search(text):
+        return text
+
+    ratios = getattr(calc_result, 'ratios', None)
+    if ratios is None:
+        return text
+
+    irr = getattr(ratios, 'irr_pct', None)
+    dscr = getattr(ratios, 'dscr_avg', None)
+    payback = getattr(ratios, 'payback_period_years', None)
+
+    bits: list[str] = []
+    if dscr is not None:
+        bits.append(f'a DSCR of {dscr}')
+    if irr is not None:
+        bits.append(f'an IRR of {irr}%')
+    if payback is not None:
+        bits.append(f'a payback period of {payback} years')
+    if not bits:
+        return text
+
+    if len(bits) == 1:
+        trio = bits[0]
+    elif len(bits) == 2:
+        trio = f'{bits[0]} and {bits[1]}'
+    else:
+        trio = f'{bits[0]}, {bits[1]}, and {bits[2]}'
+    sentence = f'The project shows {trio}.'
+
+    # Insert BEFORE the "Sources:" citation footer if one is present —
+    # otherwise append at the end.
+    import re
+    sources_match = re.search(r'\n\n*Sources:\s*KB\s*#', text)
+    if sources_match:
+        pos = sources_match.start()
+        return f'{text[:pos].rstrip()}\n\n{sentence}{text[pos:]}'
+    return f'{text.rstrip()}\n\n{sentence}'
+
+
 # Per-chapter guidance — what specific sub-topics to cover + target length.
 # Keeps prompts consistent and lets each chapter carry its own scope without
 # ballooning the base prompt template. Length figures roughly match the
@@ -1202,10 +1275,17 @@ _CHAPTER_BRIEF = {
     'executive_summary': (
         'Cover the project rationale in one sentence, the FPO and its promoter '
         'context, proposed capacity and product mix, total project cost with '
-        'means-of-finance summary, and a single viability statement citing '
-        'ONLY three ratios (DSCR, IRR, payback) — never the full ratio set. '
-        'Do not re-list revenue / EBITDA / PAT / NPV / break-even / Y1 '
-        'figures; the Financial Analysis chapter carries those. 400-600 words.'
+        'means-of-finance summary, and — MANDATORY, non-optional — one '
+        'viability sentence that cites DSCR, IRR, AND payback period '
+        'together. Target form: "The project shows a DSCR of {X.XX}, '
+        'an IRR of {YY.YY}%, and a payback period of {Z.ZZ} years." '
+        'Replace the braces with the actual values from the FACTS '
+        'block. The Executive Summary is INVALID if this three-ratio '
+        'viability sentence is missing; do NOT substitute Debt:Equity, '
+        'NPV, break-even, or EBITDA for the viability line. Do not '
+        're-list revenue / EBITDA / PAT / NPV / break-even / Y1 '
+        'figures elsewhere in the chapter — the Financial Analysis '
+        'chapter carries those. 400-600 words.'
     ),
     'project_background': (
         'Cover the sector context (national + Kerala production, demand trend, '
