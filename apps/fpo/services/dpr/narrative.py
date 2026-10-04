@@ -1211,24 +1211,62 @@ def _cap_ratio_sentences(text: str, chapter: str) -> str:
     return stripped
 
 
+def _text_has_quantified_ratio(text: str) -> bool:
+    """True if `text` contains a ratio keyword with a numeric value
+    within the same sentence (80-char window).
+
+    Used by `_ensure_exec_viability_sentence` to distinguish between
+    (a) a real quantified viability line like "DSCR of 4.88, IRR 68%,
+    payback 1.56 years" and (b) hand-wavy prose like "confirm the
+    debt service and cost recovery metrics" that mentions the keyword
+    but gives the reviewer no actual figure.
+    """
+    import re
+    for m in _RATIO_SIGNATURE_RE.finditer(text):
+        start, end = m.start(), m.end()
+        window_start = max(0, start - 80)
+        window_end = min(len(text), end + 80)
+        window = text[window_start:window_end]
+        if re.search(r'\d', window):
+            return True
+    return False
+
+
 def _ensure_exec_viability_sentence(text: str, chapter: str, calc_result) -> str:
     """Append a deterministic viability sentence to Executive Summary when
     the LLM didn't emit one.
 
-    Round-7 (2026-10-05): v18 and v20 shipped Exec Summary chapters with
-    no DSCR / IRR / payback mention at all even though the brief marked
-    it mandatory. The capper can only preserve what Gemini writes; this
-    guard fills the gap deterministically so a bank reviewer always
-    sees the headline numbers.
+    Round-7 (2026-10-05): v18/v20 shipped Exec Summary with no DSCR /
+    IRR / payback mention at all even though the brief marked it
+    mandatory. The capper can only preserve what Gemini writes; this
+    guard fills the gap so a bank reviewer always sees the headline
+    numbers.
 
-    Fires only for `executive_summary` and only when `_RATIO_SIGNATURE_RE`
-    finds zero matches in the stripped body. The sentence is derived
-    from the same calc_result the FACTS block used, so numbers reconcile
-    with the Financial Analysis table + §10 Financial Appraisal.
+    Round-8 (2026-10-05): v22 shipped a figure-less viability line
+    ("confirm the primary debt service and cost recovery metrics") —
+    the keyword 'debt service' was present but no numeric value
+    followed. Fallback was skipped, reviewer saw no actual figures.
+    Fallback now requires a QUANTIFIED ratio mention — a ratio keyword
+    followed within 80 chars (same sentence) by a digit — before
+    treating the viability line as present.
+
+    Fires only for `executive_summary`. The synthesised sentence is
+    derived from the same calc_result the FACTS block used, so numbers
+    reconcile with the Financial Analysis table + §10 Financial
+    Appraisal.
     """
     if chapter != 'executive_summary' or calc_result is None:
         return text
-    if _RATIO_SIGNATURE_RE.search(text):
+    # Strip the trailing "Sources: KB #..." footer before checking —
+    # otherwise the digit in "KB #4" counts as a quantified ratio value
+    # within the 80-char window of any ratio keyword in the body and
+    # the fallback mistakenly skips. See v22 regression (2026-10-05).
+    import re as _re
+    check_text = _re.sub(
+        r'\n\s*Sources\s*:\s*KB\s*#.*$',
+        '', text, flags=_re.IGNORECASE | _re.DOTALL,
+    )
+    if _text_has_quantified_ratio(check_text):
         return text
 
     ratios = getattr(calc_result, 'ratios', None)
