@@ -1971,12 +1971,14 @@ def build_ratios(
 
 # Precedence used to escalate a category to its worst risk.
 _RISK_ORDER = {'low': 0, 'moderate': 1, 'high': 2}
-# DPR-05 (UAT) — 'not_assessed' is a fourth class the calc engine sets when
-# risks exist but none have probability+impact; it's not in _RISK_ORDER so
-# it never ranks higher than the three real classes.
+# DPR-05 (UAT) — two extra classes that sit OUTSIDE _RISK_ORDER so they
+# never influence the max-rank calc:
+#   'not_assessed' — risks exist but probability+impact missing
+#   'no_risks'     — category has no entries at all
 _RISK_LABELS = {
     'low': 'Low', 'moderate': 'Moderate', 'high': 'High',
     'not_assessed': 'Not assessed',
+    'no_risks': 'No risks entered',
 }
 
 # 6 categories from RISK_CATEGORY_CHOICES on DPRRiskItem — mirrored here so
@@ -2154,9 +2156,16 @@ def build_risk_assessment(project) -> RiskAssessment:
             cat_rank = max(cat_rank, _RISK_ORDER.get(cls, 0))
 
         # DPR-05 (UAT) — per-category class now mirrors the overall-class
-        # convention: if the category has risks but none scored, the badge
-        # reads "Not assessed" rather than a misleading "Low".
-        if rows and scored_count == 0:
+        # convention. Three cases:
+        #   - 0 items + 0 auto-pulled → "No risks entered" (grey/neutral).
+        #     Reviewer sees this is a BLANK category, not a confidently-low
+        #     one. (Round-2 retest note: green "Low" implied assessed-as-low.)
+        #   - 1+ items but 0 scored → "Not assessed" (grey/neutral).
+        #   - at least one scored → actual class from the matrix lookup.
+        total_cat_count = len(rows) + auto_bucket_counts[code]
+        if total_cat_count == 0:
+            cat_class = 'no_risks'
+        elif rows and scored_count == 0:
             cat_class = 'not_assessed'
         else:
             cat_class = _rank_to_class(cat_rank)

@@ -127,11 +127,34 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     pl_rows = result.profit_loss.rows if result.profit_loss else []
     y1 = pl_rows[0] if pl_rows else None
 
-    # Debt:Equity — same convention as the PDF (banking `x.xx : 1`).
-    debt = mof.by_field.get('mof_bank_term_loan') or Decimal('0')
-    equity = mof.by_field.get('mof_promoters_contribution') or Decimal('0')
-    if equity > 0:
-        de_ratio = (debt / equity).quantize(Decimal('0.01'))
+    # DPR-06 (UAT) — Debt:Equity now aligned with the Balance Sheet. The
+    # BS treats promoter contribution + share capital + internal accruals
+    # as EQUITY and government grant/subsidy/CSR/NABARD as CAPITAL
+    # RESERVE (quasi-equity). The earlier narrative convention of
+    # loan / promoter_only inflated the ratio (e.g. 2.50:1 narrative vs
+    # 1.00:1 balance sheet) because it ignored the subsidy reserve. One
+    # consistent definition everywhere now:
+    #   Debt  = long-term borrowings (bank term loan + VC)
+    #   Equity = promoter equity + capital reserve (subsidy counts)
+    term_debt = (
+        (mof.by_field.get('mof_bank_term_loan') or Decimal('0'))
+        + (mof.by_field.get('mof_venture_capital') or Decimal('0'))
+    )
+    promoter_eq = (
+        (mof.by_field.get('mof_promoters_contribution') or Decimal('0'))
+        + (mof.by_field.get('mof_share_capital') or Decimal('0'))
+        + (mof.by_field.get('mof_internal_accruals') or Decimal('0'))
+    )
+    capital_reserve = (
+        (mof.by_field.get('mof_government_grant') or Decimal('0'))
+        + (mof.by_field.get('mof_government_subsidy') or Decimal('0'))
+        + (mof.by_field.get('mof_csr_support') or Decimal('0'))
+        + (mof.by_field.get('mof_nabard_assistance') or Decimal('0'))
+        + (mof.by_field.get('mof_other_financial_assistance') or Decimal('0'))
+    )
+    total_equity_for_de = promoter_eq + capital_reserve
+    if total_equity_for_de > 0:
+        de_ratio = (term_debt / total_equity_for_de).quantize(Decimal('0.01'))
         de_display = f'{de_ratio} : 1'
     else:
         de_display = 'Not available'
@@ -240,7 +263,9 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'    Scheme name:            {subsidy_scheme}',
         f'    Implementing agency:    {subsidy_agency}',
         f'    Application status:     {subsidy_status}',
-        f'Debt : Equity ratio:        {de_display}',
+        f'Debt : Equity ratio:        {de_display}  (balance-sheet-aligned: '
+        f'term debt ÷ (promoter equity + capital reserve); subsidy counts '
+        f'as quasi-equity)',
         '',
         f'Y1 revenue:                 {_fmt_inr(y1.revenue) if y1 else "Not available"}',
         f'Y1 operating cost:          {_fmt_inr(y1.operating_cost) if y1 else "Not available"}',
@@ -392,6 +417,45 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
             'air pollution control as NOT IN SCOPE unless they appear above '
             'or in a project cost line)'
         )
+
+    # DPR-04 (UAT polish) — surface the project's actual risks + the
+    # FPO's own mitigation strategies so the Risk Analysis chapter can
+    # quote them verbatim instead of paraphrasing / inventing. Only
+    # entered risks appear here; scored vs draft is noted so the LLM
+    # knows which rows have probability+impact.
+    risk_section = getattr(project, 'section_risk', None)
+    risk_rows = list(risk_section.items.all()) if risk_section else []
+    lines.append('')
+    lines.append('--- Risks + FPO-authored mitigations (verbatim) ---')
+    if risk_rows:
+        for r in risk_rows[:20]:
+            code = (r.risk_code or r.risk_code_other or 'unspecified').strip()
+            cat = (r.risk_category or 'unspecified').strip()
+            desc = (r.risk_description or '').strip()
+            if len(desc) > 200:
+                desc = desc[:197] + '...'
+            prob = (r.probability or '').strip() or '—'
+            imp = (r.impact or '').strip() or '—'
+            scored = ' (scored)' if prob != '—' and imp != '—' else ' (draft)'
+            lines.append(f'  - [{cat}/{code}]{scored} prob={prob}, impact={imp}')
+            if desc:
+                lines.append(f'    description: {desc}')
+            mitig = (r.mitigation_strategy or '').strip()
+            if mitig:
+                m = mitig.replace('\n', ' ')
+                if len(m) > 220:
+                    m = m[:217] + '...'
+                lines.append(f'    mitigation (verbatim): {m}')
+            existing = (r.existing_measures or '').strip()
+            if existing:
+                e = existing.replace('\n', ' ')
+                if len(e) > 160:
+                    e = e[:157] + '...'
+                lines.append(f'    existing measures: {e}')
+    else:
+        lines.append('  (no risks entered — Risk Analysis chapter should discuss '
+                     'typical sector risks generically and recommend the FPO '
+                     'populate the §2.3.22 Risk Register before submission)')
 
     # KAU 2026-09-19 P2.1 — surface the platform-configured (system_default)
     # rates the calc engine used so the LLM can mention provenance in prose
@@ -1141,8 +1205,16 @@ _CHAPTER_BRIEF = {
     ),
     'risk_analysis': (
         'Cover the top production, market, financial, regulatory, technology '
-        'and climate risks the project faces, with likelihood + impact + a '
-        'concrete mitigation strategy for each. Group by risk category. '
+        'and climate risks the project faces. For EACH risk in the FACTS '
+        'block "Risks + FPO-authored mitigations" section, write one short '
+        'paragraph that (a) summarises the risk description verbatim, '
+        '(b) states the probability × impact rating when scored (or notes '
+        '"not yet scored" when draft), and (c) quotes the FPO\'s own '
+        'entered mitigation strategy verbatim — do NOT paraphrase, do NOT '
+        'substitute your own mitigation idea. If existing measures are '
+        'listed, include them too. Group by risk category. If no risks '
+        'were entered, write a short generic sector-risk discussion and '
+        'end by recommending the FPO populate the §2.3.22 Risk Register. '
         '600-800 words.'
     ),
     'swot': (

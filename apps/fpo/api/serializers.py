@@ -427,6 +427,17 @@ class FPOStep3Serializer(serializers.Serializer):
         women = attrs.get('women_directors', 0)
         young = attrs.get('directors_under_35', 0)
         total_dirs = attrs.get('total_directors', 0)
+        # DPR-09 (UAT) — board size must not exceed total members. A DPR
+        # that showed "10 members, Board of 20 directors" prompted the
+        # reviewer to question the FPO's basic data integrity. The board
+        # is drawn from the membership, so total_directors ≤ total_members
+        # by definition.
+        if total_dirs and total and total_dirs > total:
+            raise serializers.ValidationError(
+                'Total directors cannot exceed total members — the board is '
+                'drawn from the membership. Reduce directors to at most the '
+                'total member count.'
+            )
         if women + young > total_dirs:
             raise serializers.ValidationError(
                 'Women directors + directors under 35 cannot exceed total directors.'

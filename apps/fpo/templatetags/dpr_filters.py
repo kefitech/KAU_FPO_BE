@@ -123,12 +123,14 @@ _RISK_LABEL_MAP = {
     'moderate': 'Moderate',
     'high': 'High',
     'not_assessed': 'Not assessed',
+    'no_risks': 'No risks entered',
 }
 _RISK_BADGE_MAP = {
     'low': 'badge-ok',
     'moderate': 'badge-warn',
     'high': 'badge-err',
     'not_assessed': 'badge-neutral',
+    'no_risks': 'badge-neutral',
 }
 
 
