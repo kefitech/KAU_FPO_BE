@@ -1119,15 +1119,18 @@ _RATIO_SIGNATURE_RE = __import__('re').compile(
     # "Y1 revenue", "Y 1 revenue", "Year 1 revenue", "year one revenue",
     # "Year 1 EBITDA", "Year 1 PAT", "Year 1 profit", "Year 1 cash flow",
     # "Year 1 turnover" / "sales" — any digit 1-9.
+    # Round-10 plurals (2026-10-05): "revenues", "profits", "turnovers"
+    # slipped past in v30 SWOT + Environmental. The plural noun forms
+    # are now accepted via a trailing `s?` on each.
     r'|(?:Y|year|Yr)\s*(?:[1-9]|one|two|three|four|five)'
-    r'\s+(?:revenue|EBITDA|PAT|profit|cash\s+flow|turnover|sales|operating\s+cost|output|production)'
+    r'\s+(?:revenues?|EBITDA|PAT|profits?|cash\s+flows?|turnovers?|sales|operating\s+costs?|outputs?|productions?)'
     # Round-6 widening (2026-10-05): tester flagged "annual turnover is
     # projected at ₹X in the first operating year" slipping past.
     # Previous pattern required "annual turnover OF ₹X"; dropped the
     # "of" tether. Added "first (operating) year" / "first year of
     # operation" / "first full year" phrasings — these are all common
     # Gemini synonyms for "Year 1".
-    r'|(?:annual|total)\s+(?:revenue|turnover|EBITDA|sales|income|output|production|profit)\b'
+    r'|(?:annual|total)\s+(?:revenues?|turnovers?|EBITDA|sales|incomes?|outputs?|productions?|profits?)\b'
     # Round-7 (2026-10-05): widened "first operating year" patterns to
     # also catch "initial operating year" / "initial year of operation"
     # — tester flagged these slipping past in v20 SWOT. Also made the
@@ -1138,7 +1141,7 @@ _RATIO_SIGNATURE_RE = __import__('re').compile(
     r'|(?:first|initial)[\s-]+(?:operating|full)[\s-]+year'
     r'|(?:first|initial)[\s-]+year[\s-]+of[\s-]+(?:operation|production|sales|business)'
     # "first-year revenue", "initial-year EBITDA", "first year sales"
-    r'|(?:first|initial)[\s-]+year[\s-]+(?:revenue|EBITDA|PAT|profit|turnover|sales|operating\s+cost|output)'
+    r'|(?:first|initial)[\s-]+year[\s-]+(?:revenues?|EBITDA|PAT|profits?|turnovers?|sales|operating\s+costs?|outputs?)'
     r')\b',
     __import__('re').IGNORECASE,
 )
@@ -1211,38 +1214,44 @@ def _cap_ratio_sentences(text: str, chapter: str) -> str:
     return stripped
 
 
+# Round-11 (2026-10-05): the fallback is ONLY concerned with the three
+# viability ratios (DSCR, IRR, payback). Earlier versions also counted
+# NPV / debt-service / EBITDA / revenue mentions as "quantified
+# viability", which falsely passed cases like "applying a 12.00% discount
+# rate for net present value calculations" and "demonstrates strong debt
+# service capabilities and investment recovery profiles". Tester's call
+# was explicit: fire the fallback unless DSCR, IRR, or payback appears
+# next to its own figure — don't count NPV / discount / tax / depreciation
+# rate sentences.
+_VIABILITY_QUANTIFIED_RE = __import__('re').compile(
+    r'\b(?:DSCR|IRR|internal\s+rate\s+of\s+return|payback(?:\s+period)?)\b'
+    r'[^.!?]{0,40}'                 # same-sentence, up to 40 chars after keyword
+    r'\d',
+    __import__('re').IGNORECASE,
+)
+
+
 def _text_has_quantified_ratio(text: str) -> bool:
-    """True if `text` contains a ratio keyword with a numeric value in
-    the SAME SENTENCE.
+    """True if `text` contains a VIABILITY ratio (DSCR / IRR / payback)
+    next to its own numeric figure, in the same sentence.
 
     Used by `_ensure_exec_viability_sentence` to distinguish between
     (a) a real quantified viability line like "DSCR of 4.88, IRR 68%,
-    payback 1.56 years" and (b) hand-wavy prose like "debt servicing
-    evaluations demonstrate operational viability" that mentions the
-    keyword but gives the reviewer no actual figure.
+    payback 1.56 years" and (b) prose that only mentions a non-
+    viability metric with numbers (NPV with discount rate, EBITDA
+    margin, project cost, tax rate) which does not satisfy the
+    "viability line" requirement.
 
-    Round-9 (2026-10-05): switched from 80-char character window to
-    sentence-boundary check. v24/v25/v26 had figure-less sentences
-    with a ratio keyword ("debt service", "debt coverage") immediately
-    followed by a different sentence containing project-cost numbers,
-    and the character-window pulled those digits in as "quantified".
-    Sentence-boundary is the right unit — if the viability line has
-    its own number, it's quantified; nearby prose doesn't count.
+    Scope narrowed in round-11 per tester feedback — NPV / debt-
+    service / revenue / discount / tax mentions no longer count as
+    viability. The chapter is viability-complete only when at least
+    one of the three core metrics (DSCR, IRR, payback) is quantified
+    with a nearby figure.
     """
     import re
-    # Simple splitter: terminator (. ! ?) followed by whitespace +
-    # capital/digit/quote/open-paren start. Matches _cap_ratio_sentences
-    # for consistency.
-    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z0-9"\'(])', text)
-    for s in sentences:
-        if not _RATIO_SIGNATURE_RE.search(s):
-            continue
-        # Require a bare digit in the sentence AND ensure it's not just
-        # a KB citation ("KB #4") — strip those before checking.
-        stripped = re.sub(r'KB\s*#\s*\d+', '', s, flags=re.IGNORECASE)
-        if re.search(r'\d', stripped):
-            return True
-    return False
+    # Strip KB citations so "KB #4" / "KB #10" don't contribute digits.
+    stripped = re.sub(r'KB\s*#\s*\d+', '', text, flags=re.IGNORECASE)
+    return bool(_VIABILITY_QUANTIFIED_RE.search(stripped))
 
 
 def _ensure_exec_viability_sentence(text: str, chapter: str, calc_result) -> str:
