@@ -79,6 +79,32 @@ MOF_LABELS = {
 }
 
 
+_TO_BE_FILLED_PDF_RE = __import__('re').compile(
+    r'\s*\[TO BE FILLED:[^\]]+\]',
+    __import__('re').IGNORECASE,
+)
+
+
+def _scrub_pdf_markers(text: str) -> str:
+    """Final-pass scrub applied only when a chapter is rendered into the PDF.
+
+    Removes `[TO BE FILLED: <hint>]` placeholders (DPR-02 UAT bug). The
+    narrative storage keeps them so an editor can see what needs filling,
+    but the bank-facing PDF must never ship with "[TO BE FILLED: name of
+    the ETP vendor]" visible to a reviewer. Prompt rule 8 already asks the
+    LLM to keep surrounding prose valid after the bracket is removed.
+    """
+    import re
+    if not text:
+        return text
+    cleaned = _TO_BE_FILLED_PDF_RE.sub('', text)
+    # Collapse any double-space / double-comma / stray leading-punct left
+    # behind by the removal so the prose still reads cleanly.
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\s+([,.;:])', r'\1', cleaned)
+    return cleaned.strip()
+
+
 def _ai_chapters_for_pdf(project) -> dict:
     """Return {chapter_key: text} of all AI-generated narrative chapters
     that have live `user_edited` content for this project.
@@ -90,6 +116,9 @@ def _ai_chapters_for_pdf(project) -> dict:
     Returns an empty dict when nothing has been generated yet; the template
     guards each render with `{% if pdf_ai.<key> %}` so an unfilled DPR
     still renders cleanly (just without narratives).
+
+    Also applies `_scrub_pdf_markers()` so `[TO BE FILLED: ...]` placeholders
+    never reach a bank reviewer (DPR-02 UAT fix).
     """
     try:
         from apps.database.models import DPRAIContent
@@ -101,7 +130,7 @@ def _ai_chapters_for_pdf(project) -> dict:
         # a chapter that was generated once and never manually edited.
         text = (row.user_edited or row.original_ai or '').strip()
         if text:
-            out[row.chapter] = text
+            out[row.chapter] = _scrub_pdf_markers(text)
     return out
 
 

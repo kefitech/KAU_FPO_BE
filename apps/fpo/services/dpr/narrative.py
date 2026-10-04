@@ -136,6 +136,32 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     else:
         de_display = 'Not available'
 
+    # Subsidy — the actual MoF fields are `mof_government_grant` + `mof_government_subsidy`
+    # (Finance model). The earlier `mof_subsidy_grant` key was a typo and always
+    # returned None, which is why DPR-01 (UAT bug) reported "subsidy details …
+    # Not available" in every narrative even when the balance sheet showed ₹7.5L.
+    subsidy_grant_amount = mof.by_field.get('mof_government_grant') or Decimal('0')
+    subsidy_direct_amount = mof.by_field.get('mof_government_subsidy') or Decimal('0')
+    subsidy_total = subsidy_grant_amount + subsidy_direct_amount
+    subsidy_display = _fmt_inr(subsidy_total) if subsidy_total > 0 else 'Not available'
+
+    # Subsidy scheme metadata (name / agency / status) from the Finance section
+    # so promoter / financial chapters can quote the actual scheme instead of
+    # saying "subsidy details … Not available".
+    finance_section = getattr(project, 'section_finance', None)
+    subsidy_scheme = (
+        (getattr(finance_section, 'subsidy_scheme_name', '') or '').strip()
+        if finance_section else ''
+    ) or 'Not available'
+    subsidy_agency = (
+        (getattr(finance_section, 'subsidy_implementing_agency', '') or '').strip()
+        if finance_section else ''
+    ) or 'Not available'
+    subsidy_status = (
+        (getattr(finance_section, 'subsidy_application_status', '') or '').strip()
+        if finance_section else ''
+    ) or 'Not available'
+
     commodity = (
         project.primary_commodity.get_name('en')
         if project.primary_commodity_id else 'Not available'
@@ -210,7 +236,10 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'  - Promoter contribution:  {_fmt_inr(mof.by_field.get("mof_promoters_contribution"))}',
         f'  - Bank / term loan:       {_fmt_inr(mof.by_field.get("mof_bank_term_loan"))}',
         f'  - Working capital loan:   {_fmt_inr(mof.by_field.get("mof_working_capital_loan"))}',
-        f'  - Subsidy / grant:        {_fmt_inr(mof.by_field.get("mof_subsidy_grant"))}',
+        f'  - Government subsidy/grant: {subsidy_display}',
+        f'    Scheme name:            {subsidy_scheme}',
+        f'    Implementing agency:    {subsidy_agency}',
+        f'    Application status:     {subsidy_status}',
         f'Debt : Equity ratio:        {de_display}',
         '',
         f'Y1 revenue:                 {_fmt_inr(y1.revenue) if y1 else "Not available"}',
@@ -220,17 +249,149 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         '',
         f'IRR:                        {_fmt_pct(ratios.irr_pct) if ratios else "Not available"}',
         f'NPV (@ discount rate):      {_fmt_inr(ratios.npv) if ratios else "Not available"}',
-        f'Discount rate used:         {_fmt_pct(ratios.discount_rate_pct) if ratios else "Not available"} [system_default]',
+        f'Discount rate used:         {_fmt_pct(ratios.discount_rate_pct) if ratios else "Not available"}',
         f'Average DSCR:               {_fmt_ratio(ratios.dscr_avg) if ratios else "Not available"}',
         f'Minimum DSCR:               {_fmt_ratio(ratios.dscr_min) if ratios else "Not available"}',
         f'Payback period (years):     {_fmt_ratio(ratios.payback_period_years) if ratios else "Not available"}',
         f'Break-even year:            {ratios.break_even_year if ratios and ratios.break_even_year else "Not available"}',
         '',
-        '--- Operating break-even (Y1 basis, Kefitech 2026-09-19) ---',
+        '--- Operating break-even (Y1 basis) ---',
         f'Break-even sales:           {_fmt_inr(ratios.break_even_sales_inr) if ratios else "Not available"}',
         f'Break-even capacity util.:  {_fmt_pct(ratios.break_even_capacity_utilisation_pct) if ratios else "Not available"} of Y1 sales',
         f'Contribution margin:        {_fmt_pct(ratios.break_even_contribution_margin_pct) if ratios else "Not available"}',
     ]
+
+    # DPR-07 (UAT) — surface the actual products planned so the technical /
+    # financial narratives describe the right process (e.g. "cold-pressed
+    # virgin coconut oil" rather than making up a copra crude-oil story).
+    products_section = getattr(project, 'section_products', None)
+    product_rows = (
+        list(products_section.items.order_by('order'))
+        if products_section else []
+    )
+    lines.append('')
+    lines.append('--- Products planned (verbatim product list) ---')
+    if product_rows:
+        for p in product_rows:
+            ptype = str(p.product_type) if p.product_type_id else 'unspecified type'
+            va = ' (value-added)' if p.is_value_added else ''
+            qty = p.annual_quantity
+            unit = getattr(p.unit_of_measurement, 'code', '') if p.unit_of_measurement_id else ''
+            price = _fmt_inr(p.selling_price_per_unit) if p.selling_price_per_unit is not None else 'price n/a'
+            qty_line = f'{qty} {unit}'.strip() if qty is not None else 'quantity n/a'
+            lines.append(f'  - {p.name} [{ptype}]{va}: {qty_line}/yr at {price}')
+            if p.description:
+                desc = p.description.strip().replace('\n', ' ')
+                if len(desc) > 160:
+                    desc = desc[:157] + '...'
+                lines.append(f'    purpose/description: {desc}')
+    else:
+        lines.append('  (no products entered — do NOT invent product details)')
+
+    # DPR-07 (UAT) — surface machinery by name + purpose so the technical
+    # chapter cannot describe equipment the FPO did not enter.
+    machinery_section = getattr(project, 'section_machinery', None)
+    machinery_rows = (
+        list(machinery_section.items.order_by('order'))
+        if machinery_section else []
+    )
+    lines.append('')
+    lines.append('--- Key machinery (verbatim list — purpose = what the equipment does) ---')
+    if machinery_rows:
+        for m in machinery_rows[:15]:  # cap at 15 to keep prompt bounded
+            purpose = (m.purpose or '').strip() or 'purpose not specified'
+            cap = (m.operating_capacity or '').strip() or (
+                f'{m.rated_capacity} {getattr(m.capacity_unit, "code", "")}'.strip()
+                if m.rated_capacity is not None and m.capacity_unit_id else ''
+            )
+            cap_display = f', capacity {cap}' if cap else ''
+            principle = (m.operating_principle or '').strip()
+            lines.append(f'  - {m.name}: {purpose}{cap_display}')
+            if principle:
+                principle = principle.replace('\n', ' ')
+                if len(principle) > 160:
+                    principle = principle[:157] + '...'
+                lines.append(f'    operating principle: {principle}')
+    else:
+        lines.append('  (no machinery entered — do NOT invent machinery types)')
+
+    # DPR-08 (UAT) — explicit utility / waste / renewable list so the
+    # environmental and technical chapters cannot hallucinate ETP / ZLD /
+    # rooftop solar / diesel genset etc. that aren't in the project cost or
+    # utility entries. The Utilities section is spread across four reverse
+    # relations: fuels (power/diesel/LPG), process_utilities (water/steam/
+    # compressed air), wastes (effluent/solid/air), renewable_initiatives
+    # (rooftop solar / biogas / rainwater harvesting).
+    utilities_section = getattr(project, 'section_utilities', None)
+    utility_lines: list[str] = []
+    if utilities_section:
+        def _label_fuel(row):
+            name = str(getattr(row, 'fuel', '') or row.fuel_other or 'fuel')
+            use = (row.purpose or '').strip()
+            cons = (row.annual_consumption or row.daily_consumption or '').strip()
+            parts = [name]
+            if use:
+                parts.append(f'for {use}')
+            if cons:
+                parts.append(f'~{cons}')
+            return ', '.join(parts)[:160]
+
+        def _label_process_util(row):
+            name = str(getattr(row, 'utility_type', '') or 'process utility')
+            use = (row.purpose or '').strip()
+            cap = (row.capacity or '').strip()
+            src = (row.source or '').strip()
+            parts = [name]
+            if use:
+                parts.append(f'for {use}')
+            if cap:
+                parts.append(f'capacity {cap}')
+            if src:
+                parts.append(f'source: {src}')
+            return ', '.join(parts)[:160]
+
+        def _label_waste(row):
+            name = str(getattr(row, 'waste', '') or row.waste_other or 'waste stream')
+            disposal = (row.disposal_method or '').strip()
+            parts = [name]
+            if disposal:
+                parts.append(f'disposal: {disposal}')
+            return ', '.join(parts)[:160]
+
+        def _label_renewable(row):
+            name = str(getattr(row, 'initiative', '') or row.initiative_other or 'initiative')
+            cap = (row.capacity or '').strip()
+            parts = [name]
+            if cap:
+                parts.append(f'capacity {cap}')
+            return ', '.join(parts)[:160]
+
+        for rel_name, header, labeller in [
+            ('fuels', 'Fuel / power sources', _label_fuel),
+            ('process_utilities', 'Process utilities', _label_process_util),
+            ('wastes', 'Waste streams declared', _label_waste),
+            ('renewable_initiatives', 'Renewable / sustainability initiatives', _label_renewable),
+        ]:
+            qs = getattr(utilities_section, rel_name, None)
+            try:
+                rows = list(qs.all()) if qs is not None else []
+            except Exception:  # noqa: BLE001
+                rows = []
+            if rows:
+                utility_lines.append(f'  {header}:')
+                for row in rows[:8]:
+                    utility_lines.append(f'    - {labeller(row)}')
+    lines.append('')
+    lines.append('--- Utilities / infrastructure actually entered + budgeted ---')
+    if utility_lines:
+        lines.extend(utility_lines)
+    else:
+        lines.append(
+            '  (no utility / waste / renewable entries recorded — treat ETP, '
+            'STP, ZLD, rooftop solar, diesel genset, rainwater harvesting, '
+            'air pollution control as NOT IN SCOPE unless they appear above '
+            'or in a project cost line)'
+        )
 
     # KAU 2026-09-19 P2.1 — surface the platform-configured (system_default)
     # rates the calc engine used so the LLM can mention provenance in prose
@@ -241,7 +402,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     lines.append('')
     lines.append('--- System-default assumptions used by the calc engine ---')
     for a in collect_system_assumptions():
-        lines.append(f'{a.label}:  {a.value}%  [system_default]')
+        lines.append(f'{a.label}:  {a.value}%')
 
     lines.append('=== END FACTS ===')
     return '\n'.join(lines)
@@ -340,31 +501,42 @@ _TO_BE_FILLED_RE = re.compile(r'\[TO BE FILLED:[^\]]+\]', re.IGNORECASE)
 _HARD_RULES = (
     'STRICT OUTPUT RULES (violations will fail post-processing):\n'
     '1. Output ONLY the finished narrative prose — nothing else.\n'
-    '2. NO markdown headers (###, ##), NO bullet lists, NO numbered lists.\n'
+    '2. NO markdown headers (###, ##), NO bullet lists, NO numbered lists, '
+    'NO markdown italics (*word* / _word_) — a bank reviewer sees asterisks '
+    'as raw characters.\n'
     '3. NO meta-commentary like "Paragraph count:", "Tone:", '
     '"Final Polish:" or references to this brief itself.\n'
     '4. NO restating the chapter title as the first line.\n'
     '5. Write in flowing paragraphs separated by a blank line.\n'
-    '6. Cite knowledge base entries inline as [KB #ID] where relevant, '
-    'and only when directly used — never as a trailing list.\n'
+    '6. DO NOT cite the knowledge base inline. Never write "[KB #ID]", '
+    '"[KB#4]", "(KB 10)" or similar in-prose markers. The PDF renders a '
+    'separate "Sources: KB #4, KB #10, ..." footer under each chapter — '
+    'cite there, not inline.\n'
     '7. GROUNDING: Every number in your output MUST come from the PROJECT '
     'FACTS block above. Do not invent, estimate, approximate, or infer '
     'numeric values. Do not present generic industry statistics as '
     'project facts.\n'
     '8. NO PLACEHOLDER TOKENS. Never write [X ...], [Rs. X ...], [Name of '
-    '...], [CIN Number], [projected ...], [insert ...], [TODO ...], or '
-    'any similar bracketed placeholder. If a required fact is not in the '
-    'FACTS block or the knowledge base, write "Not available" or "Not '
-    'provided" in flowing prose — never a bracketed placeholder.\n'
+    '...], [CIN Number], [projected ...], [insert ...], [TODO ...], '
+    '[TO BE FILLED: ...], [system_default], or any similar bracketed '
+    'placeholder / tag. If a required fact is not in the FACTS block or '
+    'the knowledge base, write "Not available" or "Not provided" in '
+    'flowing prose — never a bracketed placeholder or metadata tag.\n'
     '9. Do not claim the FPO has certifications, buyers, awards, land, '
-    'staff, or turnover that are not present in the FACTS block or the '
-    'knowledge base.\n'
-    '10. PROVENANCE. Any value tagged [system_default] in the FACTS block '
-    'is a KAU-configured platform assumption, NOT a project-specific '
-    'input. When quoting such a value, indicate that provenance in prose '
-    '— e.g. "at the platform\'s default 12% discount rate" or "using the '
-    'KAU-configured 25.17% corporate tax rate". Never present a '
-    '[system_default] value as if the FPO or the appraiser chose it.\n'
+    'staff, turnover, machinery, products, infrastructure (ETP, STP, '
+    'ZLD, rooftop solar, diesel genset, rainwater harvesting, air '
+    'pollution controls, cold chain), or utility backups that are not '
+    'present in the FACTS block "Products planned", "Key machinery", '
+    '"Utilities / infrastructure" sections, or the knowledge base. If '
+    'the utilities list says "no utility items entered", treat those '
+    'systems as NOT IN SCOPE — do not describe them as planned.\n'
+    '10. PROVENANCE OF SYSTEM DEFAULTS. The "System-default assumptions '
+    'used by the calc engine" section lists KAU-configured platform '
+    'rates (not FPO-specific choices). When quoting any of those rates, '
+    'make that provenance clear in prose — e.g. "at the platform\'s '
+    'default 12% discount rate" or "using the KAU-configured 25.17% '
+    'corporate tax rate". Never present them as if the FPO or appraiser '
+    'chose the specific number.\n'
     '11. NEUTRAL BANK-APPRAISAL LANGUAGE. This is a professional DPR for '
     'bank / scheme appraisal — write in formal, analytical, evidence-based '
     'prose. Do NOT use promotional adjectives: "highly bankable", '
@@ -375,7 +547,25 @@ _HARD_RULES = (
     'decision rests with the concerned bank or implementing agency. '
     'Present indicators (DSCR, IRR, NPV, payback) as calculated values '
     'and let the reviewer draw conclusions.\n'
-    '12. Start directly with the first sentence of the narrative.'
+    '12. STAY ON YOUR CHAPTER\'S TOPIC. The headline financial indicators '
+    '(revenue, EBITDA, PAT, IRR, NPV, DSCR, payback, break-even) belong to '
+    'the Financial Analysis chapter. Other chapters may reference ONE or '
+    'TWO of these in a passing phrase when relevant, but do NOT re-list '
+    'the full set in every chapter — the Exec Summary already does that. '
+    'Prefer specifics from your own section (products / machinery / '
+    'utilities / promoter details / market context) over re-quoting '
+    'ratios the reader has seen already.\n'
+    '13. "Not available" HANDLING. If several FACTS fields read "Not '
+    'available", mention the gap ONCE in neutral prose ("certain promoter '
+    'details are pending") — do not list every missing field separately, '
+    'do not repeat "Not available" more than two or three times in a '
+    'single chapter.\n'
+    '14. SUBSIDY. If the FACTS block "Government subsidy/grant" line '
+    'shows a value, you MUST reference it in the Financial Analysis / '
+    'Means-of-Finance narrative — including the scheme name and '
+    'implementing agency if the FACTS block provides them. Do not say '
+    '"subsidy details not available" when a subsidy amount is present.\n'
+    '15. Start directly with the first sentence of the narrative.'
 )
 
 
@@ -388,40 +578,55 @@ _HARD_RULES = (
 _LENIENT_RULES = (
     'OUTPUT RULES (lenient — this chapter allows general knowledge):\n'
     '1. Output ONLY the finished narrative prose — nothing else.\n'
-    '2. NO markdown headers (###, ##), NO bullet lists, NO numbered lists.\n'
+    '2. NO markdown headers (###, ##), NO bullet lists, NO numbered lists, '
+    'NO markdown italics (*word* / _word_). The PDF renders asterisks as '
+    'raw characters.\n'
     '3. NO meta-commentary like "Paragraph count:", "Tone:", "Final Polish:" '
     'or references to this brief itself.\n'
     '4. NO restating the chapter title as the first line.\n'
     '5. Write in flowing paragraphs separated by a blank line.\n'
-    '6. Cite knowledge base entries inline as [KB #ID] where relevant, '
-    'and only when directly used — never as a trailing list.\n'
+    '6. DO NOT cite the knowledge base inline. Never write "[KB #ID]" or '
+    'similar in-prose markers — the PDF renders a separate Sources footer.\n'
     '7. KNOWLEDGE SOURCE: You may combine the PROJECT FACTS block, the '
     'knowledge base entries, AND your own general knowledge of industry '
     'best practice / open-source technical standards / environmental norms. '
     'Prefer the FACTS block for anything project-specific, but you are '
     'encouraged to elaborate with domain expertise the FACTS block does '
     'not cover.\n'
-    '8. PLACEHOLDERS ALLOWED. Where an FPO-specific detail is required but '
-    'not available in the FACTS block or knowledge base, write exactly '
-    '`[TO BE FILLED: <short hint of what the editor should insert>]`. '
-    'Examples: `[TO BE FILLED: name of the effluent treatment vendor]`, '
-    '`[TO BE FILLED: month of PCB consent application]`. Use this pattern '
-    'ONLY — never the older `[X ...]`, `[Name of ...]`, `[insert ...]` '
-    'forms. Keep placeholders sparse — use them for genuinely FPO-specific '
-    'gaps, not to avoid writing about the topic.\n'
+    '8. PLACEHOLDERS ALLOWED SPARINGLY. Where a GENUINELY FPO-specific '
+    'detail is required (vendor name, consent date, officer name) but is '
+    'not in the FACTS block or knowledge base, you MAY write '
+    '`[TO BE FILLED: <short hint>]` — but the PDF stripper removes these '
+    'before the document is handed to a reviewer, so the surrounding '
+    'sentence must still make sense if the bracket were deleted. Prefer to '
+    'rewrite the sentence in the passive voice ("the FPO will apply for '
+    'KSPCB consent") over inserting a placeholder. Never use the older '
+    '`[X ...]`, `[Name of ...]`, `[insert ...]` forms. Keep placeholders '
+    'under 3 per chapter.\n'
     '9. Do not fabricate FPO-specific claims (certifications, buyers, '
-    'awards, land, staff, turnover figures). Use the FACTS block for those '
-    'or leave a `[TO BE FILLED: ...]` marker.\n'
-    '10. PROVENANCE. Any value tagged [system_default] in the FACTS block '
-    'is a KAU-configured platform assumption. When quoting such a value, '
-    'indicate that provenance in prose — e.g. "at the platform\'s default '
-    '12% discount rate".\n'
-    '11. NEUTRAL BANK-APPRAISAL LANGUAGE. Formal, analytical, evidence-based '
+    'awards, land, staff, turnover figures, machinery, products, '
+    'infrastructure like ETP / STP / ZLD / rooftop solar / diesel genset '
+    '/ rainwater harvesting). If a system is NOT in the FACTS block\'s '
+    '"Utilities / infrastructure" section, describe it as a '
+    'recommended/typical approach the FPO should consider — never state '
+    'it as planned or budgeted. Use the FACTS block or leave the detail '
+    'generic.\n'
+    '10. NO METADATA TAGS. Never emit `[system_default]`, `[KB #n]`, '
+    '`(system)` or similar metadata markers in the output.\n'
+    '11. PROVENANCE OF SYSTEM DEFAULTS. The "System-default assumptions" '
+    'section lists KAU-configured platform rates. When quoting those '
+    'rates, make the provenance clear in prose — e.g. "at the platform\'s '
+    'default 12% discount rate".\n'
+    '12. NEUTRAL BANK-APPRAISAL LANGUAGE. Formal, analytical, evidence-based '
     'prose. Do NOT use promotional adjectives: "highly bankable", '
     '"state-of-the-art", "uniquely positioned", "transformative", '
     '"compelling", "exceptional", "robust", "impressive". Do NOT recommend '
     'loan sanction or project approval.\n'
-    '12. Start directly with the first sentence of the narrative.'
+    '13. STAY ON YOUR CHAPTER\'S TOPIC. Headline financial indicators '
+    '(revenue, EBITDA, PAT, IRR, NPV, DSCR, payback, break-even) belong '
+    'to the Financial Analysis chapter — this chapter does not need to '
+    're-list the full ratio set.\n'
+    '14. Start directly with the first sentence of the narrative.'
 )
 
 
@@ -718,6 +923,30 @@ def _strip_prompt_echoes(body: str, chapter: str) -> str:
     # Strip bold markers but keep the enclosed text.
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
     text = re.sub(r'__(.+?)__', r'\1', text)
+    # DPR-20 (UAT) — markdown italics (`*word*` / `_word_`) were rendering as
+    # literal asterisks in the PDF. Strip the single-char markers while
+    # preserving the enclosed word. Must not match bold `**word**` — that was
+    # already handled above and consumed by the time we get here.
+    text = re.sub(r'(?<![\*\w])\*(?!\*)([^\*\n]+?)\*(?!\*)', r'\1', text)
+    text = re.sub(r'(?<![_\w])_(?!_)([^_\n]+?)_(?!_)', r'\1', text)
+    # DPR-03 (UAT) — strip stray `[system_default]` tags that Gemini sometimes
+    # echoes from the FACTS block header rather than paraphrasing in prose.
+    text = re.sub(r'\s*\[system_default\]', '', text, flags=re.IGNORECASE)
+    # DPR-03 (UAT) — strip inline `[KB #n]` / `[KB#n]` citations from the body.
+    # The chapter already renders a separate "Sources: KB #4, KB #10 ..."
+    # footer; the inline markers read as debug output to a bank reviewer.
+    text = re.sub(r'\s*\[KB\s*#?\d+\]', '', text, flags=re.IGNORECASE)
+    # DPR-03 (UAT) — scrub vendor / version strings the LLM occasionally
+    # borrows from FACTS-block headers ("Kefitech 2026-09-19 basis") or
+    # internal comments. These do not belong in a bank-facing document.
+    text = re.sub(
+        r'\s*(?:,\s*)?Kefi\s*Tech\s*\d{4}-\d{2}-\d{2}(?:\s*basis)?',
+        '', text, flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r'\s*(?:,\s*)?Kefitech\s*\d{4}-\d{2}-\d{2}(?:\s*basis)?',
+        '', text, flags=re.IGNORECASE,
+    )
 
     # Drop meta-commentary lines (some Gemini responses echo prompt structure).
     meta_pat = re.compile(
