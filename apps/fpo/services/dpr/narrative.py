@@ -1151,18 +1151,35 @@ def _cap_ratio_sentences(text: str, chapter: str) -> str:
     pieces = re.split(r'(?<=[.!?])\s+(?=[A-Z"\'(])', text)
 
     kept_matches = 0
+    seen_ratio_sentence = False
     out: list[str] = []
     for sentence in pieces:
         matches_in_sentence = len(_RATIO_SIGNATURE_RE.findall(sentence))
         if matches_in_sentence == 0:
             out.append(sentence)
             continue
+        # cap=0 chapters: strip every ratio sentence outright.
+        if cap == 0:
+            continue
+        # Round-5 fix (2026-10-05): for cap>0 chapters, ALWAYS keep the
+        # first ratio sentence even when it holds more keywords than
+        # the cap allows. v14 Executive Summary showed what the alternate
+        # rule costs: Gemini packed four keywords (DSCR + IRR + payback
+        # + break-even) into one viability sentence, cap=3 dropped the
+        # whole sentence, and the chapter shipped with no headline
+        # viability line at all. A slightly-over-cap first mention
+        # reads better than silence. Subsequent ratio sentences still
+        # go through the strict budget check so repetition is caught.
+        if not seen_ratio_sentence:
+            out.append(sentence)
+            kept_matches += matches_in_sentence
+            seen_ratio_sentence = True
+            continue
         if kept_matches + matches_in_sentence <= cap:
             out.append(sentence)
             kept_matches += matches_in_sentence
         # else: drop the whole sentence — this is the "no partial retain"
-        # branch. Only triggers when the sentence pushes us over the
-        # budget. Non-ratio sentences before + after are untouched.
+        # branch for 2nd+ ratio sentences only.
 
     stripped = ' '.join(s.strip() for s in out if s.strip())
     stripped = re.sub(r'\n{3,}', '\n\n', stripped)
