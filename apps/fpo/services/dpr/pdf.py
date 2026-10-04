@@ -306,23 +306,41 @@ def _key_assumptions_rows() -> list[dict]:
 
 
 def _debt_equity_ratio_display(by_field: dict) -> str:
-    """Format the debt-to-equity ratio as `x.xx : 1` — the standard
-    banking convention KAU wants on the DPR cover appraisal table.
+    """Format the debt-to-equity ratio as `x.xx : 1` — using the same
+    balance-sheet-aligned convention the narrative FACTS block + §9
+    Balance Sheet use (DPR-06 UAT fix):
 
-    Returns "—" when there's no equity component (division by zero) or
-    the two amounts sum to zero (empty MoF section).
+        Debt  = long-term borrowings (bank term loan + VC)
+        Equity = promoter equity + capital reserve
+                 (grants, subsidies, CSR, NABARD, other FA — subsidy
+                 counts as quasi-equity)
 
-    Example: bank loan ₹ 60 L, promoter equity ₹ 40 L  →  "1.50 : 1".
+    Previously this helper divided bank_term_loan by
+    promoter_contribution only, which gave 2.50:1 while §9 showed
+    1.00:1 for the same project because the ₹7.5L subsidy sat in
+    capital reserve. Both now reconcile.
     """
-    debt = by_field.get('mof_bank_term_loan') or Decimal('0')
-    equity = by_field.get('mof_promoters_contribution') or Decimal('0')
-    if not isinstance(debt, Decimal):
-        debt = Decimal(str(debt))
-    if not isinstance(equity, Decimal):
-        equity = Decimal(str(equity))
-    if equity <= 0:
+    def _dec(name):
+        v = by_field.get(name) or Decimal('0')
+        return v if isinstance(v, Decimal) else Decimal(str(v))
+
+    debt = _dec('mof_bank_term_loan') + _dec('mof_venture_capital')
+    equity = (
+        _dec('mof_promoters_contribution')
+        + _dec('mof_share_capital')
+        + _dec('mof_internal_accruals')
+    )
+    capital_reserve = (
+        _dec('mof_government_grant')
+        + _dec('mof_government_subsidy')
+        + _dec('mof_csr_support')
+        + _dec('mof_nabard_assistance')
+        + _dec('mof_other_financial_assistance')
+    )
+    denominator = equity + capital_reserve
+    if denominator <= 0:
         return '—'
-    ratio = (debt / equity).quantize(Decimal('0.01'))
+    ratio = (debt / denominator).quantize(Decimal('0.01'))
     return f'{ratio} : 1'
 
 

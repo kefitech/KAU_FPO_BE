@@ -1062,82 +1062,109 @@ def _strip_prompt_echoes(body: str, chapter: str) -> str:
     return text
 
 
-# Chapter → maximum number of sentences allowed to carry a headline-ratio
-# mention. Financial Analysis is unlimited (its home chapter). "Executive
-# Summary" allows the single viability sentence that cites DSCR + IRR +
-# payback — three ratios collapse into one sentence, so cap=1 works.
+# Chapter → maximum number of headline-ratio KEYWORD MATCHES allowed.
+# Round-5 (2026-10-05): switched from sentence-count to keyword-count
+# after retest flagged "Y1 revenue of ₹X and Year 1 EBITDA of ₹Y" (one
+# sentence, two keywords) slipping past a sentence-level cap of 1.
+#
+# Values match the tester's own "ratios counted per chapter" convention:
+#   Exec Summary = 3   → one viability sentence citing DSCR + IRR + payback
+#   Conclusion   = 2   → one closing phrase with up to two ratios
+#   Market / SWOT /
+#   Implementation /
+#   Environmental = 1  → single relevant mention max
+#   Background / Promoter / Technical / Risk = 0
+#   Financial Analysis = None (uncapped — home chapter)
 _RATIO_SENTENCE_CAP = {
-    'financial_analysis':     None,   # no cap — this is where ratios live
-    'executive_summary':      1,      # one viability sentence with ≤3 ratios
-    'conclusion':             1,      # one passing phrase with ≤2 ratios
+    'financial_analysis':     None,
+    'executive_summary':      3,
+    'conclusion':             2,
     'market_analysis':        1,
     'swot':                   1,
     'implementation_plan':    1,
     'environmental_impact':   1,
-    'project_background':     0,      # zero — write about sector context
+    'project_background':     0,
     'promoter_profile':       0,
     'technical_feasibility':  0,
     'risk_analysis':          0,
 }
 
-# Signatures that strongly identify a sentence as carrying a headline-ratio
-# mention. We keep the list focused on the eight indicators plus a few
-# phrase variants Gemini actually produced in UAT runs so false positives
-# are rare on prose like "revenue model" or "net present cost".
+# Signatures that strongly identify a headline-ratio mention. We keep
+# the list focused on the eight indicators plus phrase variants Gemini
+# actually produced in UAT runs so false positives are rare on prose
+# like "revenue model" or "net present cost".
+#
+# Round-5 widening (2026-10-05): tester flagged "Year 1 revenue" and
+# "Year 1 EBITDA" slipping past the capper. Earlier regex only caught
+# "Y1 revenue" / "year one revenue" / "annual revenue of". Also added
+# the "cash flow" / "turnover" / "sales" / "PAT" variants that follow
+# the Y/Year prefix.
 _RATIO_SIGNATURE_RE = __import__('re').compile(
-    r'\b('
+    r'\b(?:'
     r'IRR|internal\s+rate\s+of\s+return'
     r'|NPV|net\s+present\s+value'
     r'|DSCR|debt[\s-]+service(?:\s+coverage)?(?:\s+ratio)?'
     r'|EBITDA'
-    r'|\bPAT\b|profit\s+after\s+tax'
-    r'|payback\s+(?:period|year)'
+    r'|PAT|profit\s+after\s+tax'
+    r'|payback'
     r'|break[\s-]?even'
-    r'|Y\s*1\s+revenue|year\s+one\s+revenue|annual\s+revenue\s+of'
+    # "Y1 revenue", "Y 1 revenue", "Year 1 revenue", "year one revenue",
+    # "Year 1 EBITDA", "Year 1 PAT", "Year 1 profit", "Year 1 cash flow",
+    # "Year 1 turnover" / "sales" — any digit 1-9.
+    r'|(?:Y|year)\s*(?:[1-9]|one|two|three|four|five)'
+    r'\s+(?:revenue|EBITDA|PAT|profit|cash\s+flow|turnover|sales|operating\s+cost)'
+    r'|annual\s+(?:revenue|turnover|EBITDA|sales)\s+of'
     r')\b',
     __import__('re').IGNORECASE,
 )
 
 
 def _cap_ratio_sentences(text: str, chapter: str) -> str:
-    """Keep the first N sentences that carry a headline-ratio mention,
-    delete the rest.
+    """Keep ratio mentions within the chapter's budget, strip the rest.
 
-    N is `_RATIO_SENTENCE_CAP[chapter]`. `None` → no cap (Financial
-    Analysis). `0` → every ratio-carrying sentence stripped. Sentences
-    without any ratio signature are left untouched regardless of cap.
+    Round-5 (2026-10-05) change: cap is now a count of RATIO-KEYWORD
+    MATCHES (not sentences). Tester flagged that one sentence packing
+    two keywords ("Y1 revenue of ₹X and Year 1 EBITDA of ₹Y") slipped
+    past the sentence-level cap of 1 because it was still one sentence.
+    Switched to keyword counting so Executive Summary's combined
+    viability sentence (three keywords in one line) still fits its cap
+    of 3, but other chapters' multi-ratio sentences get stripped
+    entirely when they would exceed the budget.
+
+    Semantics per cap value:
+      None → no cap (Financial Analysis)
+      0    → any ratio sentence stripped (no mentions at all)
+      N>0  → up to N keyword matches may survive across the whole
+             chapter. If a single sentence contains more matches than
+             the remaining budget, the entire sentence is dropped —
+             partial strips risked breaking prose.
 
     Sentence splitting is simple — on `.`, `!`, `?` followed by whitespace
-    + capital letter. Good enough for the DPR prose we see; a false merge
-    only means a slightly-too-long sentence survives, which is harmless.
+    + capital letter. Good enough for DPR prose; a false merge only
+    means a slightly-too-long sentence survives, which is harmless.
     """
     cap = _RATIO_SENTENCE_CAP.get(chapter)
     if cap is None:
         return text
 
     import re
-    # Split keeping delimiters so joining preserves punctuation + spacing.
-    # Pattern: a terminator (. ! ?) followed by whitespace and a capital
-    # letter or end-of-text. Keeps numeric decimals (12.5%) intact because
-    # they lack the capital-letter follower.
     pieces = re.split(r'(?<=[.!?])\s+(?=[A-Z"\'(])', text)
 
-    kept_ratio = 0
+    kept_matches = 0
     out: list[str] = []
     for sentence in pieces:
-        if _RATIO_SIGNATURE_RE.search(sentence):
-            if kept_ratio < cap:
-                out.append(sentence)
-                kept_ratio += 1
-            # else: drop the extra ratio sentence
-        else:
+        matches_in_sentence = len(_RATIO_SIGNATURE_RE.findall(sentence))
+        if matches_in_sentence == 0:
             out.append(sentence)
+            continue
+        if kept_matches + matches_in_sentence <= cap:
+            out.append(sentence)
+            kept_matches += matches_in_sentence
+        # else: drop the whole sentence — this is the "no partial retain"
+        # branch. Only triggers when the sentence pushes us over the
+        # budget. Non-ratio sentences before + after are untouched.
 
     stripped = ' '.join(s.strip() for s in out if s.strip())
-    # Preserve paragraph breaks that the splitter blurred: wherever the
-    # original had two newlines we re-insert one when the surviving text
-    # had a double newline too. Simpler: run the collapse-blank-lines pass
-    # once more on the output.
     stripped = re.sub(r'\n{3,}', '\n\n', stripped)
     return stripped
 
