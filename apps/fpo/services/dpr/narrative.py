@@ -1212,22 +1212,35 @@ def _cap_ratio_sentences(text: str, chapter: str) -> str:
 
 
 def _text_has_quantified_ratio(text: str) -> bool:
-    """True if `text` contains a ratio keyword with a numeric value
-    within the same sentence (80-char window).
+    """True if `text` contains a ratio keyword with a numeric value in
+    the SAME SENTENCE.
 
     Used by `_ensure_exec_viability_sentence` to distinguish between
     (a) a real quantified viability line like "DSCR of 4.88, IRR 68%,
-    payback 1.56 years" and (b) hand-wavy prose like "confirm the
-    debt service and cost recovery metrics" that mentions the keyword
-    but gives the reviewer no actual figure.
+    payback 1.56 years" and (b) hand-wavy prose like "debt servicing
+    evaluations demonstrate operational viability" that mentions the
+    keyword but gives the reviewer no actual figure.
+
+    Round-9 (2026-10-05): switched from 80-char character window to
+    sentence-boundary check. v24/v25/v26 had figure-less sentences
+    with a ratio keyword ("debt service", "debt coverage") immediately
+    followed by a different sentence containing project-cost numbers,
+    and the character-window pulled those digits in as "quantified".
+    Sentence-boundary is the right unit — if the viability line has
+    its own number, it's quantified; nearby prose doesn't count.
     """
     import re
-    for m in _RATIO_SIGNATURE_RE.finditer(text):
-        start, end = m.start(), m.end()
-        window_start = max(0, start - 80)
-        window_end = min(len(text), end + 80)
-        window = text[window_start:window_end]
-        if re.search(r'\d', window):
+    # Simple splitter: terminator (. ! ?) followed by whitespace +
+    # capital/digit/quote/open-paren start. Matches _cap_ratio_sentences
+    # for consistency.
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z0-9"\'(])', text)
+    for s in sentences:
+        if not _RATIO_SIGNATURE_RE.search(s):
+            continue
+        # Require a bare digit in the sentence AND ensure it's not just
+        # a KB citation ("KB #4") — strip those before checking.
+        stripped = re.sub(r'KB\s*#\s*\d+', '', s, flags=re.IGNORECASE)
+        if re.search(r'\d', stripped):
             return True
     return False
 
