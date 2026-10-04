@@ -1111,9 +1111,17 @@ _RATIO_SIGNATURE_RE = __import__('re').compile(
     # "Y1 revenue", "Y 1 revenue", "Year 1 revenue", "year one revenue",
     # "Year 1 EBITDA", "Year 1 PAT", "Year 1 profit", "Year 1 cash flow",
     # "Year 1 turnover" / "sales" — any digit 1-9.
-    r'|(?:Y|year)\s*(?:[1-9]|one|two|three|four|five)'
-    r'\s+(?:revenue|EBITDA|PAT|profit|cash\s+flow|turnover|sales|operating\s+cost)'
-    r'|annual\s+(?:revenue|turnover|EBITDA|sales)\s+of'
+    r'|(?:Y|year|Yr)\s*(?:[1-9]|one|two|three|four|five)'
+    r'\s+(?:revenue|EBITDA|PAT|profit|cash\s+flow|turnover|sales|operating\s+cost|output|production)'
+    # Round-6 widening (2026-10-05): tester flagged "annual turnover is
+    # projected at ₹X in the first operating year" slipping past.
+    # Previous pattern required "annual turnover OF ₹X"; dropped the
+    # "of" tether. Added "first (operating) year" / "first year of
+    # operation" / "first full year" phrasings — these are all common
+    # Gemini synonyms for "Year 1".
+    r'|annual\s+(?:revenue|turnover|EBITDA|sales|income|output|production|profit)\b'
+    r'|first\s+(?:(?:operating|full)\s+year'
+    r'|year\s+of\s+(?:operation|production|sales|business))'
     r')\b',
     __import__('re').IGNORECASE,
 )
