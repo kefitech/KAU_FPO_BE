@@ -569,7 +569,12 @@ _HARD_RULES = (
     'Means-of-Finance narrative — including the scheme name and '
     'implementing agency if the FACTS block provides them. Do not say '
     '"subsidy details not available" when a subsidy amount is present.\n'
-    '15. Start directly with the first sentence of the narrative.'
+    '15. CURRENCY SYMBOL. Always write monetary amounts with the `₹` '
+    'symbol — "₹ 7,50,000" or "₹ 1.25 crore". Never write "Rs.", "Rs ", '
+    '"INR", or "Rupees". Every number already appears in the FACTS block '
+    'and PDF tables with `₹`; the prose MUST match so a bank reviewer '
+    'sees consistent currency formatting across the document.\n'
+    '16. Start directly with the first sentence of the narrative.'
 )
 
 
@@ -631,7 +636,10 @@ _LENIENT_RULES = (
     'break-even) belong to Financial Analysis — this chapter may '
     'reference at MOST ONE of them when directly relevant, and must '
     'not list the full set.\n'
-    '14. Start directly with the first sentence of the narrative.'
+    '14. CURRENCY SYMBOL. Always write monetary amounts with the `₹` '
+    'symbol — "₹ 7,50,000" or "₹ 1.25 crore". Never write "Rs.", "Rs ", '
+    '"INR", or "Rupees".\n'
+    '15. Start directly with the first sentence of the narrative.'
 )
 
 
@@ -952,6 +960,15 @@ def _strip_prompt_echoes(body: str, chapter: str) -> str:
         r'\s*(?:,\s*)?Kefitech\s*\d{4}-\d{2}-\d{2}(?:\s*basis)?',
         '', text, flags=re.IGNORECASE,
     )
+    # DPR Round-2 retest (2026-10-04) — Gemini sometimes writes "Rs." or "INR"
+    # instead of the ₹ symbol every table + the FACTS block uses, which reads
+    # inconsistent across the document. Normalise. Order matters:
+    # "Rs." first (most common), then "INR", then bare "Rs" with trailing
+    # space, then "Rupees" at word boundary (don't eat 'Rupees Mandi').
+    text = re.sub(r'\bRs\.\s*(?=\d)', '₹ ', text)
+    text = re.sub(r'\bINR\s*(?=\d)', '₹ ', text)
+    text = re.sub(r'\bRs\s+(?=\d)', '₹ ', text)
+    text = re.sub(r'\bRupees\s+(?=\d)', '₹ ', text, flags=re.IGNORECASE)
 
     # Drop meta-commentary lines (some Gemini responses echo prompt structure).
     meta_pat = re.compile(
@@ -1005,9 +1022,13 @@ _CHAPTER_BRIEF = {
     'market_analysis': (
         'Cover demand drivers for the primary commodity + secondary products, '
         'target customer segments (B2B, retail, institutional), competitor '
-        'landscape in the FPO\'s catchment, pricing benchmarks, planned '
-        'marketing / distribution channels, and expected off-take arrangements. '
-        '600-900 words.'
+        'landscape in the FPO\'s catchment, pricing benchmarks (describe '
+        'market price ranges / seasonality — do NOT re-quote Y1 revenue, '
+        'break-even sales or any Financial Analysis figure), planned '
+        'marketing / distribution channels, and expected off-take '
+        'arrangements. Reference AT MOST ONE headline ratio (e.g. a passing '
+        'mention of break-even if directly relevant to a market-pricing '
+        'point) — never two. 600-900 words.'
     ),
     'technical_feasibility': (
         'Cover the process technology chosen with reasons, raw material '
