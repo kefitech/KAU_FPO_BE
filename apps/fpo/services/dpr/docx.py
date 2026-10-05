@@ -375,7 +375,10 @@ def _fix_table_width_to_text_frame(table, landscape: bool = False) -> None:
         layout = OxmlElement('w:tblLayout')
         tbl_pr.append(layout)
     layout.set(qn('w:type'), 'fixed')
-    frame_dxa = 14580 if landscape else 9638
+    # NEW-6 round-5 (UAT): landscape text frame is 14570 twips (25.7 cm with
+    # 2 cm margins), not 14580 — the earlier 10-twip overrun pushed the right
+    # cell border past the margin by 0.5 pt. Cosmetic but easy to fix.
+    frame_dxa = 14570 if landscape else 9638
     label_dxa = 1900 if landscape else 2200
     tbl_w = tbl_pr.find(qn('w:tblW'))
     if tbl_w is None:
@@ -413,6 +416,16 @@ def _set_body_font_size(table, size_pt: int) -> None:
             for para in cell.paragraphs:
                 for run in para.runs:
                     run.font.size = Pt(size_pt)
+
+
+def _set_header_font_size(table, size_pt: int) -> None:
+    """NEW-7 round-5 (UAT): shrink header row text on wide tables so column
+    titles like "Initial cost" fit on one line in narrow data columns.
+    Header stays bold; only size is reduced."""
+    for cell in table.rows[0].cells:
+        for para in cell.paragraphs:
+            for run in para.runs:
+                run.font.size = Pt(size_pt)
 
 
 def _add_multi_year_table(
@@ -465,8 +478,11 @@ def _add_multi_year_table(
     # Round-4: multi-year tables (P&L / Cash Flow / Balance Sheet) are
     # rendered inside the landscape section opened in the main orchestrator,
     # so the width-fix targets the 25.7 cm landscape text frame.
+    # Round-5 NEW-7: header font also shrinks to 9 pt so long column titles
+    # ("Initial cost") fit without wrapping onto a second line.
     if len(header) >= 8:
         _set_body_font_size(table, 8)
+        _set_header_font_size(table, 9)
         _fix_table_width_to_text_frame(table, landscape=True)
 
 
@@ -1349,6 +1365,7 @@ def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
         total_cells[3 + j].text = _fmt_inr_table(dep.total_depreciation_by_year.get(y, Decimal('0')))
     if len(header) >= 8:
         _set_body_font_size(table, 8)
+        _set_header_font_size(table, 9)
         _fix_table_width_to_text_frame(table, landscape=True)
 
 
@@ -1696,23 +1713,29 @@ def _configure_page_setup(doc, fpo_name: str, project_title: str,
     section.right_margin = Cm(2)
 
     # Running header — FPO + project title on the left, version on the right.
-    # NEW-2 (UAT round-2): add an explicit RIGHT tab stop at 17 cm (right
-    # text-margin on A4 2-cm layout) so "DPR vN" always lands flush right
-    # regardless of FPO/project name length. Without this the Header style's
-    # Letter-size centre/right stops (4680/9360 twips) were used and the
-    # version jumped to centre for short headers.
+    # NEW-5 round-5 (UAT): replaced the fixed RIGHT tab stop at 17 cm with
+    # a section-aware `w:ptab relativeTo="margin" alignment="right"`. A fixed
+    # tab works for portrait (right margin at 17 cm) but on the landscape
+    # section (right margin at 25.7 cm) it leaves "DPR vN" mid-page. A ptab
+    # auto-snaps to the current section's right margin, so one header
+    # definition suits portrait + landscape + portrait without duplication.
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
     header_para = section.header.paragraphs[0]
     header_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    from docx.enum.text import WD_TAB_ALIGNMENT
-    header_para.paragraph_format.tab_stops.add_tab_stop(
-        Cm(17.0), WD_TAB_ALIGNMENT.RIGHT,
-    )
     header_run = header_para.add_run(f'{fpo_name} — {project_title}')
     header_run.font.size = Pt(9)
     header_run.font.color.rgb = _KAU_NAVY
     header_run.bold = True
-    tab = header_para.add_run('\t')
-    tab.font.size = Pt(9)
+    # Section-aware right-align tab via w:ptab inside its own run.
+    ptab_run = header_para.add_run()
+    ptab_run.font.size = Pt(9)
+    ptab = OxmlElement('w:ptab')
+    ptab.set(qn('w:relativeTo'), 'margin')
+    ptab.set(qn('w:alignment'), 'right')
+    ptab.set(qn('w:leader'), 'none')
+    ptab_run._r.append(ptab)
     version_run = header_para.add_run(f'DPR {version_label}')
     version_run.font.size = Pt(9)
     version_run.font.color.rgb = _KAU_NAVY
