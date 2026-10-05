@@ -108,13 +108,18 @@ def _fmt_inr_table(amount: Optional[Decimal]) -> str:
     symbol, no paise, accounting-style negatives — e.g. `6,00,000` or
     `(25,00,000)`.
 
-    WP-11 (UAT Word-vs-PDF): PDF money filter emits exactly this form; the
-    old Word helper was adding `₹` and `.00` paise on every value which
-    bloated columns and read as inconsistent next to the PDF.
+    WP-11 (UAT): PDF money filter emits exactly this form; the old Word
+    helper was adding `₹` and `.00` paise on every value which bloated
+    columns and read as inconsistent next to the PDF.
+
+    NEW-1 (UAT round-2): uses ROUND_HALF_UP so .5 always rounds UP
+    (32,812.5 → 32,813, not 32,812 as Python's default ROUND_HALF_EVEN
+    produces). Matches typical banking + schedule convention.
     """
     if amount is None:
         return '—'
-    rounded = int(amount.quantize(Decimal('1')))
+    from decimal import ROUND_HALF_UP
+    rounded = int(amount.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     if rounded == 0:
         return '0'
     s = _indian_group(str(abs(rounded)))
@@ -288,6 +293,37 @@ def _tag_header_row_repeat(table) -> None:
     trPr.append(tbl_header)
 
 
+def _style_header_row_navy(table) -> None:
+    """NEW-3 (UAT round-2): give the first row a KAU-navy fill with white
+    bold text — matches the PDF table-header visual. Previously tables used
+    the default `Light Grid Accent 1` light-blue header which read as
+    casually inconsistent next to the PDF."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    for cell in table.rows[0].cells:
+        tc_pr = cell._tc.get_or_add_tcPr()
+        shading = OxmlElement('w:shd')
+        shading.set(qn('w:val'), 'clear')
+        shading.set(qn('w:color'), 'auto')
+        shading.set(qn('w:fill'), '1F3864')  # KAU navy hex
+        tc_pr.append(shading)
+        for para in cell.paragraphs:
+            for run in para.runs:
+                run.bold = True
+                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+
+def _set_body_font_size(table, size_pt: int) -> None:
+    """WP-10 (UAT round-2 Partial): shrink body cells on wide tables so
+    year columns don't wrap. Applied to tables with ≥7 columns
+    (Depreciation, P&L, Cash Flow, Balance Sheet, Capital Schedule)."""
+    for row in table.rows[1:]:
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.font.size = Pt(size_pt)
+
+
 def _add_multi_year_table(
     doc,
     label: str,
@@ -325,12 +361,17 @@ def _add_multi_year_table(
             for run in para.runs:
                 run.bold = True
     _tag_header_row_repeat(table)
+    _style_header_row_navy(table)
     for i, row in enumerate(rows, start=1):
         cells = table.rows[i].cells
         cells[0].text = str(row.get('label') or '—')
         for j, k in enumerate(year_keys, start=1):
             v = row.get(k)
             cells[j].text = formatter(v) if v is not None else '—'
+    # WP-10 (UAT round-2): wide multi-year tables (≥8 cols including the
+    # label) shrink body cells to 8 pt so Y7–Y10 columns don't wrap.
+    if len(header) >= 8:
+        _set_body_font_size(table, 8)
 
 
 def _add_two_col_table(doc, rows: list[tuple[str, str]]) -> None:
@@ -631,10 +672,10 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
         ('6',  'Number of members / shareholders',  str(getattr(fpo, 'total_members', '') or '—') if fpo else '—', False),
         ('7',  'Promoting agency',                  (getattr(fpo, 'promoting_agency', '') or '—') if fpo else '—', False),
         ('8',  'Facilitating agency',               (getattr(fpo, 'facilitating_agency_name', '') or '—') if fpo else '—', False),
-        ('9',  'Total project cost',                _fmt_inr(r.cost.total), True),
+        ('9',  'Total project cost',                _fmt_inr_table(r.cost.total), True),
     ]
     cost_sub_rows = _breakdown_rows(r.cost.by_field, COST_LABELS)
-    mof_row = ('10', 'Means of finance', _fmt_inr(r.mof.total), True)
+    mof_row = ('10', 'Means of finance', _fmt_inr_table(r.mof.total), True)
     mof_sub_rows = _breakdown_rows(r.mof.by_field, MOF_LABELS)
     bottom_rows: list[tuple[str, str, str, bool]] = [
         ('11', 'Debt : Equity ratio',                     _debt_equity_ratio_display(r.mof.by_field), False),
@@ -704,12 +745,12 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
         _emit(idx, num, label, value, bold_value=bold_v)
         idx += 1
     for sub_label, sub_val in cost_sub_rows:
-        _emit(idx, '', str(sub_label), _fmt_inr(sub_val) if isinstance(sub_val, Decimal) else str(sub_val), sub=True)
+        _emit(idx, '', str(sub_label), _fmt_inr_table(sub_val) if isinstance(sub_val, Decimal) else str(sub_val), sub=True)
         idx += 1
     _emit(idx, mof_row[0], mof_row[1], mof_row[2], bold_value=mof_row[3])
     idx += 1
     for sub_label, sub_val in mof_sub_rows:
-        _emit(idx, '', str(sub_label), _fmt_inr(sub_val) if isinstance(sub_val, Decimal) else str(sub_val), sub=True)
+        _emit(idx, '', str(sub_label), _fmt_inr_table(sub_val) if isinstance(sub_val, Decimal) else str(sub_val), sub=True)
         idx += 1
     for num, label, value, bold_v in bottom_rows:
         _emit(idx, num, label, value, bold_value=bold_v)
@@ -762,11 +803,11 @@ def _render_fixed_capital_investment(doc, r: CalculationResult) -> None:
     # Data rows
     for i, (label, value) in enumerate(rows, start=1):
         table.rows[i].cells[0].text = str(label)
-        table.rows[i].cells[1].text = _fmt_inr(value) if isinstance(value, Decimal) else str(value)
+        table.rows[i].cells[1].text = _fmt_inr_table(value) if isinstance(value, Decimal) else str(value)
     # Total row
     total_cells = table.rows[-1].cells
     total_cells[0].text = 'Total Project Cost'
-    total_cells[1].text = _fmt_inr(r.cost.total)
+    total_cells[1].text = _fmt_inr_table(r.cost.total)
     for cell in total_cells:
         for para in cell.paragraphs:
             for run in para.runs:
@@ -798,7 +839,7 @@ def _render_cost_breakdown(doc, r: CalculationResult) -> None:
                 run.bold = True
     for i, (label, value) in enumerate(rows, start=1):
         table.rows[i].cells[0].text = str(label)
-        table.rows[i].cells[1].text = _fmt_inr(value) if isinstance(value, Decimal) else str(value)
+        table.rows[i].cells[1].text = _fmt_inr_table(value) if isinstance(value, Decimal) else str(value)
 
 
 def _render_means_of_finance(doc, r: CalculationResult) -> None:
@@ -818,10 +859,10 @@ def _render_means_of_finance(doc, r: CalculationResult) -> None:
                 run.bold = True
     for i, (label, value) in enumerate(rows, start=1):
         table.rows[i].cells[0].text = str(label)
-        table.rows[i].cells[1].text = _fmt_inr(value) if isinstance(value, Decimal) else str(value)
+        table.rows[i].cells[1].text = _fmt_inr_table(value) if isinstance(value, Decimal) else str(value)
     total_cells = table.rows[-1].cells
     total_cells[0].text = 'Total Means of Finance'
-    total_cells[1].text = _fmt_inr(r.mof.total)
+    total_cells[1].text = _fmt_inr_table(r.mof.total)
     for cell in total_cells:
         for para in cell.paragraphs:
             for run in para.runs:
@@ -1083,6 +1124,7 @@ def _add_loan_repayment_table(doc, rows: list[dict]) -> None:
             for run in para.runs:
                 run.bold = True
     _tag_header_row_repeat(table)
+    _style_header_row_navy(table)
     for i, row in enumerate(rows, start=1):
         cells = table.rows[i].cells
         cells[0].text = str(row.get('label') or '—')
@@ -1175,25 +1217,29 @@ def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
         for para in cell.paragraphs:
             for run in para.runs:
                 run.bold = True
+    _tag_header_row_repeat(table)
+    _style_header_row_navy(table)
     for i, cls in enumerate(dep.classes, start=1):
         cells = table.rows[i].cells
         cells[0].text = cls.label
         cells[1].text = _fmt_num(cls.rate_pct, '%')
-        cells[2].text = _fmt_inr(cls.initial_cost)
+        cells[2].text = _fmt_inr_table(cls.initial_cost)
         for j, row in enumerate(cls.rows):
-            cells[3 + j].text = _fmt_inr(row.depreciation)
+            cells[3 + j].text = _fmt_inr_table(row.depreciation)
         # Net block at end of horizon = closing_gross - closing_accum_dep from last row.
         net_last = (cls.rows[-1].net_block if cls.rows else None)
-        cells[-1].text = _fmt_inr(net_last) if net_last is not None else '—'
+        cells[-1].text = _fmt_inr_table(net_last) if net_last is not None else '—'
     # Totals row.
     total_cells = table.rows[-1].cells
     total_cells[0].text = 'Total'
     for para in total_cells[0].paragraphs:
         for run in para.runs:
             run.bold = True
-    total_cells[2].text = _fmt_inr(dep.total_initial_cost)
+    total_cells[2].text = _fmt_inr_table(dep.total_initial_cost)
     for j, y in enumerate(years):
-        total_cells[3 + j].text = _fmt_inr(dep.total_depreciation_by_year.get(y, Decimal('0')))
+        total_cells[3 + j].text = _fmt_inr_table(dep.total_depreciation_by_year.get(y, Decimal('0')))
+    if len(header) >= 8:
+        _set_body_font_size(table, 8)
 
 
 def _render_capital_schedule(doc, r: CalculationResult) -> None:
@@ -1222,14 +1268,16 @@ def _render_capital_schedule(doc, r: CalculationResult) -> None:
         for para in cell.paragraphs:
             for run in para.runs:
                 run.bold = True
+    _tag_header_row_repeat(table)
+    _style_header_row_navy(table)
     for i, row in enumerate(sched.rows, start=1):
         cells = table.rows[i].cells
         cells[0].text = str(getattr(row, 'month', '—'))
-        cells[1].text = _fmt_inr(getattr(row, 'cost_incurred', None))
-        cells[2].text = _fmt_inr(getattr(row, 'mof_received', None))
-        cells[3].text = _fmt_inr(getattr(row, 'cumulative_cost', None))
-        cells[4].text = _fmt_inr(getattr(row, 'cumulative_mof', None))
-        cells[5].text = _fmt_inr(getattr(row, 'unfunded', None))
+        cells[1].text = _fmt_inr_table(getattr(row, 'cost_incurred', None))
+        cells[2].text = _fmt_inr_table(getattr(row, 'mof_received', None))
+        cells[3].text = _fmt_inr_table(getattr(row, 'cumulative_cost', None))
+        cells[4].text = _fmt_inr_table(getattr(row, 'cumulative_mof', None))
+        cells[5].text = _fmt_inr_table(getattr(row, 'unfunded', None))
 
 
 def _render_risk_assessment(doc, r: CalculationResult) -> None:
@@ -1281,6 +1329,7 @@ def _render_risk_assessment(doc, r: CalculationResult) -> None:
             for para in cell.paragraphs:
                 for run in para.runs:
                     run.bold = True
+        _style_header_row_navy(table)
         for i, cat in enumerate(ra.categories, start=1):
             row = table.rows[i].cells
             row[0].text = cat.category_label
@@ -1503,6 +1552,7 @@ def _render_key_assumptions(doc) -> None:
         for para in hdr[i].paragraphs:
             for run in para.runs:
                 run.bold = True
+    _style_header_row_navy(table)
     for i, row in enumerate(rows, start=1):
         cells = table.rows[i].cells
         cells[0].text = str(row.get('label') or '—')
@@ -1535,8 +1585,17 @@ def _configure_page_setup(doc, fpo_name: str, project_title: str,
     section.right_margin = Cm(2)
 
     # Running header — FPO + project title on the left, version on the right.
+    # NEW-2 (UAT round-2): add an explicit RIGHT tab stop at 17 cm (right
+    # text-margin on A4 2-cm layout) so "DPR vN" always lands flush right
+    # regardless of FPO/project name length. Without this the Header style's
+    # Letter-size centre/right stops (4680/9360 twips) were used and the
+    # version jumped to centre for short headers.
     header_para = section.header.paragraphs[0]
     header_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    from docx.enum.text import WD_TAB_ALIGNMENT
+    header_para.paragraph_format.tab_stops.add_tab_stop(
+        Cm(17.0), WD_TAB_ALIGNMENT.RIGHT,
+    )
     header_run = header_para.add_run(f'{fpo_name} — {project_title}')
     header_run.font.size = Pt(9)
     header_run.font.color.rgb = _KAU_NAVY
