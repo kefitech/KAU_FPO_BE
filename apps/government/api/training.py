@@ -1,6 +1,8 @@
 """
 Government - Training Sessions (write access)
 """
+from django.contrib.auth import get_user_model
+from django.utils.dateparse import parse_date
 from rest_framework import serializers, status
 from rest_framework.views import APIView
 
@@ -100,29 +102,69 @@ class _AttendanceSetSerializer(serializers.Serializer):
     attendance = _AttendanceRowSerializer(many=True)
 
 
+# DataTable column id -> model field, for the `ordering` query param
+_ORDERING_FIELDS = {
+    'topic': 'topic',
+    'fpo_name': 'fpo__name',
+    'district': 'fpo__district',
+    'date': 'date',
+}
+
+
+def _query_date(request, key):
+    # Malformed or impossible dates are ignored rather than raising a 500
+    try:
+        return parse_date(request.query_params.get(key, '').strip())
+    except ValueError:
+        return None
+
+
+def _scoped_sessions(user):
+    # Every session for FPOs within this official's jurisdiction
+    # (district/block/state), not just sessions they personally created.
+    return TrainingSession.objects.filter(
+        is_deleted=False,
+        fpo__in=scope_fpo_qs(FPO.objects.filter(is_deleted=False), user),
+    )
+
+
 class GovernmentTrainingSessionListView(APIView):
     def get(self, request):
         if not is_government_user(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        # Show every session for FPOs within this official's jurisdiction
-        # (district/block/state), not just sessions they personally created.
         # Edit/attendance actions remain restricted to the creator -- see
         # `can_edit` on the serializer and the creator check in the detail
         # and attendance views below.
-        qs = TrainingSession.objects.filter(is_deleted=False).select_related('fpo', 'cbbo').prefetch_related('admin_comments')
-        qs = qs.filter(fpo__in=scope_fpo_qs(FPO.objects.filter(is_deleted=False), request.user))
+        qs = _scoped_sessions(request.user).select_related('fpo', 'cbbo').prefetch_related('admin_comments')
 
         search = request.query_params.get('search')
         if search:
             from django.db.models import Q
             qs = qs.filter(Q(topic__icontains=search) | Q(fpo__name__icontains=search))
 
-        district = request.query_params.get('district')
-        if district:
-            qs = qs.filter(fpo__district=district)
+        fpo = request.query_params.get('fpo', '').strip()
+        if fpo.isdigit():
+            qs = qs.filter(fpo_id=fpo)
 
-        qs = qs.order_by('-date')
+        created_by = request.query_params.get('created_by', '').strip()
+        if created_by.isdigit():
+            qs = qs.filter(cbbo_id=created_by)
+
+        # Session date range (YYYY-MM-DD, inclusive)
+        from_date = _query_date(request, 'from_date')
+        to_date = _query_date(request, 'to_date')
+        if from_date:
+            qs = qs.filter(date__gte=from_date)
+        if to_date:
+            qs = qs.filter(date__lte=to_date)
+
+        ordering = request.query_params.get('ordering', '').strip()
+        field = _ORDERING_FIELDS.get(ordering.lstrip('-'))
+        if field:
+            qs = qs.order_by(f'-{field}' if ordering.startswith('-') else field, '-id')
+        else:
+            qs = qs.order_by('-date', '-id')
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
@@ -216,6 +258,23 @@ class _SessionUpdateSerializer(serializers.Serializer):
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1, required=False)
     participants_count = serializers.IntegerField(min_value=0, required=False)
     venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
+
+
+class GovernmentTrainingFilterOptionsView(APIView):
+    """GET — FPO and creator choices for the session list filters, limited to sessions in scope."""
+
+    def get(self, request):
+        if not is_government_user(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        sessions = _scoped_sessions(request.user)
+        fpos = FPO.objects.filter(id__in=sessions.values('fpo_id')).order_by('name').values('id', 'name')
+        creators = get_user_model().objects.filter(id__in=sessions.values('cbbo_id'))
+        created_by = sorted(
+            ({'id': u.id, 'name': u.get_full_name() or u.username} for u in creators),
+            key=lambda c: c['name'].lower(),
+        )
+        return StandardResponse.success(data={'fpos': list(fpos), 'created_by': created_by})
 
 
 class GovernmentTrainingSessionDetailView(APIView):
