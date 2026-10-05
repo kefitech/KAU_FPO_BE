@@ -40,8 +40,6 @@ from .applications import (
     ApplicationTierAssessmentView,
     ApplicationActivateView,
     ApplicationDeactivateView,
-    ApplicationAssignSubAdminView,
-    ApplicationUnassignSubAdminView
 )
 from .external_apis import (
     ExternalAPISettingsListView,
@@ -227,8 +225,6 @@ urlpatterns = [
     path('applications/<int:fpo_id>/tier-history/',                          ApplicationTierHistoryView.as_view(),     name='admin-applications-tier-history'),
     path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),
     path('applications/<int:fpo_id>/activate/',                              ApplicationActivateView.as_view(),        name='admin-applications-activate'),
-    path('applications/<int:fpo_id>/assign-subadmin/',                       ApplicationAssignSubAdminView.as_view(),  name='admin-applications-assign-subadmin'),
-    path('applications/<int:fpo_id>/unassign-subadmin/',                     ApplicationUnassignSubAdminView.as_view(), name='admin-applications-unassign-subadmin'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
     # Market Linkage — admin browses FPOs with product listings (Arunima — P2-11)
     path('market-linkage/fpos/',                                             AdminMarketLinkageFPOListView.as_view(),     name='admin-market-linkage-fpos'),

@@ -101,9 +101,8 @@ from .cbbo_profile import CBBOOfficerProfile
 # Phase 2 — CBBO Portal
 from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
 
-# Phase 2 — Sub-admin FPO assignment (Jobin)
+# Phase 2 — Sub-admin district assignment
 from .subadmin import (
-    SubAdminFPOAssignment,
     SubAdminDistrictAssignment,
     SubAdminDistrictTransfer,
     SubAdminConfig,
@@ -317,7 +316,6 @@ __all__ = [
     'CapacityBuildingReport',
     'TrainingSession',
     'TrainingAttendance',
-    'SubAdminFPOAssignment',
     'SubAdminDistrictAssignment',
     'SubAdminDistrictTransfer',
     'SubAdminConfig',
