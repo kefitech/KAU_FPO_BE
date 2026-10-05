@@ -482,7 +482,7 @@ def _add_multi_year_table(
     # ("Initial cost") fit without wrapping onto a second line.
     if len(header) >= 8:
         _set_body_font_size(table, 8)
-        _set_header_font_size(table, 9)
+        _set_header_font_size(table, 8)
         _fix_table_width_to_text_frame(table, landscape=True)
 
 
@@ -1365,7 +1365,7 @@ def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
         total_cells[3 + j].text = _fmt_inr_table(dep.total_depreciation_by_year.get(y, Decimal('0')))
     if len(header) >= 8:
         _set_body_font_size(table, 8)
-        _set_header_font_size(table, 9)
+        _set_header_font_size(table, 8)
         _fix_table_width_to_text_frame(table, landscape=True)
 
 
