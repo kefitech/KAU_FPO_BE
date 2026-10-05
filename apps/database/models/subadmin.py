@@ -3,30 +3,14 @@ from django.db import models
 
 from apps.core.models.base import BaseModel, TimeStampedModel
 from apps.core.utils.constants import District
-from apps.database.models.fpo import FPO
-
-
-class SubAdminFPOAssignment(TimeStampedModel):
-    """Legacy — one FPO manually assigned to one sub-admin (P2-01).
-
-    Kept for backward-compat only. New sub-admins are district-scoped via
-    SubAdminDistrictAssignment; scope_fpo_queryset falls back to this table
-    only when a sub-admin has no district row yet.
-    """
-    fpo = models.OneToOneField(FPO, on_delete=models.CASCADE, related_name='subadmin_assignment')
-    subadmin = models.ForeignKey(User, on_delete=models.CASCADE, related_name='fpo_assignments')
-    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='fpo_assignments_made')
-
-    class Meta:
-        db_table = 'subadmin_fpo_assignment'
 
 
 class SubAdminDistrictAssignment(BaseModel):
     """Which district a sub-admin currently owns. One row per sub-admin.
 
-    KAU suggestion #1 — replaces the manual per-FPO assignment above.
-    scope_fpo_queryset uses this row (if present) to grant the sub-admin
-    visibility of every FPO whose district matches.
+    KAU suggestion #1 — replaced the old manual per-FPO assignment.
+    scope_fpo_queryset uses this row to grant the sub-admin visibility of
+    every FPO whose district matches; without it they see nothing.
 
     Uses BaseModel — created_by is the super admin who did the assignment,
     updated_by is whoever last edited the row (should never happen in

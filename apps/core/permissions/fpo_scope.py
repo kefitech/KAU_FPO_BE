@@ -5,7 +5,7 @@ Restricts which FPOs an admin-side user can see.
 
     super_admin                                       → all FPOs
     sub_admin with a SubAdminDistrictAssignment       → every FPO in their district
-    sub_admin without a district (legacy)             → FPOs from SubAdminFPOAssignment
+    sub_admin without a district                      → nothing (until transferred to one)
     anyone else                                       → nothing
 
 Enforced at queryset level, so an FPO outside the caller's scope is a 404,
@@ -43,22 +43,15 @@ def scope_fpo_queryset(qs, user, fpo_field=None):
     `fpo_field` is the lookup path from the queryset's model to FPO
     (e.g. 'fpo' for FPOUserMembership). Leave it None when `qs` is an FPO queryset.
 
-    Layered logic — new district-based scoping is the default; legacy per-FPO
-    assignment kicks in for sub-admins that haven't been given a district yet.
+    Sub-admins are scoped by district only; one without a district sees nothing.
     """
     if is_super_admin(user):
         return qs
 
     if is_sub_admin(user):
-        # 1. District-based (post-KAU default)
         district = get_sub_admin_district(user)
         if district:
             key = f'{fpo_field}__district' if fpo_field else 'district'
             return qs.filter(**{key: district})
-
-        # 2. Legacy per-FPO assignment (backward compat until every sub-admin
-        # has a district). Same behaviour as the previous version of this fn.
-        lookup = f'{fpo_field}__subadmin_assignment__subadmin' if fpo_field else 'subadmin_assignment__subadmin'
-        return qs.filter(**{lookup: user})
 
     return qs.none()

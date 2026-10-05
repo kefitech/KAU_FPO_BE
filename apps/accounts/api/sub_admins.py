@@ -7,8 +7,9 @@ Super admin creates sub-admin accounts and configures which permissions each
 sub-admin has. Permissions are assigned per-user from a fixed list defined in
 SUB_ADMIN_PERMISSIONS (constants.py).
 
-Super admin also decides which FPOs each sub-admin can see (P2-01 row-level
-security) via /api/admin/sub-admins/{id}/assigned-fpos/.
+Every sub-admin belongs to one district and sees every FPO in it (KAU
+suggestion #1). Super admin moves them between districts via
+/api/admin/sub-admins/{id}/transfer-district/.
 """
 
 import secrets
@@ -18,7 +19,6 @@ from django.conf import settings as django_settings
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
 
 from rest_framework import serializers, filters
 from rest_framework.decorators import action
@@ -39,7 +39,6 @@ from apps.core.services.subadmin_district import (
     get_all_district_counts,
 )
 from apps.core.views import TranslatedViewSet
-from apps.accounts.api.admin.applications import set_fpo_subadmin
 from apps.database.models.fpo import FPO
 from apps.database.models.subadmin import (
     SubAdminDistrictAssignment,
@@ -108,7 +107,6 @@ class SubAdminCreateSerializer(serializers.Serializer):
 class SubAdminSerializer(serializers.ModelSerializer):
     permissions             = serializers.SerializerMethodField()
     phone                   = serializers.SerializerMethodField()
-    assigned_fpos_count     = serializers.SerializerMethodField()
     visible_fpos_count      = serializers.SerializerMethodField()
     district                = serializers.SerializerMethodField()
     district_transfer_count = serializers.SerializerMethodField()
@@ -118,31 +116,21 @@ class SubAdminSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'email', 'first_name', 'last_name', 'phone', 'is_active',
             'date_joined', 'permissions',
-            'assigned_fpos_count', 'visible_fpos_count',
+            'visible_fpos_count',
             'district', 'district_transfer_count',
         ]
         read_only_fields = fields
 
     @extend_schema_field(serializers.IntegerField())
-    def get_assigned_fpos_count(self, obj):
-        """Legacy per-FPO assignment count. Preserved for backward compat."""
-        count = getattr(obj, '_assigned_fpos_count', None)
-        if count is None:
-            count = obj.fpo_assignments.filter(fpo__is_deleted=False).count()
-        return count
-
-    @extend_schema_field(serializers.IntegerField())
     def get_visible_fpos_count(self, obj):
-        """Total FPOs the sub-admin can currently see.
+        """Total FPOs the sub-admin can currently see — every FPO in their district.
 
-        For district sub-admins → count of FPOs in that district.
-        For legacy sub-admins   → count of manually-assigned FPOs.
+        A sub-admin with no district sees nothing until transferred to one.
         """
         assignment = getattr(obj, 'district_assignment', None)
-        if assignment:
-            from apps.database.models import FPO
-            return FPO.objects.filter(district=assignment.district, is_deleted=False).count()
-        return self.get_assigned_fpos_count(obj)
+        if not assignment:
+            return 0
+        return FPO.objects.filter(district=assignment.district, is_deleted=False).count()
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
@@ -156,7 +144,7 @@ class SubAdminSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_district(self, obj):
-        """District code (e.g. 'TSR') this sub-admin owns, or None if unassigned (legacy)."""
+        """District code (e.g. 'TSR') this sub-admin owns, or None if they have none yet."""
         assignment = getattr(obj, 'district_assignment', None)
         return assignment.district if assignment else None
 
@@ -190,32 +178,6 @@ class SubAdminPermissionSerializer(serializers.Serializer):
                 f"Valid options: {sorted(valid)}"
             )
         return value
-
-
-class SubAdminAssignFPOsSerializer(serializers.Serializer):
-    action = serializers.ChoiceField(
-        choices=['add', 'remove', 'replace'],
-        default='replace',
-        help_text=(
-            "add     — assign these FPOs to this sub-admin (moves them off any other sub-admin)\n"
-            "remove  — unassign these FPOs from this sub-admin\n"
-            "replace — this sub-admin ends up with exactly this list (default)"
-        ),
-    )
-    fpo_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        allow_empty=True,
-        help_text="List of FPO IDs.",
-    )
-
-
-class AssignedFPOSerializer(serializers.Serializer):
-    id             = serializers.IntegerField()
-    application_id = serializers.CharField()
-    name           = serializers.CharField()
-    district       = serializers.CharField()
-    status         = serializers.CharField()
-    tier           = serializers.CharField(allow_null=True)
 
 
 class AvailablePermissionSerializer(serializers.Serializer):
@@ -283,10 +245,6 @@ class SubAdminViewSet(TranslatedViewSet):
             sub_admin_group = Group.objects.get(name=UserRole.SUB_ADMIN)
             return User.objects.filter(
                 groups=sub_admin_group
-            ).annotate(
-                _assigned_fpos_count=Count(
-                    'fpo_assignments', filter=Q(fpo_assignments__fpo__is_deleted=False),
-                ),
             ).prefetch_related('user_permissions').order_by('-date_joined')
         except Group.DoesNotExist:
             return User.objects.none()
@@ -456,75 +414,6 @@ class SubAdminViewSet(TranslatedViewSet):
             message=t('admin.sub_admin_retrieved', lang),
         )
 
-    @extend_schema(
-        methods=['get'],
-        tags=['Admin - Sub Admins'],
-        responses=AssignedFPOSerializer(many=True),
-        summary="List FPOs assigned to a sub-admin",
-        description="Returns the FPOs this sub-admin can see under row-level security (P2-01).",
-    )
-    @extend_schema(
-        methods=['post'],
-        tags=['Admin - Sub Admins'],
-        request=SubAdminAssignFPOsSerializer,
-        responses=AssignedFPOSerializer(many=True),
-        summary="Update FPOs assigned to a sub-admin",
-        description=(
-            "Add, remove, or replace this sub-admin's assigned FPOs. An FPO has at most one "
-            "sub-admin, so **add** moves an FPO off whichever sub-admin had it. "
-            "Every change is audit-logged per FPO."
-        ),
-    )
-    @action(detail=True, methods=['get', 'post'], url_path='assigned-fpos')
-    def assigned_fpos(self, request, pk=None):
-        """GET — list assigned FPOs. POST — add/remove/replace assigned FPOs."""
-        user = self.get_object()
-
-        if request.method == 'POST':
-            serializer = SubAdminAssignFPOsSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            action_ = serializer.validated_data['action']
-            fpo_ids = set(serializer.validated_data['fpo_ids'])
-
-            fpos = list(
-                FPO.objects.filter(id__in=fpo_ids, is_deleted=False)
-                .select_related('subadmin_assignment__subadmin')
-            )
-            missing = fpo_ids - {f.id for f in fpos}
-            if missing:
-                return StandardResponse.error(
-                    message={'fpo_ids': f'FPOs not found: {sorted(missing)}'},
-                    status_code=400,
-                )
-            if action_ != 'remove' and not user.is_active:
-                return StandardResponse.error(
-                    message='Cannot assign FPOs to a deactivated sub-admin.',
-                    status_code=400,
-                )
-
-            with transaction.atomic():
-                if action_ == 'remove':
-                    for fpo in fpos:
-                        if getattr(getattr(fpo, 'subadmin_assignment', None), 'subadmin_id', None) == user.id:
-                            set_fpo_subadmin(fpo, None, request.user, request=request)
-                else:
-                    for fpo in fpos:
-                        set_fpo_subadmin(fpo, user, request.user, request=request)
-                if action_ == 'replace':
-                    dropped = FPO.objects.filter(
-                        subadmin_assignment__subadmin=user,
-                    ).exclude(id__in=fpo_ids).select_related('subadmin_assignment__subadmin')
-                    for fpo in dropped:
-                        set_fpo_subadmin(fpo, None, request.user, request=request)
-
-        qs = FPO.objects.filter(
-            subadmin_assignment__subadmin=user, is_deleted=False,
-        ).order_by('name')
-        return StandardResponse.success(
-            data=AssignedFPOSerializer(qs, many=True).data,
-            message='Assigned FPOs retrieved.' if request.method == 'GET' else 'Assigned FPOs updated.',
-        )
-
     @extend_schema(tags=['Admin - Sub Admins'],
                    responses=AvailablePermissionSerializer(many=True))
     @action(detail=False, methods=['get'], url_path='available-permissions')
@@ -632,8 +521,8 @@ class SubAdminViewSet(TranslatedViewSet):
             'Moves this sub-admin from their current district to `to_district`. '
             'Checks destination cap, updates the assignment row, and writes an '
             'append-only SubAdminDistrictTransfer audit record.\n\n'
-            'If the sub-admin has no current assignment (legacy), this creates the '
-            'first one — same as calling create.'
+            'If the sub-admin has no district yet, this assigns their first one. '
+            'Until then they see no FPOs.'
         ),
     )
     @action(detail=True, methods=['post'], url_path='transfer-district')
