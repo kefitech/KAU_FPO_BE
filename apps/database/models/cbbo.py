@@ -3,7 +3,7 @@ CBBO / NGO Portal Models — P2-03
 """
 from django.contrib.auth.models import User
 from django.db import models
-from apps.core.models.base import BaseModel
+from apps.core.models.base import BaseModel, TimeStampedModel
 
 
 from apps.core.models.base import BaseModel
@@ -142,6 +142,64 @@ class TrainingAttendance(BaseModel):
 
     def __str__(self):
         return f"{self.member_name} — {self.session}"
+
+
+class TrainingSessionComment(TimeStampedModel):
+    """A KAU super admin / sub-admin remark on a training session.
+
+    Shown to the CBBO officer or government official who recorded the session.
+    Author name + designation are snapshotted at comment time, so the comment
+    still reads correctly after a district transfer or account deletion.
+    """
+    session = models.ForeignKey(
+        TrainingSession, on_delete=models.CASCADE, related_name='admin_comments'
+    )
+    author = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='training_comments'
+    )
+    author_name = models.CharField(max_length=200)
+    author_designation = models.CharField(
+        max_length=200, help_text='e.g. "Super Admin" or "Sub-Admin, Thrissur"'
+    )
+    comment = models.TextField()
+    edited_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Set when the author edits the text; shown as "(edited)" and re-flags the comment as unread.',
+    )
+
+    class Meta:
+        verbose_name = 'Training Session Comment'
+        verbose_name_plural = 'Training Session Comments'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.author_name} on {self.session}"
+
+
+class TrainingSessionCommentRead(TimeStampedModel):
+    """When a CBBO officer / government official last read a session's KAU comments.
+
+    Comments newer than `last_read_at` show as unread (blue marker) on that
+    user's training table. Per user, since every government official in a
+    jurisdiction sees the same sessions.
+    """
+    session = models.ForeignKey(
+        TrainingSession, on_delete=models.CASCADE, related_name='comment_reads'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='training_comment_reads'
+    )
+    last_read_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = 'Training Comment Read'
+        verbose_name_plural = 'Training Comment Reads'
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'user'], name='uniq_training_comment_read'),
+        ]
+
+    def __str__(self):
+        return f"{self.user} read {self.session} at {self.last_read_at}"
 
 
 

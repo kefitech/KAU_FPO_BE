@@ -40,6 +40,9 @@ from .applications import (
     ApplicationTierAssessmentView,
     ApplicationActivateView,
     ApplicationDeactivateView,
+    ApplicationTrainingSessionsView,
+    ApplicationTrainingSessionCommentView,
+    ApplicationTrainingSessionCommentDetailView,
 )
 from .external_apis import (
     ExternalAPISettingsListView,
@@ -226,6 +229,9 @@ urlpatterns = [
     path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),
     path('applications/<int:fpo_id>/activate/',                              ApplicationActivateView.as_view(),        name='admin-applications-activate'),
     path('applications/<int:fpo_id>/deactivate/',                            ApplicationDeactivateView.as_view(),      name='admin-applications-deactivate'),
+    path('applications/<int:fpo_id>/training-sessions/',                     ApplicationTrainingSessionsView.as_view(), name='admin-applications-training-sessions'),
+    path('applications/<int:fpo_id>/training-sessions/<int:session_id>/comments/', ApplicationTrainingSessionCommentView.as_view(), name='admin-applications-training-session-comments'),
+    path('applications/<int:fpo_id>/training-sessions/<int:session_id>/comments/<int:comment_id>/', ApplicationTrainingSessionCommentDetailView.as_view(), name='admin-applications-training-session-comment-detail'),
     # Market Linkage — admin browses FPOs with product listings (Arunima — P2-11)
     path('market-linkage/fpos/',                                             AdminMarketLinkageFPOListView.as_view(),     name='admin-market-linkage-fpos'),
     path('market-linkage/fpos/<int:fpo_id>/products/',                       AdminMarketLinkageFPOProductsView.as_view(), name='admin-market-linkage-fpo-products'),

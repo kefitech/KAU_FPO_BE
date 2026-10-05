@@ -441,14 +441,21 @@ def seed_menu():
         order     = 4,
     )
     seed_item(
+        label_key = 'menu.cbbo_training',
+        path      = '/cbbo/training',
+        icon      = 'graduation-cap',
+        roles     = [cbbo_group],
+        order     = 5,
+    )
+    seed_item(
         label_key = 'menu.cbbo_profile',
         path      = '/cbbo/profile',
         icon      = 'user',
         roles     = [cbbo_group],
-        order     = 5,
+        order     = 6,
     )
     # seed_item only sets order on create — keep My Profile last on existing DBs
-    MenuItem.objects.filter(label_key='menu.cbbo_profile').update(order=5)
+    MenuItem.objects.filter(label_key='menu.cbbo_profile').update(order=6)
 
     # ── Government portal pages (Jobin) ───────────────────────────────────────
 

@@ -99,7 +99,10 @@ from .organisation import Organisation
 from .cbbo_profile import CBBOOfficerProfile
 
 # Phase 2 — CBBO Portal
-from .cbbo import CapacityBuildingReport, TrainingSession, TrainingAttendance
+from .cbbo import (
+    CapacityBuildingReport, TrainingSession, TrainingAttendance,
+    TrainingSessionComment, TrainingSessionCommentRead,
+)
 
 # Phase 2 — Sub-admin district assignment
 from .subadmin import (
@@ -316,6 +319,8 @@ __all__ = [
     'CapacityBuildingReport',
     'TrainingSession',
     'TrainingAttendance',
+    'TrainingSessionComment',
+    'TrainingSessionCommentRead',
     'SubAdminDistrictAssignment',
     'SubAdminDistrictTransfer',
     'SubAdminConfig',

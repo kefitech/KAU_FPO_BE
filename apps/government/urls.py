@@ -10,6 +10,7 @@ from apps.government.api.training import (
     GovernmentTrainingSessionListView,
     GovernmentTrainingSessionDetailView,
     GovernmentTrainingAttendanceSetView,
+    GovernmentTrainingCommentsReadView,
 )
 from apps.government.api.registration import GovernmentRegistrationView, GovernmentRegistrationOTPSendView, GovernmentRegistrationOTPConfirmView, GovernmentRegistrationEmailOTPSendView, GovernmentRegistrationEmailOTPConfirmView
 from apps.government.api.reports import GovernmentFPOReportView
@@ -25,6 +26,7 @@ urlpatterns = [
     path('training-sessions/', GovernmentTrainingSessionListView.as_view(), name='training-list'),
     path('training-sessions/<int:session_id>/', GovernmentTrainingSessionDetailView.as_view(), name='training-detail'),
     path('training-sessions/<int:session_id>/attendance/', GovernmentTrainingAttendanceSetView.as_view(), name='training-attendance'),
+    path('training-sessions/<int:session_id>/comments/read/', GovernmentTrainingCommentsReadView.as_view(), name='training-comments-read'),
     path('register/', GovernmentRegistrationView.as_view(), name='register'),
     path('register/otp/send/', GovernmentRegistrationOTPSendView.as_view(), name='register-otp-send'),
     path('register/otp/confirm/', GovernmentRegistrationOTPConfirmView.as_view(), name='register-otp-confirm'),
