@@ -170,6 +170,10 @@ class DPRDocxDownloadView(APIView):
         project, err = get_project_or_error(request.user, project_uuid)
         if err:
             return err
+        # WP-06 (UAT): piping version_number from the latest DPRDocument now
+        # happens inside render_docx_for_project when the caller leaves it
+        # None, so this call stays unchanged. No-op kept to document that
+        # the lookup is intentional.
         docx_bytes = render_docx_for_project(project)
 
         raw_title = (project.title or '').strip() or 'dpr'

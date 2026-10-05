@@ -29,7 +29,7 @@ from typing import Optional
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Cm, Inches, Mm, Pt, RGBColor
 
 from apps.fpo.services.dpr.calculation import CalculationResult, compute
 from apps.fpo.services.dpr.chart_helpers import (
@@ -71,30 +71,95 @@ _CHAPTER_ORDER = (
 )
 
 
+def _indian_group(int_str: str) -> str:
+    """Format an unsigned integer string with Indian comma grouping
+    (`1234567` → `12,34,567`)."""
+    if len(int_str) <= 3:
+        return int_str
+    head, tail = int_str[:-3], int_str[-3:]
+    pieces: list[str] = []
+    while len(head) > 2:
+        pieces.insert(0, head[-2:])
+        head = head[:-2]
+    if head:
+        pieces.insert(0, head)
+    return ','.join(pieces) + ',' + tail
+
+
 def _fmt_inr(amount: Optional[Decimal]) -> str:
-    """Render a Decimal ₹ amount as `₹ 12,34,567.89` (Indian numbering)."""
+    """Render a Decimal ₹ amount as `₹ 12,34,567.89` (Indian numbering).
+
+    Legacy helper kept for the few prose-style spots (cover headline, loan
+    headline). Table cells use `_fmt_inr_table` instead so the Word output
+    matches the PDF (no ₹ symbol, no paise — rounded to nearest rupee).
+    """
     if amount is None:
         return '—'
     negative = amount < 0
     a = abs(amount).quantize(Decimal('0.01'))
     int_part, _, dec_part = str(a).partition('.')
-    if len(int_part) > 3:
-        head, tail = int_part[:-3], int_part[-3:]
-        pieces = []
-        while len(head) > 2:
-            pieces.insert(0, head[-2:])
-            head = head[:-2]
-        if head:
-            pieces.insert(0, head)
-        int_part = ','.join(pieces) + ',' + tail
+    int_part = _indian_group(int_part)
     sign = '-' if negative else ''
     return f'₹ {sign}{int_part}.{dec_part or "00"}'
 
 
+def _fmt_inr_table(amount: Optional[Decimal]) -> str:
+    """Render a Decimal as a plain table cell: Indian comma grouping, no ₹
+    symbol, no paise, accounting-style negatives — e.g. `6,00,000` or
+    `(25,00,000)`.
+
+    WP-11 (UAT Word-vs-PDF): PDF money filter emits exactly this form; the
+    old Word helper was adding `₹` and `.00` paise on every value which
+    bloated columns and read as inconsistent next to the PDF.
+    """
+    if amount is None:
+        return '—'
+    rounded = int(amount.quantize(Decimal('1')))
+    if rounded == 0:
+        return '0'
+    s = _indian_group(str(abs(rounded)))
+    return f'({s})' if rounded < 0 else s
+
+
+def _fmt_pct(v, suffix: str = '%') -> str:
+    """Percentage renderer that strips trailing .00 — `Decimal('68.00')` →
+    `68%` (WP-11)."""
+    if v is None:
+        return '—'
+    s = str(v)
+    # Strip trailing zeros after the decimal point, then a dangling dot.
+    if '.' in s:
+        s = s.rstrip('0').rstrip('.')
+    return f'{s}{suffix}'
+
+
 def _fmt_num(v, suffix: str = '') -> str:
+    """Legacy no-op formatter kept for callers that still need the raw
+    decimal pass-through. Prefer `_fmt_pct` for percentages and
+    `_fmt_inr_table` for currency."""
     if v is None:
         return '—'
     return f'{v}{suffix}'
+
+
+# WP-05 (UAT Word-vs-PDF): map every risk class to a reader-friendly label +
+# a hex colour. Shared across the overall badge, per-category class column,
+# and any future risk-chapter use. `no_risks` and `not_assessed` are the two
+# post-RCD classes that previously rendered as `No_risks` and `Not_assessed`
+# in Word because the code called `.capitalize()` on the raw code.
+_RISK_DISPLAY = {
+    'low':          ('Low',               RGBColor(0x2E, 0x7D, 0x32)),
+    'moderate':     ('Moderate',          RGBColor(0xB4, 0x60, 0x00)),
+    'high':         ('High',              RGBColor(0xC0, 0x2D, 0x2D)),
+    'not_assessed': ('Not assessed',      RGBColor(0x55, 0x55, 0x55)),
+    'no_risks':     ('No risks entered',  RGBColor(0x55, 0x55, 0x55)),
+}
+
+
+def _risk_display(cls: str) -> tuple[str, RGBColor]:
+    key = (cls or '').lower()
+    return _RISK_DISPLAY.get(key, (key.replace('_', ' ').capitalize() or '—',
+                                    RGBColor(0x33, 0x33, 0x33)))
 
 
 def _bookmark_id_counter() -> int:
@@ -207,11 +272,27 @@ def _embed_image_file(doc, path: str, width_inches: float = 5.5) -> None:
         return
 
 
+def _tag_header_row_repeat(table) -> None:
+    """Mark the first row of `table` as a header row that repeats across page
+    breaks (WP-10). python-docx has no API for this — set <w:tblHeader/> in
+    the row's <w:trPr> directly."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    tr = table.rows[0]._tr
+    trPr = tr.find(qn('w:trPr'))
+    if trPr is None:
+        trPr = OxmlElement('w:trPr')
+        tr.insert(0, trPr)
+    tbl_header = OxmlElement('w:tblHeader')
+    tbl_header.set(qn('w:val'), 'true')
+    trPr.append(tbl_header)
+
+
 def _add_multi_year_table(
     doc,
     label: str,
     rows: list[dict],
-    formatter=lambda v: _fmt_inr(v),
+    formatter=lambda v: _fmt_inr_table(v),
     heading_level: int = 1,
 ) -> None:
     """Render a multi-year financial table.
@@ -219,12 +300,17 @@ def _add_multi_year_table(
     `rows` is a list of dicts like `[{'label': 'Revenue', 'y1': ..., 'y2': ...}]`.
     Column headers come from the union of numeric keys sorted, so the caller
     doesn't have to hand-write header rows.
+
+    WP-11 (UAT): default formatter is now `_fmt_inr_table` so cells read as
+    `6,00,000` / `(25,00,000)` instead of `₹ 6,00,000.00`.
+
+    WP-10 (UAT): the header row is tagged `<w:tblHeader/>` so Word repeats
+    it when the table spills across a page.
     """
     if not rows:
         return
     if label:
         _add_heading(doc, label, level=heading_level)
-    # Column order: label first, then y1..yN (or year1..).
     year_keys = sorted(
         {k for r in rows for k in r.keys() if k not in ('label',)},
         key=lambda k: (len(k), k),
@@ -238,6 +324,7 @@ def _add_multi_year_table(
         for para in cell.paragraphs:
             for run in para.runs:
                 run.bold = True
+    _tag_header_row_repeat(table)
     for i, row in enumerate(rows, start=1):
         cells = table.rows[i].cells
         cells[0].text = str(row.get('label') or '—')
@@ -780,7 +867,16 @@ def _render_products(doc, project) -> None:
             except Exception:  # noqa: BLE001 — bad image path shouldn't kill the DOCX
                 para.add_run('(image unavailable)').italic = True
         else:
-            img_cell.paragraphs[0].text = ''
+            # WP-12 (UAT): PDF shows a "No photo" placeholder box when the
+            # product has no uploaded image. Previously the Word version
+            # emitted an empty cell with no indication; now matches the
+            # PDF so a reviewer sees the shape of the card either way.
+            placeholder = img_cell.paragraphs[0]
+            placeholder.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            ph_run = placeholder.add_run('No photo')
+            ph_run.italic = True
+            ph_run.font.size = Pt(10)
+            ph_run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
 
         # ── Right cell: product details ──────────────────────────────────
         details_cell.text = ''  # clear default empty paragraph
@@ -889,20 +985,23 @@ def _rows_from_pl(r: CalculationResult) -> list[dict]:
 
 
 def _rows_from_cashflow(r: CalculationResult) -> list[dict]:
+    # WP-08 (UAT): row set + labels now mirror the PDF (report.html §8) 1:1.
+    # Previous Word version carried extra "Working capital Δ" + "Opening cash"
+    # rows and used "Cash from…" labels; PDF uses the shorter "CF from…"
+    # convention. Working capital delta already feeds into cash_from_operations
+    # upstream, so showing it as its own line double-counted it visually.
     if not r.cash_flow or not r.cash_flow.rows:
         return []
     fields = [
         ('PAT', 'pat'),
         ('Depreciation add-back', 'depreciation_addback'),
-        ('Working capital Δ', 'working_capital_change'),
-        ('Cash from operations', 'cash_from_operations'),
+        ('CF from Operations', 'cash_from_operations'),
         ('Capex', 'capex'),
-        ('Cash from investing', 'cash_from_investing'),
+        ('CF from Investing', 'cash_from_investing'),
         ('MoF inflow', 'mof_inflow'),
-        ('Loan principal repayment', 'loan_principal_repayment'),
-        ('Cash from financing', 'cash_from_financing'),
+        ('Loan repayment', 'loan_principal_repayment'),
+        ('CF from Financing', 'cash_from_financing'),
         ('Net cash flow', 'net_cash_flow'),
-        ('Opening cash', 'opening_cash'),
         ('Closing cash', 'closing_cash'),
     ]
     out: list[dict] = []
@@ -915,6 +1014,10 @@ def _rows_from_cashflow(r: CalculationResult) -> list[dict]:
 
 
 def _rows_from_balance_sheet(r: CalculationResult) -> list[dict]:
+    # WP-02 (UAT): added term loan + liabilities + totals + invariant row so
+    # the Word balance sheet actually balances like the PDF does. Previous
+    # version stopped at Retained earnings and omitted the entire liabilities
+    # side, so the sheet appeared broken to any reviewer.
     if not r.balance_sheet or not getattr(r.balance_sheet, 'rows', None):
         return []
     fields = [
@@ -929,6 +1032,11 @@ def _rows_from_balance_sheet(r: CalculationResult) -> list[dict]:
         ('Promoter equity', 'promoter_equity'),
         ('Capital reserve', 'capital_reserve'),
         ('Retained earnings', 'retained_earnings'),
+        ('Total equity', 'total_equity'),
+        ('Term loan outstanding', 'term_loan_outstanding'),
+        ('Other liabilities', 'other_liabilities'),
+        ('Total liabilities', 'total_liabilities'),
+        ('Total equity & liabilities', 'total_equity_and_liabilities'),
     ]
     out: list[dict] = []
     for label, attr in fields:
@@ -940,41 +1048,103 @@ def _rows_from_balance_sheet(r: CalculationResult) -> list[dict]:
 
 
 def _rows_from_interest(r: CalculationResult) -> list[dict]:
+    """WP-09 (UAT): rows are now YEARS (not line items). Columns become
+    Opening / Interest / Principal / Closing — matching the PDF table at
+    §6. Previous shape had those four as rows + years spread across
+    columns, which transposed the table and made it unreadable."""
     sched = r.interest_schedule
     if not sched or not sched.rows:
         return []
-    fields = [
-        ('Opening balance', 'opening_balance'),
-        ('Interest', 'interest'),
-        ('Principal', 'principal'),
-        ('Closing balance', 'closing_balance'),
-    ]
     out: list[dict] = []
-    for label, attr in fields:
-        row: dict = {'label': label}
-        for r_ in sched.rows:
-            row[f'y{r_.year}'] = getattr(r_, attr, None)
-        out.append(row)
+    for row in sched.rows:
+        out.append({
+            'label':    f'Y{row.year}',
+            'opening':  getattr(row, 'opening_balance', None),
+            'interest': getattr(row, 'interest', None),
+            'principal': getattr(row, 'principal', None),
+            'closing':  getattr(row, 'closing_balance', None),
+        })
     return out
 
 
+def _add_loan_repayment_table(doc, rows: list[dict]) -> None:
+    """WP-09 (UAT): render loan repayment with four fixed columns —
+    Year | Opening | Interest | Principal | Closing. Years run down the
+    rows, matching the PDF."""
+    if not rows:
+        return
+    headers = ['Year', 'Opening balance', 'Interest', 'Principal', 'Closing balance']
+    table = doc.add_table(rows=len(rows) + 1, cols=len(headers))
+    table.style = 'Light Grid Accent 1'
+    for i, h in enumerate(headers):
+        cell = table.rows[0].cells[i]
+        cell.text = h
+        for para in cell.paragraphs:
+            for run in para.runs:
+                run.bold = True
+    _tag_header_row_repeat(table)
+    for i, row in enumerate(rows, start=1):
+        cells = table.rows[i].cells
+        cells[0].text = str(row.get('label') or '—')
+        for j, k in enumerate(('opening', 'interest', 'principal', 'closing'), start=1):
+            cells[j].text = _fmt_inr_table(row.get(k))
+
+
 def _render_ratios(doc, r: CalculationResult) -> None:
-    """Ratios don't fit the year-by-year layout — render as key/value."""
+    """Financial Appraisal (§10) — explicit label + formatter per ratio.
+
+    WP-03 (UAT): the previous version read raw attr names via `.title()`
+    which produced "Dscr Avg", "Irr (%)", "Npv" (and dropped payback /
+    break-even entirely because the attr names didn't match). Now matches
+    the PDF (report.html §10) 1:1: NPV, IRR, Payback, Break-even year,
+    Min DSCR, Avg DSCR + an operating break-even sub-table under it.
+    """
     ratios = r.ratios
     if not ratios:
         return
     _add_heading(doc, '10. Financial Appraisal', level=1, bookmark='sec_10')
-    rows = []
-    for attr in (
-        'dscr_avg', 'dscr_minimum', 'irr_pct', 'npv', 'bcr', 'roi_pct',
-        'payback_years', 'break_even_pct',
-    ):
-        v = getattr(ratios, attr, None) if hasattr(ratios, attr) else None
-        if v is not None:
-            pretty = attr.replace('_pct', ' (%)').replace('_', ' ').title()
-            display = _fmt_inr(v) if attr == 'npv' else _fmt_num(v)
-            rows.append((pretty, display))
+
+    npv = getattr(ratios, 'npv', None)
+    irr = getattr(ratios, 'irr_pct', None)
+    payback = getattr(ratios, 'payback_period_years', None) or getattr(ratios, 'payback_years', None)
+    break_even_year = getattr(ratios, 'break_even_year', None)
+    dscr_min = getattr(ratios, 'dscr_min', None) or getattr(ratios, 'dscr_minimum', None)
+    dscr_avg = getattr(ratios, 'dscr_avg', None)
+    discount_rate = getattr(ratios, 'discount_rate_pct', None)
+
+    def _fmt_years(v):
+        if v is None:
+            return '—'
+        s = str(v).rstrip('0').rstrip('.')
+        return f'{s} years'
+
+    def _fmt_dscr(v):
+        if v is None:
+            return '—'
+        return f'{v}x'
+
+    rows = [
+        ('NPV' + (f' (@ {_fmt_pct(discount_rate)})' if discount_rate is not None else ''),
+            _fmt_inr_table(npv)),
+        ('IRR', _fmt_pct(irr)),
+        ('Payback period', _fmt_years(payback)),
+        ('Break-even year', f'Y{break_even_year}' if break_even_year else '—'),
+        ('Minimum DSCR', _fmt_dscr(dscr_min)),
+        ('Average DSCR', _fmt_dscr(dscr_avg)),
+    ]
     _add_two_col_table(doc, rows)
+
+    # Operating break-even sub-table (matches report.html §10 operating-BE panel)
+    be_sales = getattr(ratios, 'break_even_sales_inr', None)
+    be_util = getattr(ratios, 'break_even_capacity_utilisation_pct', None)
+    contribution = getattr(ratios, 'break_even_contribution_margin_pct', None)
+    if any(v is not None for v in (be_sales, be_util, contribution)):
+        _add_para(doc, 'Operating break-even (Y1 basis)', bold=True, size=11)
+        _add_two_col_table(doc, [
+            ('Break-even sales', _fmt_inr_table(be_sales)),
+            ('Break-even capacity utilisation', _fmt_pct(be_util)),
+            ('Contribution margin', _fmt_pct(contribution)),
+        ])
 
 
 def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
@@ -1079,23 +1249,26 @@ def _render_risk_assessment(doc, r: CalculationResult) -> None:
         return
     _add_heading(doc, '11. Risk Assessment', level=1, bookmark='sec_11')
 
-    overall = (ra.overall_class or 'low').lower()
-    badge_colour = {
-        'high': RGBColor(0xC0, 0x2D, 0x2D),
-        'moderate': RGBColor(0xB4, 0x60, 0x00),
-        'low': RGBColor(0x2E, 0x7D, 0x32),
-    }.get(overall, RGBColor(0x33, 0x33, 0x33))
+    # WP-05 (UAT): use the shared label map so "no_risks" / "not_assessed"
+    # render as "No risks entered" / "Not assessed" instead of the
+    # auto-capitalised raw code ("No_risks").
+    overall_label, overall_colour = _risk_display(ra.overall_class)
 
     p_summary = doc.add_paragraph()
     p_summary.add_run('Overall project risk: ').bold = True
-    badge_run = p_summary.add_run(overall.capitalize())
+    badge_run = p_summary.add_run(overall_label)
     badge_run.bold = True
-    badge_run.font.color.rgb = badge_colour
+    badge_run.font.color.rgb = overall_colour
     p_summary.add_run(
         f'   ·   {ra.total_risks_scored} of {ra.total_risks_added} risks scored via matrix'
     )
-    if getattr(ra, 'matrix_note', ''):
-        _add_para(doc, ra.matrix_note, italic=True, size=9)
+    # WP-05 (UAT): the matrix_note field carries internal admin plumbing
+    # ("25 matrix cells configured. Admin edits at /api/admin/dpr/risk-matrix/.")
+    # and never appeared in the PDF. Keep it out of the bank-facing Word
+    # export too — only surface strings that don't advertise admin paths.
+    note = getattr(ra, 'matrix_note', '') or ''
+    if note and '/api/admin/' not in note and 'matrix cells configured' not in note.lower():
+        _add_para(doc, note, italic=True, size=9)
 
     if ra.categories:
         headers = ['Category', 'Risks entered', 'Scored', 'Low',
@@ -1116,17 +1289,15 @@ def _render_risk_assessment(doc, r: CalculationResult) -> None:
             row[3].text = str(cat.class_counts.get('low', 0))
             row[4].text = str(cat.class_counts.get('moderate', 0))
             row[5].text = str(cat.class_counts.get('high', 0))
-            # Category class colour to mirror the PDF badge visual.
-            cclass = (cat.category_class or 'low').lower()
-            row[6].text = cclass.capitalize()
+            # WP-05 (UAT): category class now flows through the shared label
+            # map so "no_risks" / "not_assessed" surface as reader-friendly
+            # text instead of "No_risks" / "Not_assessed".
+            cat_label, cat_colour = _risk_display(cat.category_class)
+            row[6].text = cat_label
             for para in row[6].paragraphs:
                 for run in para.runs:
                     run.bold = True
-                    run.font.color.rgb = {
-                        'high': RGBColor(0xC0, 0x2D, 0x2D),
-                        'moderate': RGBColor(0xB4, 0x60, 0x00),
-                        'low': RGBColor(0x2E, 0x7D, 0x32),
-                    }.get(cclass, RGBColor(0x33, 0x33, 0x33))
+                    run.font.color.rgb = cat_colour
 
     _add_para(
         doc,
@@ -1208,12 +1379,15 @@ def _render_toc(doc, project, ai: dict, has_products: bool,
     if has_tech_flows:
         entries.append(('12. Manufacturing Process', 'sec_12'))
 
+    # WP-01 (UAT): Risk Analysis AI chapter was missing from both the TOC
+    # map and the body loop. Added here + in the body renderer below.
     trailing_map = {
         'market_analysis': ('Market Analysis (AI)', 'sec_ai_market_analysis'),
         'technical_feasibility': ('Technical Feasibility (AI)', 'sec_ai_technical_feasibility'),
         'financial_analysis': ('Financial Analysis (AI)', 'sec_ai_financial_analysis'),
         'implementation_plan': ('Implementation Plan (AI)', 'sec_ai_implementation_plan'),
         'swot': ('SWOT Analysis (AI)', 'sec_ai_swot'),
+        'risk_analysis': ('Risk Analysis (AI)', 'sec_ai_risk_analysis'),
         'environmental_impact': ('Environmental Impact (AI)', 'sec_ai_environmental_impact'),
         'conclusion': ('Conclusion', 'sec_ai_conclusion'),
     }
@@ -1224,12 +1398,14 @@ def _render_toc(doc, project, ai: dict, has_products: bool,
     entries.append(('Key Assumptions Used', 'sec_assumptions'))
     entries.append(('Limitations & Guidelines for Entrepreneurs', 'sec_guidelines'))
 
-    for i, (label, anchor) in enumerate(entries, start=1):
-        # Numbered list style so entries visually align like PDF TOC.
-        p = doc.add_paragraph(style='List Number')
-        # Add the hyperlink inside the paragraph — Word treats it as a
-        # clickable target with underline + blue-ish colour from Hyperlink
-        # character style.
+    # WP-07 (UAT): previous version applied the "List Number" style which
+    # prepended an auto-counter to each entry; the entry text already carried
+    # the manual section number ("1. Project at a Glance", "10. Financial
+    # Appraisal", …) so Word rendered "4. 1. Project at a Glance" / "13. 10.
+    # Financial Appraisal". Dropped the style so the manual prefixes stand
+    # alone and read as a clean TOC.
+    for label, anchor in entries:
+        p = doc.add_paragraph()
         _add_toc_hyperlink(p, anchor, label)
         p.paragraph_format.space_after = Pt(2)
 
@@ -1330,8 +1506,96 @@ def _render_key_assumptions(doc) -> None:
     for i, row in enumerate(rows, start=1):
         cells = table.rows[i].cells
         cells[0].text = str(row.get('label') or '—')
-        cells[1].text = str(row.get('value') or '—')
+        # WP-04 (UAT): the dict shape from `_key_assumptions_rows()` is
+        # `{label, value_pct, source}` — the old `.get('value')` always
+        # missed and emitted "—" for every row. Prefer the explicit
+        # value_pct key, keep a `.get('value')` fallback for any future
+        # row shape that uses the shorter name.
+        cells[1].text = str(row.get('value_pct') or row.get('value') or '—')
         cells[2].text = str(row.get('source') or '—')
+    _tag_header_row_repeat(table)
+
+
+def _configure_page_setup(doc, fpo_name: str, project_title: str,
+                          version_label: str) -> None:
+    """WP-10 (UAT): switch Word page setup from the python-docx default
+    (US Letter, 1" margins, no header/footer) to the PDF's convention —
+    A4 portrait, 2 cm margins, running header with FPO + project, running
+    footer with version + "Page X of Y".
+    """
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    section = doc.sections[0]
+    section.page_width = Mm(210)
+    section.page_height = Mm(297)
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+
+    # Running header — FPO + project title on the left, version on the right.
+    header_para = section.header.paragraphs[0]
+    header_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    header_run = header_para.add_run(f'{fpo_name} — {project_title}')
+    header_run.font.size = Pt(9)
+    header_run.font.color.rgb = _KAU_NAVY
+    header_run.bold = True
+    tab = header_para.add_run('\t')
+    tab.font.size = Pt(9)
+    version_run = header_para.add_run(f'DPR {version_label}')
+    version_run.font.size = Pt(9)
+    version_run.font.color.rgb = _KAU_NAVY
+
+    # Running footer — centred version + "Page X of Y" using fields that
+    # Word fills on open / F9 refresh.
+    footer_para = section.footer.paragraphs[0]
+    footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    fpref = footer_para.add_run(f'DPR {version_label}   ·   Page ')
+    fpref.font.size = Pt(9)
+    fpref.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+    # PAGE field
+    fld_begin = OxmlElement('w:fldChar'); fld_begin.set(qn('w:fldCharType'), 'begin')
+    instr = OxmlElement('w:instrText'); instr.text = ' PAGE '
+    fld_end = OxmlElement('w:fldChar'); fld_end.set(qn('w:fldCharType'), 'end')
+    page_run = footer_para.add_run()
+    page_run._r.append(fld_begin); page_run._r.append(instr); page_run._r.append(fld_end)
+    page_run.font.size = Pt(9)
+    page_run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+    of_run = footer_para.add_run(' of ')
+    of_run.font.size = Pt(9)
+    of_run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+    # NUMPAGES field
+    nb = OxmlElement('w:fldChar'); nb.set(qn('w:fldCharType'), 'begin')
+    ni = OxmlElement('w:instrText'); ni.text = ' NUMPAGES '
+    ne = OxmlElement('w:fldChar'); ne.set(qn('w:fldCharType'), 'end')
+    num_run = footer_para.add_run()
+    num_run._r.append(nb); num_run._r.append(ni); num_run._r.append(ne)
+    num_run.font.size = Pt(9)
+    num_run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+
+
+def _resolve_version_label(project, version_number: Optional[int]) -> str:
+    """WP-06 (UAT): the cover + header/footer used to read "Preview" when
+    `version_number` wasn't passed in. Now falls back to the latest non-
+    archived DPRDocument.version_number so a reviewer sees `v35` instead of
+    `Preview` when the Manage DPRs page has already produced versioned
+    PDFs."""
+    if version_number is not None:
+        return f'v{version_number}'
+    try:
+        from apps.database.models import DPRDocument
+        latest = (
+            DPRDocument.objects
+            .filter(project=project, is_archived=False)
+            .order_by('-version_number')
+            .first()
+        )
+        if latest and latest.version_number:
+            return f'v{latest.version_number}'
+    except Exception:  # noqa: BLE001 — model lookup is best-effort
+        pass
+    return 'Preview'
 
 
 def render_docx_for_project(
@@ -1360,7 +1624,10 @@ def render_docx_for_project(
     normal.font.name = 'Calibri'
     normal.font.size = Pt(11)
 
-    version_label = f'v{version_number}' if version_number else 'Preview'
+    version_label = _resolve_version_label(project, version_number)
+    fpo_name = project.fpo.name if project.fpo_id else '—'
+    _configure_page_setup(doc, fpo_name, project.title or '(untitled)',
+                          version_label)
     generated_at = datetime.now().strftime('%d %b %Y · %I:%M %p')
     _render_cover(doc, project, version_label, generated_at,
                   projection_years=result.projection_years)
@@ -1423,14 +1690,25 @@ def render_docx_for_project(
     _render_capital_schedule(doc, result)
     _render_depreciation_schedule(doc, result)
 
-    # §6 Loan Repayment Schedule (chart + table).
+    # §6 Loan Repayment Schedule (chart + transposed table).
+    # WP-09 (UAT): rows = years, columns = Opening / Interest / Principal /
+    # Closing — matches the PDF's §6 shape.
     if result.interest_schedule and getattr(result.interest_schedule, 'rows', None):
-        _add_heading(doc, '6. Loan Repayment Schedule', level=1, bookmark='sec_6')
-        _embed_data_url_chart(doc, repayment_schedule_bar(result.interest_schedule.rows))
-        _add_multi_year_table(doc, '', _rows_from_interest(result), heading_level=2)
-        # Blank string heading to skip drawing an inner sub-heading; but
-        # `_add_multi_year_table` unconditionally calls _add_heading. Simpler
-        # to just re-emit the section title as sub-header for the table.
+        _add_heading(doc, '6. Loan Repayment Schedule (₹)', level=1, bookmark='sec_6')
+        sched = result.interest_schedule
+        loan_bits = []
+        if getattr(sched, 'loan_amount', None) is not None:
+            loan_bits.append(f'Loan: ₹{_fmt_inr_table(sched.loan_amount)}')
+        if getattr(sched, 'interest_rate_pct', None) is not None:
+            loan_bits.append(f'@ {_fmt_pct(sched.interest_rate_pct)}')
+        if getattr(sched, 'tenure_years', None):
+            loan_bits.append(f'Tenure: {sched.tenure_years} years')
+        if getattr(sched, 'moratorium_months', None) is not None:
+            loan_bits.append(f'Moratorium: {sched.moratorium_months} months')
+        if loan_bits:
+            _add_para(doc, '   ·   '.join(loan_bits), italic=True, size=9)
+        _embed_data_url_chart(doc, repayment_schedule_bar(sched.rows))
+        _add_loan_repayment_table(doc, _rows_from_interest(result))
     # §7 P&L (+ chart)
     if result.profit_loss:
         _add_heading(doc, '7. Projected Profit & Loss', level=1, bookmark='sec_7')
@@ -1457,12 +1735,15 @@ def render_docx_for_project(
     # 4. Trailing AI narrative chapters — Market, Tech, Finance, Impl,
     #    SWOT, Env, Conclusion (Project Background + Promoter Profile
     #    already rendered above).
+    # WP-01 (UAT): Risk Analysis AI chapter is now part of the trailing
+    # stack. Order mirrors the PDF (after SWOT, before Environmental Impact).
     trailing_ai = [
         ('market_analysis', 'Market Analysis'),
         ('technical_feasibility', 'Technical Feasibility'),
         ('financial_analysis', 'Financial Analysis'),
         ('implementation_plan', 'Implementation Plan'),
         ('swot', 'SWOT Analysis'),
+        ('risk_analysis', 'Risk Analysis'),
         ('environmental_impact', 'Environmental Impact'),
         ('conclusion', 'Conclusion'),
     ]
