@@ -8,6 +8,7 @@ from apps.cbbo.api.assignments import AssignedFPOListView, AssignedFPODetailView
 from apps.cbbo.api.reports import ReportListCreateView, ReportDetailView, ReportSubmitView
 from apps.cbbo.api.training import (
     TrainingSessionListCreateView, TrainingSessionDetailView, TrainingAttendanceSetView,
+    TrainingCommentsReadView,
 )
 from apps.cbbo.api.market_linkage import CBBOMarketLinkageFPOListView, CBBOMarketLinkageFPOProductsView
 from apps.cbbo.api.registration import CBBORegistrationView, PublicOrganisationListView, CBBORegistrationOTPSendView, CBBORegistrationOTPConfirmView, CBBORegistrationEmailOTPSendView, CBBORegistrationEmailOTPConfirmView
@@ -25,6 +26,7 @@ urlpatterns = [
     path('training/', TrainingSessionListCreateView.as_view(), name='cbbo-training-list-create'),
     path('training/<int:session_id>/', TrainingSessionDetailView.as_view(), name='cbbo-training-detail'),
     path('training/<int:session_id>/attendance/', TrainingAttendanceSetView.as_view(), name='cbbo-training-attendance-set'),
+    path('training/<int:session_id>/comments/read/', TrainingCommentsReadView.as_view(), name='cbbo-training-comments-read'),
     # market_linkage.py
     path('market-linkage/fpos/', CBBOMarketLinkageFPOListView.as_view(), name='cbbo-market-linkage-fpos'),
     path('market-linkage/fpos/<int:fpo_id>/products/', CBBOMarketLinkageFPOProductsView.as_view(), name='cbbo-market-linkage-fpo-products'),

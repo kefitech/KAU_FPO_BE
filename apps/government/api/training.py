@@ -8,6 +8,9 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import TrainingSession, TrainingAttendance
+from apps.cbbo.training_comments import (
+    TrainingSessionCommentSerializer, comment_read_map, has_unread_comments, mark_comments_read,
+)
 
 from apps.government.api.scoping import is_government_user, scope_fpo_qs, get_fpo_scoped
 
@@ -19,12 +22,18 @@ class _SessionListSerializer(serializers.ModelSerializer):
     attendance_total = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    # KAU admin / sub-admin remarks — shown in the session's view sheet
+    comments = TrainingSessionCommentSerializer(source='admin_comments', many=True, read_only=True)
+    has_unread_comments = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
         fields = ['id', 'fpo', 'fpo_name', 'district', 'topic', 'trainer_name', 'date', 'time',
                   'duration_hours', 'participants_count', 'venue', 'attendance_count', 'attendance_total',
-                  'created_by_name', 'can_edit']
+                  'created_by_name', 'can_edit', 'comments', 'has_unread_comments']
+
+    def get_has_unread_comments(self, obj):
+        return has_unread_comments(obj, self.context.get('comment_reads', {}))
 
     def get_attendance_count(self, obj):
         return obj.attendance.filter(attended=True).count()
@@ -47,12 +56,13 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
     attendance = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    comments = TrainingSessionCommentSerializer(source='admin_comments', many=True, read_only=True)
 
     class Meta:
         model = TrainingSession
         fields = ['id', 'fpo', 'fpo_name', 'topic', 'trainer_name', 'date', 'time', 'duration_hours',
                   'participants_count', 'venue', 'attendance', 'created_at', 'updated_at',
-                  'created_by_name', 'can_edit']
+                  'created_by_name', 'can_edit', 'comments']
 
     def get_attendance(self, obj):
         return [
@@ -100,7 +110,7 @@ class GovernmentTrainingSessionListView(APIView):
         # Edit/attendance actions remain restricted to the creator -- see
         # `can_edit` on the serializer and the creator check in the detail
         # and attendance views below.
-        qs = TrainingSession.objects.filter(is_deleted=False).select_related('fpo', 'cbbo')
+        qs = TrainingSession.objects.filter(is_deleted=False).select_related('fpo', 'cbbo').prefetch_related('admin_comments')
         qs = qs.filter(fpo__in=scope_fpo_qs(FPO.objects.filter(is_deleted=False), request.user))
 
         search = request.query_params.get('search')
@@ -116,7 +126,10 @@ class GovernmentTrainingSessionListView(APIView):
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
-        data = _SessionListSerializer(page, many=True, context={'request': request}).data
+        data = _SessionListSerializer(
+            page, many=True,
+            context={'request': request, 'comment_reads': comment_read_map(request.user, page)},
+        ).data
         return paginator.get_paginated_response(data)
 
     def post(self, request):
@@ -213,7 +226,7 @@ class GovernmentTrainingSessionDetailView(APIView):
         # Anyone in the same jurisdiction can VIEW the session detail.
         session = TrainingSession.objects.filter(
             id=session_id, is_deleted=False
-        ).select_related('fpo', 'cbbo').prefetch_related('attendance').first()
+        ).select_related('fpo', 'cbbo').prefetch_related('attendance', 'admin_comments').first()
         if not session or session.fpo not in scope_fpo_qs(FPO.objects.filter(is_deleted=False), request.user):
             return StandardResponse.error('Session not found.', status_code=status.HTTP_404_NOT_FOUND)
 
@@ -259,6 +272,25 @@ class GovernmentTrainingSessionDetailView(APIView):
 
         session.soft_delete(user=request.user)
         return StandardResponse.success(message='Training session deleted.')
+
+
+class GovernmentTrainingCommentsReadView(APIView):
+    """POST — the official opened this session; clears its unread-comment marker for them."""
+
+    def post(self, request, session_id):
+        if not is_government_user(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        # Same visibility as the detail view: any session for an FPO in the official's jurisdiction.
+        session = TrainingSession.objects.filter(id=session_id, is_deleted=False).first()
+        in_scope = session and scope_fpo_qs(
+            FPO.objects.filter(id=session.fpo_id, is_deleted=False), request.user,
+        ).exists()
+        if not in_scope:
+            return StandardResponse.error('Session not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        mark_comments_read(request.user, session)
+        return StandardResponse.success(message='Comments marked as read.')
 
 
 class GovernmentTrainingAttendanceSetView(APIView):

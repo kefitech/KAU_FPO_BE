@@ -174,7 +174,7 @@ SUB_ADMIN_PERMISSIONS = [
     ('can_approve_govt_official_logins', 'Can approve or reject government official applications'),
     ('can_approve_cbbo_logins',          'Can approve or reject CBBO officer applications'),
     ('can_manage_schemes',               'Can create/edit/delete own schemes (read-only otherwise)'),
-    ('can_manage_trainings',             'Can create/edit/delete own trainings (read-only otherwise)'),
+    ('can_manage_trainings',             'Can view FPO training sessions (Training tab on applications)'),
 ]
 
 

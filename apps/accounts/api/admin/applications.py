@@ -14,11 +14,15 @@ Endpoints:
     POST   /api/admin/applications/{id}/request-info/               — APPROVED → INFO_REQUIRED
     POST   /api/admin/applications/{id}/verify-document/{doc_id}/
     PATCH  /api/admin/applications/{id}/set-user-limit/             — deprecated (410)
+    GET    /api/admin/applications/{id}/training-sessions/          — CBBO + government sessions (?source=)
+    POST   /api/admin/applications/{id}/training-sessions/{session_id}/comments/ — admin remark on a session
+    PATCH/DELETE  …/training-sessions/{session_id}/comments/{comment_id}/      — author edits; author or super admin deletes
 
 Permissions:
     list / detail / verify-document  → super_admin OR sub_admin with can_view_all_fpos
     reject / approve / (de)activate  → super_admin OR sub_admin with can_approve_fpo
     request-info                     → super_admin OR sub_admin with can_request_info
+    training-sessions (+ comments)   → super_admin OR sub_admin with can_manage_trainings
     set-user-limit                   → super_admin only
 
 Row-level security (KAU suggestion #1):
@@ -26,6 +30,7 @@ Row-level security (KAU suggestion #1):
     Every lookup goes through scope_fpo_queryset(), so an out-of-scope FPO is a 404.
 """
 
+from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
@@ -38,9 +43,12 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
 from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory, FPOTierHistory, FPOAssessment, AssessmentAnswer, AssessmentUpload
+from apps.database.models.cbbo import TrainingSession, TrainingSessionComment
+from apps.database.models.government import GovernmentOfficialProfile
+from apps.cbbo.training_comments import TrainingSessionCommentSerializer, admin_designation
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
-from apps.core.permissions.fpo_scope import scope_fpo_queryset
+from apps.core.permissions.fpo_scope import is_super_admin, scope_fpo_queryset
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -251,6 +259,66 @@ class _ActivateDeactivateSerializer(serializers.Serializer):
     )
 
 
+def _can_edit_training_comment(user, comment):
+    """Only the author edits — nobody rewrites someone else's words."""
+    return comment.author_id == user.id
+
+
+def _can_delete_training_comment(user, comment):
+    """The author, or any super admin (moderation)."""
+    return comment.author_id == user.id or is_super_admin(user)
+
+
+class _AdminTrainingCommentSerializer(TrainingSessionCommentSerializer):
+    """Shared comment shape + what the requesting admin may do with it. Needs `request` in context."""
+    can_edit   = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+
+    class Meta(TrainingSessionCommentSerializer.Meta):
+        fields = TrainingSessionCommentSerializer.Meta.fields + ['can_edit', 'can_delete']
+        read_only_fields = fields
+
+    def get_can_edit(self, obj):
+        return _can_edit_training_comment(self.context['request'].user, obj)
+
+    def get_can_delete(self, obj):
+        return _can_delete_training_comment(self.context['request'].user, obj)
+
+
+class _TrainingSessionSerializer(serializers.ModelSerializer):
+    """One training session held for the FPO — read-only view for KAU admins.
+
+    Expects the queryset annotations added in ApplicationTrainingSessionsView:
+    `by_government`, `attendance_count`, `attendance_total`.
+    """
+    conducted_by_name   = serializers.SerializerMethodField()
+    conducted_by_source = serializers.SerializerMethodField()
+    attendance_count    = serializers.IntegerField(read_only=True)
+    attendance_total    = serializers.IntegerField(read_only=True)
+    comments            = _AdminTrainingCommentSerializer(source='admin_comments', many=True, read_only=True)
+
+    class Meta:
+        model  = TrainingSession
+        fields = [
+            'id', 'topic', 'trainer_name', 'date', 'time', 'duration_hours',
+            'participants_count', 'venue',
+            'conducted_by_name', 'conducted_by_source',
+            'attendance_count', 'attendance_total',
+            'comments',
+        ]
+
+    def get_conducted_by_name(self, obj):
+        # `cbbo` holds whoever created the session — a CBBO officer or a government official
+        return obj.cbbo.get_full_name() or obj.cbbo.email or obj.cbbo.username
+
+    def get_conducted_by_source(self, obj):
+        return 'government' if obj.by_government else 'cbbo'
+
+
+class _TrainingCommentCreateSerializer(serializers.Serializer):
+    comment = serializers.CharField(max_length=2000)
+
+
 class _AdminEditFPOSerializer(serializers.Serializer):
     name                   = serializers.CharField(max_length=200, required=False)
     name_ml                = serializers.CharField(max_length=200, required=False, allow_blank=True)
@@ -305,6 +373,15 @@ def _can_verify_docs(user):
     return (
         user.groups.filter(name=UserRole.SUB_ADMIN).exists()
         and user.has_perm('accounts.can_verify_documents')
+    )
+
+
+def _can_manage_trainings(user):
+    if user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
+        return True
+    return (
+        user.groups.filter(name=UserRole.SUB_ADMIN).exists()
+        and user.has_perm('accounts.can_manage_trainings')
     )
 
 
@@ -1082,3 +1159,187 @@ class ApplicationTierAssessmentView(APIView):
             data={'fpo_id': fpo_id, 'assessments': data},
             message='Tier assessments retrieved.',
         )
+
+
+class ApplicationTrainingSessionsView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Training sessions held for an FPO',
+        description=(
+            'Read-only list of every training session CBBO officers and government officials '
+            'have recorded for this FPO, newest first.\n\n'
+            'Filter with `?source=cbbo` or `?source=government` (who created the session).\n\n'
+            'Super admin, or a sub-admin with `can_manage_trainings` (their district only).'
+        ),
+        parameters=[
+            OpenApiParameter('source', description='cbbo or government', required=False, type=str),
+            OpenApiParameter('page', required=False, type=int),
+            OpenApiParameter('page_size', required=False, type=int),
+        ],
+        responses={200: _TrainingSessionSerializer(many=True)},
+    )
+    def get(self, request, fpo_id):
+        if not _can_manage_trainings(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = _get_fpo(fpo_id, request.user)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        qs = (
+            TrainingSession.objects.filter(fpo=fpo, is_deleted=False)
+            .select_related('cbbo')
+            .prefetch_related('admin_comments')
+            .annotate(
+                by_government=Exists(GovernmentOfficialProfile.objects.filter(user=OuterRef('cbbo'))),
+                attendance_total=Count('attendance'),
+                attendance_count=Count('attendance', filter=Q(attendance__attended=True)),
+            )
+            .order_by('-date', '-id')
+        )
+
+        source = request.query_params.get('source', '').strip().lower()
+        if source == 'government':
+            qs = qs.filter(by_government=True)
+        elif source == 'cbbo':
+            qs = qs.filter(by_government=False)
+        elif source:
+            return StandardResponse.error(
+                'source must be cbbo or government.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        paginator = StandardPagination()
+        page      = paginator.paginate_queryset(qs, request)
+        data      = _TrainingSessionSerializer(page, many=True, context={'request': request}).data
+        return paginator.get_paginated_response(data)
+
+
+class ApplicationTrainingSessionCommentView(APIView):
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Comment on a training session',
+        description=(
+            'Adds a KAU admin remark to one of the FPO\'s training sessions. The CBBO officer '
+            'or government official who recorded the session sees it on their training page.\n\n'
+            'The author\'s name and designation ("Super Admin" / "Sub-Admin, <district>") are '
+            'saved with the comment.\n\n'
+            'Super admin, or a sub-admin with `can_manage_trainings` (their district only).'
+        ),
+        request=_TrainingCommentCreateSerializer,
+        responses={201: TrainingSessionCommentSerializer},
+    )
+    def post(self, request, fpo_id, session_id):
+        if not _can_manage_trainings(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = _get_fpo(fpo_id, request.user)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        session = TrainingSession.objects.filter(id=session_id, fpo=fpo, is_deleted=False).first()
+        if not session:
+            return StandardResponse.error('Training session not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        ser = _TrainingCommentCreateSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        user    = request.user
+        comment = TrainingSessionComment.objects.create(
+            session=session,
+            author=user,
+            author_name=user.get_full_name() or user.email or user.username,
+            author_designation=admin_designation(user),
+            comment=ser.validated_data['comment'],
+        )
+        return StandardResponse.success(
+            data=_AdminTrainingCommentSerializer(comment, context={'request': request}).data,
+            message='Comment added.',
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class ApplicationTrainingSessionCommentDetailView(APIView):
+    """Edit (author only) or delete (author or super admin) one training-session comment."""
+
+    def _get_comment(self, request, fpo_id, session_id, comment_id):
+        """(comment, error_response) — scoped like the rest of the Training tab."""
+        if not _can_manage_trainings(request.user):
+            return None, StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        fpo = _get_fpo(fpo_id, request.user)
+        if not fpo:
+            return None, StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        comment = TrainingSessionComment.objects.filter(
+            id=comment_id, session_id=session_id, session__fpo=fpo, session__is_deleted=False,
+        ).first()
+        if not comment:
+            return None, StandardResponse.error('Comment not found.', status_code=status.HTTP_404_NOT_FOUND)
+        return comment, None
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Edit a training-session comment',
+        description='Only the comment\'s author can edit it. Marks it "(edited)" and shows it as unread again to the official.',
+        request=_TrainingCommentCreateSerializer,
+        responses={200: TrainingSessionCommentSerializer},
+    )
+    def patch(self, request, fpo_id, session_id, comment_id):
+        comment, error = self._get_comment(request, fpo_id, session_id, comment_id)
+        if error:
+            return error
+        if not _can_edit_training_comment(request.user, comment):
+            return StandardResponse.error(
+                'Only the author can edit this comment.', status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        ser = _TrainingCommentCreateSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        comment.comment   = ser.validated_data['comment']
+        comment.edited_at = timezone.now()
+        comment.save(update_fields=['comment', 'edited_at', 'updated_at'])
+        return StandardResponse.success(
+            data=_AdminTrainingCommentSerializer(comment, context={'request': request}).data,
+            message='Comment updated.',
+        )
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='Delete a training-session comment',
+        description='The comment\'s author, or any super admin, can delete it.',
+        responses={200: None},
+    )
+    def delete(self, request, fpo_id, session_id, comment_id):
+        comment, error = self._get_comment(request, fpo_id, session_id, comment_id)
+        if error:
+            return error
+        if not _can_delete_training_comment(request.user, comment):
+            return StandardResponse.error(
+                'Only the author or a super admin can delete this comment.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        comment.delete()
+        return StandardResponse.success(message='Comment deleted.')

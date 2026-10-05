@@ -7,6 +7,7 @@ GET    /api/cbbo/training/<id>/                session detail with attendance ro
 PATCH  /api/cbbo/training/<id>/                edit session details
 DELETE /api/cbbo/training/<id>/                soft-delete a session
 POST   /api/cbbo/training/<id>/attendance/     replace the attendance roster
+POST   /api/cbbo/training/<id>/comments/read/  clear the unread KAU-comment marker for the caller
 
 Mirrors apps/government/api/training.py, with CBBO scoping: an officer sees
 and edits only the sessions they created themselves, and only while the FPO
@@ -25,6 +26,9 @@ from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import TrainingSession, TrainingAttendance
+from apps.cbbo.training_comments import (
+    TrainingSessionCommentSerializer, comment_read_map, has_unread_comments, mark_comments_read,
+)
 
 from apps.cbbo.api.assignments import is_cbbo_user, is_fpo_assigned, scope_fpo_qs
 
@@ -39,12 +43,18 @@ class _SessionListSerializer(serializers.ModelSerializer):
     attendance_total = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    # KAU admin / sub-admin remarks — shown in the session's view sheet
+    comments = TrainingSessionCommentSerializer(source='admin_comments', many=True, read_only=True)
+    has_unread_comments = serializers.SerializerMethodField()
 
     class Meta:
         model = TrainingSession
         fields = ['id', 'fpo', 'fpo_name', 'district', 'topic', 'trainer_name', 'date', 'time',
                   'duration_hours', 'participants_count', 'venue', 'attendance_count',
-                  'attendance_total', 'created_by_name', 'can_edit']
+                  'attendance_total', 'created_by_name', 'can_edit', 'comments', 'has_unread_comments']
+
+    def get_has_unread_comments(self, obj):
+        return has_unread_comments(obj, self.context.get('comment_reads', {}))
 
     def get_attendance_count(self, obj):
         return obj.attendance.filter(attended=True).count()
@@ -67,12 +77,13 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
     attendance = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    comments = TrainingSessionCommentSerializer(source='admin_comments', many=True, read_only=True)
 
     class Meta:
         model = TrainingSession
         fields = ['id', 'fpo', 'fpo_name', 'district', 'topic', 'trainer_name', 'date', 'time',
                   'duration_hours', 'participants_count', 'venue', 'attendance',
-                  'created_at', 'updated_at', 'created_by_name', 'can_edit']
+                  'created_at', 'updated_at', 'created_by_name', 'can_edit', 'comments']
 
     def get_attendance(self, obj):
         return [
@@ -153,7 +164,7 @@ def _get_session_visible(session_id, user):
     """Own session whose FPO is still inside the caller's current jurisdiction."""
     session = TrainingSession.objects.filter(
         id=session_id, cbbo=user, is_deleted=False,
-    ).select_related('fpo', 'cbbo').prefetch_related('attendance').first()
+    ).select_related('fpo', 'cbbo').prefetch_related('attendance', 'admin_comments').first()
     if not session or not is_fpo_assigned(session.fpo, user):
         return None
     return session
@@ -205,7 +216,7 @@ class TrainingSessionListCreateView(APIView):
         if not is_cbbo_user(request.user):
             return _denied(request)
 
-        qs = TrainingSession.objects.filter(cbbo=request.user, is_deleted=False).select_related('fpo', 'cbbo')
+        qs = TrainingSession.objects.filter(cbbo=request.user, is_deleted=False).select_related('fpo', 'cbbo').prefetch_related('admin_comments')
         qs = qs.filter(fpo__in=scope_fpo_qs(FPO.objects.filter(is_deleted=False), request.user))
 
         search = (request.query_params.get('search') or '').strip()
@@ -224,7 +235,10 @@ class TrainingSessionListCreateView(APIView):
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
-        data = _SessionListSerializer(page, many=True, context={'request': request}).data
+        data = _SessionListSerializer(
+            page, many=True,
+            context={'request': request, 'comment_reads': comment_read_map(request.user, page)},
+        ).data
         return paginator.get_paginated_response(data)
 
     # ── CREATE ───────────────────────────────────────────────────────────────
@@ -365,6 +379,21 @@ class TrainingSessionDetailView(APIView):
             changes={'deleted': True, 'topic': session.topic},
         )
         return StandardResponse.success(message='Training session deleted.')
+
+
+class TrainingCommentsReadView(APIView):
+    """POST — the officer opened this session; clears its unread-comment marker for them."""
+
+    def post(self, request, session_id):
+        if not is_cbbo_user(request.user):
+            return _denied(request)
+
+        session = _get_session_visible(session_id, request.user)
+        if not session:
+            return _session_not_found()
+
+        mark_comments_read(request.user, session)
+        return StandardResponse.success(message='Comments marked as read.')
 
 
 class TrainingAttendanceSetView(APIView):
