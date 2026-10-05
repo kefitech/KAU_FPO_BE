@@ -10,6 +10,9 @@ Filters:
   ?tier=A/B/C/D
   ?from_date=2026-01-01
   ?to_date=2026-06-30
+
+Permissions:
+  super_admin OR sub_admin with can_generate_reports (sub-admins get their district only)
 """
 
 import io
@@ -30,8 +33,13 @@ from apps.core.permissions.fpo_scope import scope_fpo_queryset
 from apps.database.models.fpo import FPO
 
 
-def _can_view(user):
-    return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
+def _can_generate_reports(user):
+    if user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
+        return True
+    return (
+        user.groups.filter(name=UserRole.SUB_ADMIN).exists()
+        and user.has_perm('accounts.can_generate_reports')
+    )
 
 
 def _build_queryset(params, user=None):
@@ -303,6 +311,7 @@ class FPOSummaryReportView(APIView):
             '- `?district=TRS` (district code)\n'
             '- `?tier=A/B/C/D`\n'
             '- `?from_date=2026-01-01&to_date=2026-06-30`\n\n'
+            'Super admin, or a sub-admin with `can_generate_reports` (limited to their district).\n\n'
             'Returns a file download, not JSON.'
         ),
         parameters=[
@@ -316,7 +325,7 @@ class FPOSummaryReportView(APIView):
         responses={200: None},
     )
     def get(self, request):
-        if not _can_view(request.user):
+        if not _can_generate_reports(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
         fmt = request.query_params.get('file_format', 'excel').lower().strip()
