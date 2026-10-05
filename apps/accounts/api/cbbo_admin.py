@@ -70,9 +70,12 @@ class CBBOCreateSerializer(serializers.Serializer):
     )
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        # Emails are stored lowercased, so check the normalised value — otherwise an
+        # uppercase duplicate slips past this check and fails on the unique username.
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('A user with this email already exists.')
-        return value.lower()
+        return value
 
     def validate_phone(self, value):
         if value:

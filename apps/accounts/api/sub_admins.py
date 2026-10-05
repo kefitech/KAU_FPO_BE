@@ -18,6 +18,7 @@ import logging
 from django.conf import settings as django_settings
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from rest_framework import serializers, filters
@@ -30,6 +31,7 @@ from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.constants import UserRole, SUB_ADMIN_PERMISSIONS, District
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
+from apps.core.utils.validators import validate_person_name
 from apps.core.services.translation import t
 from apps.core.services.subadmin_district import (
     check_cap,
@@ -60,6 +62,13 @@ def _get_sub_admin_permissions():
 
 # ─── Serializers ─────────────────────────────────────────────────────────────
 
+def _validate_name(value, label):
+    try:
+        return validate_person_name(value, label)
+    except DjangoValidationError as e:
+        raise serializers.ValidationError(e.messages[0])
+
+
 class SubAdminCreateSerializer(serializers.Serializer):
     email                = serializers.EmailField()
     first_name           = serializers.CharField(max_length=150)
@@ -82,9 +91,18 @@ class SubAdminCreateSerializer(serializers.Serializer):
     )
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        # Emails are stored lowercased, so check the normalised value — otherwise an
+        # uppercase duplicate slips past this check and fails on the unique username.
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('A user with this email already exists.')
-        return value.lower()
+        return value
+
+    def validate_first_name(self, value):
+        return _validate_name(value, 'First name')
+
+    def validate_last_name(self, value):
+        return _validate_name(value, 'Last name') if value else value
 
     def validate_phone(self, value):
         if value:
@@ -206,6 +224,12 @@ class SubAdminUpdateSerializer(serializers.Serializer):
     last_name  = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text="Sub-admin's last name")
     phone      = serializers.CharField(max_length=15,  required=False, allow_blank=True, help_text="Indian phone number (10 digits)")
 
+    def validate_first_name(self, value):
+        return _validate_name(value, 'First name')
+
+    def validate_last_name(self, value):
+        return _validate_name(value, 'Last name') if value else value
+
 
 @extend_schema_view(
     list=extend_schema(tags=['Admin - Sub Admins']),
@@ -264,7 +288,7 @@ class SubAdminViewSet(TranslatedViewSet):
         try:
             check_cap(data['district'])
         except ValueError as e:
-            return StandardResponse.error(message={'district': str(e)}, status_code=400)
+            return StandardResponse.error(message=str(e), errors={'district': [str(e)]}, status_code=400)
 
         temp_password = secrets.token_urlsafe(10)
 
@@ -332,9 +356,11 @@ class SubAdminViewSet(TranslatedViewSet):
         lang = self.get_language()
         user = self.get_object()
 
-        first_name = request.data.get('first_name')
-        last_name  = request.data.get('last_name')
-        phone      = request.data.get('phone')
+        serializer = SubAdminUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        first_name = serializer.validated_data.get('first_name')
+        last_name  = serializer.validated_data.get('last_name')
+        phone      = serializer.validated_data.get('phone')
 
         user_fields = []
         if first_name is not None:
@@ -547,7 +573,7 @@ class SubAdminViewSet(TranslatedViewSet):
         try:
             check_cap(to_district)
         except ValueError as e:
-            return StandardResponse.error(message={'to_district': str(e)}, status_code=400)
+            return StandardResponse.error(message=str(e), errors={'to_district': [str(e)]}, status_code=400)
 
         with transaction.atomic():
             if current:
@@ -896,6 +922,12 @@ class SubAdminViewSet(TranslatedViewSet):
             raise ValueError('email is not a valid address.')
         if not first_name:
             raise ValueError('first_name is required.')
+        try:
+            validate_person_name(first_name, 'first_name')
+            if last_name:
+                validate_person_name(last_name, 'last_name')
+        except DjangoValidationError as e:
+            raise ValueError(e.messages[0])
         if not district:
             raise ValueError('district is required.')
         if district not in dict(District.choices):

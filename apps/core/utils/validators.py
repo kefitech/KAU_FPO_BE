@@ -42,6 +42,32 @@ def _t(key, language='en', **kwargs):
 
 
 # =============================================================================
+# NAME VALIDATORS
+# =============================================================================
+
+PERSON_NAME_REGEX = r"^[A-Za-z][A-Za-z .'-]*$"
+
+
+def validate_person_name(value: str, label: str = 'Name') -> str:
+    """
+    Validate a person's name: letters, spaces, dots, apostrophes and hyphens,
+    starting with a letter. Rejects markup such as <script> tags.
+
+    Returns:
+        The trimmed name
+
+    Raises:
+        ValidationError: If the name contains anything else
+    """
+    cleaned = value.strip()
+    if not re.fullmatch(PERSON_NAME_REGEX, cleaned):
+        raise ValidationError(
+            f"{label} can only contain letters, spaces, dots, apostrophes and hyphens."
+        )
+    return cleaned
+
+
+# =============================================================================
 # PHONE VALIDATORS
 # =============================================================================
 
