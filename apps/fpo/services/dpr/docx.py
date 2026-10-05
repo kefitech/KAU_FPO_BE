@@ -313,13 +313,55 @@ def _style_header_row_navy(table) -> None:
                 run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 
 
-def _fix_table_width_to_text_frame(table) -> None:
-    """WP-10 round-3 (UAT): clamp a table's rendered width to the 17 cm A4
-    text frame and switch to fixed layout so Word respects column widths
-    without auto-expanding to the widest cell content.
+def _start_landscape_section(doc) -> None:
+    """WP-10 round-4 (UAT): wrap wide multi-year tables in a landscape
+    A4 section so year columns fit without wrapping on long values.
 
-    python-docx has no API for `tblLayout` or `tblW` — write both via raw
-    OOXML. Width is 9638 dxa (17 cm × 1440 twips/inch × 1 cm/2.54 cm).
+    Depreciation / P&L / Cash Flow / Balance Sheet have 12-14 columns.
+    Portrait A4 at 17 cm text frame gives ~572-743 twips per year
+    column after the label; after cell padding, values up to 1,19,02,128
+    (38.4 pt at Calibri 8 pt) break onto two lines. Landscape widens the
+    text frame to 25.7 cm so each year column gets ~46 pt usable width
+    — comfortable for 8-digit INR values.
+
+    `_end_landscape_section` closes the block back to portrait so later
+    sections (ratios, risk, products, AI chapters) are not stuck in
+    landscape.
+    """
+    from docx.enum.section import WD_ORIENT, WD_SECTION
+    section = doc.add_section(start_type=WD_SECTION.NEW_PAGE)
+    section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width = Mm(297)
+    section.page_height = Mm(210)
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+
+
+def _end_landscape_section(doc) -> None:
+    """Close the landscape block and return to portrait A4 for later
+    sections. See `_start_landscape_section`."""
+    from docx.enum.section import WD_ORIENT, WD_SECTION
+    section = doc.add_section(start_type=WD_SECTION.NEW_PAGE)
+    section.orientation = WD_ORIENT.PORTRAIT
+    section.page_width = Mm(210)
+    section.page_height = Mm(297)
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+
+
+def _fix_table_width_to_text_frame(table, landscape: bool = False) -> None:
+    """Clamp a table's rendered width to the current page's text frame and
+    switch to fixed layout so Word respects column widths without
+    auto-expanding to the widest cell content.
+
+    WP-10 round-3: wrote tblLayout/tblW/tblGrid via raw OOXML.
+    WP-10 round-4: `landscape=True` targets the wider landscape A4 text
+    frame (14580 dxa ≈ 25.7 cm) instead of portrait's 9638 dxa (17 cm).
+    Narrows the label column slightly so year columns breathe.
     """
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
@@ -328,33 +370,28 @@ def _fix_table_width_to_text_frame(table) -> None:
     if tbl_pr is None:
         tbl_pr = OxmlElement('w:tblPr')
         tbl.insert(0, tbl_pr)
-    # tblLayout type="fixed" — honour explicit column widths; don't expand
     layout = tbl_pr.find(qn('w:tblLayout'))
     if layout is None:
         layout = OxmlElement('w:tblLayout')
         tbl_pr.append(layout)
     layout.set(qn('w:type'), 'fixed')
-    # tblW w="9638" type="dxa" — table itself is 17 cm wide
+    frame_dxa = 14580 if landscape else 9638
+    label_dxa = 1900 if landscape else 2200
     tbl_w = tbl_pr.find(qn('w:tblW'))
     if tbl_w is None:
         tbl_w = OxmlElement('w:tblW')
         tbl_pr.append(tbl_w)
-    tbl_w.set(qn('w:w'), '9638')
+    tbl_w.set(qn('w:w'), str(frame_dxa))
     tbl_w.set(qn('w:type'), 'dxa')
-    # Distribute column widths evenly in dxa; keep first column slightly
-    # wider so row labels fit, remainder shared across data columns.
     cols = list(table.columns)
     n = len(cols)
     if n > 1:
-        label_w = 2200  # ~3.9 cm for the label column
-        remaining = 9638 - label_w
+        remaining = frame_dxa - label_dxa
         per = remaining // (n - 1)
-        widths = [label_w] + [per] * (n - 1)
-        # fix any rounding drift on the last column
-        widths[-1] = 9638 - sum(widths[:-1])
+        widths = [label_dxa] + [per] * (n - 1)
+        widths[-1] = frame_dxa - sum(widths[:-1])
         for col, w in zip(cols, widths):
-            col.width = Pt(w / 20)  # python-docx Length wants pt; 20 twips = 1 pt
-        # Also set grid widths so Word doesn't re-flow
+            col.width = Pt(w / 20)
         grid = tbl.find(qn('w:tblGrid'))
         if grid is None:
             grid = OxmlElement('w:tblGrid')
@@ -424,13 +461,13 @@ def _add_multi_year_table(
             cells[j].text = formatter(v) if v is not None else '—'
     # WP-10 (UAT round-2): wide multi-year tables (≥8 cols including the
     # label) shrink body cells to 8 pt so Y7–Y10 columns don't wrap.
-    # Round-3: ALSO clamp table width to the 17 cm text frame via
-    # tblLayout=fixed + tblW=9638 dxa, otherwise Word auto-expands beyond
-    # the right margin (observed: Depreciation 747 px, P&L 694 px, CF 796
-    # px, BS 788 px vs 643 px text frame).
+    # Round-3: ALSO clamp table width via tblLayout=fixed + tblW.
+    # Round-4: multi-year tables (P&L / Cash Flow / Balance Sheet) are
+    # rendered inside the landscape section opened in the main orchestrator,
+    # so the width-fix targets the 25.7 cm landscape text frame.
     if len(header) >= 8:
         _set_body_font_size(table, 8)
-        _fix_table_width_to_text_frame(table)
+        _fix_table_width_to_text_frame(table, landscape=True)
 
 
 def _add_two_col_table(doc, rows: list[tuple[str, str]]) -> None:
@@ -1312,7 +1349,7 @@ def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
         total_cells[3 + j].text = _fmt_inr_table(dep.total_depreciation_by_year.get(y, Decimal('0')))
     if len(header) >= 8:
         _set_body_font_size(table, 8)
-        _fix_table_width_to_text_frame(table)
+        _fix_table_width_to_text_frame(table, landscape=True)
 
 
 def _render_capital_schedule(doc, r: CalculationResult) -> None:
@@ -1821,6 +1858,15 @@ def render_docx_for_project(
     _render_fixed_capital_investment(doc, result)
     _render_means_of_finance(doc, result)
     _render_capital_schedule(doc, result)
+
+    # WP-10 round-4 (UAT): wrap §5–§9 (the four 12-14 column wide tables)
+    # in a landscape A4 section. Portrait couldn't give the year columns
+    # enough width even with 8 pt body font; landscape widens the text
+    # frame from 17 cm to 25.7 cm — year columns now get ~46 pt usable
+    # which is comfortable for 8-digit INR values like "1,19,02,128".
+    # Section break closes before §10 to put ratios + risk + products +
+    # trailing AI chapters back on portrait pages.
+    _start_landscape_section(doc)
     _render_depreciation_schedule(doc, result)
 
     # §6 Loan Repayment Schedule (chart + transposed table).
@@ -1855,6 +1901,8 @@ def render_docx_for_project(
     if result.balance_sheet and getattr(result.balance_sheet, 'rows', None):
         _add_heading(doc, '9. Projected Balance Sheet', level=1, bookmark='sec_9')
         _add_multi_year_table(doc, '', _rows_from_balance_sheet(result), heading_level=2)
+    # WP-10 round-4: close the landscape block so §10+ reverts to portrait.
+    _end_landscape_section(doc)
     # §10 Financial Appraisal (ratios)
     _render_ratios(doc, result)
     # §11 Risk Assessment
