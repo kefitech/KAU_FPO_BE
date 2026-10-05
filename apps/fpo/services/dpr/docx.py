@@ -313,6 +313,60 @@ def _style_header_row_navy(table) -> None:
                 run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 
 
+def _fix_table_width_to_text_frame(table) -> None:
+    """WP-10 round-3 (UAT): clamp a table's rendered width to the 17 cm A4
+    text frame and switch to fixed layout so Word respects column widths
+    without auto-expanding to the widest cell content.
+
+    python-docx has no API for `tblLayout` or `tblW` — write both via raw
+    OOXML. Width is 9638 dxa (17 cm × 1440 twips/inch × 1 cm/2.54 cm).
+    """
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    tbl = table._tbl
+    tbl_pr = tbl.find(qn('w:tblPr'))
+    if tbl_pr is None:
+        tbl_pr = OxmlElement('w:tblPr')
+        tbl.insert(0, tbl_pr)
+    # tblLayout type="fixed" — honour explicit column widths; don't expand
+    layout = tbl_pr.find(qn('w:tblLayout'))
+    if layout is None:
+        layout = OxmlElement('w:tblLayout')
+        tbl_pr.append(layout)
+    layout.set(qn('w:type'), 'fixed')
+    # tblW w="9638" type="dxa" — table itself is 17 cm wide
+    tbl_w = tbl_pr.find(qn('w:tblW'))
+    if tbl_w is None:
+        tbl_w = OxmlElement('w:tblW')
+        tbl_pr.append(tbl_w)
+    tbl_w.set(qn('w:w'), '9638')
+    tbl_w.set(qn('w:type'), 'dxa')
+    # Distribute column widths evenly in dxa; keep first column slightly
+    # wider so row labels fit, remainder shared across data columns.
+    cols = list(table.columns)
+    n = len(cols)
+    if n > 1:
+        label_w = 2200  # ~3.9 cm for the label column
+        remaining = 9638 - label_w
+        per = remaining // (n - 1)
+        widths = [label_w] + [per] * (n - 1)
+        # fix any rounding drift on the last column
+        widths[-1] = 9638 - sum(widths[:-1])
+        for col, w in zip(cols, widths):
+            col.width = Pt(w / 20)  # python-docx Length wants pt; 20 twips = 1 pt
+        # Also set grid widths so Word doesn't re-flow
+        grid = tbl.find(qn('w:tblGrid'))
+        if grid is None:
+            grid = OxmlElement('w:tblGrid')
+            tbl.insert(1, grid)
+        for g in grid.findall(qn('w:gridCol')):
+            grid.remove(g)
+        for w in widths:
+            gc = OxmlElement('w:gridCol')
+            gc.set(qn('w:w'), str(w))
+            grid.append(gc)
+
+
 def _set_body_font_size(table, size_pt: int) -> None:
     """WP-10 (UAT round-2 Partial): shrink body cells on wide tables so
     year columns don't wrap. Applied to tables with ≥7 columns
@@ -370,8 +424,13 @@ def _add_multi_year_table(
             cells[j].text = formatter(v) if v is not None else '—'
     # WP-10 (UAT round-2): wide multi-year tables (≥8 cols including the
     # label) shrink body cells to 8 pt so Y7–Y10 columns don't wrap.
+    # Round-3: ALSO clamp table width to the 17 cm text frame via
+    # tblLayout=fixed + tblW=9638 dxa, otherwise Word auto-expands beyond
+    # the right margin (observed: Depreciation 747 px, P&L 694 px, CF 796
+    # px, BS 788 px vs 643 px text frame).
     if len(header) >= 8:
         _set_body_font_size(table, 8)
+        _fix_table_width_to_text_frame(table)
 
 
 def _add_two_col_table(doc, rows: list[tuple[str, str]]) -> None:
@@ -626,11 +685,14 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
     district_display = f'{district}, Kerala' if district else '—'
 
     def _pat_first_three() -> str:
+        # WP-11 round-3 (UAT): the Glance Y1/Y2/Y3 PAT prose row previously
+        # printed "₹ 12,67,433.12" paise-included. Now matches PDF table-cell
+        # convention — plain Indian grouping, no ₹, no paise.
         if not r.profit_loss or not r.profit_loss.rows:
             return '—'
         parts = []
         for row in r.profit_loss.rows[:3]:
-            parts.append(f'Y{row.year}: {_fmt_inr(row.pat)}')
+            parts.append(f'Y{row.year}: {_fmt_inr_table(row.pat)}')
         return ' · '.join(parts)
 
     def _dscr_avg() -> str:
@@ -644,15 +706,19 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
         return f'{r.ratios.payback_period_years} years'
 
     def _npv_label() -> tuple[str, str]:
+        # WP-11 round-3 (UAT): NPV display switches to the table formatter
+        # so Glance reads "84,28,024" matching PDF §1, not "₹ 84,28,024.49".
         rate = r.ratios.discount_rate_pct if r.ratios and r.ratios.discount_rate_pct is not None else None
-        label = f'Net Present Value ({rate}%)' if rate is not None else 'Net Present Value'
-        val = _fmt_inr(r.ratios.npv) if r.ratios and r.ratios.npv is not None else '—'
+        label = f'Net Present Value ({_fmt_pct(rate)})' if rate is not None else 'Net Present Value'
+        val = _fmt_inr_table(r.ratios.npv) if r.ratios and r.ratios.npv is not None else '—'
         return label, val
 
     def _irr() -> str:
+        # WP-11 round-3 (UAT): strip trailing `.00` so Glance shows "68%"
+        # like the PDF, not "68.00%".
         if not r.ratios or r.ratios.irr_pct is None:
             return 'Not solvable — see §11'
-        return f'{r.ratios.irr_pct}%'
+        return _fmt_pct(r.ratios.irr_pct)
 
     def _break_even() -> str:
         if not r.ratios or getattr(r.ratios, 'break_even_year', None) is None:
@@ -800,6 +866,9 @@ def _render_fixed_capital_investment(doc, r: CalculationResult) -> None:
         for para in cell.paragraphs:
             for run in para.runs:
                 run.bold = True
+    # NEW-4 round-3 (UAT): bring §2 header into the KAU-navy style the
+    # other data tables already use so the Word output reads consistently.
+    _style_header_row_navy(table)
     # Data rows
     for i, (label, value) in enumerate(rows, start=1):
         table.rows[i].cells[0].text = str(label)
@@ -857,6 +926,9 @@ def _render_means_of_finance(doc, r: CalculationResult) -> None:
         for para in cell.paragraphs:
             for run in para.runs:
                 run.bold = True
+    # NEW-4 round-3 (UAT): §3 header now styled navy-fill + white bold,
+    # matching the rest of the data tables.
+    _style_header_row_navy(table)
     for i, (label, value) in enumerate(rows, start=1):
         table.rows[i].cells[0].text = str(label)
         table.rows[i].cells[1].text = _fmt_inr_table(value) if isinstance(value, Decimal) else str(value)
@@ -1240,6 +1312,7 @@ def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
         total_cells[3 + j].text = _fmt_inr_table(dep.total_depreciation_by_year.get(y, Decimal('0')))
     if len(header) >= 8:
         _set_body_font_size(table, 8)
+        _fix_table_width_to_text_frame(table)
 
 
 def _render_capital_schedule(doc, r: CalculationResult) -> None:
@@ -1278,6 +1351,7 @@ def _render_capital_schedule(doc, r: CalculationResult) -> None:
         cells[3].text = _fmt_inr_table(getattr(row, 'cumulative_cost', None))
         cells[4].text = _fmt_inr_table(getattr(row, 'cumulative_mof', None))
         cells[5].text = _fmt_inr_table(getattr(row, 'unfunded', None))
+    _fix_table_width_to_text_frame(table)
 
 
 def _render_risk_assessment(doc, r: CalculationResult) -> None:
