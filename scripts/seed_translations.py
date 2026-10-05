@@ -4045,6 +4045,7 @@ def seed_menu_translations(languages):
         ('cbbo_reports',           'Capacity Building Reports','കപ്പാസിറ്റി ബിൽഡിംഗ് റിപ്പോർട്ടുകൾ'),
         ('cbbo_market_linkage',    'Market Linkage',           'വിപണി ബന്ധം'),
         ('cbbo_profile',           'My Profile',               'എന്റെ പ്രൊഫൈൽ'),
+        ('cbbo_training',          'Training Sessions',        'ട്രെയിനിംഗ് സെഷനുകൾ'),
         # Expert portal
         ('expert_dashboard',       'Dashboard',                'ഡാഷ്‌ബോർഡ്'),
         ('expert_availability',    'Availability',             'ലഭ്യത'),
