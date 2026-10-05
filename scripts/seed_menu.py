@@ -422,11 +422,19 @@ def seed_menu():
         order     = 3,
     )
     seed_item(
+        label_key = 'menu.cbbo_training',
+        path      = '/cbbo/training',
+        icon      = 'graduation-cap',
+        roles     = [cbbo_group],
+        order     = 4,
+    )
+
+    seed_item(
         label_key = 'menu.cbbo_profile',
         path      = '/cbbo/profile',
         icon      = 'user',
         roles     = [cbbo_group],
-        order     = 4,
+        order     = 5,
     )
 
     # ── Government portal pages (Jobin) ───────────────────────────────────────
