@@ -3005,6 +3005,10 @@ def seed_frontend_ui_translations(languages):
             'error_load':                    'Could not load training sessions.',
             'empty_no_sessions':             'No training sessions yet.',
             'badge_attended':                '{attended}/{total} attended',
+            'filter_all_fpo':                'All FPOs',
+            'filter_all_created_by':         'Created By: All',
+            'filter_from_date':              'From',
+            'filter_to_date':                'To',
             # KAU admin comments (also used by the CBBO training page)
             'col_comments':                  'Comments',
             'section_comments':              'KAU Comments',
@@ -3897,6 +3901,10 @@ def seed_fpo_portal_ml_translations(languages):
         'government_training.error_load':                    'പരിശീലന സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.',
         'government_training.empty_no_sessions':             'ഇതുവരെ പരിശീലന സെഷനുകൾ ഇല്ല.',
         'government_training.badge_attended':                '{attended}/{total} പങ്കെടുത്തു',
+        'government_training.filter_all_fpo':                'എല്ലാ എഫ്പിഒകളും',
+        'government_training.filter_all_created_by':         'സൃഷ്ടിച്ചത്: എല്ലാവരും',
+        'government_training.filter_from_date':              'മുതൽ',
+        'government_training.filter_to_date':                'വരെ',
         'government_training.col_comments':                  'അഭിപ്രായങ്ങൾ',
         'government_training.section_comments':              'KAU അഭിപ്രായങ്ങൾ',
         'government_training.comments_empty':                'KAU-യിൽ നിന്ന് ഇതുവരെ അഭിപ്രായങ്ങളൊന്നുമില്ല.',
@@ -4977,6 +4985,8 @@ def seed_buyer_portal_translations(languages):
 
     buyer_portal_keys = [
         # ── buyer_dashboard.* ──
+        ('buyer_dashboard.page_title',         'Buyer Dashboard',
+         'ക്രേതാവ് ഡാഷ്‌ബോർഡ്'),
         ('buyer_dashboard.welcome_msg',        'Welcome, {name}',
          'സ്വാഗതം, {name}'),
         ('buyer_dashboard.buyer_type_fpo',     'FPO Buyer',
