@@ -110,6 +110,44 @@ def _fmt_ratio(v: Optional[Decimal]) -> str:
     return f'{v}' if v is not None else 'Not available'
 
 
+def _fmt_qty(value, unit: str = '') -> str:
+    """Render a quantity with Indian comma grouping + an explicit unit.
+
+    DPR-10 (UAT): Gemini was mis-reading raw floats such as `105000.000` as
+    `1,050,000` (10x inflation) in a handful of chapters. Writing the value
+    as `105,000 kg` with explicit grouping + unit removes the ambiguity.
+    """
+    if value is None:
+        return ''
+    try:
+        d = Decimal(str(value))
+    except (TypeError, ValueError, ArithmeticError):
+        return f'{value} {unit}'.strip()
+    # Round to integer when the fraction is .00; otherwise keep two dp.
+    if d == d.to_integral_value():
+        d = d.quantize(Decimal('1'))
+        int_part, dec_part = str(d), ''
+    else:
+        d = d.quantize(Decimal('0.01'))
+        int_part, _, dec_part = str(d).partition('.')
+    # Indian grouping on int_part
+    negative = int_part.startswith('-')
+    if negative:
+        int_part = int_part[1:]
+    if len(int_part) > 3:
+        head, tail = int_part[:-3], int_part[-3:]
+        pieces = []
+        while len(head) > 2:
+            pieces.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            pieces.insert(0, head)
+        int_part = ','.join(pieces) + ',' + tail
+    sign = '-' if negative else ''
+    body = f'{sign}{int_part}' + (f'.{dec_part}' if dec_part else '')
+    return f'{body} {unit}'.strip()
+
+
 def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult) -> str:
     """Return the labelled FACTS block that the prompt injects verbatim.
 
@@ -303,7 +341,9 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
             qty = p.annual_quantity
             unit = getattr(p.unit_of_measurement, 'code', '') if p.unit_of_measurement_id else ''
             price = _fmt_inr(p.selling_price_per_unit) if p.selling_price_per_unit is not None else 'price n/a'
-            qty_line = f'{qty} {unit}'.strip() if qty is not None else 'quantity n/a'
+            # DPR-10 (UAT): format quantity with Indian commas + explicit unit
+            # so Gemini can't read `105000.000` as `1,050,000`.
+            qty_line = _fmt_qty(qty, unit) if qty is not None else 'quantity n/a'
             lines.append(f'  - {p.name} [{ptype}]{va}: {qty_line}/yr at {price}')
             if p.description:
                 desc = p.description.strip().replace('\n', ' ')
@@ -325,8 +365,10 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     if machinery_rows:
         for m in machinery_rows[:15]:  # cap at 15 to keep prompt bounded
             purpose = (m.purpose or '').strip() or 'purpose not specified'
+            # DPR-10 (UAT): emit rated capacity with Indian commas + unit so
+            # Gemini doesn't mis-read raw floats.
             cap = (m.operating_capacity or '').strip() or (
-                f'{m.rated_capacity} {getattr(m.capacity_unit, "code", "")}'.strip()
+                _fmt_qty(m.rated_capacity, getattr(m.capacity_unit, 'code', ''))
                 if m.rated_capacity is not None and m.capacity_unit_id else ''
             )
             cap_display = f', capacity {cap}' if cap else ''
@@ -854,6 +896,8 @@ def generate_chapter(
     except LLMError as e:
         # Log the failure so it appears in the admin usage table, then bubble
         # up as NarrativeError so the API layer returns 503.
+        # DPR-10 (UAT): include chapter key in reference_id so admin usage
+        # table can trace which chapter failed on which model.
         AIUsageLog.objects.create(
             service=AIUsageLog.Service.DPR_NARRATIVES,
             fpo=project.fpo,
@@ -864,7 +908,7 @@ def generate_chapter(
             cost_usd=Decimal('0'), cost_inr=Decimal('0'),
             success=False,
             error_message=str(e)[:500],
-            reference_id=str(project.id),
+            reference_id=f'{project.id}:{chapter}',
         )
         raise NarrativeError(f'LLM provider failure: {e}') from e
 
@@ -890,6 +934,9 @@ def generate_chapter(
 
     # Convert USD → INR using the configured rate, then record + apply the
     # spend against the monthly cap (auto-disables if breached).
+    # DPR-10 (UAT): include chapter key in reference_id so admin usage table
+    # shows which model wrote each chapter — critical for tracing a fallback
+    # that produced wrong quantities to the specific chapter + model combo.
     cost_inr = response.cost_usd * cfg.usd_to_inr_rate
     AIUsageLog.objects.create(
         service=AIUsageLog.Service.DPR_NARRATIVES,
@@ -903,7 +950,7 @@ def generate_chapter(
         cost_usd=response.cost_usd,
         cost_inr=cost_inr,
         success=True,
-        reference_id=str(project.id),
+        reference_id=f'{project.id}:{chapter}',
     )
     # Update running budget totals — no-op for mock (cost=0) but keeps the
     # cap enforced for real providers.
