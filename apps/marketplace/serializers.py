@@ -3,6 +3,9 @@
 
 from rest_framework import serializers
 
+from apps.core.services.lookup import LookupService
+from apps.core.utils.constants import get_district_name
+
 from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models import (
     BuyerDirectory,
@@ -245,6 +248,10 @@ class ProductSerializer(serializers.ModelSerializer):
 
 class BuyerDirectorySerializer(serializers.ModelSerializer):
     account_active = serializers.SerializerMethodField()
+    # Read-only display helpers for the admin Buyer Directory table / detail sheet
+    district_display    = serializers.SerializerMethodField()
+    commodities_display = serializers.SerializerMethodField()
+    fpo_name            = serializers.SerializerMethodField()
 
     class Meta:
         model = BuyerDirectory
@@ -252,6 +259,7 @@ class BuyerDirectorySerializer(serializers.ModelSerializer):
             'id', 'name', 'organisation', 'contact_email', 'contact_phone', 'location',
             'commodities_interested', 'min_quantity', 'max_quantity', 'unit', 'is_verified',
             'fpo', 'user', 'status', 'account_active', 'created_at', 'updated_at',
+            'district_display', 'commodities_display', 'fpo_name',
         ]
         # Admin manages this directly (ARUNIMA.md: "Buyer Directory (Admin only)"),
         # so is_verified is writable here — set explicitly via the /verify/ action instead
@@ -270,6 +278,20 @@ class BuyerDirectorySerializer(serializers.ModelSerializer):
         if obj.fpo_id and obj.fpo.primary_user_id:
             return obj.fpo.primary_user.is_active
         return None
+
+    def _lang(self):
+        return getattr(self.context.get('request'), 'language', 'en')
+
+    def get_district_display(self, obj):
+        """`location` holds a district code (e.g. "TSR") — return its localised name."""
+        return get_district_name(obj.location, language=self._lang()) if obj.location else None
+
+    def get_commodities_display(self, obj):
+        lang = self._lang()
+        return [LookupService.get_name('commodity', code, lang) or code for code in (obj.commodities_interested or [])]
+
+    def get_fpo_name(self, obj):
+        return obj.fpo.name if obj.fpo_id else None
 
 
 class BuyerSellerMatchSerializer(serializers.ModelSerializer):

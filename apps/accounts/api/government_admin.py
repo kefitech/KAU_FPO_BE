@@ -499,7 +499,7 @@ class GovernmentViewSet(TranslatedViewSet):
     def approve_registration(self, request, pk=None):
         from apps.core.permissions.rbac import require_sub_admin_perm
         if not require_sub_admin_perm(request.user, 'can_approve_govt_official_logins'):
-            return StandardResponse.error(message='Permission denied. Requires can_approve_govt_official_logins.', status_code=403)
+            return StandardResponse.error(message='Permission denied. You don\'t have access to approve or reject government official registrations. Please contact the admin.', status_code=403)
 
         lang = self.get_language()
         user = self.get_object()
@@ -557,7 +557,7 @@ class GovernmentViewSet(TranslatedViewSet):
     def reject_registration(self, request, pk=None):
         from apps.core.permissions.rbac import require_sub_admin_perm
         if not require_sub_admin_perm(request.user, 'can_approve_govt_official_logins'):
-            return StandardResponse.error(message='Permission denied. Requires can_approve_govt_official_logins.', status_code=403)
+            return StandardResponse.error(message='Permission denied. You don\'t have access to approve or reject government official registrations. Please contact the admin.', status_code=403)
 
         lang = self.get_language()
         user = self.get_object()

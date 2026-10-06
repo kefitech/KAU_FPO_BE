@@ -1036,6 +1036,10 @@ def seed_ui_translations(languages):
         ('sub_admins_table.col_visible_fpos',   'FPOs in Scope',                            'പരിധിയിലുള്ള FPO-കൾ'),
         ('sub_admins_table.no_district',        'No district',                              'ജില്ലയില്ല'),
         ('sub_admins_table.filter_district',    'All Districts',                            'എല്ലാ ജില്ലകളും'),
+        # Dashboard district map subtitle for sub-admins — the map is statewide for them too
+        ('admin_dashboard.chart_district_subtitle_statewide', 'FPOs registered in every district of Kerala — hover for details', 'കേരളത്തിലെ എല്ലാ ജില്ലകളിലും രജിസ്റ്റർ ചെയ്ത FPO-കൾ — വിശദാംശങ്ങൾക്ക് ഹോവർ ചെയ്യുക'),
+        # Dashboard status donut — centre label when no section is hovered
+        ('admin_dashboard.donut_total',         'Total FPOs',                               'ആകെ FPO-കൾ'),
         # Shown instead of the row menu on CBBOs / officials a sub-admin can only view
         ('cbbos_table.view_only',               'View only',                                'കാണാൻ മാത്രം'),
         ('government_table.view_only',          'View only',                                'കാണാൻ മാത്രം'),
@@ -4536,6 +4540,21 @@ def seed_admin_buyers_translations(languages):
          'സജീവമാക്കുക'),
         ('buyers_table.action_reset_password', 'Reset Password',
          'രഹസ്യവാക്ക് പുനഃക്രമീകരിക്കുക'),
+        # District column + row-click detail sheet
+        ('buyers_table.col_district',          'District',              'ജില്ല'),
+        ('buyers_table.view_title',            'Buyer Details',         'വാങ്ങുന്നയാളുടെ വിശദാംശങ്ങൾ'),
+        ('buyers_table.section_contact',       'Contact',               'ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ'),
+        ('buyers_table.section_interest',      'Buying Interest',       'വാങ്ങൽ താൽപ്പര്യം'),
+        ('buyers_table.section_account',       'Account',               'അക്കൗണ്ട്'),
+        ('buyers_table.field_commodities',     'Commodities',           'ഉൽപ്പന്നങ്ങൾ'),
+        ('buyers_table.field_quantity',        'Quantity',              'അളവ്'),
+        ('buyers_table.field_buyer_type',      'Buyer Type',            'വാങ്ങുന്നയാളുടെ തരം'),
+        ('buyers_table.type_fpo',              'FPO buyer',             'FPO വാങ്ങുന്നയാൾ'),
+        ('buyers_table.type_external',         'External buyer',        'ബാഹ്യ വാങ്ങുന്നയാൾ'),
+        ('buyers_table.field_login_account',   'Login Account',         'ലോഗിൻ അക്കൗണ്ട്'),
+        ('buyers_table.account_active',        'Active',                'സജീവം'),
+        ('buyers_table.account_none',          'No login account',      'ലോഗിൻ അക്കൗണ്ട് ഇല്ല'),
+        ('buyers_table.field_registered_on',   'Registered On',         'രജിസ്റ്റർ ചെയ്ത തീയതി'),
     ]
 
     count = 0
@@ -4623,7 +4642,7 @@ def seed_banner_translations(languages):
         ('banner.slide1_title',    'Empowering Farmers through FPO Linkage',  'FPO ലിങ്കേജ് വഴി കർഷകരെ ശക്തിപ്പെടുത്തുക'),
         ('banner.slide1_desc',     'A digital platform connecting Farmer Producer Organizations across Kerala with markets, experts, and government support under the KAU-FPO Linkage Programme.',
                                    'KAU-FPO ലിങ്കേജ് പ്രോഗ്രാമിന് കീഴിൽ കേരളത്തിലെ ഫാർമർ പ്രൊഡ്യൂസർ ഓർഗനൈസേഷനുകളെ വിപണികൾ, വിദഗ്ദ്ധർ, സർക്കാർ പിന്തുണ എന്നിവയുമായി ബന്ധിപ്പിക്കുന്ന ഒരു ഡിജിറ്റൽ പ്ലാറ്റ്ഫോം.'),
-        ('banner.slide1_btn',      'Get Started',                              'ആരംഭിക്കുക'),
+        ('banner.slide1_btn',      'Register',                                 'രജിസ്റ്റർ ചെയ്യുക'),
         ('banner.slide2_subtitle', 'KAU-FPO Platform',                        'KAU-FPO പ്ലാറ്റ്ഫോം'),
         ('banner.slide2_title',    'Smart Agriculture for a Better Tomorrow',  'മികച്ച നാളേക്കായി സ്മാർട്ട് കൃഷി'),
         ('banner.slide2_desc',     'AI-powered crop recommendations, market linkage via ONDC, expert consultancy, and GIS mapping — all in one platform for Kerala\'s farming community.',
@@ -4670,7 +4689,7 @@ def seed_nav_translations(languages):
 
     NAV_KEYS = [
         # key,                    EN value,                   ML value
-        ('nav.get_started',       'Get Started',              'ആരംഭിക്കുക'),
+        ('nav.get_started',       'Register',                 'രജിസ്റ്റർ ചെയ്യുക'),
         ('nav.sign_in',           'Sign In',                  'സൈൻ ഇൻ'),
         ('nav.register',          'Register FPO',             'FPO രജിസ്റ്റർ ചെയ്യുക'),
         ('nav.pages',             'Pages',                    'പേജുകൾ'),
@@ -5192,6 +5211,9 @@ def seed_buyer_portal_translations(languages):
         ('buyer_dashboard.chart_inquiries_label',
          'Inquiries',
          'അന്വേഷണങ്ങൾ'),
+        ('buyer_dashboard.chart_inquiries_total',
+         'Total inquiries',
+         'ആകെ അന്വേഷണങ്ങൾ'),
         ('buyer_dashboard.chart_inquiry_status',
          'Inquiry Status',
          'അന്വേഷണ നില'),

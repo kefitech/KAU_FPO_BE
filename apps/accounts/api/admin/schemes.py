@@ -187,7 +187,7 @@ class SchemeListView(APIView):
     def post(self, request):
         if not _can_manage_schemes(request.user):
             return StandardResponse.error(
-                'Permission denied. Sub-admins need can_manage_schemes to create schemes.',
+                'Permission denied. You don\'t have access to create schemes. Please contact the admin.',
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 

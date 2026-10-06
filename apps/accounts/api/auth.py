@@ -27,6 +27,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 
+from apps.core.permissions.fpo_scope import get_sub_admin_district
 from apps.core.permissions.rbac import IsSuperAdminOrFirstUser, IsSuperAdmin, get_user_permissions
 from apps.core.utils.throttles import (
     ForgotPasswordThrottle, OTPVerifyThrottle, RegisterThrottle,
@@ -676,6 +677,8 @@ class MeView(APIView):
                 'preferred_language': profile.preferred_language if profile else 'en',
                 'role':               role,
                 'permissions':        sorted(permissions) if '*' not in permissions else ['*'],
+                # Sub-admins only: their district, so forms can offer just that one
+                'district':           get_sub_admin_district(user) if role == 'sub_admin' else None,
             },
             'menu':           None if (redirect and redirect.get('stage') != 'dashboard') else _build_menu(user, lang),
             'redirect':       redirect,

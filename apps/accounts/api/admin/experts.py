@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 from django.db.models import Q
+from apps.core.permissions.fpo_scope import get_sub_admin_district, is_super_admin
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -36,6 +37,21 @@ def _sync_login_account(expert, is_active):
     if expert.user_id and expert.user.is_active != is_active:
         expert.user.is_active = is_active
         expert.user.save(update_fields=['is_active'])
+
+
+def _sub_admin_district_error(user, district, current=None):
+    """
+    A sub-admin may only put an expert in their own district. `current` is the
+    expert's district when editing — leaving it unchanged is always fine.
+    Returns an error message, or None when allowed.
+    """
+    if is_super_admin(user) or not district or district == current:
+        return None
+    own = get_sub_admin_district(user)
+    if district != own:
+        return f'You can only add experts to your own district ({own}).' if own else \
+            'You have no district assigned, so you cannot set an expert\'s district.'
+    return None
 
 
 class ExpertSerializer(serializers.ModelSerializer):
@@ -147,7 +163,15 @@ class ExpertListView(APIView):
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        expert = serializer.save()
+        # Sub-admins add experts to their own district — filled in when left blank.
+        extra = {}
+        if not is_super_admin(request.user):
+            district = serializer.validated_data.get('district') or get_sub_admin_district(request.user)
+            error = _sub_admin_district_error(request.user, district)
+            if error:
+                return StandardResponse.error(error, errors={'district': [error]}, status_code=status.HTTP_403_FORBIDDEN)
+            extra['district'] = district or ''
+        expert = serializer.save(**extra)
 
         if not expert.user and expert.email and not User.objects.filter(username=expert.email).exists():
             temp_password = secrets.token_urlsafe(10)
@@ -217,6 +241,10 @@ class ExpertDetailView(APIView):
         if not serializer.is_valid():
             return StandardResponse.error('Validation failed.', errors=serializer.errors,
                                           status_code=status.HTTP_400_BAD_REQUEST)
+
+        error = _sub_admin_district_error(request.user, serializer.validated_data.get('district'), current=expert.district)
+        if error:
+            return StandardResponse.error(error, errors={'district': [error]}, status_code=status.HTTP_403_FORBIDDEN)
 
         serializer.save()
         if 'is_active' in serializer.validated_data:
