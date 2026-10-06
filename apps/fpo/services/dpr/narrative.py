@@ -204,63 +204,78 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     subsidy_grant_amount = mof.by_field.get('mof_government_grant') or Decimal('0')
     subsidy_direct_amount = mof.by_field.get('mof_government_subsidy') or Decimal('0')
     subsidy_total = subsidy_grant_amount + subsidy_direct_amount
-    subsidy_display = _fmt_inr(subsidy_total) if subsidy_total > 0 else 'Not available'
+    # DPR-10 (UAT): when NO subsidy is proposed, emit an explicit state so the
+    # LLM stops writing "subsidy or grant assistance ... currently listed as
+    # not available" (observed on similar-01, contrasting-02, contrasting-03).
+    subsidy_display = (
+        _fmt_inr(subsidy_total)
+        if subsidy_total > 0 else
+        'No subsidy proposed in this project'
+    )
+    subsidy_proposed = subsidy_total > 0
 
     # Subsidy scheme metadata (name / agency / status) from the Finance section
     # so promoter / financial chapters can quote the actual scheme instead of
-    # saying "subsidy details … Not available".
+    # saying "subsidy details … Not available". Only surface the metadata when
+    # a subsidy amount is actually proposed — otherwise the LLM reads three
+    # 'Not available' lines and manufactures sentences about missing details
+    # (DPR-10 UAT).
     finance_section = getattr(project, 'section_finance', None)
     subsidy_scheme = (
         (getattr(finance_section, 'subsidy_scheme_name', '') or '').strip()
         if finance_section else ''
-    ) or 'Not available'
+    ) or 'Not disclosed by the FPO'
     subsidy_agency = (
         (getattr(finance_section, 'subsidy_implementing_agency', '') or '').strip()
         if finance_section else ''
-    ) or 'Not available'
+    ) or 'Not disclosed by the FPO'
     subsidy_status = (
         (getattr(finance_section, 'subsidy_application_status', '') or '').strip()
         if finance_section else ''
-    ) or 'Not available'
+    ) or 'Not disclosed by the FPO'
 
     commodity = (
         project.primary_commodity.get_name('en')
-        if project.primary_commodity_id else 'Not available'
+        if project.primary_commodity_id else 'Not provided by the FPO'
     )
-    fpo_name = project.fpo.name if project.fpo_id else 'Not available'
+    fpo_name = project.fpo.name if project.fpo_id else 'Not provided by the FPO'
 
     # KAU 2026-09-19 §Promoter Profile — surface these fields to the LLM
     # so the promoter_profile chapter stops emitting [Name of the CEO] etc.
-    ceo_name = getattr(project, 'ceo_name', '') or 'Not available'
-    ceo_qual = getattr(project, 'ceo_qualification', '') or 'Not available'
+    # DPR-10 (UAT): use the explicit "Not provided by the FPO" state in
+    # place of the generic "Not available" so the LLM has one vocabulary
+    # for missing promoter data (prompt rule 13 bans "not available").
+    _NOT_PROVIDED = 'Not provided by the FPO'
+    ceo_name = getattr(project, 'ceo_name', '') or _NOT_PROVIDED
+    ceo_qual = getattr(project, 'ceo_qualification', '') or _NOT_PROVIDED
     ceo_exp  = getattr(project, 'ceo_experience_years', None)
-    ceo_exp_display = f'{ceo_exp} years' if ceo_exp is not None else 'Not available'
+    ceo_exp_display = f'{ceo_exp} years' if ceo_exp is not None else _NOT_PROVIDED
     area_acres = getattr(project, 'total_area_acreage', None)
-    area_display = f'{area_acres} acres' if area_acres is not None else 'Not available'
+    area_display = f'{area_acres} acres' if area_acres is not None else _NOT_PROVIDED
     women_pct = getattr(project, 'women_shareholding_pct', None)
-    women_display = f'{women_pct}%' if women_pct is not None else 'Not available'
-    landholding = (getattr(project, 'landholding_summary', '') or '').strip() or 'Not available'
+    women_display = f'{women_pct}%' if women_pct is not None else _NOT_PROVIDED
+    landholding = (getattr(project, 'landholding_summary', '') or '').strip() or _NOT_PROVIDED
     board_freq_raw = getattr(project, 'board_meeting_frequency', '') or ''
     board_freq_display = (
         dict((k, v) for k, v in [
             ('monthly', 'Monthly'), ('quarterly', 'Quarterly'),
             ('half_yearly', 'Half-yearly'), ('annually', 'Annually'),
         ]).get(board_freq_raw, board_freq_raw)
-        or 'Not available'
+        or _NOT_PROVIDED
     )
     # FPO governance / membership snapshot — pulled from FPO row so the
     # narrative can quote member counts + director composition verbatim.
     fpo = project.fpo if project.fpo_id else None
     total_members = getattr(fpo, 'total_members', None) if fpo else None
-    total_members_display = f'{total_members} members' if total_members else 'Not available'
+    total_members_display = f'{total_members} members' if total_members else _NOT_PROVIDED
     women_members = getattr(fpo, 'female_members', None) if fpo else None
-    women_members_display = f'{women_members} women members' if women_members else 'Not available'
+    women_members_display = f'{women_members} women members' if women_members else _NOT_PROVIDED
     total_dirs = getattr(fpo, 'total_directors', None) if fpo else None
     women_dirs = getattr(fpo, 'women_directors', None) if fpo else None
     board_display = (
         f'{total_dirs} directors ({women_dirs} women)'
         if total_dirs and women_dirs is not None else
-        (f'{total_dirs} directors' if total_dirs else 'Not available')
+        (f'{total_dirs} directors' if total_dirs else _NOT_PROVIDED)
     )
 
     # PSC — variable-length list, one line per member so the LLM sees the
@@ -270,7 +285,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         psc_lines = [f'  - {m.get("name", "?")} — {m.get("role", "?")} ({m.get("affiliation", "?")})' for m in psc]
         psc_block = 'Project Steering Committee:\n' + '\n'.join(psc_lines)
     else:
-        psc_block = 'Project Steering Committee:  Not constituted / Not available'
+        psc_block = 'Project Steering Committee:  Not constituted / Not provided by the FPO'
 
     lines = [
         '=== PROJECT FACTS (use these values verbatim; do not estimate) ===',
@@ -294,35 +309,58 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         '--- Project cost + finance ---',
         f'Total project cost:         {_fmt_inr(cost.total)}',
         f'Total means of finance:     {_fmt_inr(mof.total)}',
+    ]
+
+    # DPR-10 (UAT): Only emit subsidy scheme metadata when a subsidy is
+    # actually proposed — otherwise three "Not available" lines in a row
+    # push the LLM to invent sentences about missing details.
+    lines.extend([
         f'  - Promoter contribution:  {_fmt_inr(mof.by_field.get("mof_promoters_contribution"))}',
         f'  - Bank / term loan:       {_fmt_inr(mof.by_field.get("mof_bank_term_loan"))}',
         f'  - Working capital loan:   {_fmt_inr(mof.by_field.get("mof_working_capital_loan"))}',
         f'  - Government subsidy/grant: {subsidy_display}',
-        f'    Scheme name:            {subsidy_scheme}',
-        f'    Implementing agency:    {subsidy_agency}',
-        f'    Application status:     {subsidy_status}',
+    ])
+    if subsidy_proposed:
+        lines.extend([
+            f'    Scheme name:            {subsidy_scheme}',
+            f'    Implementing agency:    {subsidy_agency}',
+            f'    Application status:     {subsidy_status}',
+        ])
+
+    # DPR-10 (UAT): Explicit state for self-funded projects so the narrative
+    # stops writing "the project shows an average DSCR of Not available"
+    # (observed on contrasting-03 KAU-FPO-TVM-2026-0002). When there is no
+    # term loan the DSCR / interest-coverage ratios do not apply.
+    has_term_loan = term_debt > 0
+    _dscr_na = (
+        'N/A — self-funded project (no term loan to service)'
+        if not has_term_loan else 'Not available'
+    )
+
+    lines.extend([
         f'Debt : Equity ratio:        {de_display}  (balance-sheet-aligned: '
         f'term debt ÷ (promoter equity + capital reserve); subsidy counts '
         f'as quasi-equity)',
+        f'Has term loan:              {"Yes" if has_term_loan else "No — this is a self-funded / grant-only project; DSCR / debt-coverage ratios do not apply"}',
         '',
-        f'Y1 revenue:                 {_fmt_inr(y1.revenue) if y1 else "Not available"}',
-        f'Y1 operating cost:          {_fmt_inr(y1.operating_cost) if y1 else "Not available"}',
-        f'Y1 EBITDA:                  {_fmt_inr(y1.ebitda) if y1 else "Not available"}',
-        f'Y1 PAT:                     {_fmt_inr(y1.pat) if y1 else "Not available"}',
+        f'Y1 revenue:                 {_fmt_inr(y1.revenue) if y1 else "Not available (projection not yet computed)"}',
+        f'Y1 operating cost:          {_fmt_inr(y1.operating_cost) if y1 else "Not available (projection not yet computed)"}',
+        f'Y1 EBITDA:                  {_fmt_inr(y1.ebitda) if y1 else "Not available (projection not yet computed)"}',
+        f'Y1 PAT:                     {_fmt_inr(y1.pat) if y1 else "Not available (projection not yet computed)"}',
         '',
-        f'IRR:                        {_fmt_pct(ratios.irr_pct) if ratios else "Not available"}',
-        f'NPV (@ discount rate):      {_fmt_inr(ratios.npv) if ratios else "Not available"}',
+        f'IRR:                        {_fmt_pct(ratios.irr_pct) if ratios else "Not available (projection not yet computed)"}',
+        f'NPV (@ discount rate):      {_fmt_inr(ratios.npv) if ratios else "Not available (projection not yet computed)"}',
         f'Discount rate used:         {_fmt_pct(ratios.discount_rate_pct) if ratios else "Not available"}',
-        f'Average DSCR:               {_fmt_ratio(ratios.dscr_avg) if ratios else "Not available"}',
-        f'Minimum DSCR:               {_fmt_ratio(ratios.dscr_min) if ratios else "Not available"}',
-        f'Payback period (years):     {_fmt_ratio(ratios.payback_period_years) if ratios else "Not available"}',
-        f'Break-even year:            {ratios.break_even_year if ratios and ratios.break_even_year else "Not available"}',
+        f'Average DSCR:               {_fmt_ratio(ratios.dscr_avg) if (ratios and ratios.dscr_avg is not None) else _dscr_na}',
+        f'Minimum DSCR:               {_fmt_ratio(ratios.dscr_min) if (ratios and ratios.dscr_min is not None) else _dscr_na}',
+        f'Payback period (years):     {_fmt_ratio(ratios.payback_period_years) if (ratios and ratios.payback_period_years is not None) else "Not available (projection not yet computed)"}',
+        f'Break-even year:            {ratios.break_even_year if ratios and ratios.break_even_year else "Not available (projection not yet computed)"}',
         '',
         '--- Operating break-even (Y1 basis) ---',
-        f'Break-even sales:           {_fmt_inr(ratios.break_even_sales_inr) if ratios else "Not available"}',
-        f'Break-even capacity util.:  {_fmt_pct(ratios.break_even_capacity_utilisation_pct) if ratios else "Not available"} of Y1 sales',
-        f'Contribution margin:        {_fmt_pct(ratios.break_even_contribution_margin_pct) if ratios else "Not available"}',
-    ]
+        f'Break-even sales:           {_fmt_inr(ratios.break_even_sales_inr) if (ratios and ratios.break_even_sales_inr is not None) else "Not available (projection not yet computed)"}',
+        f'Break-even capacity util.:  {_fmt_pct(ratios.break_even_capacity_utilisation_pct) if (ratios and ratios.break_even_capacity_utilisation_pct is not None) else "Not available (projection not yet computed)"} of Y1 sales',
+        f'Contribution margin:        {_fmt_pct(ratios.break_even_contribution_margin_pct) if (ratios and ratios.break_even_contribution_margin_pct is not None) else "Not available (projection not yet computed)"}',
+    ])
 
     # DPR-07 (UAT) — surface the actual products planned so the technical /
     # financial narratives describe the right process (e.g. "cold-pressed
@@ -670,22 +708,38 @@ _HARD_RULES = (
     '    A post-process scrubber will delete any ratio sentence beyond '
     'these caps before the narrative ships to the PDF, so staying inside '
     'the budget is the only way to control which content survives.\n'
-    '13. "Not available" HANDLING. If several FACTS fields read "Not '
-    'available", mention the gap ONCE in neutral prose ("certain promoter '
-    'details are pending") — do not list every missing field separately, '
-    'do not repeat "Not available" more than two or three times in a '
-    'single chapter.\n'
+    '13. "Not available" HANDLING. NEVER write the literal phrase "not '
+    'available" in your output. The FACTS block uses explicit state '
+    'phrases that you must echo verbatim where relevant: '
+    '"No subsidy proposed in this project", "N/A — self-funded project '
+    '(no term loan to service)", "Not disclosed by the FPO", "Not provided '
+    'by the FPO", or "Not available (projection not yet computed)". If a '
+    'field reads one of these, use the exact phrase in prose or do not '
+    'mention the field at all. Treat "Not available" in the FACTS block '
+    'ONLY as "projection not yet computed" — never paraphrase it as a '
+    'policy or scheme being unavailable.\n'
     '14. SUBSIDY. If the FACTS block "Government subsidy/grant" line '
     'shows a value, you MUST reference it in the Financial Analysis / '
     'Means-of-Finance narrative — including the scheme name and '
-    'implementing agency if the FACTS block provides them. Do not say '
-    '"subsidy details not available" when a subsidy amount is present.\n'
-    '15. CURRENCY SYMBOL. Always write monetary amounts with the `₹` '
+    'implementing agency if the FACTS block provides them. If the line '
+    'reads "No subsidy proposed in this project", state exactly that '
+    '("No government subsidy or grant is proposed in this project") — '
+    'never write that subsidy details are "not available" or "pending", '
+    'and never speculate about which schemes the FPO could apply for.\n'
+    '15. SELF-FUNDED / NO-DEBT PROJECTS. If the FACTS block "Has term loan" '
+    'line reads "No", DO NOT quote DSCR, minimum DSCR, debt-service '
+    'coverage, interest-coverage, or payback-of-loan ratios anywhere in '
+    'the narrative — the FACTS block will have already marked those as '
+    'N/A. The Executive Summary\'s mandatory three-ratio sentence '
+    '(DSCR + IRR + payback) is REPLACED by a two-ratio sentence '
+    '(IRR + payback) for a self-funded project. Describe the financing '
+    'as fully internal / promoter / grant-funded without debt service.\n'
+    '16. CURRENCY SYMBOL. Always write monetary amounts with the `₹` '
     'symbol — "₹ 7,50,000" or "₹ 1.25 crore". Never write "Rs.", "Rs ", '
     '"INR", or "Rupees". Every number already appears in the FACTS block '
     'and PDF tables with `₹`; the prose MUST match so a bank reviewer '
     'sees consistent currency formatting across the document.\n'
-    '16. Start directly with the first sentence of the narrative.'
+    '17. Start directly with the first sentence of the narrative.'
 )
 
 
@@ -750,7 +804,14 @@ _LENIENT_RULES = (
     '14. CURRENCY SYMBOL. Always write monetary amounts with the `₹` '
     'symbol — "₹ 7,50,000" or "₹ 1.25 crore". Never write "Rs.", "Rs ", '
     '"INR", or "Rupees".\n'
-    '15. Start directly with the first sentence of the narrative.'
+    '15. "Not available" HANDLING. NEVER write the literal phrase "not '
+    'available" in your output. The FACTS block uses explicit state '
+    'phrases ("No subsidy proposed in this project", "N/A — self-funded '
+    'project", "Not disclosed by the FPO", "Not provided by the FPO") — '
+    'echo them verbatim where relevant, or omit the sentence entirely. '
+    'Do not paraphrase a missing value as "subsidy details are not '
+    'available" or "turnover not available".\n'
+    '16. Start directly with the first sentence of the narrative.'
 )
 
 
