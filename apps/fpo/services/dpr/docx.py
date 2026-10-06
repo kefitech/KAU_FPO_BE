@@ -1667,8 +1667,11 @@ def _render_technologies(doc, project) -> None:
             p.add_run(step)
 
 
-def _render_key_assumptions(doc) -> None:
-    rows = _key_assumptions_rows()
+def _render_key_assumptions(doc, project=None) -> None:
+    # DPR-10 (UAT): pass project through so project-entered rates
+    # (loan interest, inflation) are labelled as such instead of being
+    # mis-labelled as 'KAU DPR platform default'.
+    rows = _key_assumptions_rows(project)
     if not rows:
         return
     _add_heading(doc, 'Key Assumptions Used', level=1, bookmark='sec_assumptions')
@@ -1957,7 +1960,7 @@ def render_docx_for_project(
             _render_ai_chapter(doc, key, label, text)
 
     # 5. Reference sections.
-    _render_key_assumptions(doc)
+    _render_key_assumptions(doc, project)
     _render_limitations(doc)
 
     buf = io.BytesIO()

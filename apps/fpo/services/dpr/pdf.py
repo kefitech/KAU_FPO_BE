@@ -285,12 +285,19 @@ def build_pdf_filename(project, version_number: int) -> str:
     return f'DPR_{_fpo_slug(project)}_v{version_number}.pdf'
 
 
-def _key_assumptions_rows() -> list[dict]:
+def _key_assumptions_rows(project=None) -> list[dict]:
     """Rows for the PDF's "Key Assumptions" mini-table (KAU 2026-09-19 P2.1).
 
-    Every DPRConfig-configured rate the calc engine reads gets listed here
-    so the DPR reader (banker / KAU reviewer) can see at a glance which
-    figures are platform assumptions vs FPO-entered.
+    Every rate the calc engine reads gets listed here so the DPR reader
+    (banker / KAU reviewer) can see at a glance which figures the FPO
+    supplied and which fell back to KAU platform defaults.
+
+    DPR-10 (UAT): when `project` is supplied, project-entered overrides
+    win. Each row's `source` reads either 'Project-entered' or 'KAU
+    platform default', and the overriding project value gets a hint of
+    the superseded default in parentheses so the reader can see what
+    changed. Earlier version labelled every row 'KAU DPR platform default'
+    even for projects that had entered their own loan interest rate.
 
     Each row: {label, value_pct, source}. `value_pct` is a plain string
     with a "%" suffix; template renders it as-is.
@@ -299,10 +306,21 @@ def _key_assumptions_rows() -> list[dict]:
     # Django shell doesn't force apps.fpo.services.dpr.provenance to load
     # before the Django app registry is ready.
     from .provenance import collect_system_assumptions
-    return [
-        {'label': a.label, 'value_pct': f'{a.value}%', 'source': 'KAU DPR platform default'}
-        for a in collect_system_assumptions()
-    ]
+    rows = []
+    for a in collect_system_assumptions(project):
+        if a.overridden:
+            rows.append({
+                'label': a.label,
+                'value_pct': f'{a.value}%',
+                'source': f'Project-entered (overrides platform default of {a.platform_default}%)',
+            })
+        else:
+            rows.append({
+                'label': a.label,
+                'value_pct': f'{a.value}%',
+                'source': 'KAU platform default',
+            })
+    return rows
 
 
 def _debt_equity_ratio_display(by_field: dict) -> str:
@@ -491,7 +509,7 @@ def render_html_for_project(
         # DPRConfig-configured rate the calc engine used. Rendered just
         # before the Limitations chapter so bank / KAU reviewer can see
         # which figures are platform defaults vs project-specific.
-        'key_assumptions_rows': _key_assumptions_rows(),
+        'key_assumptions_rows': _key_assumptions_rows(project),
         # Per-technology process flowcharts. Empty list = section omitted.
         'technologies_with_flow': _technologies_with_flow(project),
         # Product list + cover hero image (first product with a photo).

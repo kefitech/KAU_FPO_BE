@@ -577,16 +577,25 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
                      'typical sector risks generically and recommend the FPO '
                      'populate the §2.3.22 Risk Register before submission)')
 
-    # KAU 2026-09-19 P2.1 — surface the platform-configured (system_default)
-    # rates the calc engine used so the LLM can mention provenance in prose
-    # (e.g. "using the platform's default 12% discount rate") rather than
-    # asserting each rate as a project-specific fact. Values snapshotted at
-    # facts-formatting time so the FACTS block stays deterministic.
+    # KAU 2026-09-19 P2.1 + DPR-10 (UAT): surface the rates the calc engine
+    # ACTUALLY used — project overrides win over platform defaults, and the
+    # provenance is now explicit per row ("project-entered: 6.00% (platform
+    # default is 10.50%)" vs "platform default: 12.00% (not overridden)").
+    # This fixes similar-01 narrating "fallback 10.50%" for a project that
+    # had entered its own 6%.
     from .provenance import collect_system_assumptions
     lines.append('')
-    lines.append('--- System-default assumptions used by the calc engine ---')
-    for a in collect_system_assumptions():
-        lines.append(f'{a.label}:  {a.value}%')
+    lines.append('--- Rates actually used by the calc engine (project overrides win) ---')
+    for a in collect_system_assumptions(project):
+        if a.overridden:
+            lines.append(
+                f'{a.label}:  {a.value}%  '
+                f'(project-entered — overrides platform default of {a.platform_default}%)'
+            )
+        else:
+            lines.append(
+                f'{a.label}:  {a.value}%  (platform default — not overridden by this project)'
+            )
 
     lines.append('=== END FACTS ===')
     return '\n'.join(lines)
@@ -714,13 +723,16 @@ _HARD_RULES = (
     '"Utilities / infrastructure" sections, or the knowledge base. If '
     'the utilities list says "no utility items entered", treat those '
     'systems as NOT IN SCOPE — do not describe them as planned.\n'
-    '10. PROVENANCE OF SYSTEM DEFAULTS. The "System-default assumptions '
-    'used by the calc engine" section lists KAU-configured platform '
-    'rates (not FPO-specific choices). When quoting any of those rates, '
-    'make that provenance clear in prose — e.g. "at the platform\'s '
-    'default 12% discount rate" or "using the KAU-configured 25.17% '
-    'corporate tax rate". Never present them as if the FPO or appraiser '
-    'chose the specific number.\n'
+    '10. PROVENANCE OF ASSUMPTIONS. The "Rates actually used by the calc '
+    'engine" section lists every rate the engine applied, with each row '
+    'tagged as either "project-entered — overrides platform default of X%" '
+    'or "platform default — not overridden by this project". QUOTE THE '
+    'ACTUAL VALUE on each row, and reflect its provenance in prose. '
+    'Examples: "the FPO\'s own loan interest rate of 6%" (for project-entered '
+    'rows) or "at the platform\'s default 12% discount rate" (for '
+    'platform-default rows). NEVER call a rate a "fallback" or a "default" '
+    'if the row is tagged project-entered — doing so misrepresents what '
+    'the project actually assumed.\n'
     '11. NEUTRAL BANK-APPRAISAL LANGUAGE. This is a professional DPR for '
     'bank / scheme appraisal — write in formal, analytical, evidence-based '
     'prose. Do NOT use promotional adjectives: "highly bankable", '
@@ -827,10 +839,12 @@ _LENIENT_RULES = (
     'generic.\n'
     '10. NO METADATA TAGS. Never emit `[system_default]`, `[KB #n]`, '
     '`(system)` or similar metadata markers in the output.\n'
-    '11. PROVENANCE OF SYSTEM DEFAULTS. The "System-default assumptions" '
-    'section lists KAU-configured platform rates. When quoting those '
-    'rates, make the provenance clear in prose — e.g. "at the platform\'s '
-    'default 12% discount rate".\n'
+    '11. PROVENANCE OF ASSUMPTIONS. The "Rates actually used by the calc '
+    'engine" section tags each rate as either project-entered (overrides '
+    'platform default) or platform default. Quote the actual value and '
+    'reflect its provenance in prose — e.g. "the FPO\'s own 6% loan rate" '
+    'or "at the platform\'s default 12% discount rate". Do not call a '
+    'rate a "fallback" when the row is tagged project-entered.\n'
     '12. NEUTRAL BANK-APPRAISAL LANGUAGE. Formal, analytical, evidence-based '
     'prose. Do NOT use promotional adjectives: "highly bankable", '
     '"state-of-the-art", "uniquely positioned", "transformative", '

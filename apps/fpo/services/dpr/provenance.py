@@ -30,53 +30,101 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Optional
 
 from apps.database.models import DPRConfig
 
 
 # DPRConfig keys the calc engine reads. Order matches presentation order
 # in the Key Assumptions table. `label` is what shows up on the PDF row.
-_SYSTEM_RATE_KEYS: list[tuple[str, str, Decimal]] = [
-    ('discount_rate_pct',                  'NPV discount rate',            Decimal('12')),
-    ('tax_rate_pct',                       'Corporate tax rate',           Decimal('25.17')),
-    ('inflation_rate_pct',                 'General inflation / OPEX escalator', Decimal('6')),
-    ('loan_interest_rate_default_pct',     'Loan interest rate (fallback)', Decimal('10.5')),
-    ('depreciation_rate_building_pct',     'Buildings — SLM depreciation', Decimal('10')),
-    ('depreciation_rate_machinery_pct',    'Plant & machinery — SLM depreciation', Decimal('15')),
-    ('depreciation_rate_equipment_pct',    'Equipment & vehicles — SLM depreciation', Decimal('15')),
-    ('project_cost_variance_pct',          'Project cost variance tolerance', Decimal('10')),
+# `override_field` — if set, this names the Finance-section field that lets
+# the FPO override the platform default on a per-project basis. The calc
+# engine reads the project value first and only falls back to DPRConfig
+# when the project field is None.
+_SYSTEM_RATE_KEYS: list[tuple[str, str, Decimal, Optional[str]]] = [
+    ('discount_rate_pct',                  'NPV discount rate',            Decimal('12'),    None),
+    ('tax_rate_pct',                       'Corporate tax rate',           Decimal('25.17'), None),
+    ('inflation_rate_pct',                 'General inflation / OPEX escalator', Decimal('6'), 'inflation_rate_pct'),
+    ('loan_interest_rate_default_pct',     'Loan interest rate',           Decimal('10.5'),  'rate_of_interest_pct'),
+    ('depreciation_rate_building_pct',     'Buildings — SLM depreciation', Decimal('10'),    None),
+    ('depreciation_rate_machinery_pct',    'Plant & machinery — SLM depreciation', Decimal('15'), None),
+    ('depreciation_rate_equipment_pct',    'Equipment & vehicles — SLM depreciation', Decimal('15'), None),
+    ('project_cost_variance_pct',          'Project cost variance tolerance', Decimal('10'), None),
 ]
 
 
 @dataclass
 class Assumption:
-    """One system-default rate used in the compute.
+    """One rate used in the compute.
+
     `key`   — DPRConfig key
     `label` — human label shown on PDF + admin
-    `value` — the Decimal used at compute time (from DPRConfig; falls back
-              to the code default if the row is missing)
-    `overridden` — True when the FPO's per-project override is used instead
-                   of DPRConfig (only relevant for the 6 Finance §Cat I
-                   escalation rates today). Reserved slot — the current
-                   FACTS block doesn't render an override-badge yet, but
-                   the model row is ready for it.
+    `value` — the Decimal actually used at compute time. When the project
+              overrode via Finance section, this is the FPO's number; else
+              it's the DPRConfig / code-default.
+    `platform_default` — the DPRConfig / code default (what the engine
+              would have used had the project not overridden).
+    `overridden` — True when the FPO's per-project override is in use.
     """
     key: str
     label: str
     value: Decimal
+    platform_default: Decimal = Decimal('0')
     overridden: bool = False
 
 
-def collect_system_assumptions() -> list[Assumption]:
-    """Return every system-default rate the calc engine uses.
+def _project_override(project, override_field: Optional[str]) -> Optional[Decimal]:
+    """Return the project-level override for a rate if the FPO entered one.
 
-    Values snapshotted from DPRConfig at call time (same read path as
-    the calc engine — see `calculation.py`), with the code-default as
-    a fallback so a missing config row still renders a plausible number
-    rather than blowing up.
+    Only reads from `project.section_finance.<field>`. Returns None when the
+    project / section / field is missing OR when the value is None.
+    """
+    if not project or not override_field:
+        return None
+    fin = getattr(project, 'section_finance', None)
+    if fin is None:
+        return None
+    val = getattr(fin, override_field, None)
+    if val is None:
+        return None
+    try:
+        return Decimal(str(val))
+    except (TypeError, ValueError, ArithmeticError):
+        return None
+
+
+def collect_system_assumptions(project=None) -> list[Assumption]:
+    """Return every rate the calc engine uses — project overrides win.
+
+    When `project` is passed in, each row reports the FPO's own value where
+    the project overrode via Finance section. The platform_default field is
+    always populated so callers can show "project value X% overrides
+    platform default Y%" in prose or in a mini-table.
+
+    DPR-10 (UAT): the testing team flagged that the Key Assumptions table
+    was labelling EVERY rate as 'KAU DPR platform default' even for
+    projects that supplied their own loan interest rate. The LLM then
+    narrated 'the term loan interest is structured around a fallback rate
+    of 10.50%' for a project running on 6%. Returning the actual value
+    with an explicit `overridden` flag fixes both the PDF table and the
+    FACTS block the narrative reads from.
     """
     rows: list[Assumption] = []
-    for cfg_key, label, code_default in _SYSTEM_RATE_KEYS:
-        value = DPRConfig.get_decimal(cfg_key, code_default)
-        rows.append(Assumption(key=cfg_key, label=label, value=value))
+    for cfg_key, label, code_default, override_field in _SYSTEM_RATE_KEYS:
+        platform_default = DPRConfig.get_decimal(cfg_key, code_default)
+        override = _project_override(project, override_field)
+        if override is not None:
+            rows.append(Assumption(
+                key=cfg_key, label=label,
+                value=override,
+                platform_default=platform_default,
+                overridden=True,
+            ))
+        else:
+            rows.append(Assumption(
+                key=cfg_key, label=label,
+                value=platform_default,
+                platform_default=platform_default,
+                overridden=False,
+            ))
     return rows
