@@ -31,7 +31,7 @@ from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.constants import UserRole, SUB_ADMIN_PERMISSIONS, District
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
-from apps.core.utils.validators import validate_person_name
+from apps.core.utils.validators import validate_person_name, validate_indian_phone
 from apps.core.services.translation import t
 from apps.core.services.subadmin_district import (
     check_cap,
@@ -61,6 +61,42 @@ def _get_sub_admin_permissions():
 
 
 # ─── Serializers ─────────────────────────────────────────────────────────────
+
+# RFC 5321 limits. Django's EmailValidator doesn't enforce the local-part one.
+EMAIL_LOCAL_PART_MAX_LENGTH = 64
+EMAIL_MAX_LENGTH            = 254
+
+
+def _email_too_long(email):
+    local_part = email.rsplit('@', 1)[0]
+    return len(local_part) > EMAIL_LOCAL_PART_MAX_LENGTH or len(email) > EMAIL_MAX_LENGTH
+
+
+NAME_MAX_LENGTH = 150   # User.first_name / last_name column size
+
+
+def _bulk_name_problems(value, label):
+    """Return the problems with a bulk-invite name cell (empty list when valid)."""
+    if len(value) > NAME_MAX_LENGTH:
+        return [f'{label} must be at most {NAME_MAX_LENGTH} characters.']
+    try:
+        validate_person_name(value, label)
+    except DjangoValidationError as e:
+        return e.messages
+    return []
+
+
+def _cell_to_str(value):
+    """
+    Turn an xlsx cell into text. Whole-number floats lose their '.0' so a
+    phone typed as a number (9876543210.0) still validates.
+    """
+    if value is None:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return str(value).strip()
+
 
 def _validate_name(value, label):
     try:
@@ -94,6 +130,10 @@ class SubAdminCreateSerializer(serializers.Serializer):
         # Emails are stored lowercased, so check the normalised value — otherwise an
         # uppercase duplicate slips past this check and fails on the unique username.
         value = value.lower()
+        if _email_too_long(value):
+            raise serializers.ValidationError(
+                'Enter a valid email address (at most 64 characters before the @).'
+            )
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('A user with this email already exists.')
         return value
@@ -106,12 +146,10 @@ class SubAdminCreateSerializer(serializers.Serializer):
 
     def validate_phone(self, value):
         if value:
-            from apps.core.utils.validators import validate_indian_phone
-            from django.core.exceptions import ValidationError as DjangoValidationError
             try:
-                validate_indian_phone(value)
+                return validate_indian_phone(value)   # stores the cleaned 10 digits
             except DjangoValidationError as e:
-                raise serializers.ValidationError(str(e))
+                raise serializers.ValidationError(e.messages[0])
         return value
 
     def validate(self, attrs):
@@ -374,13 +412,10 @@ class SubAdminViewSet(TranslatedViewSet):
 
         if phone is not None:
             if phone:
-                from apps.core.utils.validators import validate_indian_phone
-                from django.core.exceptions import ValidationError as DjangoValidationError
-                from rest_framework import serializers as drf_serializers
                 try:
-                    validate_indian_phone(phone)
+                    phone = validate_indian_phone(phone)
                 except DjangoValidationError as e:
-                    raise drf_serializers.ValidationError({'phone': str(e)})
+                    raise serializers.ValidationError({'phone': e.messages[0]})
             profile = user.profile
             profile.phone = phone
             profile.save(update_fields=['phone'])
@@ -874,7 +909,7 @@ class SubAdminViewSet(TranslatedViewSet):
                 for row in ws.iter_rows(min_row=2, values_only=True):
                     if not any(v not in (None, '') for v in row):
                         continue  # skip fully-blank trailing rows
-                    rows.append(dict(zip(headers, [str(v).strip() if v is not None else '' for v in row])))
+                    rows.append(dict(zip(headers, [_cell_to_str(v) for v in row])))
             else:
                 return StandardResponse.error('Only .xlsx and .csv are supported.', status_code=400)
         except Exception as e:
@@ -888,15 +923,24 @@ class SubAdminViewSet(TranslatedViewSet):
             try:
                 user = self._invite_one(row, request.user, lang)
                 success.append({'row': i, 'email': user.email, 'district': row.get('district')})
-            except Exception as e:
-                errors.append({
-                    'row':        i,
-                    'email':      row.get('email', ''),
-                    'first_name': row.get('first_name', ''),
-                    'last_name':  row.get('last_name', ''),
-                    'district':   row.get('district', ''),
-                    'reason':     str(e),
-                })
+                continue
+            except DjangoValidationError as e:
+                reasons = e.messages
+            except ValueError as e:
+                reasons = [str(e)]
+            except Exception:
+                # Never echo raw DB / internal errors back to the admin.
+                logger.exception(f'Bulk invite row {i} failed unexpectedly.')
+                reasons = ['Could not create this sub-admin. Please check the row and try again.']
+            errors.append({
+                'row':        i,
+                'email':      row.get('email', ''),
+                'first_name': row.get('first_name', ''),
+                'last_name':  row.get('last_name', ''),
+                'district':   row.get('district', ''),
+                'reasons':    reasons,
+                'reason':     ' '.join(reasons),
+            })
 
         return StandardResponse.success(
             data={'success': len(success), 'failed': len(errors), 'results': success, 'errors': errors},
@@ -904,7 +948,15 @@ class SubAdminViewSet(TranslatedViewSet):
         )
 
     def _invite_one(self, row, invited_by, lang):
-        """Invite a single sub-admin from a bulk-invite row. Raises on any validation failure."""
+        """
+        Invite a single sub-admin from a bulk-invite row.
+
+        Every field is checked before anything is created, and all problems
+        are raised together as one DjangoValidationError so the admin can fix
+        the row in a single pass. A full district cap raises ValueError.
+        """
+        from django.core.validators import EmailValidator
+
         email      = (row.get('email') or '').strip().lower()
         first_name = (row.get('first_name') or '').strip()
         last_name  = (row.get('last_name') or '').strip()
@@ -912,32 +964,46 @@ class SubAdminViewSet(TranslatedViewSet):
         district   = (row.get('district') or '').strip().upper()
         channel    = (row.get('notification_channel') or 'email').strip().lower() or 'email'
 
-        if not email:
-            raise ValueError('email is required.')
-        from django.core.validators import EmailValidator
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        try:
-            EmailValidator()(email)
-        except DjangoValidationError:
-            raise ValueError('email is not a valid address.')
+        problems = []
+
         if not first_name:
-            raise ValueError('first_name is required.')
-        try:
-            validate_person_name(first_name, 'first_name')
-            if last_name:
-                validate_person_name(last_name, 'last_name')
-        except DjangoValidationError as e:
-            raise ValueError(e.messages[0])
+            problems.append('first_name is required.')
+        else:
+            problems += _bulk_name_problems(first_name, 'first_name')
+        if last_name:
+            problems += _bulk_name_problems(last_name, 'last_name')
+
+        if not email:
+            problems.append('email is required.')
+        else:
+            try:
+                EmailValidator()(email)
+            except DjangoValidationError:
+                problems.append('email is not a valid address.')
+            else:
+                if _email_too_long(email):
+                    problems.append('email is not a valid address (at most 64 characters before the @).')
+                elif User.objects.filter(email__iexact=email).exists():
+                    problems.append('A user with this email already exists.')
+
+        if phone:
+            try:
+                phone = validate_indian_phone(phone)   # strips spaces / +91
+            except DjangoValidationError:
+                problems.append('phone must be a 10-digit Indian mobile number starting with 6, 7, 8 or 9.')
+
         if not district:
-            raise ValueError('district is required.')
-        if district not in dict(District.choices):
-            raise ValueError(f'Unknown district code "{district}".')
-        if User.objects.filter(email=email).exists():
-            raise ValueError('A user with this email already exists.')
+            problems.append('district is required.')
+        elif district not in dict(District.choices):
+            problems.append(f'Unknown district code "{district}".')
+
         if channel not in ('email', 'sms'):
-            raise ValueError('notification_channel must be email or sms.')
-        if channel == 'sms' and not phone:
-            raise ValueError('SMS channel needs a phone number.')
+            problems.append('notification_channel must be email or sms.')
+        elif channel == 'sms' and not phone:
+            problems.append('SMS channel needs a phone number.')
+
+        if problems:
+            raise DjangoValidationError(problems)
 
         check_cap(district)   # raises ValueError if full
 
