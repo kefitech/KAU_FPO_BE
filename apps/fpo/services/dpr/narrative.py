@@ -287,9 +287,55 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     else:
         psc_block = 'Project Steering Committee:  Not constituted / Not provided by the FPO'
 
+    # DPR-10 (UAT): Promoter Profile chapter was always writing "past
+    # turnover / track record not available" because the FACTS block
+    # never surfaced the baseline operating data. Pull from three places:
+    #   1. FPO.annual_turnover  (declared headline turnover)
+    #   2. DPRSectionBaseline   (existing production, capacity, employees,
+    #                            certifications, current turnover)
+    #   3. Finance section      (projected revenue is in P&L rows, so
+    #                            implicit — not duplicated here)
+    fpo_annual_turnover = (
+        getattr(fpo, 'annual_turnover', None) if fpo else None
+    )
+    fpo_annual_turnover_display = (
+        _fmt_inr(fpo_annual_turnover)
+        if fpo_annual_turnover else _NOT_PROVIDED
+    )
+
+    baseline = getattr(project, 'section_baseline', None)
+    baseline_turnover = getattr(baseline, 'current_annual_turnover', None) if baseline else None
+    baseline_turnover_display = (
+        _fmt_inr(baseline_turnover) if baseline_turnover else _NOT_PROVIDED
+    )
+    def _baseline_text(attr: str) -> str:
+        if not baseline:
+            return _NOT_PROVIDED
+        raw = (getattr(baseline, attr, '') or '').strip()
+        if not raw:
+            return _NOT_PROVIDED
+        return (raw[:217] + '...') if len(raw) > 220 else raw
+
+    baseline_products   = _baseline_text('existing_products')
+    baseline_capacity   = _baseline_text('existing_installed_capacity')
+    baseline_production = _baseline_text('current_annual_production')
+    baseline_certs      = _baseline_text('existing_certifications')
+    baseline_market     = _baseline_text('existing_market_coverage')
+    baseline_prev_exp   = _baseline_text('previous_experience')
+    baseline_challenges = _baseline_text('major_challenges')
+
+    baseline_employees = getattr(baseline, 'num_employees', None) if baseline else None
+    baseline_employees_display = (
+        f'{baseline_employees} employees' if baseline_employees else _NOT_PROVIDED
+    )
+    baseline_util = getattr(baseline, 'current_capacity_utilization_pct', None) if baseline else None
+    baseline_util_display = (
+        f'{baseline_util}%' if baseline_util is not None else _NOT_PROVIDED
+    )
+
     lines = [
         '=== PROJECT FACTS (use these values verbatim; do not estimate) ===',
-        f'Project title:              {project.title or "Not available"}',
+        f'Project title:              {project.title or "Not provided by the FPO"}',
         f'FPO / promoter:             {fpo_name}',
         f'Primary commodity:          {commodity}',
         '',
@@ -305,6 +351,23 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'Total area covered:         {area_display}',
         f'Landholding pattern:        {landholding}',
         psc_block,
+        '',
+        # DPR-10 (UAT): Promoter Profile chapter was always writing "past
+        # turnover / track record not available" — this block fixes that.
+        # The promoter_profile chapter should quote these fields verbatim
+        # instead of saying track-record information is missing.
+        '--- FPO track record (existing operations prior to this project) ---',
+        f'Declared annual turnover (FPO master):  {fpo_annual_turnover_display}',
+        f'Current annual turnover (baseline):     {baseline_turnover_display}',
+        f'Current annual production:              {baseline_production}',
+        f'Existing installed capacity:            {baseline_capacity}',
+        f'Capacity utilisation (current):         {baseline_util_display}',
+        f'Existing products / services:           {baseline_products}',
+        f'Existing certifications held:           {baseline_certs}',
+        f'Existing market coverage:               {baseline_market}',
+        f'Employees on roll (current):            {baseline_employees_display}',
+        f'Previous experience / track record:     {baseline_prev_exp}',
+        f'Major existing operational challenges:  {baseline_challenges}',
         '',
         '--- Project cost + finance ---',
         f'Total project cost:         {_fmt_inr(cost.total)}',
@@ -1521,11 +1584,19 @@ _CHAPTER_BRIEF = {
         '(total member farmers, women members, geographic spread), governance / '
         'board composition (total directors + women directors + meeting frequency), '
         'CEO name / qualification / experience, women shareholding %, total farming '
-        'area covered, member landholding pattern, Project Steering Committee '
-        'composition (if constituted), and any past turnover or operational track '
-        'record from the FACTS block. If a field reads "Not available" in the '
-        'FACTS block, say so in prose — never fill it with generic industry '
-        'language. 500-700 words.'
+        'area covered, member landholding pattern, and Project Steering Committee '
+        'composition (if constituted). THEN — DPR-10 UAT MANDATE — cover the '
+        'FPO\'s TRACK RECORD using the "FPO track record" section of the FACTS '
+        'block: declared annual turnover, baseline current turnover, current '
+        'production, existing installed capacity + utilisation %, existing '
+        'products / services, certifications held, market coverage, employees '
+        'on roll, previous experience, and major operational challenges. '
+        'Quote each of these verbatim where the FACTS block supplies a value. '
+        'If a field reads "Not provided by the FPO" or "Not available (projection '
+        'not yet computed)", echo the exact phrase in prose — never write '
+        '"past turnover / track record is not available" or anything similar '
+        'that implies the data isn\'t supplied when the FACTS block has it. '
+        '500-700 words.'
     ),
     'market_analysis': (
         'Cover demand drivers for the primary commodity + secondary products, '
