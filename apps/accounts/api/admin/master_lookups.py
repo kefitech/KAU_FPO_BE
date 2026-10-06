@@ -41,6 +41,7 @@ from apps.core.models.generic import MasterLookup
 from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
+from apps.core.utils.validators import validate_not_only_symbols
 import re
 
 from apps.database.models import (
@@ -57,7 +58,39 @@ COMMODITY_SECTIONS = [
 ]
 
 
-class LookupCreateSerializer(serializers.Serializer):
+# Names allow letters, digits, spaces and _ ( ) . , - / & ' and must include a letter, so
+# input like "%$%^&*" is rejected. The Malayalam name also allows the whole Malayalam block
+# (its vowel signs are combining marks, not letters) and ZWNJ/ZWJ, which older Malayalam
+# text uses for chillu letters. Mirrors master-data-dialog.tsx — keep the two in sync.
+_NAME_EN_CHARS = re.compile(r"[A-Za-z0-9 _(),.\-/&']+")
+_NAME_ML_CHARS = re.compile(r"[ഀ-ൿ‌‍A-Za-z0-9 _(),.\-/&']+")
+
+
+def _validate_name(value, allowed, label):
+    value = value.strip()
+    if not value:
+        return value
+    if not allowed.fullmatch(value):
+        raise serializers.ValidationError(
+            f"{label} can only contain letters, numbers, spaces and _ ( ) . , - / & '"
+        )
+    if not any(c.isalpha() for c in value):
+        raise serializers.ValidationError(f'{label} must contain at least one letter.')
+    return value
+
+
+class _LookupTextValidationMixin:
+    def validate_name_en(self, value):
+        return _validate_name(value, _NAME_EN_CHARS, 'English name')
+
+    def validate_name_ml(self, value):
+        return _validate_name(value, _NAME_ML_CHARS, 'Malayalam name')
+
+    def validate_description(self, value):
+        return validate_not_only_symbols(value, 'Description')
+
+
+class LookupCreateSerializer(_LookupTextValidationMixin, serializers.Serializer):
     code          = serializers.RegexField(
         r'^[a-z0-9_]+$', max_length=50,
         help_text='Unique lowercase code — letters, digits and underscores (e.g. state_bank_of_india)',
@@ -69,6 +102,8 @@ class LookupCreateSerializer(serializers.Serializer):
     is_active     = serializers.BooleanField(required=False, default=True)
 
     def validate_code(self, value):
+        if not re.search(r'[a-z0-9]', value):
+            raise serializers.ValidationError('Code must contain a letter or number.')
         if MasterLookup.objects.filter(category=self.context['category'], code=value).exists():
             raise serializers.ValidationError('An entry with this code already exists.')
         return value
@@ -112,7 +147,7 @@ class CropLookupCreateSerializer(LookupCreateSerializer):
         return attrs
 
 
-class LookupUpdateSerializer(serializers.Serializer):
+class LookupUpdateSerializer(_LookupTextValidationMixin, serializers.Serializer):
     """PATCH body. The code is immutable — other tables reference it."""
     name_en       = serializers.CharField(max_length=255, required=False)
     name_ml       = serializers.CharField(max_length=255, required=False)
