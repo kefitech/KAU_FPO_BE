@@ -7,6 +7,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
+from apps.core.utils.constants import FPOStatus
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import TrainingSession, TrainingAttendance
@@ -184,6 +185,7 @@ class GovernmentTrainingSessionListView(APIView):
 
         created_ids = []
         not_found = []
+        not_approved = []
 
         for app_id in data['fpo_application_ids']:
             try:
@@ -195,6 +197,11 @@ class GovernmentTrainingSessionListView(APIView):
             fpo = get_fpo_scoped(fpo_obj.id, request.user)
             if not fpo:
                 not_found.append(app_id)
+                continue
+
+            # Sessions can only be scheduled for approved FPOs; drafts / pending applications are skipped
+            if fpo.status != FPOStatus.APPROVED:
+                not_approved.append(app_id)
                 continue
 
             session = TrainingSession.objects.create(
@@ -237,16 +244,20 @@ class GovernmentTrainingSessionListView(APIView):
 
         if not created_ids:
             return StandardResponse.error(
-                'None of the selected FPOs could be found in your jurisdiction.',
+                'Training sessions can only be scheduled for approved FPOs.' if not_approved and not not_found
+                else 'None of the selected FPOs could be found in your jurisdiction.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         message = f'Training session recorded for {len(created_ids)} FPO(s).'
         if not_found:
             message += f" Could not find/access: {', '.join(not_found)}."
+        if not_approved:
+            message += f" Skipped (not approved): {', '.join(not_approved)}."
 
         return StandardResponse.success(
-            data={'session_ids': created_ids, 'not_found': not_found}, message=message,
+            data={'session_ids': created_ids, 'not_found': not_found, 'not_approved': not_approved},
+            message=message,
         )
 
 

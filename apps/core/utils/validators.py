@@ -68,6 +68,28 @@ def validate_person_name(value: str, label: str = 'Name') -> str:
 
 
 # =============================================================================
+# FREE TEXT VALIDATORS
+# =============================================================================
+
+# Any Unicode letter or digit, so Malayalam text passes
+_HAS_LETTER_OR_DIGIT = re.compile(r'[^\W_]')
+
+
+def validate_not_only_symbols(value: str, label: str = 'This field') -> str:
+    """
+    Reject text made only of special characters, e.g. "@#$%" or "!!! ...".
+    Blank values pass; whether a field is required is checked separately.
+    Mirrors hasLetterOrDigit in the frontend's src/lib/validations/text.ts.
+
+    Raises:
+        ValidationError: If the value contains no letter or digit
+    """
+    if value and not _HAS_LETTER_OR_DIGIT.search(value):
+        raise ValidationError(f'{label} must contain letters or numbers, not only symbols.')
+    return value
+
+
+# =============================================================================
 # PHONE VALIDATORS
 # =============================================================================
 

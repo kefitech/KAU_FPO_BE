@@ -24,6 +24,8 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
+from apps.core.utils.validators import validate_not_only_symbols
+from apps.core.utils.constants import FPOStatus
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import TrainingSession, TrainingAttendance
 from apps.cbbo.training_comments import (
@@ -99,7 +101,19 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
         return bool(request and obj.cbbo_id == request.user.id)
 
 
-class _SessionCreateSerializer(serializers.Serializer):
+# Free text must contain a letter or digit, so input made only of symbols ("@#$%") is rejected
+class _SessionTextValidationMixin:
+    def validate_topic(self, value):
+        return validate_not_only_symbols(value, 'Topic')
+
+    def validate_trainer_name(self, value):
+        return validate_not_only_symbols(value, 'Trainer name')
+
+    def validate_venue(self, value):
+        return validate_not_only_symbols(value, 'Venue')
+
+
+class _SessionCreateSerializer(_SessionTextValidationMixin, serializers.Serializer):
     # New clients send fpo_application_ids (one session is created per FPO).
     # fpo_id is still accepted so older clients keep working.
     fpo_application_ids = serializers.ListField(
@@ -120,7 +134,7 @@ class _SessionCreateSerializer(serializers.Serializer):
         return attrs
 
 
-class _SessionEditSerializer(serializers.Serializer):
+class _SessionEditSerializer(_SessionTextValidationMixin, serializers.Serializer):
     topic = serializers.CharField(max_length=300, required=False)
     trainer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     date = serializers.DateField(required=False)
@@ -134,6 +148,9 @@ class _AttendanceRowSerializer(serializers.Serializer):
     member_name = serializers.CharField(max_length=200)
     attended = serializers.BooleanField(default=False)
 
+    def validate_member_name(self, value):
+        return validate_not_only_symbols(value, 'Member name')
+
 
 class _AttendanceSetSerializer(serializers.Serializer):
     attendance = _AttendanceRowSerializer(many=True)
@@ -142,6 +159,15 @@ class _AttendanceSetSerializer(serializers.Serializer):
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
+# DataTable column id -> model field, for the `ordering` query param
+_ORDERING_FIELDS = {
+    'topic': 'topic',
+    'fpo_name': 'fpo__name',
+    'district': 'fpo__district',
+    'date': 'date',
+}
+
+
 def _denied(request):
     return StandardResponse.error(
         t('common.permission_denied', request.language),
@@ -211,6 +237,7 @@ class TrainingSessionListCreateView(APIView):
     # Optional: ?search=<text>   topic OR FPO name
     #           ?district=<code> FPO district
     #           ?topic=<text>    topic only (kept for older clients)
+    #           ?ordering=<column id>, '-' prefix for descending
 
     def get(self, request):
         if not is_cbbo_user(request.user):
@@ -231,7 +258,12 @@ class TrainingSessionListCreateView(APIView):
         if topic:
             qs = qs.filter(topic__icontains=topic)
 
-        qs = qs.order_by('-date', '-id')
+        ordering = request.query_params.get('ordering', '').strip()
+        field = _ORDERING_FIELDS.get(ordering.lstrip('-'))
+        if field:
+            qs = qs.order_by(f'-{field}' if ordering.startswith('-') else field, '-id')
+        else:
+            qs = qs.order_by('-date', '-id')
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
@@ -254,7 +286,7 @@ class TrainingSessionListCreateView(APIView):
             return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
         data = ser.validated_data
 
-        fpos, not_found = [], []
+        fpos, not_found, not_approved = [], [], []
         seen = set()
 
         for app_id in data.get('fpo_application_ids') or []:
@@ -263,6 +295,8 @@ class TrainingSessionListCreateView(APIView):
             ).select_related('primary_user').first()
             if not fpo or not is_fpo_assigned(fpo, request.user):
                 not_found.append(app_id)
+            elif fpo.status != FPOStatus.APPROVED:
+                not_approved.append(app_id)
             elif fpo.id not in seen:
                 seen.add(fpo.id)
                 fpos.append(fpo)
@@ -273,13 +307,17 @@ class TrainingSessionListCreateView(APIView):
             ).select_related('primary_user').first()
             if not fpo or not is_fpo_assigned(fpo, request.user):
                 not_found.append(str(data['fpo_id']))
+            elif fpo.status != FPOStatus.APPROVED:
+                not_approved.append(fpo.application_id or str(fpo.id))
             elif fpo.id not in seen:
                 seen.add(fpo.id)
                 fpos.append(fpo)
 
+        # Sessions can only be scheduled for approved FPOs; drafts / pending applications are skipped
         if not fpos:
             return StandardResponse.error(
-                'None of the selected FPOs could be found in your jurisdiction.',
+                'Training sessions can only be scheduled for approved FPOs.' if not_approved and not not_found
+                else 'None of the selected FPOs could be found in your jurisdiction.',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -310,10 +348,15 @@ class TrainingSessionListCreateView(APIView):
         message = f'Training session recorded for {len(session_ids)} FPO(s).'
         if not_found:
             message += f" Could not find/access: {', '.join(not_found)}."
+        if not_approved:
+            message += f" Skipped (not approved): {', '.join(not_approved)}."
 
         return StandardResponse.success(
             # 'id' is kept for older clients that created a single session.
-            data={'id': session_ids[0], 'session_ids': session_ids, 'not_found': not_found},
+            data={
+                'id': session_ids[0], 'session_ids': session_ids,
+                'not_found': not_found, 'not_approved': not_approved,
+            },
             message=message,
         )
 
