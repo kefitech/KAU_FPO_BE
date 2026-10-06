@@ -1,3 +1,5 @@
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.views import APIView
  
@@ -6,6 +8,8 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
+from apps.core.utils.constants import District, FPOStatus
+from apps.core.utils.validators import validate_not_only_symbols
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import CapacityBuildingReport
  
@@ -23,7 +27,7 @@ class _ReportListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = CapacityBuildingReport
         fields = ['id', 'fpo', 'fpo_name', 'district', 'district_display', 'date', 'status',
-                  'participants_count', 'created_at']
+                  'participants_count', 'activities', 'outcomes', 'created_at', 'updated_at']
     def get_district_display(self, obj):
         return obj.fpo.get_district_display()
  
@@ -43,7 +47,16 @@ class _ReportDetailSerializer(serializers.ModelSerializer):
         return f"{obj.cbbo.first_name} {obj.cbbo.last_name}".strip() or obj.cbbo.username
  
  
-class _ReportCreateSerializer(serializers.Serializer):
+# Free text must contain a letter or digit, so input made only of symbols ("@#$%") is rejected
+class _ReportTextValidationMixin:
+    def validate_activities(self, value):
+        return validate_not_only_symbols(value, 'Activities')
+
+    def validate_outcomes(self, value):
+        return validate_not_only_symbols(value, 'Outcomes')
+
+
+class _ReportCreateSerializer(_ReportTextValidationMixin, serializers.Serializer):
     fpo_id = serializers.IntegerField()
     date = serializers.DateField()
     activities = serializers.CharField(min_length=10)
@@ -51,7 +64,7 @@ class _ReportCreateSerializer(serializers.Serializer):
     outcomes = serializers.CharField(required=False, allow_blank=True)
  
  
-class _ReportEditSerializer(serializers.Serializer):
+class _ReportEditSerializer(_ReportTextValidationMixin, serializers.Serializer):
     date = serializers.DateField(required=False)
     activities = serializers.CharField(min_length=10, required=False)
     participants_count = serializers.IntegerField(min_value=0, required=False)
@@ -61,6 +74,16 @@ class _ReportEditSerializer(serializers.Serializer):
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal helper
 # ──────────────────────────────────────────────────────────────────────────────
+# DataTable column id -> model field, for the `ordering` query param
+_ORDERING_FIELDS = {
+    'fpo_name': 'fpo__name',
+    'district': 'fpo__district',
+    'date': 'date',
+    'participants_count': 'participants_count',
+    'status': 'status',
+}
+
+
 def _get_report_scoped(report_id, user):
     """A CBBO user can only touch their own reports (not another org/rep's),
     and only for FPOs still in their jurisdiction — checked at read time in
@@ -83,6 +106,8 @@ class ReportListCreateView(APIView):
     # Scoped to own reports only, and to the caller's CURRENT jurisdiction
     # (so a revoked district assignment hides that district immediately).
     # Optional: ?status=draft|submitted
+    #           ?search=<text>  FPO name, district name, or status
+    #           ?ordering=<column id>, '-' prefix for descending
     def get(self, request):
         if not is_cbbo_user(request.user):
             return StandardResponse.error(
@@ -99,8 +124,23 @@ class ReportListCreateView(APIView):
         s = request.query_params.get('status')
         if s:
             qs = qs.filter(status=s)
+
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            # district is stored as a code (TSR), so match the search against the label (Thrissur)
+            district_codes = [code for code, label in District.choices if search.lower() in label.lower()]
+            qs = qs.filter(
+                Q(fpo__name__icontains=search)
+                | Q(fpo__district__in=district_codes)
+                | Q(status__iexact=search)
+            )
  
-        qs = qs.order_by('-date')
+        ordering = request.query_params.get('ordering', '').strip()
+        field = _ORDERING_FIELDS.get(ordering.lstrip('-'))
+        if field:
+            qs = qs.order_by(f'-{field}' if ordering.startswith('-') else field, '-id')
+        else:
+            qs = qs.order_by('-date', '-id')
  
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
@@ -129,6 +169,19 @@ class ReportListCreateView(APIView):
         if not is_fpo_assigned(fpo, request.user):
             # 404, not 403 — don't confirm the FPO exists to an out-of-jurisdiction user
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
+
+        # Draft / pending applications aren't operating FPOs yet
+        if fpo.status != FPOStatus.APPROVED:
+            return StandardResponse.error(
+                'Reports can only be filed for approved FPOs.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ser.validated_data['date'] > timezone.localdate():
+            return StandardResponse.error(
+                'Report date cannot be in the future.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
  
         report = CapacityBuildingReport.objects.create(
             fpo=fpo,
@@ -174,6 +227,13 @@ class ReportDetailView(APIView):
         ser = _ReportEditSerializer(data=request.data)
         if not ser.is_valid():
             return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        new_date = ser.validated_data.get('date')
+        if new_date and new_date > timezone.localdate():
+            return StandardResponse.error(
+                'Report date cannot be in the future.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
  
         changes = {}
         for field, value in ser.validated_data.items():
@@ -189,6 +249,26 @@ class ReportDetailView(APIView):
             )
  
         return StandardResponse.success(data={'id': report.id}, message='Report updated.')
+
+    # ── DELETE A REPORT (DRAFT ONLY) ── soft delete; submitted reports are locked
+    def delete(self, request, report_id):
+        report = _get_report_scoped(report_id, request.user)
+        if not report:
+            return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
+
+        if report.status == 'submitted':
+            return StandardResponse.error(
+                'This report has been submitted and is locked.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        report.soft_delete(user=request.user)
+        AuditService.log(
+            user=request.user, action=AuditLog.Action.SOFT_DELETE, instance=report, request=request,
+            changes={'deleted': True, 'fpo_id': report.fpo_id, 'date': str(report.date)},
+        )
+
+        return StandardResponse.success(message='Report deleted.')
  
  
 class ReportSubmitView(APIView):

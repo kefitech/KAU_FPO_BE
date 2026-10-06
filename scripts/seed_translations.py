@@ -5696,6 +5696,216 @@ def seed_recommendations_translations(languages):
 
 
 
+def seed_cbbo_portal_translations(languages):
+    """
+    Seed UI labels for the CBBO portal: the Reports pages
+    (src/app/cbbo/reports: list + view sheet, new, detail/edit) and the
+    "not only symbols" validation messages on the training and profile forms.
+    Malayalam values are best-effort — marked unverified for native review.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    report_keys = [
+        # ── List page, row actions and view sheet ──────────────────────────
+        ('cbbo_reports_list.page_title',           'Reports',
+         'റിപ്പോർട്ടുകൾ'),
+        ('cbbo_reports_list.page_description',     "Capacity building reports you've filed",
+         'നിങ്ങൾ ഫയൽ ചെയ്ത ശേഷി വികസന റിപ്പോർട്ടുകൾ'),
+        ('cbbo_reports_list.btn_new',              'New Report',
+         'പുതിയ റിപ്പോർട്ട്'),
+        ('cbbo_reports_list.search_placeholder',   'Search by FPO, district or status...',
+         'FPO, ജില്ല അല്ലെങ്കിൽ സ്ഥിതി പ്രകാരം തിരയുക...'),
+        ('cbbo_reports_list.col_header',           'Columns',
+         'കോളങ്ങൾ'),
+        ('cbbo_reports_list.col_toggle_columns',   'Toggle columns',
+         'കോളങ്ങൾ മാറ്റുക'),
+        ('cbbo_reports_list.col_fpo',              'FPO',
+         'FPO'),
+        ('cbbo_reports_list.col_district',         'District',
+         'ജില്ല'),
+        ('cbbo_reports_list.col_date',             'Date',
+         'തീയതി'),
+        ('cbbo_reports_list.col_participants',     'Participants',
+         'പങ്കെടുത്തവർ'),
+        ('cbbo_reports_list.col_status',           'Status',
+         'സ്ഥിതി'),
+        ('cbbo_reports_list.status_draft',         'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('cbbo_reports_list.status_submitted',     'Submitted',
+         'സമർപ്പിച്ചു'),
+        ('cbbo_reports_list.action_view',          'View',
+         'കാണുക'),
+        ('cbbo_reports_list.action_edit',          'Edit',
+         'എഡിറ്റ് ചെയ്യുക'),
+        ('cbbo_reports_list.action_delete',        'Delete',
+         'ഇല്ലാതാക്കുക'),
+        ('cbbo_reports_list.delete',               'Delete',
+         'ഇല്ലാതാക്കുക'),
+        ('cbbo_reports_list.deleting',             'Deleting...',
+         'ഇല്ലാതാക്കുന്നു...'),
+        ('cbbo_reports_list.delete_confirm_title', 'Delete Report',
+         'റിപ്പോർട്ട് ഇല്ലാതാക്കുക'),
+        ('cbbo_reports_list.delete_confirm_desc',  'Delete the draft report for "{fpo}" dated {date}? This action cannot be undone.',
+         '"{fpo}" എന്ന FPO-യുടെ {date} തീയതിയിലെ ഡ്രാഫ്റ്റ് റിപ്പോർട്ട് ഇല്ലാതാക്കണോ? ഈ പ്രവർത്തനം പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('cbbo_reports_list.toast_deleted',        'Report deleted',
+         'റിപ്പോർട്ട് ഇല്ലാതാക്കി'),
+        ('cbbo_reports_list.delete_failed',        'Failed to delete report',
+         'റിപ്പോർട്ട് ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('cbbo_reports_list.section_report',       'Report',
+         'റിപ്പോർട്ട്'),
+        ('cbbo_reports_list.section_details',      'Details',
+         'വിശദാംശങ്ങൾ'),
+        ('cbbo_reports_list.section_record',       'Record',
+         'രേഖ'),
+        ('cbbo_reports_list.field_activities',     'Activities',
+         'പ്രവർത്തനങ്ങൾ'),
+        ('cbbo_reports_list.field_outcomes',       'Outcomes',
+         'ഫലങ്ങൾ'),
+        ('cbbo_reports_list.field_created',        'Created',
+         'സൃഷ്ടിച്ചത്'),
+        ('cbbo_reports_list.field_updated',        'Last Updated',
+         'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്'),
+
+        # ── New report ─────────────────────────────────────────────────────
+        ('cbbo_reports_new.back',                    'Back',
+         'തിരികെ'),
+        ('cbbo_reports_new.page_title',              'New Report',
+         'പുതിയ റിപ്പോർട്ട്'),
+        ('cbbo_reports_new.page_description',        'This report saves as a draft - submit it separately once ready.',
+         'ഈ റിപ്പോർട്ട് ഡ്രാഫ്റ്റായി സേവ് ചെയ്യപ്പെടും - തയ്യാറാകുമ്പോൾ പ്രത്യേകം സമർപ്പിക്കുക.'),
+        ('cbbo_reports_new.section_title',           'Report Details',
+         'റിപ്പോർട്ട് വിശദാംശങ്ങൾ'),
+        ('cbbo_reports_new.field_fpo',               'FPO',
+         'FPO'),
+        ('cbbo_reports_new.placeholder_fpo_loading', 'Loading FPOs...',
+         'FPO-കൾ ലോഡ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_new.placeholder_fpo_search',  'Search your assigned FPOs...',
+         'നിങ്ങൾക്ക് നിയോഗിക്കപ്പെട്ട FPO-കൾ തിരയുക...'),
+        ('cbbo_reports_new.label_selected',          'Selected',
+         'തിരഞ്ഞെടുത്തത്'),
+        ('cbbo_reports_new.field_date',              'Date',
+         'തീയതി'),
+        ('cbbo_reports_new.field_participants',      'Participants Count',
+         'പങ്കെടുത്തവരുടെ എണ്ണം'),
+        ('cbbo_reports_new.field_activities',        'Activities',
+         'പ്രവർത്തനങ്ങൾ'),
+        ('cbbo_reports_new.placeholder_activities',  'What was done during the visit (min 10 characters)',
+         'സന്ദർശനത്തിനിടെ ചെയ്ത കാര്യങ്ങൾ (കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ)'),
+        ('cbbo_reports_new.field_outcomes',          'Outcomes',
+         'ഫലങ്ങൾ'),
+        ('cbbo_reports_new.btn_cancel',              'Cancel',
+         'റദ്ദാക്കുക'),
+        ('cbbo_reports_new.btn_save',                'Save Draft',
+         'ഡ്രാഫ്റ്റ് സേവ് ചെയ്യുക'),
+        ('cbbo_reports_new.btn_saving',              'Saving...',
+         'സേവ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_new.toast_saved',             'Report saved as draft',
+         'റിപ്പോർട്ട് ഡ്രാഫ്റ്റായി സേവ് ചെയ്തു'),
+        ('cbbo_reports_new.toast_save_failed',       'Failed to save report',
+         'റിപ്പോർട്ട് സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+        ('cbbo_reports_new.error_select_fpo',        'Select an FPO',
+         'ഒരു FPO തിരഞ്ഞെടുക്കുക'),
+        ('cbbo_reports_new.error_date_required',     'Select a date',
+         'ഒരു തീയതി തിരഞ്ഞെടുക്കുക'),
+        ('cbbo_reports_new.error_future_date',       'Report date cannot be in the future',
+         'റിപ്പോർട്ട് തീയതി ഭാവിയിലാകാൻ പാടില്ല'),
+        ('cbbo_reports_new.error_activities_length', 'Activities must be at least 10 characters',
+         'പ്രവർത്തനങ്ങൾ കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ ആയിരിക്കണം'),
+        ('cbbo_reports_new.error_participants_range', 'Participants count must be between 0 and 100000',
+         'പങ്കെടുത്തവരുടെ എണ്ണം 0-നും 100000-നും ഇടയിലായിരിക്കണം'),
+        ('cbbo_reports_new.error_activities_symbols', 'Activities must contain letters or numbers, not only symbols',
+         'പ്രവർത്തനങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('cbbo_reports_new.error_outcomes_symbols',   'Outcomes must contain letters or numbers, not only symbols',
+         'ഫലങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+
+        # ── Report detail / edit ───────────────────────────────────────────
+        ('cbbo_reports_detail.back',                   'Back',
+         'തിരികെ'),
+        ('cbbo_reports_detail.loading',                'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_detail.badge_draft',            'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('cbbo_reports_detail.badge_submitted',        'Submitted',
+         'സമർപ്പിച്ചു'),
+        ('cbbo_reports_detail.filed_by',               'Filed by',
+         'ഫയൽ ചെയ്തത്'),
+        ('cbbo_reports_detail.on_date',                'on',
+         'തീയതി'),
+        ('cbbo_reports_detail.section_title',          'Report Details',
+         'റിപ്പോർട്ട് വിശദാംശങ്ങൾ'),
+        ('cbbo_reports_detail.field_date',             'Date',
+         'തീയതി'),
+        ('cbbo_reports_detail.field_participants',     'Participants Count',
+         'പങ്കെടുത്തവരുടെ എണ്ണം'),
+        ('cbbo_reports_detail.field_activities',       'Activities',
+         'പ്രവർത്തനങ്ങൾ'),
+        ('cbbo_reports_detail.field_outcomes',         'Outcomes',
+         'ഫലങ്ങൾ'),
+        ('cbbo_reports_detail.btn_save_changes',       'Save Changes',
+         'മാറ്റങ്ങൾ സേവ് ചെയ്യുക'),
+        ('cbbo_reports_detail.btn_saving',             'Saving...',
+         'സേവ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_detail.btn_submit_report',      'Submit Report',
+         'റിപ്പോർട്ട് സമർപ്പിക്കുക'),
+        ('cbbo_reports_detail.btn_submitting',         'Submitting...',
+         'സമർപ്പിക്കുന്നു...'),
+        ('cbbo_reports_detail.confirm_submit_title',   'Submit Report',
+         'റിപ്പോർട്ട് സമർപ്പിക്കുക'),
+        ('cbbo_reports_detail.confirm_submit_desc',    'Once submitted, this report is locked and can no longer be edited. Continue?',
+         'സമർപ്പിച്ചുകഴിഞ്ഞാൽ ഈ റിപ്പോർട്ട് ലോക്ക് ചെയ്യപ്പെടും, പിന്നീട് എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല. തുടരണോ?'),
+        ('cbbo_reports_detail.confirm_submit_btn',     'Submit',
+         'സമർപ്പിക്കുക'),
+        ('cbbo_reports_detail.confirm_submitting_btn', 'Submitting...',
+         'സമർപ്പിക്കുന്നു...'),
+        ('cbbo_reports_detail.toast_updated',          'Report updated',
+         'റിപ്പോർട്ട് അപ്ഡേറ്റ് ചെയ്തു'),
+        ('cbbo_reports_detail.toast_update_failed',    'Failed to update report',
+         'റിപ്പോർട്ട് അപ്ഡേറ്റ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+        ('cbbo_reports_detail.error_future_date',      'Report date cannot be in the future',
+         'റിപ്പോർട്ട് തീയതി ഭാവിയിലാകാൻ പാടില്ല'),
+        ('cbbo_reports_detail.error_activities_length', 'Activities must be at least 10 characters',
+         'പ്രവർത്തനങ്ങൾ കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ ആയിരിക്കണം'),
+        ('cbbo_reports_detail.error_activities_symbols', 'Activities must contain letters or numbers, not only symbols',
+         'പ്രവർത്തനങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('cbbo_reports_detail.error_outcomes_symbols',   'Outcomes must contain letters or numbers, not only symbols',
+         'ഫലങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('cbbo_reports_detail.toast_submitted',        "Report submitted - it's now locked",
+         'റിപ്പോർട്ട് സമർപ്പിച്ചു - ഇപ്പോൾ ലോക്ക് ചെയ്തിരിക്കുന്നു'),
+        ('cbbo_reports_detail.toast_submit_failed',    'Failed to submit report',
+         'റിപ്പോർട്ട് സമർപ്പിക്കാൻ കഴിഞ്ഞില്ല'),
+
+        # ── Training session edit form (namespace shared with the government form) ──
+        ('government_training_new.err_topic_symbols',   'Topic must contain letters or numbers, not only symbols',
+         'വിഷയത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('government_training_new.err_trainer_symbols', 'Trainer name must contain letters or numbers, not only symbols',
+         'പരിശീലകന്റെ പേരിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('government_training_new.err_venue_symbols',   'Venue must contain letters or numbers, not only symbols',
+         'വേദിയിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+
+        # ── Profile form (namespace shared with the FPO settings page) ──────
+        ('fpo_settings.val_first_name_symbols', 'First name must contain letters or numbers, not only symbols.',
+         'ആദ്യ നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
+        ('fpo_settings.val_last_name_symbols',  'Last name must contain letters or numbers, not only symbols.',
+         'അവസാന നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in report_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'CBBO portal UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'CBBO portal UI label — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -5815,6 +6025,11 @@ def seed_translations():
     rec_count = seed_recommendations_translations(languages)
     print(f"✅ Seeded {rec_count} recommendation translations")
     total_count += rec_count
+
+    print("\nSeeding CBBO portal translations...")
+    cbbo_portal_count = seed_cbbo_portal_translations(languages)
+    print(f"✅ Seeded {cbbo_portal_count} CBBO portal translations")
+    total_count += cbbo_portal_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")

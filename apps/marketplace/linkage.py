@@ -32,6 +32,14 @@ class LinkageProductSerializer(BuyerProductSerializer):
 _LIVE_BATCH = Q(products__is_deleted=False, products__stocks__is_deleted=False)
 
 
+# DataTable column id -> model field, for the `ordering` query param
+_ORDERING_FIELDS = {
+    'name': 'name',
+    'district_display': 'district',
+    'product_count': 'product_count',
+}
+
+
 def linkage_fpo_queryset(scoped_fpo_qs):
     """FPOs (already scoped to the caller) that have at least one listed batch."""
     return (
@@ -61,6 +69,11 @@ def linkage_fpos_response(request, scoped_fpo_qs):
     search = request.query_params.get('search', '').strip()
     if search:
         qs = qs.filter(Q(name__icontains=search) | Q(name_ml__icontains=search))
+
+    ordering = request.query_params.get('ordering', '').strip()
+    field = _ORDERING_FIELDS.get(ordering.lstrip('-'))
+    if field:
+        qs = qs.order_by(f'-{field}' if ordering.startswith('-') else field, '-id')
 
     paginator = StandardPagination()
     page = paginator.paginate_queryset(qs, request)

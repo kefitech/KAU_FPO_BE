@@ -62,6 +62,17 @@ def get_fpo_scoped(fpo_id, user):
 # ──────────────────────────────────────────────────────────────────────────────
 # Serializers
 # ──────────────────────────────────────────────────────────────────────────────
+# DataTable column id -> model field, for the `ordering` query param
+_ORDERING_FIELDS = {
+    'name': 'name',
+    'application_id': 'application_id',
+    'district_display': 'district',
+    'status': 'status',
+    'total_members': 'total_members',
+    'updated_at': 'updated_at',
+}
+
+
 def _district_display(district_code, request):
     """Best-effort district name lookup — never crashes the response if the
     helper/import doesn't exist in your project; falls back to the raw code."""
@@ -188,6 +199,7 @@ class AssignedFPOListView(APIView):
     # Query params (all optional):
     #   status = <FPO.status value>   -> exact match
     #   search = <text>               -> matches name OR application_id
+    #   ordering = <column id>        -> '-' prefix for descending
 
     def get(self, request):
         if not is_cbbo_user(request.user):
@@ -208,7 +220,12 @@ class AssignedFPOListView(APIView):
         if search:
             qs = qs.filter(name__icontains=search) | qs.filter(application_id__icontains=search)
  
-        qs = qs.order_by('-updated_at')
+        ordering = request.query_params.get('ordering', '').strip()
+        field = _ORDERING_FIELDS.get(ordering.lstrip('-'))
+        if field:
+            qs = qs.order_by(f'-{field}' if ordering.startswith('-') else field, '-id')
+        else:
+            qs = qs.order_by('-updated_at')
  
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)

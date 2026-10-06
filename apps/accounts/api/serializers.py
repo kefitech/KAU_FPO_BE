@@ -457,6 +457,14 @@ class ProfileUpdateSerializer(serializers.Serializer):
     phone              = serializers.CharField(max_length=15, required=False, allow_blank=True, help_text="Indian phone number (10 digits)")
     preferred_language = serializers.CharField(max_length=10, required=False, help_text="Language code e.g. en, ml")
 
+    def validate_first_name(self, value):
+        from apps.core.utils.validators import validate_not_only_symbols
+        return validate_not_only_symbols(value, 'First name')
+
+    def validate_last_name(self, value):
+        from apps.core.utils.validators import validate_not_only_symbols
+        return validate_not_only_symbols(value, 'Last name')
+
     def validate_phone(self, value):
         if value:
             from apps.core.utils.validators import validate_indian_phone
