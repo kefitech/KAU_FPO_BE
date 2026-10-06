@@ -36,15 +36,17 @@ class GovernmentOfficialProfile(BaseModel):
     )
     jurisdiction_type = models.CharField(
         max_length=20,
-        choices=[('district', 'District'), ('block', 'Block'), ('state', 'State')]
+        choices=[('district', 'District'), ('state', 'State')]
     )
-    assigned_district = models.CharField(
-        max_length=10, null=True, blank=True,
-        help_text='District code from constants.py - set when jurisdiction_type=district or block'
+    # Like a CBBO's district assignments: one or more district codes when
+    # jurisdiction_type=district, empty when state-wide.
+    assigned_districts = models.JSONField(
+        default=list, blank=True,
+        help_text='District codes from constants.py (e.g. ["TSR", "EKM"]) - set when jurisdiction_type=district'
     )
     assigned_block = models.CharField(
         max_length=100, null=True, blank=True,
-        help_text='Block/taluk code, MasterLookup category: block - set when jurisdiction_type=block'
+        help_text='Legacy - block/taluk jurisdiction was removed (migration 0131); always empty now'
     )
     user_category = models.CharField(
         max_length=30, choices=USER_CATEGORY_CHOICES, null=True, blank=True,

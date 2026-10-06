@@ -1035,6 +1035,10 @@ def seed_ui_translations(languages):
         ('sub_admins_table.col_date_joined',    'Date Joined',                              'ചേർന്ന തീയതി'),
         ('sub_admins_table.col_visible_fpos',   'FPOs in Scope',                            'പരിധിയിലുള്ള FPO-കൾ'),
         ('sub_admins_table.no_district',        'No district',                              'ജില്ലയില്ല'),
+        ('sub_admins_table.filter_district',    'All Districts',                            'എല്ലാ ജില്ലകളും'),
+        # Shown instead of the row menu on CBBOs / officials a sub-admin can only view
+        ('cbbos_table.view_only',               'View only',                                'കാണാൻ മാത്രം'),
+        ('government_table.view_only',          'View only',                                'കാണാൻ മാത്രം'),
         ('sub_admins_table.no_district_hint',   'Sees no FPOs until transferred to a district', 'ഒരു ജില്ലയിലേക്ക് മാറ്റുന്നതുവരെ FPO-കളൊന്നും കാണാനാവില്ല'),
         ('sub_admins_table.no_assigned_fpos_short', 'None',                                 'ഒന്നുമില്ല'),
         ('sub_admins_table.view_fpos_hint',     'View FPOs in scope',                       'പരിധിയിലുള്ള FPO-കൾ കാണുക'),
