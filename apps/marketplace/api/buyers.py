@@ -18,7 +18,7 @@ from rest_framework import filters
 from apps.core.models.generic import AuditLog
 from rest_framework.exceptions import PermissionDenied
 
-from apps.core.permissions.fpo_scope import is_super_admin, scope_fpo_queryset
+from apps.core.permissions.fpo_scope import get_sub_admin_district, is_sub_admin, is_super_admin
 from apps.core.permissions.rbac import IsAuthenticated, IsFPOManager, IsSubAdminOrSuperAdmin
 from apps.core.services.audit import AuditService as AuditLogService
 from apps.core.services.translation import t
@@ -73,9 +73,10 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     PATCH/DELETE      /api/admin/buyers/{id}/
     POST              /api/admin/buyers/{id}/verify/
 
-    Super admin manages every buyer. A sub-admin manages only FPO-as-buyer
-    rows whose FPO is assigned to them (P2-01); external buyers and other
-    FPOs' rows are out of scope (404).
+    Super admin manages every buyer. A sub-admin manages the buyers in their own
+    district: FPO-as-buyer rows whose FPO is in it, and external buyers whose
+    district (`location`) is theirs. Everything else is out of scope (404) —
+    including external buyers with no district, which stay super-admin only.
     """
 
     serializer_class = BuyerDirectorySerializer
@@ -90,12 +91,26 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     update_message = 'marketplace.buyer_updated'
     destroy_message = 'marketplace.buyer_deleted'
 
+    @staticmethod
+    def _scope_to_district(queryset, user):
+        """Super admin: every buyer. Sub-admin: their district's FPO buyers and external buyers."""
+        from django.db.models import Q
+
+        if is_super_admin(user):
+            return queryset
+        district = get_sub_admin_district(user) if is_sub_admin(user) else None
+        if not district:
+            return queryset.none()
+        return queryset.filter(
+            Q(fpo__district=district)                       # FPO buying from other FPOs
+            | Q(fpo__isnull=True, location=district)        # external buyer in this district
+        )
+
     def get_queryset(self):
         from django.db.models import Q
 
         queryset = BuyerDirectory.objects.filter(is_deleted=False).order_by('-created_at')
-        # sub-admins: assigned FPOs' buyer rows only (drops external buyers, which have no FPO)
-        queryset = scope_fpo_queryset(queryset, self.request.user, fpo_field='fpo')
+        queryset = self._scope_to_district(queryset, self.request.user)
         buyer_type = self.request.query_params.get('buyer_type')
         if buyer_type == 'fpo':
             queryset = queryset.filter(fpo__isnull=False)
@@ -131,6 +146,14 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
         # Re-linking a buyer to another FPO/account would move it out of a sub-admin's scope.
         if not is_super_admin(self.request.user) and {'fpo', 'user'} & set(serializer.validated_data):
             raise PermissionDenied('Only a super admin can link a buyer to a different FPO or account.')
+        # Likewise moving a buyer to another district.
+        new_location = serializer.validated_data.get('location')
+        if (
+            not is_super_admin(self.request.user)
+            and new_location is not None
+            and new_location != get_sub_admin_district(self.request.user)
+        ):
+            raise PermissionDenied('You can only assign buyers to your own district.')
         serializer.save()
 
     def perform_destroy(self, instance):

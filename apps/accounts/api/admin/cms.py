@@ -47,6 +47,11 @@ def _is_admin(user):
     return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
+def _is_super_admin(user):
+    # Announcements and FAQs are managed by the super admin only — sub-admins don't need them.
+    return user.groups.filter(name=UserRole.SUPER_ADMIN).exists()
+
+
 def _active_language_codes():
     return {lang['code'] for lang in Language.get_active_languages()}
 
@@ -224,7 +229,7 @@ class AnnouncementListView(APIView):
         description='Pass `?lang=ml` to get resolved text + available_languages per field.',
     )
     def get(self, request):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         qs = Announcement.objects.all()
         category = request.query_params.get('category')
@@ -260,7 +265,7 @@ class AnnouncementListView(APIView):
         request=AnnouncementSerializer,
     )
     def post(self, request):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         serializer = AnnouncementSerializer(data=request.data)
         if not serializer.is_valid():
@@ -288,7 +293,7 @@ class AnnouncementDetailView(APIView):
         description='Pass `?lang=ml` to get resolved text + available_languages.',
     )
     def get(self, request, pk):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         obj = self._get(pk)
         if not obj:
@@ -309,7 +314,7 @@ class AnnouncementDetailView(APIView):
         ),
     )
     def patch(self, request, pk):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         obj = self._get(pk)
         if not obj:
@@ -324,7 +329,7 @@ class AnnouncementDetailView(APIView):
 
     @extend_schema(tags=['Admin - CMS'], summary='Delete an announcement')
     def delete(self, request, pk):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         obj = self._get(pk)
         if not obj:
@@ -371,7 +376,7 @@ class FAQListView(APIView):
         description='Pass `?lang=ml` to get resolved text + available_languages per field.',
     )
     def get(self, request):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         qs = FAQ.objects.all()
         category = request.query_params.get('category')
@@ -405,7 +410,7 @@ class FAQListView(APIView):
         ),
     )
     def post(self, request):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         serializer = FAQSerializer(data=request.data)
         if not serializer.is_valid():
@@ -433,7 +438,7 @@ class FAQDetailView(APIView):
         description='Pass `?lang=ml` to get resolved text + available_languages.',
     )
     def get(self, request, pk):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         obj = self._get(pk)
         if not obj:
@@ -443,7 +448,7 @@ class FAQDetailView(APIView):
 
     @extend_schema(tags=['Admin - CMS'], summary='Update a FAQ')
     def patch(self, request, pk):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         obj = self._get(pk)
         if not obj:
@@ -458,7 +463,7 @@ class FAQDetailView(APIView):
 
     @extend_schema(tags=['Admin - CMS'], summary='Delete a FAQ')
     def delete(self, request, pk):
-        if not _is_admin(request.user):
+        if not _is_super_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
         obj = self._get(pk)
         if not obj:

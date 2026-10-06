@@ -157,14 +157,14 @@ def seed_menu():
         label_key = 'menu.announcements',
         path      = '/admin/announcements',
         icon      = 'megaphone',
-        roles     = [super_admin_group, sub_admin_group],
+        roles     = [super_admin_group],   # sub-admins don't manage announcements/FAQs
         order     = 11,
     )
     seed_item(
         label_key = 'menu.faqs',
         path      = '/admin/faqs',
         icon      = 'help-circle',
-        roles     = [super_admin_group, sub_admin_group],
+        roles     = [super_admin_group],   # sub-admins don't manage announcements/FAQs
         order     = 12,
     )
     seed_item(

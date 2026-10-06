@@ -42,7 +42,7 @@ class AdminDashboardStatsView(APIView):
             '- **stat_cards** — total registrations, approved, pending, suspended\n'
             '- **status_breakdown** — count per FPO status\n'
             '- **tier_distribution** — count of A/B/C/D/not-assessed FPOs\n'
-            '- **district_distribution** — FPO count per district\n'
+            '- **district_distribution** — FPO count per district, statewide for every admin (sub-admins included)\n'
             '- **monthly_trend** — registrations per month for last 12 months\n'
             '- **pending_actions** — items needing admin attention\n'
         ),
@@ -98,8 +98,11 @@ class AdminDashboardStatsView(APIView):
                 tier_distribution['not_assessed'] += row['count']
 
         # ── District Distribution ─────────────────────────────────────────────
+        # Statewide for everyone, sub-admins included, so the map can compare their
+        # district with the rest of Kerala. It only shows a count per district (no
+        # drill-down); every other figure here stays scoped to the caller's FPOs.
         district_counts = (
-            fpos.exclude(district='')
+            FPO.objects.filter(is_deleted=False).exclude(district='')
             .values('district')
             .annotate(count=Count('id'))
             .order_by('-count')

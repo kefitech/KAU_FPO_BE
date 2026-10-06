@@ -231,20 +231,6 @@ def seed_admin_translations(languages):
         ('template_code_deleted',      'Template code deleted successfully',        'ടെംപ്ലേറ്റ് കോഡ് വിജയകരമായി ഇല്ലാതാക്കി'),
         ('template_code_activated',    'Template code activated successfully',      'ടെംപ്ലേറ്റ് കോഡ് വിജയകരമായി സജീവമാക്കി'),
         ('template_code_deactivated',  'Template code deactivated successfully',    'ടെംപ്ലേറ്റ് കോഡ് വിജയകരമായി നിഷ്ക്രിയമാക്കി'),
-        # Two-factor authentication
-        ('two_factor_required',                 'Two-factor authentication required',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം ആവശ്യമാണ്'),
-        ('two_factor_setup_initiated',          'Scan the QR code with Google Authenticator',  'Google Authenticator ഉപയോഗിച്ച് QR കോഡ് സ്കാൻ ചെയ്യുക'),
-        ('two_factor_enabled',                  'Two-factor authentication enabled successfully', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം വിജയകരമായി പ്രവർത്തനക്ഷമമാക്കി'),
-        ('two_factor_disabled',                 'Two-factor authentication disabled',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം നിഷ്ക്രിയമാക്കി'),
-        ('two_factor_already_enabled',          'Two-factor authentication is already enabled', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം ഇതിനകം പ്രവർത്തനക്ഷമമാണ്'),
-        ('two_factor_not_enabled',              'Two-factor authentication is not enabled',     'ടു-ഫാക്ടർ പ്രാമാണീകരണം പ്രവർത്തനക്ഷമമല്ല'),
-        ('two_factor_not_initiated',            'Please initiate 2FA setup first',              'ആദ്യം 2FA സജ്ജീകരണം ആരംഭിക്കുക'),
-        ('two_factor_invalid_code',             'Invalid or expired code',                      'അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട കോഡ്'),
-        ('two_factor_invalid_backup_code',      'Invalid backup code',                          'അസാധുവായ ബാക്കപ്പ് കോഡ്'),
-        ('two_factor_code_required',            'Code is required',                             'കോഡ് ആവശ്യമാണ്'),
-        ('two_factor_admin_only',               'Two-factor authentication is for admin accounts only', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം അഡ്മിൻ അക്കൗണ്ടുകൾക്ക് മാത്രമാണ്'),
-        ('two_factor_status_retrieved',         'Two-factor status retrieved successfully',     'ടു-ഫാക്ടർ സ്ഥിതി വിജയകരമായി ലഭിച്ചു'),
-        ('two_factor_backup_codes_regenerated', 'Backup codes regenerated successfully',        'ബാക്കപ്പ് കോഡുകൾ വിജയകരമായി പുനർജനിച്ചു'),
         # Sub-admin management
         ('sub_admins_retrieved',            'Sub-admins retrieved successfully',            'സബ്-അഡ്മിൻമാർ വിജയകരമായി ലഭിച്ചു'),
         ('sub_admin_retrieved',             'Sub-admin retrieved successfully',             'സബ്-അഡ്മിൻ വിജയകരമായി ലഭിച്ചു'),
@@ -325,6 +311,37 @@ def seed_admin_translations(languages):
         Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'Admin management', 'is_verified': True}
+        )
+        count += 1
+
+    # Two-factor authentication — the views call t('auth.two_factor_*'), so these
+    # live in the 'auth' category (they were once seeded under 'admin', which no
+    # code reads, and every 2FA message came back as its raw key).
+    auth_category = TranslationCategory.objects.get(code='auth')
+    auth_messages = [
+        ('two_factor_required',                 'Two-factor authentication required',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം ആവശ്യമാണ്'),
+        ('two_factor_setup_initiated',          'Scan the QR code with Google Authenticator',  'Google Authenticator ഉപയോഗിച്ച് QR കോഡ് സ്കാൻ ചെയ്യുക'),
+        ('two_factor_enabled',                  'Two-factor authentication enabled successfully', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം വിജയകരമായി പ്രവർത്തനക്ഷമമാക്കി'),
+        ('two_factor_disabled',                 'Two-factor authentication disabled',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം നിഷ്ക്രിയമാക്കി'),
+        ('two_factor_already_enabled',          'Two-factor authentication is already enabled', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം ഇതിനകം പ്രവർത്തനക്ഷമമാണ്'),
+        ('two_factor_not_enabled',              'Two-factor authentication is not enabled',     'ടു-ഫാക്ടർ പ്രാമാണീകരണം പ്രവർത്തനക്ഷമമല്ല'),
+        ('two_factor_not_initiated',            'Please initiate 2FA setup first',              'ആദ്യം 2FA സജ്ജീകരണം ആരംഭിക്കുക'),
+        ('two_factor_invalid_code',             'Invalid or expired code',                      'അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട കോഡ്'),
+        ('two_factor_invalid_backup_code',      'Invalid backup code',                          'അസാധുവായ ബാക്കപ്പ് കോഡ്'),
+        ('two_factor_code_required',            'Code is required',                             'കോഡ് ആവശ്യമാണ്'),
+        ('two_factor_admin_only',               'Two-factor authentication is for admin accounts only', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം അഡ്മിൻ അക്കൗണ്ടുകൾക്ക് മാത്രമാണ്'),
+        ('two_factor_status_retrieved',         'Two-factor status retrieved successfully',     'ടു-ഫാക്ടർ സ്ഥിതി വിജയകരമായി ലഭിച്ചു'),
+        ('two_factor_backup_codes_regenerated', 'Backup codes regenerated successfully',        'ബാക്കപ്പ് കോഡുകൾ വിജയകരമായി പുനർജനിച്ചു'),
+        ('invalid_or_expired_token',            'Invalid or expired token',                     'അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട ടോക്കൺ'),
+    ]
+    for key, en_value, ml_value in auth_messages:
+        Translation.objects.update_or_create(
+            category=auth_category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Two-factor authentication', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=auth_category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Two-factor authentication', 'is_verified': True}
         )
         count += 1
 
@@ -996,7 +1013,7 @@ def seed_ui_translations(languages):
         ('menu_dialog.toast_deactivated',       'Menu item deactivated successfully', 'മെനു ഇനം വിജയകരമായി നിഷ്ക്രിയമാക്കി'),
 
         # ── sub_admins_table — Sub-Admins list columns & actions ─────────
-        ('sub_admins_table.page_title',         'Sub-Admins',                               'സബ്-അഡ്മിൻ'),
+        ('sub_admins_table.page_title',         'Sub-Admins',                               'സബ്-അഡ്മിൻമാർ'),
         ('sub_admins_table.page_description',   'Manage sub-admin accounts and their permissions', 'സബ്-അഡ്മിൻ അക്കൗണ്ടുകളും അനുമതികളും നിയന്ത്രിക്കുക'),
         ('sub_admins_table.add_button',         'Add Sub-Admin',                            'സബ്-അഡ്മിൻ ചേർക്കുക'),
         ('sub_admins_table.col_name',           'Name',                                     'പേര്'),
@@ -1013,6 +1030,69 @@ def seed_ui_translations(languages):
         ('sub_admins_table.toast_deactivated',  'Sub-admin deactivated',                    'സബ്-അഡ്മിൻ നിഷ്ക്രിയമാക്കി'),
         ('sub_admins_table.toast_deleted',      'Sub-admin deleted',                        'സബ്-അഡ്മിൻ ഇല്ലാതാക്കി'),
         ('sub_admins_table.delete_description', 'Are you sure you want to delete "{name}"? This action cannot be undone.', '"{name}" ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഈ പ്രവർത്തനം പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('sub_admins_table.col_district',       'District',                                 'ജില്ല'),
+        ('sub_admins_table.col_phone',          'Phone',                                    'ഫോൺ'),
+        ('sub_admins_table.col_date_joined',    'Date Joined',                              'ചേർന്ന തീയതി'),
+        ('sub_admins_table.col_visible_fpos',   'FPOs in Scope',                            'പരിധിയിലുള്ള FPO-കൾ'),
+        ('sub_admins_table.no_district',        'No district',                              'ജില്ലയില്ല'),
+        ('sub_admins_table.filter_district',    'All Districts',                            'എല്ലാ ജില്ലകളും'),
+        # Dashboard district map subtitle for sub-admins — the map is statewide for them too
+        ('admin_dashboard.chart_district_subtitle_statewide', 'FPOs registered in every district of Kerala — hover for details', 'കേരളത്തിലെ എല്ലാ ജില്ലകളിലും രജിസ്റ്റർ ചെയ്ത FPO-കൾ — വിശദാംശങ്ങൾക്ക് ഹോവർ ചെയ്യുക'),
+        # Dashboard status donut — centre label when no section is hovered
+        ('admin_dashboard.donut_total',         'Total FPOs',                               'ആകെ FPO-കൾ'),
+        # Shown instead of the row menu on CBBOs / officials a sub-admin can only view
+        ('cbbos_table.view_only',               'View only',                                'കാണാൻ മാത്രം'),
+        ('government_table.view_only',          'View only',                                'കാണാൻ മാത്രം'),
+        ('sub_admins_table.no_district_hint',   'Sees no FPOs until transferred to a district', 'ഒരു ജില്ലയിലേക്ക് മാറ്റുന്നതുവരെ FPO-കളൊന്നും കാണാനാവില്ല'),
+        ('sub_admins_table.no_assigned_fpos_short', 'None',                                 'ഒന്നുമില്ല'),
+        ('sub_admins_table.view_fpos_hint',     'View FPOs in scope',                       'പരിധിയിലുള്ള FPO-കൾ കാണുക'),
+        ('sub_admins_table.view_title',         'Sub-Admin Details',                        'സബ്-അഡ്മിൻ വിശദാംശങ്ങൾ'),
+        ('sub_admins_table.view_all',           'View list →',                              'ലിസ്റ്റ് കാണുക →'),
+        ('sub_admins_table.transfer_district',  'Transfer District',                        'ജില്ല മാറ്റുക'),
+        ('sub_admins_table.disable_2fa',        'Disable 2FA',                              '2FA പ്രവർത്തനരഹിതമാക്കുക'),
+        ('sub_admins_table.disable_2fa_failed', 'Failed to disable 2FA',                    '2FA പ്രവർത്തനരഹിതമാക്കൽ പരാജയപ്പെട്ടു'),
+        ('sub_admins_table.toast_2fa_disabled', '2FA disabled for this user',               'ഈ ഉപയോക്താവിന് 2FA പ്രവർത്തനരഹിതമാക്കി'),
+        ('sub_admins_table.disable_2fa_description', 'Two-factor authentication will be turned off for "{name}". They will sign in with just their password until they set it up again.', '"{name}" എന്നയാളുടെ ടു-ഫാക്ടർ പ്രാമാണീകരണം ഓഫാക്കും. വീണ്ടും സജ്ജീകരിക്കുന്നതുവരെ അവർ പാസ്‌വേഡ് മാത്രം ഉപയോഗിച്ച് ലോഗിൻ ചെയ്യും.'),
+        ('sub_admins_table.disable_2fa_confirm', 'Disable',                                 'പ്രവർത്തനരഹിതമാക്കുക'),
+        ('sub_admins_table.disabling',          'Disabling...',                             'പ്രവർത്തനരഹിതമാക്കുന്നു...'),
+        ('sub_admins_table.reset_password',     'Reset Password',                           'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക'),
+        ('sub_admins_table.reset_password_title', 'Reset Password',                         'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക'),
+        ('sub_admins_table.reset_password_description', 'A temporary password will be generated and sent to "{name}" via email. They will be required to change it on next login.', 'ഒരു താൽക്കാലിക പാസ്‌വേഡ് സൃഷ്ടിച്ച് "{name}" എന്നയാൾക്ക് ഇ-മെയിൽ വഴി അയയ്ക്കും. അടുത്ത ലോഗിനിൽ അത് മാറ്റേണ്ടതുണ്ട്.'),
+        ('sub_admins_table.reset_confirm',      'Reset',                                    'റീസെറ്റ് ചെയ്യുക'),
+        ('sub_admins_table.sending',            'Sending...',                               'അയക്കുന്നു...'),
+        ('sub_admins_table.toast_password_reset', 'Temporary password sent successfully',   'താൽക്കാലിക പാസ്‌വേഡ് വിജയകരമായി അയച്ചു'),
+        ('sub_admins_table.reset_password_failed', 'Failed to reset password',              'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
+
+        # ── sub_admins_table — Bulk Invite dialog ──────────────────────────
+        ('sub_admins_table.bulk_invite_button', 'Bulk Invite',                              'ബൾക്ക് ക്ഷണം'),
+        ('sub_admins_table.bulk_invite_title',  'Bulk Invite Sub-Admins',                   'സബ്-അഡ്മിൻമാരെ ബൾക്കായി ക്ഷണിക്കുക'),
+        ('sub_admins_table.bulk_invite_description', 'Download the Excel template, fill in one row per sub-admin, and upload. Each row is processed independently.', 'എക്സൽ ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്ത്, ഓരോ സബ്-അഡ്മിനും ഓരോ വരി പൂരിപ്പിച്ച് അപ്‌ലോഡ് ചെയ്യുക. ഓരോ വരിയും പ്രത്യേകമായി പ്രോസസ്സ് ചെയ്യും.'),
+        ('sub_admins_table.download_template',  'Download Template',                        'ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്യുക'),
+        ('sub_admins_table.template_download_failed', 'Failed to download template.',       'ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്യൽ പരാജയപ്പെട്ടു.'),
+        ('sub_admins_table.upload_label',       'Choose filled template (.xlsx or .csv)',   'പൂരിപ്പിച്ച ടെംപ്ലേറ്റ് തിരഞ്ഞെടുക്കുക (.xlsx അല്ലെങ്കിൽ .csv)'),
+        ('sub_admins_table.remove_file',        'Remove file',                              'ഫയൽ നീക്കം ചെയ്യുക'),
+        ('sub_admins_table.upload_btn',         'Upload & Invite',                          'അപ്‌ലോഡ് ചെയ്ത് ക്ഷണിക്കുക'),
+        ('sub_admins_table.bulk_upload_summary', '{success} invited, {failed} failed.',     '{success} പേരെ ക്ഷണിച്ചു, {failed} എണ്ണം പരാജയപ്പെട്ടു.'),
+        ('sub_admins_table.bulk_upload_failed', 'Bulk upload failed.',                      'ബൾക്ക് അപ്‌ലോഡ് പരാജയപ്പെട്ടു.'),
+        ('sub_admins_table.result_success',     'Success',                                  'വിജയിച്ചത്'),
+        ('sub_admins_table.result_failed',      'Failed',                                   'പരാജയപ്പെട്ടത്'),
+        ('sub_admins_table.col_row',            'Row',                                      'വരി'),
+        ('sub_admins_table.col_reason',         'Reason',                                   'കാരണം'),
+        ('sub_admins_table.close',              'Close',                                    'അടയ്ക്കുക'),
+
+        # ── sub_admins_table — Transfer District dialog ────────────────────
+        ('sub_admins_table.transfer_title',     'Transfer District',                        'ജില്ല മാറ്റുക'),
+        ('sub_admins_table.transfer_description', 'Move this sub-admin to a different district. The change is audit-logged and the destination cap is checked before the move.', 'ഈ സബ്-അഡ്മിനെ മറ്റൊരു ജില്ലയിലേക്ക് മാറ്റുക. ഈ മാറ്റം ഓഡിറ്റ് ലോഗിൽ രേഖപ്പെടുത്തും, മാറ്റുന്നതിന് മുമ്പ് പുതിയ ജില്ലയുടെ പരിധി പരിശോധിക്കും.'),
+        ('sub_admins_table.select_placeholder', 'Select destination',                       'പുതിയ ജില്ല തിരഞ്ഞെടുക്കുക'),
+        ('sub_admins_table.reason_label',       'Reason (optional)',                        'കാരണം (ഓപ്ഷണൽ)'),
+        ('sub_admins_table.reason_placeholder', 'e.g. Reorganisation for FY 2026-27',       'ഉദാ: 2026-27 സാമ്പത്തിക വർഷത്തെ പുനഃസംഘടന'),
+        ('sub_admins_table.reason_word_count',  '{count}/{max} words',                      '{count}/{max} വാക്കുകൾ'),
+        ('sub_admins_table.reason_too_long',    'Reason can be at most {max} words.',       'കാരണം പരമാവധി {max} വാക്കുകൾ ആയിരിക്കണം.'),
+        ('sub_admins_table.history_heading',    'Transfer History',                         'ജില്ലാ മാറ്റ ചരിത്രം'),
+        ('sub_admins_table.cancel',             'Cancel',                                   'റദ്ദാക്കുക'),
+        ('sub_admins_table.transfer_btn',       'Transfer',                                 'മാറ്റുക'),
+        ('sub_admins_table.transfer_success',   '{email} moved to {district}.',             '{email} {district} ജില്ലയിലേക്ക് മാറ്റി.'),
+        ('sub_admins_table.transfer_failed',    'Transfer failed.',                         'ജില്ല മാറ്റൽ പരാജയപ്പെട്ടു.'),
 
         # ── sub_admins_dialog — Add/Edit Sub-Admin dialog ─────────────────
         ('sub_admins_dialog.add_title',                     'Add Sub-Admin',                'സബ്-അഡ്മിൻ ചേർക്കുക'),
@@ -1028,6 +1108,36 @@ def seed_ui_translations(languages):
         ('sub_admins_dialog.permissions_no_results',        'No permissions found',         'അനുമതികൾ കണ്ടെത്തിയില്ല'),
         ('sub_admins_dialog.toast_created',                 'Sub-admin created successfully', 'സബ്-അഡ്മിൻ വിജയകരമായി സൃഷ്ടിച്ചു'),
         ('sub_admins_dialog.toast_updated',                 'Sub-admin updated successfully', 'സബ്-അഡ്മിൻ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു'),
+        ('sub_admins_dialog.section_basic',                 'Basic Information',            'അടിസ്ഥാന വിവരങ്ങൾ'),
+        ('sub_admins_dialog.section_account',               'Account Setup',                'അക്കൗണ്ട് സജ്ജീകരണം'),
+        ('sub_admins_dialog.section_permissions',           'Permissions',                  'അനുമതികൾ'),
+        ('sub_admins_dialog.first_name_placeholder',        'John',                         'John'),
+        ('sub_admins_dialog.last_name_placeholder',         'Doe',                          'Doe'),
+        ('sub_admins_dialog.email_placeholder',             'admin@example.com',            'admin@example.com'),
+        ('sub_admins_dialog.phone_label',                   'Phone',                        'ഫോൺ'),
+        ('sub_admins_dialog.phone_placeholder',             '98765 43210',                  '98765 43210'),
+        ('sub_admins_dialog.district_label',                'District',                     'ജില്ല'),
+        ('sub_admins_dialog.district_placeholder',          'Select a district',            'ഒരു ജില്ല തിരഞ്ഞെടുക്കുക'),
+        ('sub_admins_dialog.district_full',                 'limit reached',                'പരിധി എത്തി'),
+        ('sub_admins_dialog.district_hint',                 'The sub-admin will see every FPO in this district. Transfer them later from the detail page.', 'ഈ ജില്ലയിലെ എല്ലാ FPO-കളും സബ്-അഡ്മിന് കാണാനാകും. പിന്നീട് വിശദാംശ പേജിൽ നിന്ന് ജില്ല മാറ്റാം.'),
+        ('sub_admins_dialog.notification_channel_label',    'Send Credentials Via',         'ലോഗിൻ വിവരങ്ങൾ അയയ്ക്കേണ്ട മാർഗം'),
+        ('sub_admins_dialog.notification_channel_hint',     'A generated password will be sent to the sub-admin via this channel.', 'സൃഷ്ടിച്ച പാസ്‌വേഡ് ഈ മാർഗത്തിലൂടെ സബ്-അഡ്മിന് അയയ്ക്കും.'),
+        ('sub_admins_dialog.add_description',               'Fill in the details to create a new sub-admin account.', 'പുതിയ സബ്-അഡ്മിൻ അക്കൗണ്ട് സൃഷ്ടിക്കാൻ വിശദാംശങ്ങൾ പൂരിപ്പിക്കുക.'),
+        ('sub_admins_dialog.loading',                       'Loading...',                   'ലോഡ് ചെയ്യുന്നു...'),
+        ('sub_admins_dialog.load_failed',                   'Failed to load sub-admin.',    'സബ്-അഡ്മിൻ വിവരങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.'),
+        ('sub_admins_dialog.channel_email',                 'Email',                        'ഇ-മെയിൽ'),
+        ('sub_admins_dialog.channel_sms',                   'SMS',                          'SMS'),
+        ('sub_admins_dialog.toast_create_failed',           'Failed to create sub-admin',   'സബ്-അഡ്മിൻ സൃഷ്ടിക്കൽ പരാജയപ്പെട്ടു'),
+        ('sub_admins_dialog.toast_update_failed',           'Failed to update sub-admin',   'സബ്-അഡ്മിൻ അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
+        ('sub_admins_dialog.val_first_name_required',       'First name is required',       'പേരിന്റെ ആദ്യഭാഗം നിർബന്ധമാണ്'),
+        ('sub_admins_dialog.val_last_name_required',        'Last name is required',        'പേരിന്റെ അവസാനഭാഗം നിർബന്ധമാണ്'),
+        ('sub_admins_dialog.val_first_name_pattern',        'First name can only contain letters, spaces, dots, apostrophes and hyphens', 'പേരിന്റെ ആദ്യഭാഗത്തിൽ ഇംഗ്ലീഷ് അക്ഷരങ്ങൾ, സ്പേസ്, ഡോട്ട് (.), അപ്പോസ്ട്രഫി (\'), ഹൈഫൻ (-) എന്നിവ മാത്രമേ പാടുള്ളൂ'),
+        ('sub_admins_dialog.val_last_name_pattern',         'Last name can only contain letters, spaces, dots, apostrophes and hyphens', 'പേരിന്റെ അവസാനഭാഗത്തിൽ ഇംഗ്ലീഷ് അക്ഷരങ്ങൾ, സ്പേസ്, ഡോട്ട് (.), അപ്പോസ്ട്രഫി (\'), ഹൈഫൻ (-) എന്നിവ മാത്രമേ പാടുള്ളൂ'),
+        ('sub_admins_dialog.val_max_50',                    'Max 50 characters',            'പരമാവധി 50 അക്ഷരങ്ങൾ'),
+        ('sub_admins_dialog.val_email_invalid',             'Enter a valid email address',  'സാധുവായ ഇമെയിൽ വിലാസം നൽകുക'),
+        ('sub_admins_dialog.val_email_max',                 'Email must be at most 50 characters', 'ഇ-മെയിൽ പരമാവധി 50 അക്ഷരങ്ങൾ ആയിരിക്കണം'),
+        ('sub_admins_dialog.val_phone_invalid',             'Enter a valid 10-digit mobile number', 'സാധുവായ 10 അക്ക മൊബൈൽ നമ്പർ നൽകുക'),
+        ('sub_admins_dialog.val_district_required',         'Pick a district',              'ഒരു ജില്ല തിരഞ്ഞെടുക്കുക'),
 
         # ── confirm_dialog — Global delete confirmation dialog ────────────
         ('confirm_dialog.delete_language',      'Delete Language',                  'ഭാഷ ഇല്ലാതാക്കുക'),
@@ -4187,6 +4297,18 @@ def seed_fixes(languages):
         (category_ui, 'admin_schemes.toast_activated', lang_ml, 'സ്കീം സജീവമാക്കി'),
         (category_ui, 'admin_schemes.toast_deactivated', lang_ml, 'സ്കീം നിർജ്ജീവമാക്കി'),
         (category_ui, 'admin_schemes.empty_state', lang_ml, 'സ്കീമുകളൊന്നും കണ്ടെത്തിയില്ല.'),
+        # common.* keys used on the Sub-Admins page — seed_frontend_ui_translations
+        # writes English as the Malayalam placeholder, so set the real values here.
+        (category_ui, 'common.badge_active', lang_ml, 'സജീവം'),
+        (category_ui, 'common.badge_inactive', lang_ml, 'നിഷ്ക്രിയം'),
+        (category_ui, 'common.edit', lang_ml, 'എഡിറ്റ് ചെയ്യുക'),
+        (category_ui, 'common.section_account', lang_ml, 'അക്കൗണ്ട്'),
+        (category_ui, 'common.section_access', lang_ml, 'ആക്സസ്'),
+        (category_ui, 'common.section_permissions', lang_en, 'Permissions'),
+        (category_ui, 'common.section_permissions', lang_ml, 'അനുമതികൾ'),
+        (category_ui, 'common.delete_failed', lang_ml, 'ഇല്ലാതാക്കൽ പരാജയപ്പെട്ടു'),
+        (category_ui, 'common.update_failed', lang_ml, 'അപ്ഡേറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
+        (category_ui, 'common.saving', lang_ml, 'സേവ് ചെയ്യുന്നു…'),
     ]
 
     # New OTP attempt tracking keys (seeded via messages.py with double-brace placeholders)
@@ -4418,6 +4540,21 @@ def seed_admin_buyers_translations(languages):
          'സജീവമാക്കുക'),
         ('buyers_table.action_reset_password', 'Reset Password',
          'രഹസ്യവാക്ക് പുനഃക്രമീകരിക്കുക'),
+        # District column + row-click detail sheet
+        ('buyers_table.col_district',          'District',              'ജില്ല'),
+        ('buyers_table.view_title',            'Buyer Details',         'വാങ്ങുന്നയാളുടെ വിശദാംശങ്ങൾ'),
+        ('buyers_table.section_contact',       'Contact',               'ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ'),
+        ('buyers_table.section_interest',      'Buying Interest',       'വാങ്ങൽ താൽപ്പര്യം'),
+        ('buyers_table.section_account',       'Account',               'അക്കൗണ്ട്'),
+        ('buyers_table.field_commodities',     'Commodities',           'ഉൽപ്പന്നങ്ങൾ'),
+        ('buyers_table.field_quantity',        'Quantity',              'അളവ്'),
+        ('buyers_table.field_buyer_type',      'Buyer Type',            'വാങ്ങുന്നയാളുടെ തരം'),
+        ('buyers_table.type_fpo',              'FPO buyer',             'FPO വാങ്ങുന്നയാൾ'),
+        ('buyers_table.type_external',         'External buyer',        'ബാഹ്യ വാങ്ങുന്നയാൾ'),
+        ('buyers_table.field_login_account',   'Login Account',         'ലോഗിൻ അക്കൗണ്ട്'),
+        ('buyers_table.account_active',        'Active',                'സജീവം'),
+        ('buyers_table.account_none',          'No login account',      'ലോഗിൻ അക്കൗണ്ട് ഇല്ല'),
+        ('buyers_table.field_registered_on',   'Registered On',         'രജിസ്റ്റർ ചെയ്ത തീയതി'),
     ]
 
     count = 0
@@ -4505,7 +4642,7 @@ def seed_banner_translations(languages):
         ('banner.slide1_title',    'Empowering Farmers through FPO Linkage',  'FPO ലിങ്കേജ് വഴി കർഷകരെ ശക്തിപ്പെടുത്തുക'),
         ('banner.slide1_desc',     'A digital platform connecting Farmer Producer Organizations across Kerala with markets, experts, and government support under the KAU-FPO Linkage Programme.',
                                    'KAU-FPO ലിങ്കേജ് പ്രോഗ്രാമിന് കീഴിൽ കേരളത്തിലെ ഫാർമർ പ്രൊഡ്യൂസർ ഓർഗനൈസേഷനുകളെ വിപണികൾ, വിദഗ്ദ്ധർ, സർക്കാർ പിന്തുണ എന്നിവയുമായി ബന്ധിപ്പിക്കുന്ന ഒരു ഡിജിറ്റൽ പ്ലാറ്റ്ഫോം.'),
-        ('banner.slide1_btn',      'Get Started',                              'ആരംഭിക്കുക'),
+        ('banner.slide1_btn',      'Register',                                 'രജിസ്റ്റർ ചെയ്യുക'),
         ('banner.slide2_subtitle', 'KAU-FPO Platform',                        'KAU-FPO പ്ലാറ്റ്ഫോം'),
         ('banner.slide2_title',    'Smart Agriculture for a Better Tomorrow',  'മികച്ച നാളേക്കായി സ്മാർട്ട് കൃഷി'),
         ('banner.slide2_desc',     'AI-powered crop recommendations, market linkage via ONDC, expert consultancy, and GIS mapping — all in one platform for Kerala\'s farming community.',
@@ -4552,7 +4689,7 @@ def seed_nav_translations(languages):
 
     NAV_KEYS = [
         # key,                    EN value,                   ML value
-        ('nav.get_started',       'Get Started',              'ആരംഭിക്കുക'),
+        ('nav.get_started',       'Register',                 'രജിസ്റ്റർ ചെയ്യുക'),
         ('nav.sign_in',           'Sign In',                  'സൈൻ ഇൻ'),
         ('nav.register',          'Register FPO',             'FPO രജിസ്റ്റർ ചെയ്യുക'),
         ('nav.pages',             'Pages',                    'പേജുകൾ'),
@@ -5074,6 +5211,9 @@ def seed_buyer_portal_translations(languages):
         ('buyer_dashboard.chart_inquiries_label',
          'Inquiries',
          'അന്വേഷണങ്ങൾ'),
+        ('buyer_dashboard.chart_inquiries_total',
+         'Total inquiries',
+         'ആകെ അന്വേഷണങ്ങൾ'),
         ('buyer_dashboard.chart_inquiry_status',
          'Inquiry Status',
          'അന്വേഷണ നില'),
@@ -5219,6 +5359,9 @@ def seed_fpo_buyer_directory_translations(languages):
          'ക്രേതാവായി രജിസ്റ്റർ ചെയ്യുക'),
         ('fpo_buyer_directory.btn_registering', 'Registering…',
          'രജിസ്റ്റർ ചെയ്യുന്നു…'),
+        ('fpo_buyer_directory.member_register_note',
+         "Only your FPO's primary user can register the FPO as a buyer.",
+         'FPO-യെ ക്രേതാവായി രജിസ്റ്റർ ചെയ്യാൻ നിങ്ങളുടെ FPO-യുടെ പ്രാഥമിക ഉപയോക്താവിന് മാത്രമേ കഴിയൂ.'),
 
         # ── Pending state ──
         ('fpo_buyer_directory.pending_title', 'Request Pending',
@@ -5693,6 +5836,216 @@ def seed_recommendations_translations(languages):
 
 
 
+def seed_cbbo_portal_translations(languages):
+    """
+    Seed UI labels for the CBBO portal: the Reports pages
+    (src/app/cbbo/reports: list + view sheet, new, detail/edit) and the
+    "not only symbols" validation messages on the training and profile forms.
+    Malayalam values are best-effort — marked unverified for native review.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    report_keys = [
+        # ── List page, row actions and view sheet ──────────────────────────
+        ('cbbo_reports_list.page_title',           'Reports',
+         'റിപ്പോർട്ടുകൾ'),
+        ('cbbo_reports_list.page_description',     "Capacity building reports you've filed",
+         'നിങ്ങൾ ഫയൽ ചെയ്ത ശേഷി വികസന റിപ്പോർട്ടുകൾ'),
+        ('cbbo_reports_list.btn_new',              'New Report',
+         'പുതിയ റിപ്പോർട്ട്'),
+        ('cbbo_reports_list.search_placeholder',   'Search by FPO, district or status...',
+         'FPO, ജില്ല അല്ലെങ്കിൽ സ്ഥിതി പ്രകാരം തിരയുക...'),
+        ('cbbo_reports_list.col_header',           'Columns',
+         'കോളങ്ങൾ'),
+        ('cbbo_reports_list.col_toggle_columns',   'Toggle columns',
+         'കോളങ്ങൾ മാറ്റുക'),
+        ('cbbo_reports_list.col_fpo',              'FPO',
+         'FPO'),
+        ('cbbo_reports_list.col_district',         'District',
+         'ജില്ല'),
+        ('cbbo_reports_list.col_date',             'Date',
+         'തീയതി'),
+        ('cbbo_reports_list.col_participants',     'Participants',
+         'പങ്കെടുത്തവർ'),
+        ('cbbo_reports_list.col_status',           'Status',
+         'സ്ഥിതി'),
+        ('cbbo_reports_list.status_draft',         'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('cbbo_reports_list.status_submitted',     'Submitted',
+         'സമർപ്പിച്ചു'),
+        ('cbbo_reports_list.action_view',          'View',
+         'കാണുക'),
+        ('cbbo_reports_list.action_edit',          'Edit',
+         'എഡിറ്റ് ചെയ്യുക'),
+        ('cbbo_reports_list.action_delete',        'Delete',
+         'ഇല്ലാതാക്കുക'),
+        ('cbbo_reports_list.delete',               'Delete',
+         'ഇല്ലാതാക്കുക'),
+        ('cbbo_reports_list.deleting',             'Deleting...',
+         'ഇല്ലാതാക്കുന്നു...'),
+        ('cbbo_reports_list.delete_confirm_title', 'Delete Report',
+         'റിപ്പോർട്ട് ഇല്ലാതാക്കുക'),
+        ('cbbo_reports_list.delete_confirm_desc',  'Delete the draft report for "{fpo}" dated {date}? This action cannot be undone.',
+         '"{fpo}" എന്ന FPO-യുടെ {date} തീയതിയിലെ ഡ്രാഫ്റ്റ് റിപ്പോർട്ട് ഇല്ലാതാക്കണോ? ഈ പ്രവർത്തനം പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('cbbo_reports_list.toast_deleted',        'Report deleted',
+         'റിപ്പോർട്ട് ഇല്ലാതാക്കി'),
+        ('cbbo_reports_list.delete_failed',        'Failed to delete report',
+         'റിപ്പോർട്ട് ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('cbbo_reports_list.section_report',       'Report',
+         'റിപ്പോർട്ട്'),
+        ('cbbo_reports_list.section_details',      'Details',
+         'വിശദാംശങ്ങൾ'),
+        ('cbbo_reports_list.section_record',       'Record',
+         'രേഖ'),
+        ('cbbo_reports_list.field_activities',     'Activities',
+         'പ്രവർത്തനങ്ങൾ'),
+        ('cbbo_reports_list.field_outcomes',       'Outcomes',
+         'ഫലങ്ങൾ'),
+        ('cbbo_reports_list.field_created',        'Created',
+         'സൃഷ്ടിച്ചത്'),
+        ('cbbo_reports_list.field_updated',        'Last Updated',
+         'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്'),
+
+        # ── New report ─────────────────────────────────────────────────────
+        ('cbbo_reports_new.back',                    'Back',
+         'തിരികെ'),
+        ('cbbo_reports_new.page_title',              'New Report',
+         'പുതിയ റിപ്പോർട്ട്'),
+        ('cbbo_reports_new.page_description',        'This report saves as a draft - submit it separately once ready.',
+         'ഈ റിപ്പോർട്ട് ഡ്രാഫ്റ്റായി സേവ് ചെയ്യപ്പെടും - തയ്യാറാകുമ്പോൾ പ്രത്യേകം സമർപ്പിക്കുക.'),
+        ('cbbo_reports_new.section_title',           'Report Details',
+         'റിപ്പോർട്ട് വിശദാംശങ്ങൾ'),
+        ('cbbo_reports_new.field_fpo',               'FPO',
+         'FPO'),
+        ('cbbo_reports_new.placeholder_fpo_loading', 'Loading FPOs...',
+         'FPO-കൾ ലോഡ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_new.placeholder_fpo_search',  'Search your assigned FPOs...',
+         'നിങ്ങൾക്ക് നിയോഗിക്കപ്പെട്ട FPO-കൾ തിരയുക...'),
+        ('cbbo_reports_new.label_selected',          'Selected',
+         'തിരഞ്ഞെടുത്തത്'),
+        ('cbbo_reports_new.field_date',              'Date',
+         'തീയതി'),
+        ('cbbo_reports_new.field_participants',      'Participants Count',
+         'പങ്കെടുത്തവരുടെ എണ്ണം'),
+        ('cbbo_reports_new.field_activities',        'Activities',
+         'പ്രവർത്തനങ്ങൾ'),
+        ('cbbo_reports_new.placeholder_activities',  'What was done during the visit (min 10 characters)',
+         'സന്ദർശനത്തിനിടെ ചെയ്ത കാര്യങ്ങൾ (കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ)'),
+        ('cbbo_reports_new.field_outcomes',          'Outcomes',
+         'ഫലങ്ങൾ'),
+        ('cbbo_reports_new.btn_cancel',              'Cancel',
+         'റദ്ദാക്കുക'),
+        ('cbbo_reports_new.btn_save',                'Save Draft',
+         'ഡ്രാഫ്റ്റ് സേവ് ചെയ്യുക'),
+        ('cbbo_reports_new.btn_saving',              'Saving...',
+         'സേവ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_new.toast_saved',             'Report saved as draft',
+         'റിപ്പോർട്ട് ഡ്രാഫ്റ്റായി സേവ് ചെയ്തു'),
+        ('cbbo_reports_new.toast_save_failed',       'Failed to save report',
+         'റിപ്പോർട്ട് സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+        ('cbbo_reports_new.error_select_fpo',        'Select an FPO',
+         'ഒരു FPO തിരഞ്ഞെടുക്കുക'),
+        ('cbbo_reports_new.error_date_required',     'Select a date',
+         'ഒരു തീയതി തിരഞ്ഞെടുക്കുക'),
+        ('cbbo_reports_new.error_future_date',       'Report date cannot be in the future',
+         'റിപ്പോർട്ട് തീയതി ഭാവിയിലാകാൻ പാടില്ല'),
+        ('cbbo_reports_new.error_activities_length', 'Activities must be at least 10 characters',
+         'പ്രവർത്തനങ്ങൾ കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ ആയിരിക്കണം'),
+        ('cbbo_reports_new.error_participants_range', 'Participants count must be between 0 and 100000',
+         'പങ്കെടുത്തവരുടെ എണ്ണം 0-നും 100000-നും ഇടയിലായിരിക്കണം'),
+        ('cbbo_reports_new.error_activities_symbols', 'Activities must contain letters or numbers, not only symbols',
+         'പ്രവർത്തനങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('cbbo_reports_new.error_outcomes_symbols',   'Outcomes must contain letters or numbers, not only symbols',
+         'ഫലങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+
+        # ── Report detail / edit ───────────────────────────────────────────
+        ('cbbo_reports_detail.back',                   'Back',
+         'തിരികെ'),
+        ('cbbo_reports_detail.loading',                'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_detail.badge_draft',            'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('cbbo_reports_detail.badge_submitted',        'Submitted',
+         'സമർപ്പിച്ചു'),
+        ('cbbo_reports_detail.filed_by',               'Filed by',
+         'ഫയൽ ചെയ്തത്'),
+        ('cbbo_reports_detail.on_date',                'on',
+         'തീയതി'),
+        ('cbbo_reports_detail.section_title',          'Report Details',
+         'റിപ്പോർട്ട് വിശദാംശങ്ങൾ'),
+        ('cbbo_reports_detail.field_date',             'Date',
+         'തീയതി'),
+        ('cbbo_reports_detail.field_participants',     'Participants Count',
+         'പങ്കെടുത്തവരുടെ എണ്ണം'),
+        ('cbbo_reports_detail.field_activities',       'Activities',
+         'പ്രവർത്തനങ്ങൾ'),
+        ('cbbo_reports_detail.field_outcomes',         'Outcomes',
+         'ഫലങ്ങൾ'),
+        ('cbbo_reports_detail.btn_save_changes',       'Save Changes',
+         'മാറ്റങ്ങൾ സേവ് ചെയ്യുക'),
+        ('cbbo_reports_detail.btn_saving',             'Saving...',
+         'സേവ് ചെയ്യുന്നു...'),
+        ('cbbo_reports_detail.btn_submit_report',      'Submit Report',
+         'റിപ്പോർട്ട് സമർപ്പിക്കുക'),
+        ('cbbo_reports_detail.btn_submitting',         'Submitting...',
+         'സമർപ്പിക്കുന്നു...'),
+        ('cbbo_reports_detail.confirm_submit_title',   'Submit Report',
+         'റിപ്പോർട്ട് സമർപ്പിക്കുക'),
+        ('cbbo_reports_detail.confirm_submit_desc',    'Once submitted, this report is locked and can no longer be edited. Continue?',
+         'സമർപ്പിച്ചുകഴിഞ്ഞാൽ ഈ റിപ്പോർട്ട് ലോക്ക് ചെയ്യപ്പെടും, പിന്നീട് എഡിറ്റ് ചെയ്യാൻ കഴിയില്ല. തുടരണോ?'),
+        ('cbbo_reports_detail.confirm_submit_btn',     'Submit',
+         'സമർപ്പിക്കുക'),
+        ('cbbo_reports_detail.confirm_submitting_btn', 'Submitting...',
+         'സമർപ്പിക്കുന്നു...'),
+        ('cbbo_reports_detail.toast_updated',          'Report updated',
+         'റിപ്പോർട്ട് അപ്ഡേറ്റ് ചെയ്തു'),
+        ('cbbo_reports_detail.toast_update_failed',    'Failed to update report',
+         'റിപ്പോർട്ട് അപ്ഡേറ്റ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+        ('cbbo_reports_detail.error_future_date',      'Report date cannot be in the future',
+         'റിപ്പോർട്ട് തീയതി ഭാവിയിലാകാൻ പാടില്ല'),
+        ('cbbo_reports_detail.error_activities_length', 'Activities must be at least 10 characters',
+         'പ്രവർത്തനങ്ങൾ കുറഞ്ഞത് 10 അക്ഷരങ്ങൾ ആയിരിക്കണം'),
+        ('cbbo_reports_detail.error_activities_symbols', 'Activities must contain letters or numbers, not only symbols',
+         'പ്രവർത്തനങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('cbbo_reports_detail.error_outcomes_symbols',   'Outcomes must contain letters or numbers, not only symbols',
+         'ഫലങ്ങളിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('cbbo_reports_detail.toast_submitted',        "Report submitted - it's now locked",
+         'റിപ്പോർട്ട് സമർപ്പിച്ചു - ഇപ്പോൾ ലോക്ക് ചെയ്തിരിക്കുന്നു'),
+        ('cbbo_reports_detail.toast_submit_failed',    'Failed to submit report',
+         'റിപ്പോർട്ട് സമർപ്പിക്കാൻ കഴിഞ്ഞില്ല'),
+
+        # ── Training session edit form (namespace shared with the government form) ──
+        ('government_training_new.err_topic_symbols',   'Topic must contain letters or numbers, not only symbols',
+         'വിഷയത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('government_training_new.err_trainer_symbols', 'Trainer name must contain letters or numbers, not only symbols',
+         'പരിശീലകന്റെ പേരിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+        ('government_training_new.err_venue_symbols',   'Venue must contain letters or numbers, not only symbols',
+         'വേദിയിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ'),
+
+        # ── Profile form (namespace shared with the FPO settings page) ──────
+        ('fpo_settings.val_first_name_symbols', 'First name must contain letters or numbers, not only symbols.',
+         'ആദ്യ നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
+        ('fpo_settings.val_last_name_symbols',  'Last name must contain letters or numbers, not only symbols.',
+         'അവസാന നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in report_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'CBBO portal UI label', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'CBBO portal UI label — best-effort, needs native review', 'is_verified': False}
+        )
+        count += 1
+
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -5812,6 +6165,11 @@ def seed_translations():
     rec_count = seed_recommendations_translations(languages)
     print(f"✅ Seeded {rec_count} recommendation translations")
     total_count += rec_count
+
+    print("\nSeeding CBBO portal translations...")
+    cbbo_portal_count = seed_cbbo_portal_translations(languages)
+    print(f"✅ Seeded {cbbo_portal_count} CBBO portal translations")
+    total_count += cbbo_portal_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     print("\nApplying translation fixes...")
