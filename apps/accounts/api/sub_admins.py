@@ -25,7 +25,7 @@ from rest_framework import serializers, filters
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 
-from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
+from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field, OpenApiParameter
 
 from apps.core.permissions.rbac import IsSuperAdmin
 from apps.core.utils.constants import UserRole, SUB_ADMIN_PERMISSIONS, District
@@ -232,7 +232,14 @@ class SubAdminUpdateSerializer(serializers.Serializer):
 
 
 @extend_schema_view(
-    list=extend_schema(tags=['Admin - Sub Admins']),
+    list=extend_schema(
+        tags=['Admin - Sub Admins'],
+        parameters=[OpenApiParameter(
+            'district', str, required=False,
+            description='3-letter district code (e.g. "TSR") to list only that district\'s sub-admins, '
+                        'or "none" for sub-admins without a district.',
+        )],
+    ),
     retrieve=extend_schema(tags=['Admin - Sub Admins']),
     create=extend_schema(tags=['Admin - Sub Admins']),
     partial_update=extend_schema(
@@ -267,11 +274,20 @@ class SubAdminViewSet(TranslatedViewSet):
     def get_queryset(self):
         try:
             sub_admin_group = Group.objects.get(name=UserRole.SUB_ADMIN)
-            return User.objects.filter(
-                groups=sub_admin_group
-            ).prefetch_related('user_permissions').order_by('-date_joined')
         except Group.DoesNotExist:
             return User.objects.none()
+        qs = User.objects.filter(
+            groups=sub_admin_group
+        ).prefetch_related('user_permissions').order_by('-date_joined')
+
+        # District filter on the list page: ?district=TSR, or ?district=none for unassigned.
+        if self.action == 'list':
+            district = (self.request.query_params.get('district') or '').strip().upper()
+            if district == 'NONE':
+                qs = qs.filter(district_assignment__isnull=True)
+            elif district in dict(District.choices):
+                qs = qs.filter(district_assignment__district=district)
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'create':

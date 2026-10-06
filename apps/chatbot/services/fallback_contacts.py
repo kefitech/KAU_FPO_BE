@@ -218,8 +218,8 @@ def _user_district(user, hint: str = '') -> str | None:
 
     # 3. Government / CBBO profiles
     govt = getattr(user, 'govt_profile', None)
-    if govt and getattr(govt, 'assigned_district', ''):
-        return govt.assigned_district
+    if govt and getattr(govt, 'assigned_districts', None):
+        return govt.assigned_districts[0]   # first of possibly several districts
 
     return hint or None
 

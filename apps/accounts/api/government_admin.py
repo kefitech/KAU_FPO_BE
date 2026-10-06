@@ -1,7 +1,7 @@
 """
 Government Official Management API (admin-side)
 Base Path: /api/admin/government/
-Supports three jurisdiction levels: district, block, state.
+Supports two jurisdiction levels: district and state (block/taluk access was removed).
 """
 
 import secrets
@@ -11,29 +11,26 @@ from django.contrib.auth.models import User, Group
 
 from rest_framework import serializers, filters
 from rest_framework.decorators import action
+from rest_framework.permissions import SAFE_METHODS
 
 from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
 
+from apps.core.permissions.cbbo_govt_scope import (
+    assignable_districts, can_manage, own_district_error, scope_govt_queryset,
+)
 from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
-from apps.core.services.lookup import LookupService
 from apps.core.views import TranslatedViewSet
 from apps.notifications.services import send_notification
 from apps.database.models.government import GovernmentOfficialProfile
+from apps.government.api.scoping import clean_jurisdiction_districts
 
 logger = logging.getLogger(__name__)
 
-JURISDICTION_CHOICES = [('district', 'District'), ('block', 'Block'), ('state', 'State')]
-
-
-def _block_display(code, request):
-    if not code:
-        return None
-    lang = getattr(request, 'language', 'en')
-    return LookupService.get_name('block', code, lang) or code
+JURISDICTION_CHOICES = [('district', 'District'), ('state', 'State')]
 
 
 class GovernmentCreateSerializer(serializers.Serializer):
@@ -45,8 +42,14 @@ class GovernmentCreateSerializer(serializers.Serializer):
     designation          = serializers.CharField(max_length=200)
     department           = serializers.CharField(max_length=200)
     jurisdiction_type    = serializers.ChoiceField(choices=JURISDICTION_CHOICES)
-    assigned_district     = serializers.ChoiceField(choices=District.choices, required=False, allow_null=True)
-    assigned_block        = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    assigned_districts   = serializers.ListField(
+        child=serializers.ChoiceField(choices=District.choices), required=False, default=list,
+        help_text='District codes — required (one or more) when jurisdiction_type=district.',
+    )
+    assigned_district    = serializers.ChoiceField(
+        choices=District.choices, required=False, allow_null=True, write_only=True,
+        help_text='Deprecated single district — use assigned_districts.',
+    )
 
     def validate_email(self, value):
         # Emails are stored lowercased, so check the normalised value — otherwise an
@@ -71,15 +74,7 @@ class GovernmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'notification_channel': 'Cannot use SMS - no phone number provided.'
             })
-        if attrs['jurisdiction_type'] == 'district' and not attrs.get('assigned_district'):
-            raise serializers.ValidationError({
-                'assigned_district': 'Required when jurisdiction_type=district.'
-            })
-        if attrs['jurisdiction_type'] == 'block' and not attrs.get('assigned_block'):
-            raise serializers.ValidationError({
-                'assigned_block': 'Required when jurisdiction_type=block.'
-            })
-        return attrs
+        return clean_jurisdiction_districts(attrs)
 
 
 class GovernmentSerializer(serializers.ModelSerializer):
@@ -87,24 +82,27 @@ class GovernmentSerializer(serializers.ModelSerializer):
     designation                = serializers.SerializerMethodField()
     department                 = serializers.SerializerMethodField()
     jurisdiction_type          = serializers.SerializerMethodField()
-    assigned_district          = serializers.SerializerMethodField()
-    assigned_district_display  = serializers.SerializerMethodField()
-    assigned_block             = serializers.SerializerMethodField()
-    assigned_block_display     = serializers.SerializerMethodField()
+    assigned_districts         = serializers.SerializerMethodField()
+    assigned_districts_display = serializers.SerializerMethodField()
     registration_status        = serializers.SerializerMethodField()
     user_category               = serializers.SerializerMethodField()
     id_number                   = serializers.SerializerMethodField()
+    can_manage                  = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined',
             'designation', 'department', 'jurisdiction_type',
-            'assigned_district', 'assigned_district_display',
-            'assigned_block', 'assigned_block_display',
-            'registration_status', 'user_category', 'id_number',
+            'assigned_districts', 'assigned_districts_display',
+            'registration_status', 'user_category', 'id_number', 'can_manage',
         ]
         read_only_fields = fields
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_manage(self, obj):
+        # False for rows a sub-admin can only view (state-level, or another district)
+        return can_manage(self.context, obj, scope_govt_queryset)
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
@@ -122,28 +120,14 @@ class GovernmentSerializer(serializers.ModelSerializer):
     def get_jurisdiction_type(self, obj):
         return getattr(getattr(obj, 'govt_profile', None), 'jurisdiction_type', '')
 
-    @extend_schema_field(serializers.CharField())
-    def get_assigned_district(self, obj):
-        return getattr(getattr(obj, 'govt_profile', None), 'assigned_district', None)
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_assigned_districts(self, obj):
+        return list(getattr(getattr(obj, 'govt_profile', None), 'assigned_districts', None) or [])
 
-    @extend_schema_field(serializers.CharField())
-    def get_assigned_district_display(self, obj):
-        profile = getattr(obj, 'govt_profile', None)
-        if not profile or not profile.assigned_district:
-            return None
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_assigned_districts_display(self, obj):
         lang = getattr(self.context.get('request'), 'language', 'en')
-        return get_district_name(profile.assigned_district, language=lang)
-
-    @extend_schema_field(serializers.CharField())
-    def get_assigned_block(self, obj):
-        return getattr(getattr(obj, 'govt_profile', None), 'assigned_block', None)
-
-    @extend_schema_field(serializers.CharField())
-    def get_assigned_block_display(self, obj):
-        profile = getattr(obj, 'govt_profile', None)
-        if not profile or not profile.assigned_block:
-            return None
-        return _block_display(profile.assigned_block, self.context.get('request'))
+        return [get_district_name(code, language=lang) for code in self.get_assigned_districts(obj)]
 
     @extend_schema_field(serializers.CharField())
     def get_registration_status(self, obj):
@@ -160,24 +144,34 @@ class GovernmentSerializer(serializers.ModelSerializer):
 
 class GovernmentJurisdictionActionSerializer(serializers.Serializer):
     jurisdiction_type  = serializers.ChoiceField(choices=JURISDICTION_CHOICES)
-    assigned_district   = serializers.ChoiceField(choices=District.choices, required=False, allow_null=True)
-    assigned_block      = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    assigned_districts   = serializers.ListField(
+        child=serializers.ChoiceField(choices=District.choices), required=False, default=list,
+        help_text='District codes — required (one or more) when jurisdiction_type=district.',
+    )
+    assigned_district    = serializers.ChoiceField(
+        choices=District.choices, required=False, allow_null=True, write_only=True,
+        help_text='Deprecated single district — use assigned_districts.',
+    )
 
     def validate(self, attrs):
-        if attrs['jurisdiction_type'] == 'district' and not attrs.get('assigned_district'):
-            raise serializers.ValidationError({
-                'assigned_district': 'Required when jurisdiction_type=district.'
-            })
-        if attrs['jurisdiction_type'] == 'block' and not attrs.get('assigned_block'):
-            raise serializers.ValidationError({
-                'assigned_block': 'Required when jurisdiction_type=block.'
-            })
-        return attrs
+        return clean_jurisdiction_districts(attrs)
 
 
 class AvailableDistrictSerializer(serializers.Serializer):
     code = serializers.CharField()
     name = serializers.CharField()
+
+
+def _jurisdiction_error(user, data, current=None):
+    """
+    A sub-admin may only give an official jurisdiction inside their own district.
+    When changing an existing official (`current` = their districts now), only the
+    districts being added or removed count — other districts already there stay as they are.
+    """
+    districts = set(data['assigned_districts'])
+    if current is not None:
+        districts ^= set(current)
+    return own_district_error(user, state_wide=data['jurisdiction_type'] == 'state', districts=sorted(districts))
 
 
 class GovernmentUpdateSerializer(serializers.Serializer):
@@ -213,9 +207,12 @@ class GovernmentViewSet(TranslatedViewSet):
     destroy_message = 'admin.government_deleted'
 
     def get_queryset(self):
-        return User.objects.filter(
+        qs = User.objects.filter(
             govt_profile__isnull=False
         ).select_related('govt_profile').order_by('-date_joined')
+        # Sub-admins read their district + state-level officials (all with can_view_all_cbbo_govt)
+        # but only change officials in their own district.
+        return scope_govt_queryset(qs, self.request.user, manage=self.request.method not in SAFE_METHODS)
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -227,6 +224,10 @@ class GovernmentViewSet(TranslatedViewSet):
         serializer = GovernmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
+        error = _jurisdiction_error(request.user, data)
+        if error:
+            return StandardResponse.error(message=error, errors={'jurisdiction_type': [error]}, status_code=403)
 
         temp_password = secrets.token_urlsafe(10)
 
@@ -247,8 +248,7 @@ class GovernmentViewSet(TranslatedViewSet):
             designation=data['designation'],
             department=data['department'],
             jurisdiction_type=jtype,
-            assigned_district=data.get('assigned_district') if jtype == 'district' else None,
-            assigned_block=data.get('assigned_block') if jtype == 'block' else None,
+            assigned_districts=data['assigned_districts'],
         )
 
         profile = user.profile
@@ -350,7 +350,7 @@ class GovernmentViewSet(TranslatedViewSet):
         request=GovernmentJurisdictionActionSerializer,
         responses=GovernmentSerializer,
         summary="Change official's jurisdiction",
-        description="Switch between district, block, or state-wide access.",
+        description="Switch between district-wise (one or more districts) and state-wide access.",
     )
     @action(detail=True, methods=['get', 'post'], url_path='jurisdiction')
     def jurisdiction(self, request, pk=None):
@@ -374,13 +374,17 @@ class GovernmentViewSet(TranslatedViewSet):
             serializer = GovernmentJurisdictionActionSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
+            current = user.govt_profile.assigned_districts if user.govt_profile.jurisdiction_type == 'district' else []
+            error = _jurisdiction_error(request.user, data, current=current)
+            if error:
+                return StandardResponse.error(message=error, errors={'jurisdiction_type': [error]}, status_code=403)
             jtype = data['jurisdiction_type']
 
             govt_profile = user.govt_profile
             govt_profile.jurisdiction_type = jtype
-            govt_profile.assigned_district = data.get('assigned_district') if jtype == 'district' else None
-            govt_profile.assigned_block = data.get('assigned_block') if jtype == 'block' else None
-            govt_profile.save(update_fields=['jurisdiction_type', 'assigned_district', 'assigned_block'])
+            govt_profile.assigned_districts = data['assigned_districts']
+            govt_profile.assigned_block = None   # block access was removed; clear any legacy value
+            govt_profile.save(update_fields=['jurisdiction_type', 'assigned_districts', 'assigned_block'])
 
             return StandardResponse.success(
                 data=GovernmentSerializer(user, context={"request": request}).data,
@@ -396,16 +400,10 @@ class GovernmentViewSet(TranslatedViewSet):
     @action(detail=False, methods=['get'], url_path='available-districts')
     def available_districts(self, request):
         lang = self.get_language()
-        data = [{'code': code, 'name': get_district_name(code, language=lang)} for code in District.values]
+        allowed = assignable_districts(request.user)   # sub-admins: only their own district
+        codes = District.values if allowed is None else allowed
+        data = [{'code': code, 'name': get_district_name(code, language=lang)} for code in codes]
         return StandardResponse.success(data=data, message=t('admin.districts_retrieved', lang))
-
-    @extend_schema(tags=['Admin - Government'], responses=AvailableDistrictSerializer(many=True))
-    @action(detail=False, methods=['get'], url_path='available-blocks')
-    def available_blocks(self, request):
-        lang = self.get_language()
-        items = LookupService.get_by_category('block', lang)
-        data = [{'code': item['code'], 'name': item['name']} for item in items]
-        return StandardResponse.success(data=data, message=t('admin.blocks_retrieved', lang))
 
     @extend_schema(tags=['Admin - Government'])
     @action(detail=True, methods=['post'])

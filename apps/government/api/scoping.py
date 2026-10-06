@@ -1,4 +1,24 @@
+from rest_framework import serializers
+
 from apps.database.models.government import GovernmentOfficialProfile
+
+
+def clean_jurisdiction_districts(attrs):
+    """
+    Shared by the admin and self-registration serializers. Folds the legacy single
+    `assigned_district` into the `assigned_districts` list, de-dupes it, and requires
+    at least one district for district jurisdiction (empty when state-wide).
+    """
+    districts = list(attrs.get('assigned_districts') or [])
+    legacy = attrs.pop('assigned_district', None)
+    if legacy:
+        districts.append(legacy)
+    districts = list(dict.fromkeys(districts))
+
+    if attrs['jurisdiction_type'] == 'district' and not districts:
+        raise serializers.ValidationError({'assigned_districts': 'Select at least one district.'})
+    attrs['assigned_districts'] = districts if attrs['jurisdiction_type'] == 'district' else []
+    return attrs
 
 
 def get_govt_profile(user):
@@ -16,7 +36,6 @@ def get_jurisdiction_scope(user):
     Returns a dict describing scope:
       {'type': 'ALL'}
       {'type': 'district', 'values': [<district_code>]}
-      {'type': 'block', 'values': [<block_code>]}
     or None if the user has no usable jurisdiction.
     """
     profile = get_govt_profile(user)
@@ -24,10 +43,8 @@ def get_jurisdiction_scope(user):
         return None
     if profile.jurisdiction_type == 'state':
         return {'type': 'ALL'}
-    if profile.jurisdiction_type == 'block' and profile.assigned_block:
-        return {'type': 'block', 'values': [profile.assigned_block]}
-    if profile.jurisdiction_type == 'district' and profile.assigned_district:
-        return {'type': 'district', 'values': [profile.assigned_district]}
+    if profile.jurisdiction_type == 'district' and profile.assigned_districts:
+        return {'type': 'district', 'values': list(profile.assigned_districts)}
     return None
 
 
@@ -37,8 +54,6 @@ def scope_fpo_qs(qs, user):
         return qs.none()
     if scope['type'] == 'ALL':
         return qs
-    if scope['type'] == 'block':
-        return qs.filter(block_taluk__in=scope['values'])
     return qs.filter(district__in=scope['values'])
 
 
@@ -48,8 +63,6 @@ def is_fpo_assigned(fpo, user):
         return False
     if scope['type'] == 'ALL':
         return True
-    if scope['type'] == 'block':
-        return fpo.block_taluk in scope['values']
     return fpo.district in scope['values']
 
 
@@ -59,8 +72,6 @@ def get_fpo_scoped(fpo_id, user):
     qs = FPO.objects.filter(id=fpo_id)
     if not scope:
         return None
-    if scope['type'] == 'block':
-        qs = qs.filter(block_taluk__in=scope['values'])
-    elif scope['type'] != 'ALL':
+    if scope['type'] != 'ALL':
         qs = qs.filter(district__in=scope['values'])
     return qs.select_related('primary_user').first()

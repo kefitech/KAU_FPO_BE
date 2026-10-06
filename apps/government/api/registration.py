@@ -23,6 +23,7 @@ from apps.core.utils.responses import StandardResponse
 from apps.database.models.government import GovernmentOfficialProfile, USER_CATEGORY_CHOICES
 from apps.notifications.services import send_notification
 
+from apps.government.api.scoping import clean_jurisdiction_districts
 from apps.government.api.validators import validate_id_number
 
 logger = logging.getLogger(__name__)
@@ -226,8 +227,11 @@ class GovernmentRegistrationSerializer(serializers.Serializer):
     user_category = serializers.ChoiceField(choices=USER_CATEGORY_CHOICES)
     id_number = serializers.CharField(max_length=30)
     jurisdiction_type = serializers.ChoiceField(choices=GovernmentOfficialProfile._meta.get_field('jurisdiction_type').choices)
-    assigned_district = serializers.ChoiceField(choices=District.choices, required=False, allow_null=True)
-    assigned_block = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    assigned_districts = serializers.ListField(
+        child=serializers.ChoiceField(choices=District.choices), required=False, default=list,
+    )
+    # Deprecated single district — still accepted, folded into assigned_districts.
+    assigned_district = serializers.ChoiceField(choices=District.choices, required=False, allow_null=True, write_only=True)
 
     def validate_email(self, value):
         value = value.lower()
@@ -243,14 +247,7 @@ class GovernmentRegistrationSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        if attrs['jurisdiction_type'] == 'district' and not attrs.get('assigned_district'):
-            raise serializers.ValidationError({
-                'assigned_district': 'Required when jurisdiction_type=district.'
-            })
-        if attrs['jurisdiction_type'] == 'block' and not attrs.get('assigned_block'):
-            raise serializers.ValidationError({
-                'assigned_block': 'Required when jurisdiction_type=block.'
-            })
+        clean_jurisdiction_districts(attrs)
 
         is_valid, error = validate_id_number(attrs['user_category'], attrs['id_number'])
         if not is_valid:
@@ -285,8 +282,7 @@ class GovernmentRegistrationView(APIView):
             designation=data['designation'],
             department=data['department'],
             jurisdiction_type=data['jurisdiction_type'],
-            assigned_district=data.get('assigned_district') if data['jurisdiction_type'] == 'district' else None,
-            assigned_block=data.get('assigned_block') if data['jurisdiction_type'] == 'block' else None,
+            assigned_districts=data['assigned_districts'],
             user_category=data['user_category'],
             id_number=data['id_number'],
             registration_status='pending',

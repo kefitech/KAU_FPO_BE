@@ -175,6 +175,7 @@ SUB_ADMIN_PERMISSIONS = [
     ('can_approve_cbbo_logins',          'Can approve or reject CBBO officer applications'),
     ('can_manage_schemes',               'Can create/edit/delete own schemes (read-only otherwise)'),
     ('can_manage_trainings',             'Can view FPO training sessions (Training tab on applications)'),
+    ('can_view_all_cbbo_govt',           'Can view CBBOs and government officials in every district (read-only outside own district)'),
 ]
 
 

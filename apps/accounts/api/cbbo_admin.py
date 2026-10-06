@@ -25,9 +25,14 @@ from django.contrib.auth.models import User, Group
 
 from rest_framework import serializers, filters
 from rest_framework.decorators import action
+from rest_framework.permissions import SAFE_METHODS
 
 from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
 
+from apps.core.permissions.cbbo_govt_scope import (
+    assignable_districts, can_manage, own_district_error, scope_cbbo_queryset,
+)
+from apps.core.permissions.fpo_scope import get_sub_admin_district, is_sub_admin, is_super_admin
 from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
 from apps.database.models.organisation import Organisation
@@ -123,14 +128,20 @@ class CBBOSerializer(serializers.ModelSerializer):
     organisation_id   = serializers.SerializerMethodField()
     organisation_name = serializers.SerializerMethodField()
     registration_status = serializers.SerializerMethodField()
+    can_manage  = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name', 'registration_status']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name', 'registration_status', 'can_manage']
         read_only_fields = fields
 
     def get_registration_status(self, obj):
         return getattr(getattr(obj, 'cbbo_profile', None), 'registration_status', None)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_manage(self, obj):
+        # False for rows a sub-admin can only view (state-wide, or another district)
+        return can_manage(self.context, obj, scope_cbbo_queryset)
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
@@ -242,9 +253,12 @@ class CBBOViewSet(TranslatedViewSet):
     def get_queryset(self):
         # "is a CBBO" == has at least one CBBOAssignment row, same
         # definition used by is_cbbo_user() in assignments.py
-        return User.objects.filter(
+        qs = User.objects.filter(
             cbbo_assignments__isnull=False
         ).distinct().prefetch_related('cbbo_assignments').order_by('-date_joined')
+        # Sub-admins read their district + state-wide CBBOs (all with can_view_all_cbbo_govt)
+        # but only change CBBOs in their own district.
+        return scope_cbbo_queryset(qs, self.request.user, manage=self.request.method not in SAFE_METHODS)
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -260,6 +274,14 @@ class CBBOViewSet(TranslatedViewSet):
         serializer = CBBOCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
+        error = own_district_error(
+            request.user,
+            state_wide=data['level'] == CBBOAssignment.LEVEL_STATE,
+            districts=data.get('district_codes') or [],
+        )
+        if error:
+            return StandardResponse.error(message=error, errors={'district_codes': [error]}, status_code=403)
 
         temp_password = secrets.token_urlsafe(10)
 
@@ -427,11 +449,19 @@ class CBBOViewSet(TranslatedViewSet):
 
             serializer = CBBODistrictActionSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            self._assign_districts(
-                user,
-                serializer.validated_data['district_codes'],
-                action=serializer.validated_data.get('action', 'replace'),
-            )
+            codes       = serializer.validated_data['district_codes']
+            assign_mode = serializer.validated_data.get('action', 'replace')
+
+            error = own_district_error(request.user, districts=codes)
+            if not error and assign_mode == 'replace' and is_sub_admin(request.user) and not is_super_admin(request.user):
+                # 'replace' would drop the CBBO's other districts, which aren't this sub-admin's to change.
+                own = get_sub_admin_district(request.user)
+                if user.cbbo_assignments.filter(level=CBBOAssignment.LEVEL_DISTRICT, is_active=True).exclude(district=own).exists():
+                    error = 'This CBBO also covers other districts. Use add or remove for your own district only.'
+            if error:
+                return StandardResponse.error(message=error, errors={'district_codes': [error]}, status_code=403)
+
+            self._assign_districts(user, codes, action=assign_mode)
             return StandardResponse.success(
                 data=CBBOSerializer(user, context={"request": request}).data,
                 message=t('admin.cbbo_districts_updated', lang),
@@ -452,7 +482,9 @@ class CBBOViewSet(TranslatedViewSet):
     def available_districts(self, request):
         """List all districts that can be assigned to CBBOs."""
         lang = self.get_language()
-        data = [{'code': code, 'name': get_district_name(code, language=lang)} for code in District.values]
+        allowed = assignable_districts(request.user)   # sub-admins: only their own district
+        codes = District.values if allowed is None else allowed
+        data = [{'code': code, 'name': get_district_name(code, language=lang)} for code in codes]
         return StandardResponse.success(
             data=data,
             message=t('admin.districts_retrieved', lang),
