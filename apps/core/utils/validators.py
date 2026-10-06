@@ -93,7 +93,7 @@ def validate_indian_phone(value: str, language: str = 'en') -> str:
         cleaned = cleaned[2:]
 
     if not re.match(INDIAN_PHONE_REGEX, cleaned):
-        raise ValidationError(_t('invalid_phone', language))
+        raise ValidationError(msg(ValidationMessages.INVALID_PHONE, language))
 
     return cleaned
 
