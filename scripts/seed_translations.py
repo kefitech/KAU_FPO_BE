@@ -231,20 +231,6 @@ def seed_admin_translations(languages):
         ('template_code_deleted',      'Template code deleted successfully',        'ടെംപ്ലേറ്റ് കോഡ് വിജയകരമായി ഇല്ലാതാക്കി'),
         ('template_code_activated',    'Template code activated successfully',      'ടെംപ്ലേറ്റ് കോഡ് വിജയകരമായി സജീവമാക്കി'),
         ('template_code_deactivated',  'Template code deactivated successfully',    'ടെംപ്ലേറ്റ് കോഡ് വിജയകരമായി നിഷ്ക്രിയമാക്കി'),
-        # Two-factor authentication
-        ('two_factor_required',                 'Two-factor authentication required',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം ആവശ്യമാണ്'),
-        ('two_factor_setup_initiated',          'Scan the QR code with Google Authenticator',  'Google Authenticator ഉപയോഗിച്ച് QR കോഡ് സ്കാൻ ചെയ്യുക'),
-        ('two_factor_enabled',                  'Two-factor authentication enabled successfully', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം വിജയകരമായി പ്രവർത്തനക്ഷമമാക്കി'),
-        ('two_factor_disabled',                 'Two-factor authentication disabled',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം നിഷ്ക്രിയമാക്കി'),
-        ('two_factor_already_enabled',          'Two-factor authentication is already enabled', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം ഇതിനകം പ്രവർത്തനക്ഷമമാണ്'),
-        ('two_factor_not_enabled',              'Two-factor authentication is not enabled',     'ടു-ഫാക്ടർ പ്രാമാണീകരണം പ്രവർത്തനക്ഷമമല്ല'),
-        ('two_factor_not_initiated',            'Please initiate 2FA setup first',              'ആദ്യം 2FA സജ്ജീകരണം ആരംഭിക്കുക'),
-        ('two_factor_invalid_code',             'Invalid or expired code',                      'അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട കോഡ്'),
-        ('two_factor_invalid_backup_code',      'Invalid backup code',                          'അസാധുവായ ബാക്കപ്പ് കോഡ്'),
-        ('two_factor_code_required',            'Code is required',                             'കോഡ് ആവശ്യമാണ്'),
-        ('two_factor_admin_only',               'Two-factor authentication is for admin accounts only', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം അഡ്മിൻ അക്കൗണ്ടുകൾക്ക് മാത്രമാണ്'),
-        ('two_factor_status_retrieved',         'Two-factor status retrieved successfully',     'ടു-ഫാക്ടർ സ്ഥിതി വിജയകരമായി ലഭിച്ചു'),
-        ('two_factor_backup_codes_regenerated', 'Backup codes regenerated successfully',        'ബാക്കപ്പ് കോഡുകൾ വിജയകരമായി പുനർജനിച്ചു'),
         # Sub-admin management
         ('sub_admins_retrieved',            'Sub-admins retrieved successfully',            'സബ്-അഡ്മിൻമാർ വിജയകരമായി ലഭിച്ചു'),
         ('sub_admin_retrieved',             'Sub-admin retrieved successfully',             'സബ്-അഡ്മിൻ വിജയകരമായി ലഭിച്ചു'),
@@ -325,6 +311,37 @@ def seed_admin_translations(languages):
         Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'Admin management', 'is_verified': True}
+        )
+        count += 1
+
+    # Two-factor authentication — the views call t('auth.two_factor_*'), so these
+    # live in the 'auth' category (they were once seeded under 'admin', which no
+    # code reads, and every 2FA message came back as its raw key).
+    auth_category = TranslationCategory.objects.get(code='auth')
+    auth_messages = [
+        ('two_factor_required',                 'Two-factor authentication required',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം ആവശ്യമാണ്'),
+        ('two_factor_setup_initiated',          'Scan the QR code with Google Authenticator',  'Google Authenticator ഉപയോഗിച്ച് QR കോഡ് സ്കാൻ ചെയ്യുക'),
+        ('two_factor_enabled',                  'Two-factor authentication enabled successfully', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം വിജയകരമായി പ്രവർത്തനക്ഷമമാക്കി'),
+        ('two_factor_disabled',                 'Two-factor authentication disabled',           'ടു-ഫാക്ടർ പ്രാമാണീകരണം നിഷ്ക്രിയമാക്കി'),
+        ('two_factor_already_enabled',          'Two-factor authentication is already enabled', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം ഇതിനകം പ്രവർത്തനക്ഷമമാണ്'),
+        ('two_factor_not_enabled',              'Two-factor authentication is not enabled',     'ടു-ഫാക്ടർ പ്രാമാണീകരണം പ്രവർത്തനക്ഷമമല്ല'),
+        ('two_factor_not_initiated',            'Please initiate 2FA setup first',              'ആദ്യം 2FA സജ്ജീകരണം ആരംഭിക്കുക'),
+        ('two_factor_invalid_code',             'Invalid or expired code',                      'അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട കോഡ്'),
+        ('two_factor_invalid_backup_code',      'Invalid backup code',                          'അസാധുവായ ബാക്കപ്പ് കോഡ്'),
+        ('two_factor_code_required',            'Code is required',                             'കോഡ് ആവശ്യമാണ്'),
+        ('two_factor_admin_only',               'Two-factor authentication is for admin accounts only', 'ടു-ഫാക്ടർ പ്രാമാണീകരണം അഡ്മിൻ അക്കൗണ്ടുകൾക്ക് മാത്രമാണ്'),
+        ('two_factor_status_retrieved',         'Two-factor status retrieved successfully',     'ടു-ഫാക്ടർ സ്ഥിതി വിജയകരമായി ലഭിച്ചു'),
+        ('two_factor_backup_codes_regenerated', 'Backup codes regenerated successfully',        'ബാക്കപ്പ് കോഡുകൾ വിജയകരമായി പുനർജനിച്ചു'),
+        ('invalid_or_expired_token',            'Invalid or expired token',                     'അസാധുവായ അല്ലെങ്കിൽ കാലഹരണപ്പെട്ട ടോക്കൺ'),
+    ]
+    for key, en_value, ml_value in auth_messages:
+        Translation.objects.update_or_create(
+            category=auth_category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': 'Two-factor authentication', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=auth_category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'Two-factor authentication', 'is_verified': True}
         )
         count += 1
 
@@ -1027,6 +1044,9 @@ def seed_ui_translations(languages):
         ('sub_admins_table.disable_2fa',        'Disable 2FA',                              '2FA പ്രവർത്തനരഹിതമാക്കുക'),
         ('sub_admins_table.disable_2fa_failed', 'Failed to disable 2FA',                    '2FA പ്രവർത്തനരഹിതമാക്കൽ പരാജയപ്പെട്ടു'),
         ('sub_admins_table.toast_2fa_disabled', '2FA disabled for this user',               'ഈ ഉപയോക്താവിന് 2FA പ്രവർത്തനരഹിതമാക്കി'),
+        ('sub_admins_table.disable_2fa_description', 'Two-factor authentication will be turned off for "{name}". They will sign in with just their password until they set it up again.', '"{name}" എന്നയാളുടെ ടു-ഫാക്ടർ പ്രാമാണീകരണം ഓഫാക്കും. വീണ്ടും സജ്ജീകരിക്കുന്നതുവരെ അവർ പാസ്‌വേഡ് മാത്രം ഉപയോഗിച്ച് ലോഗിൻ ചെയ്യും.'),
+        ('sub_admins_table.disable_2fa_confirm', 'Disable',                                 'പ്രവർത്തനരഹിതമാക്കുക'),
+        ('sub_admins_table.disabling',          'Disabling...',                             'പ്രവർത്തനരഹിതമാക്കുന്നു...'),
         ('sub_admins_table.reset_password',     'Reset Password',                           'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക'),
         ('sub_admins_table.reset_password_title', 'Reset Password',                         'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക'),
         ('sub_admins_table.reset_password_description', 'A temporary password will be generated and sent to "{name}" via email. They will be required to change it on next login.', 'ഒരു താൽക്കാലിക പാസ്‌വേഡ് സൃഷ്ടിച്ച് "{name}" എന്നയാൾക്ക് ഇ-മെയിൽ വഴി അയയ്ക്കും. അടുത്ത ലോഗിനിൽ അത് മാറ്റേണ്ടതുണ്ട്.'),
@@ -1058,6 +1078,8 @@ def seed_ui_translations(languages):
         ('sub_admins_table.select_placeholder', 'Select destination',                       'പുതിയ ജില്ല തിരഞ്ഞെടുക്കുക'),
         ('sub_admins_table.reason_label',       'Reason (optional)',                        'കാരണം (ഓപ്ഷണൽ)'),
         ('sub_admins_table.reason_placeholder', 'e.g. Reorganisation for FY 2026-27',       'ഉദാ: 2026-27 സാമ്പത്തിക വർഷത്തെ പുനഃസംഘടന'),
+        ('sub_admins_table.reason_word_count',  '{count}/{max} words',                      '{count}/{max} വാക്കുകൾ'),
+        ('sub_admins_table.reason_too_long',    'Reason can be at most {max} words.',       'കാരണം പരമാവധി {max} വാക്കുകൾ ആയിരിക്കണം.'),
         ('sub_admins_table.history_heading',    'Transfer History',                         'ജില്ലാ മാറ്റ ചരിത്രം'),
         ('sub_admins_table.cancel',             'Cancel',                                   'റദ്ദാക്കുക'),
         ('sub_admins_table.transfer_btn',       'Transfer',                                 'മാറ്റുക'),

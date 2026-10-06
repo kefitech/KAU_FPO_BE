@@ -31,6 +31,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.exceptions import TokenError
 from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiResponse
 
+from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsSuperAdmin, IsSubAdminOrSuperAdmin
 from apps.core.utils.throttles import TwoFactorLoginThrottle, TwoFactorSetupThrottle, Disable2FAOTPThrottle
 from apps.core.utils.constants import UserRole
@@ -587,14 +588,27 @@ class TwoFactorDisableView(APIView):
                 message=t('common.not_found', lang), status_code=404
             )
 
-        try:
-            two_factor = AdminTwoFactor.objects.get(user=user)
-            two_factor.is_enabled = False
-            two_factor.secret = ''
-            two_factor.backup_codes = []
-            two_factor.save()
-        except AdminTwoFactor.DoesNotExist:
-            pass
+        # Only an active 2FA can be disabled — don't report success for a user
+        # who never finished setup.
+        two_factor = AdminTwoFactor.objects.filter(user=user, is_enabled=True).first()
+        if not two_factor:
+            return StandardResponse.error(
+                message=t('auth.two_factor_not_enabled', lang), status_code=400
+            )
+
+        two_factor.is_enabled = False
+        two_factor.secret = ''
+        two_factor.backup_codes = []
+        two_factor.save()
+
+        # Account-recovery override of another user's security setting — keep a trail.
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.UPDATE,
+            instance=two_factor,
+            changes={'is_enabled': {'old': True, 'new': False}, 'disabled_for': user.email},
+            request=request,
+        )
 
         return StandardResponse.success(
             message=t('auth.two_factor_disabled', lang),

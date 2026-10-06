@@ -241,9 +241,20 @@ class AvailablePermissionSerializer(serializers.Serializer):
     description = serializers.CharField()
 
 
+TRANSFER_REASON_MAX_WORDS = 500
+
+
 class TransferDistrictSerializer(serializers.Serializer):
     to_district = serializers.ChoiceField(choices=District.choices)
     reason      = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_reason(self, value):
+        # Same count as the dialog's counter: whitespace-separated words.
+        if len(value.split()) > TRANSFER_REASON_MAX_WORDS:
+            raise serializers.ValidationError(
+                f'Reason can be at most {TRANSFER_REASON_MAX_WORDS} words.'
+            )
+        return value
 
 
 class DistrictTransferHistorySerializer(serializers.ModelSerializer):
