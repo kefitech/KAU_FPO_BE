@@ -311,20 +311,60 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'Total means of finance:     {_fmt_inr(mof.total)}',
     ]
 
-    # DPR-10 (UAT): Only emit subsidy scheme metadata when a subsidy is
-    # actually proposed — otherwise three "Not available" lines in a row
-    # push the LLM to invent sentences about missing details.
-    lines.extend([
-        f'  - Promoter contribution:  {_fmt_inr(mof.by_field.get("mof_promoters_contribution"))}',
-        f'  - Bank / term loan:       {_fmt_inr(mof.by_field.get("mof_bank_term_loan"))}',
-        f'  - Working capital loan:   {_fmt_inr(mof.by_field.get("mof_working_capital_loan"))}',
-        f'  - Government subsidy/grant: {subsidy_display}',
-    ])
+    # DPR-10 (UAT): Emit EVERY non-zero funding source — the previous version
+    # only emitted 4 lines (promoter / term loan / WC loan / subsidy) and
+    # left out share capital, internal accruals, venture capital, CSR,
+    # NABARD, other sources. That meant the AI narrative often listed
+    # funding totals that didn't match the project cost (similar-01 showed
+    # ₹2.25 Cr of sources against a ₹2.50 Cr total; contrasting-02 showed
+    # ₹78 L against ₹90 L — ₹12 L member share capital was missing).
+    _MOF_LABELS = [
+        ('mof_promoters_contribution',     'Promoter contribution'),
+        ('mof_share_capital',              'Member share capital'),
+        ('mof_internal_accruals',          'Internal accruals'),
+        ('mof_bank_term_loan',             'Bank / term loan'),
+        ('mof_working_capital_loan',       'Working capital loan'),
+        ('mof_government_grant',           'Government grant'),
+        ('mof_government_subsidy',         'Government subsidy'),
+        ('mof_nabard_assistance',          'NABARD assistance'),
+        ('mof_csr_support',                'CSR support'),
+        ('mof_venture_capital',            'Venture capital'),
+        ('mof_other_financial_assistance', 'Other financial assistance'),
+        ('mof_other_sources',              'Other sources'),
+    ]
+    mof_total_dec = mof.total or Decimal('0')
+    listed_total = Decimal('0')
+    nonzero_source_count = 0
+    for key, label in _MOF_LABELS:
+        v = mof.by_field.get(key) or Decimal('0')
+        if v <= 0:
+            continue
+        listed_total += v
+        nonzero_source_count += 1
+        if mof_total_dec > 0:
+            pct = (v * Decimal('100') / mof_total_dec).quantize(Decimal('0.1'))
+            lines.append(f'  - {label}: {_fmt_inr(v)}  ({pct}% of total means of finance)')
+        else:
+            lines.append(f'  - {label}: {_fmt_inr(v)}')
+    if nonzero_source_count == 0:
+        lines.append('  - (no funding sources entered yet; means-of-finance total is '
+                     'zero so the LLM MUST NOT quote a funding mix)')
+    # Self-check line so the LLM can confirm sources sum to the total before
+    # writing a funding paragraph. If this reads "mismatch", the FPO's
+    # entered figures don't balance and the AI should flag that gap.
+    lines.append(
+        f'Sum of funding sources shown above:  {_fmt_inr(listed_total)}  '
+        f'(this MUST equal the Total means of finance line; '
+        f'{"MATCH" if listed_total == mof_total_dec else "mismatch — flag in prose"})'
+    )
+    # Aggregate subsidy summary line — rule 14 anchors on this phrase, so
+    # keep it stable even when the per-source breakdown above is empty.
+    lines.append(f'Government subsidy/grant (aggregate):  {subsidy_display}')
     if subsidy_proposed:
         lines.extend([
-            f'    Scheme name:            {subsidy_scheme}',
-            f'    Implementing agency:    {subsidy_agency}',
-            f'    Application status:     {subsidy_status}',
+            f'  Subsidy scheme name:        {subsidy_scheme}',
+            f'  Implementing agency:        {subsidy_agency}',
+            f'  Application status:         {subsidy_status}',
         ])
 
     # DPR-10 (UAT): Explicit state for self-funded projects so the narrative
