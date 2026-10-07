@@ -32,7 +32,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Cm, Inches, Mm, Pt, RGBColor
 
 from apps.fpo.services.dpr.calculation import CalculationResult, compute
-from apps.fpo.services.dpr.enum_display import enum_display as _enum_display
+from apps.fpo.services.dpr.enum_display import (
+    enum_display as _enum_display,
+    display_or_undisclosed as _disclosed_or_default,
+)
 from apps.fpo.services.dpr.chart_helpers import (
     cost_breakdown_pie,
     pnl_trend_bar,
@@ -791,7 +794,7 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
         ('5',  'Legal structure',                   (_enum_display('legal_structure', getattr(fpo, 'legal_structure', '')) or '—') if fpo else '—', False),
         ('6',  'Number of members / shareholders',  str(getattr(fpo, 'total_members', '') or '—') if fpo else '—', False),
         ('7',  'Promoting agency',                  (_enum_display('promoting_agency', getattr(fpo, 'promoting_agency', '')) or '—') if fpo else '—', False),
-        ('8',  'Facilitating agency',               (getattr(fpo, 'facilitating_agency_name', '') or '—') if fpo else '—', False),
+        ('8',  'Facilitating agency',               (_disclosed_or_default(getattr(fpo, 'facilitating_agency_name', '')) if fpo else '—'), False),
         ('9',  'Total project cost',                _fmt_inr_table(r.cost.total), True),
     ]
     cost_sub_rows = _breakdown_rows(r.cost.by_field, COST_LABELS)

@@ -183,3 +183,21 @@ def enum_display(code, category: str) -> str:
     """
     from apps.fpo.services.dpr.enum_display import enum_display as _resolve
     return _resolve(category, code)
+
+
+@register.filter
+def disclosed_or_default(value) -> str:
+    """Render a free-text FPO field, substituting a 'not disclosed' label
+    when the value looks like a test / dummy entry.
+
+    BUG-24 (KAU Section 6): fields like `facilitating_agency_name` were
+    rendering raw test strings ('TEST', 'OPK') on the DPR cover and
+    Promoter Profile section. This filter catches those placeholders
+    and returns 'Not disclosed by the FPO' so the DPR doesn't carry
+    test clutter.
+
+    Usage:
+        {{ project.fpo.facilitating_agency_name|disclosed_or_default }}
+    """
+    from apps.fpo.services.dpr.enum_display import display_or_undisclosed
+    return display_or_undisclosed(value)

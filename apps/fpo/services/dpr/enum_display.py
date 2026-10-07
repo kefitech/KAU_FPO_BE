@@ -41,3 +41,54 @@ def enum_display(category: str, code, language: str = 'en') -> str:
         return result
     # Fallback: `producer_companies` → "Producer Companies"
     return str(code).replace('_', ' ').strip().title()
+
+
+# BUG-24 (KAU §6): obvious test-data placeholders that leaked into the
+# cover + Promoter Profile section of the DPR. The source is the FPO
+# registration data where testers typed `TEST`, `OPK` etc. into the
+# facilitating_agency_name field. Rather than block the DPR submit, we
+# strip these at render time and treat the field as "Not disclosed by
+# the FPO" so KAU doesn't see test clutter.
+_TEST_PLACEHOLDER_PATTERNS = frozenset({
+    'test', 'opk', 'todo', 'xxx', 'tbd', 'tba', 'na', 'n/a',
+    'none', 'nil', 'dummy', 'sample', 'placeholder',
+})
+
+
+def is_test_placeholder(value) -> bool:
+    """True when a free-text field value looks like a test / dummy entry.
+
+    Catches the exact literal placeholders (TEST, OPK, TBD, …) and short
+    strings under 5 characters that are almost always typos or test
+    scaffolding (real agency names run at least a word). Case-insensitive.
+
+    None / empty → False so the caller's own default kicks in.
+    """
+    if value is None:
+        return False
+    s = str(value).strip()
+    if not s:
+        return False
+    lower = s.lower()
+    if lower in _TEST_PLACEHOLDER_PATTERNS:
+        return True
+    # Strings under 5 chars (after strip) are almost certainly not a real
+    # agency name. KAU §6 flagged "OPK" (3 chars) and "TEST" (4) — both
+    # fit this bucket. Legitimate agency codes like "NABARD" (6), "SFAC"
+    # (4) are too short on their own either, but those live in the
+    # `promoting_agency` field with its own MasterLookup, not here in
+    # `facilitating_agency_name` which is free text.
+    if len(s) < 5:
+        return True
+    return False
+
+
+def display_or_undisclosed(value) -> str:
+    """Return value if it looks real, else the 'not disclosed' sentinel.
+
+    Shared by the PDF template filter + the docx renderer so the two
+    stay consistent.
+    """
+    if is_test_placeholder(value):
+        return 'Not disclosed by the FPO'
+    return str(value or '').strip() or 'Not disclosed by the FPO'

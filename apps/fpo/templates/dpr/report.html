@@ -297,7 +297,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <tr><td class="rownum">5</td>  <td class="k">Legal structure</td>                    <td class="v">{{ project.fpo.legal_structure|enum_display:"legal_structure"|default:"—" }}</td></tr>
       <tr><td class="rownum">6</td>  <td class="k">Number of members / shareholders</td>   <td class="v">{{ project.fpo.total_members|default_if_none:"—" }}</td></tr>
       <tr><td class="rownum">7</td>  <td class="k">Promoting agency</td>                   <td class="v">{{ project.fpo.promoting_agency|enum_display:"promoting_agency"|default:"—" }}</td></tr>
-      <tr><td class="rownum">8</td>  <td class="k">Facilitating agency</td>                <td class="v">{{ project.fpo.facilitating_agency_name|default:"—" }}</td></tr>
+      <tr><td class="rownum">8</td>  <td class="k">Facilitating agency</td>                <td class="v">{{ project.fpo.facilitating_agency_name|disclosed_or_default }}</td></tr>
 
       <tr><td class="rownum">9</td>  <td class="k">Total project cost</td>                 <td class="v"><strong>₹ {{ r.cost.total|money }}</strong></td></tr>
       {% for label, val in cost_breakdown_rows %}
