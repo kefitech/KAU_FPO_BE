@@ -30,13 +30,23 @@ def money(value) -> str:
         return str(value)
     neg = d < 0
     d = abs(d)
-    # Split integer + fractional. Show 2 decimals only when non-zero.
+    # Split integer + fractional.
     int_part = int(d)
     frac = d - int_part
     int_str = _indian_grouping(int_part)
     if frac > 0:
-        frac_str = f'{frac:.2f}'.split('.')[1].rstrip('0')
-        out = f'{int_str}.{frac_str}' if frac_str else int_str
+        # BUG-30 minor (KAU §6 retest): the money filter used to strip the
+        # trailing zero in a '.N0' fraction, so values like 49,76,702.30
+        # rendered as '49,76,702.3'. Single-decimal currency reads as
+        # incomplete to a bank reviewer. Always show 2 decimals when any
+        # fractional exists; drop the whole fraction only when it rounds
+        # to zero at 2 dp (meaning the sub-rupee noise is below the
+        # banker-visible resolution).
+        frac_str = f'{frac:.2f}'.split('.')[1]
+        if frac_str == '00':
+            out = int_str
+        else:
+            out = f'{int_str}.{frac_str}'
     else:
         out = int_str
     return f'({out})' if neg else out

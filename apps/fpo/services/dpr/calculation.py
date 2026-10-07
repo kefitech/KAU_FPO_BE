@@ -1322,6 +1322,16 @@ def _amortise_reducing_balance(
         if opening == 0:
             interest = Decimal('0')
 
+        # Minor (KAU §6 retest): decimal residue sometimes leaves a ₹0.01
+        # or ₹0.02 closing balance after the final principal payment of a
+        # fully-repaid loan. Snap sub-rupee residuals to zero so the
+        # 'leftover 0.02' never ships to a KAU-visible PDF — and push
+        # the residue into the final principal payment so the loan
+        # totals still reconcile.
+        if balance != 0 and abs(balance) < Decimal('1'):
+            principal = (principal + balance).quantize(Decimal('0.01'))
+            balance = Decimal('0')
+
         rows.append(InterestScheduleRow(
             year=year,
             opening_balance=opening,
@@ -1439,6 +1449,13 @@ def _amortise_emi(
 
         if opening == 0:
             interest = Decimal('0')
+
+        # Minor (KAU §6 retest): snap sub-rupee residual to zero on
+        # the final payment of a fully-amortised loan — the ₹0.02
+        # leftover otherwise ships to the PDF.
+        if balance != 0 and abs(balance) < Decimal('1'):
+            principal = (principal + balance).quantize(Decimal('0.01'))
+            balance = Decimal('0')
 
         rows.append(InterestScheduleRow(
             year=year,

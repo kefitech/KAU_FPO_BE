@@ -252,6 +252,34 @@ def validate_section(section) -> dict[str, Any]:
         'cost_vehicles',
         'cost_electrification', 'cost_water_supply', 'cost_utilities',
     ]
+    # BUG-31 (KAU §6 retest): the testing team found that WC opex
+    # (sum of 10 wc_* fields) and P&L opex (sum of 14 op_* fields)
+    # are entered as independent inputs and can diverge by >100x.
+    # The operating-cycle WC calculation reads only the wc_* sum, so
+    # a mis-aligned wc_* list produces a WC requirement that bears no
+    # relationship to the actual annual operating cost in the P&L.
+    # Warn when the two diverge by more than 25% (a common 'FPO
+    # miscategorised a cost line' threshold).
+    wc_annual_opex = _sum(section, WC_FIELDS)
+    pl_annual_opex = _sum(section, OPEX_FIELDS)
+    if wc_annual_opex > 0 and pl_annual_opex > 0:
+        divergence = abs(wc_annual_opex - pl_annual_opex)
+        divergence_pct = (divergence * Decimal('100') / pl_annual_opex).quantize(Decimal('0.01'))
+        if divergence_pct > Decimal('25'):
+            warnings.append(_warn(
+                'wc_opex_vs_pl_opex_divergence', 'wc_raw_materials',
+                f'The WC opex total (Σ wc_* = ₹{wc_annual_opex:,.0f}) differs '
+                f'from the P&L operating cost total (Σ op_* = ₹{pl_annual_opex:,.0f}) '
+                f'by {divergence_pct}%. These two totals should normally agree '
+                f'within 10-15% because they describe the SAME annual '
+                f'operating cost: the WC breakdown is used by the operating-'
+                f'cycle calculation (KAU §2.4), and the P&L breakdown is '
+                f'used by the P&L / cash flow / DSCR. Please reconcile — '
+                f'typically one of the two was entered selectively (e.g. '
+                f'raw materials in op_raw_material but not wc_raw_materials '
+                f'or vice versa).',
+            ))
+
     hard_cost = _sum(section, _HARD_COST_FIELDS)
     contingency = Decimal(str(section.cost_contingencies or 0))
     if hard_cost > 0:
