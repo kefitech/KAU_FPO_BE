@@ -27,10 +27,10 @@ from rest_framework import serializers, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import SAFE_METHODS
 
-from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, extend_schema_field
 
 from apps.core.permissions.cbbo_govt_scope import (
-    assignable_districts, can_manage, own_district_error, scope_cbbo_queryset,
+    assignable_districts, can_manage, filter_cbbo_by_district, own_district_error, scope_cbbo_queryset,
 )
 from apps.core.permissions.fpo_scope import get_sub_admin_district, is_sub_admin, is_super_admin
 from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
@@ -218,7 +218,11 @@ class CBBOUpdateSerializer(serializers.Serializer):
 # ─── ViewSet ─────────────────────────────────────────────────────────────────
 
 @extend_schema_view(
-    list=extend_schema(tags=['Admin - CBBOs']),
+    list=extend_schema(tags=['Admin - CBBOs'], parameters=[OpenApiParameter(
+            'district', str, required=False,
+            description='3-letter district code (e.g. "TSR") to list only that district\'s CBBOs, '
+                        'or "state" for state-wide ones.',
+        )]),
     retrieve=extend_schema(tags=['Admin - CBBOs']),
     create=extend_schema(tags=['Admin - CBBOs']),
     partial_update=extend_schema(
@@ -258,7 +262,11 @@ class CBBOViewSet(TranslatedViewSet):
         ).distinct().prefetch_related('cbbo_assignments').order_by('-date_joined')
         # Sub-admins read their district + state-wide CBBOs (all with can_view_all_cbbo_govt)
         # but only change CBBOs in their own district.
-        return scope_cbbo_queryset(qs, self.request.user, manage=self.request.method not in SAFE_METHODS)
+        qs = scope_cbbo_queryset(qs, self.request.user, manage=self.request.method not in SAFE_METHODS)
+        # District filter on the list page: ?district=TSR, or ?district=state for state-wide.
+        if self.action == 'list':
+            qs = filter_cbbo_by_district(qs, self.request.query_params.get('district'))
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'create':

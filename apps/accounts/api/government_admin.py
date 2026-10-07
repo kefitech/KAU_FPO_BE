@@ -13,10 +13,10 @@ from rest_framework import serializers, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import SAFE_METHODS
 
-from drf_spectacular.utils import extend_schema, extend_schema_view, extend_schema_field
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, extend_schema_field
 
 from apps.core.permissions.cbbo_govt_scope import (
-    assignable_districts, can_manage, own_district_error, scope_govt_queryset,
+    assignable_districts, can_manage, filter_govt_by_district, own_district_error, scope_govt_queryset,
 )
 from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
@@ -183,7 +183,11 @@ class GovernmentUpdateSerializer(serializers.Serializer):
 
 
 @extend_schema_view(
-    list=extend_schema(tags=['Admin - Government']),
+    list=extend_schema(tags=['Admin - Government'], parameters=[OpenApiParameter(
+            'district', str, required=False,
+            description='3-letter district code (e.g. "TSR") to list only that district\'s officials, '
+                        'or "state" for state-wide ones.',
+        )]),
     retrieve=extend_schema(tags=['Admin - Government']),
     create=extend_schema(tags=['Admin - Government']),
     partial_update=extend_schema(
@@ -212,7 +216,11 @@ class GovernmentViewSet(TranslatedViewSet):
         ).select_related('govt_profile').order_by('-date_joined')
         # Sub-admins read their district + state-level officials (all with can_view_all_cbbo_govt)
         # but only change officials in their own district.
-        return scope_govt_queryset(qs, self.request.user, manage=self.request.method not in SAFE_METHODS)
+        qs = scope_govt_queryset(qs, self.request.user, manage=self.request.method not in SAFE_METHODS)
+        # District filter on the list page: ?district=TSR, or ?district=state for state-level.
+        if self.action == 'list':
+            qs = filter_govt_by_district(qs, self.request.query_params.get('district'))
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'create':
