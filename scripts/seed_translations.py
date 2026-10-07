@@ -1051,6 +1051,11 @@ def seed_ui_translations(languages):
         # Shown instead of the row menu on CBBOs / officials a sub-admin can only view
         ('cbbos_table.view_only',               'View only',                                'കാണാൻ മാത്രം'),
         ('government_table.view_only',          'View only',                                'കാണാൻ മാത്രം'),
+        # District filter on the CBBO / Government tables (+ its state-wide option, also the scope badge)
+        ('cbbos_table.filter_district',         'All Districts',                            'എല്ലാ ജില്ലകളും'),
+        ('cbbos_table.state_wide',              'State-wide',                               'സംസ്ഥാനതലം'),
+        ('government_table.filter_district',    'All Districts',                            'എല്ലാ ജില്ലകളും'),
+        ('government_table.state_wide',         'State-wide',                               'സംസ്ഥാനതലം'),
         ('sub_admins_table.no_district_hint',   'Sees no FPOs until transferred to a district', 'ഒരു ജില്ലയിലേക്ക് മാറ്റുന്നതുവരെ FPO-കളൊന്നും കാണാനാവില്ല'),
         ('sub_admins_table.no_assigned_fpos_short', 'None',                                 'ഒന്നുമില്ല'),
         ('sub_admins_table.view_fpos_hint',     'View FPOs in scope',                       'പരിധിയിലുള്ള FPO-കൾ കാണുക'),

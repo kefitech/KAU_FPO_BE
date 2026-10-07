@@ -22,6 +22,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 
 from apps.core.permissions.fpo_scope import get_sub_admin_district, is_sub_admin, is_super_admin
+from apps.core.utils.constants import District
 from apps.database.models.cbbo import CBBOAssignment
 
 VIEW_ALL_PERM = 'accounts.can_view_all_cbbo_govt'
@@ -70,6 +71,25 @@ def scope_cbbo_queryset(qs, user, manage=False):
 def scope_govt_queryset(qs, user, manage=False):
     """Government officials `user` may see — or, with manage=True, may change."""
     return _scope(qs, user, _govt_in_district, _govt_state_wide, manage)
+
+
+def _filter_by_district(qs, value, in_district, state_wide):
+    code = (value or '').strip().upper()
+    if code == 'STATE':
+        return qs.filter(state_wide())
+    if code in District.values:
+        return qs.filter(in_district(code))
+    return qs  # blank / unknown → no filter
+
+
+def filter_cbbo_by_district(qs, value):
+    """List filter: ?district=TSR → CBBOs actively assigned to TSR; ?district=state → state-wide ones."""
+    return _filter_by_district(qs, value, _cbbo_in_district, _cbbo_state_wide)
+
+
+def filter_govt_by_district(qs, value):
+    """List filter: ?district=TSR → officials whose districts include TSR; ?district=state → state-level ones."""
+    return _filter_by_district(qs, value, _govt_in_district, _govt_state_wide)
 
 
 def can_manage(context, obj, scope_fn):
