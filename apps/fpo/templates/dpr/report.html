@@ -93,6 +93,10 @@ Author: Athul Gopan (Kefi Tech Solutions)
     .product-card { display: flex; gap: 5mm; padding: 4mm; margin-bottom: 4mm; border: 1px solid #ccc; border-radius: 2mm; background: #fcfcfc; page-break-inside: avoid; }
     .product-card .prod-img { width: 55mm; height: 40mm; object-fit: cover; border: 1px solid #ddd; border-radius: 1mm; background: #f4f6f9; }
     .product-card .prod-info { flex: 1; font-size: 9.5pt; }
+    /* BUG-22 (KAU §6): when a product has no image, drop the empty-tile
+       placeholder entirely and let the info block take the full card width. */
+    .product-card--no-image { gap: 0; }
+    .product-card--no-image .prod-info { font-size: 10pt; }
     .product-card .prod-name { font-size: 11pt; font-weight: 700; color: #1F3864; margin: 0 0 2mm 0; }
     .product-card .prod-meta { color: #555; margin: 1mm 0; }
     .product-card .prod-meta strong { color: #1F3864; }
@@ -792,12 +796,14 @@ Author: Athul Gopan (Kefi Tech Solutions)
   <h2 id="sec-products">Proposed Products &amp; Services</h2>
   <div class="products-grid">
     {% for p in pdf_products %}
-      <div class="product-card">
+      <div class="product-card{% if not p.image_path %} product-card--no-image{% endif %}">
         {% if p.image_path %}
           <img class="prod-img" src="file://{{ p.image_path }}" alt="{{ p.name }}" />
-        {% else %}
-          <div class="prod-img" style="display:flex;align-items:center;justify-content:center;color:#bbb;font-style:italic;font-size:8pt;">No photo</div>
         {% endif %}
+        {# BUG-22 (KAU §6): the "No photo" placeholder box is dropped
+           entirely when the product has no image. The product-card--no-image
+           modifier lets the card stretch the info block to full width so
+           the layout stays tidy without a greyed-out empty tile. #}
         <div class="prod-info">
           <div class="prod-name">
             {{ p.name }}

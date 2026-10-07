@@ -1007,24 +1007,26 @@ def _render_products(doc, project) -> None:
         return
     _add_heading(doc, 'Proposed Products & Services', level=1, bookmark='sec_products')
     for p in products:
-        # 1 row × 2 cols. Image on the left (2 inches), details on the right.
-        card = doc.add_table(rows=1, cols=2)
-        card.style = 'Light Grid Accent 1'
-        card.autofit = False
-        # Column widths — python-docx sets width per cell for reliability
-        # across word processors (Word ignores table-level widths sometimes).
-        img_col_width = Inches(2.0)
-        details_col_width = Inches(4.5)
-        card.columns[0].width = img_col_width
-        card.columns[1].width = details_col_width
-        img_cell, details_cell = card.rows[0].cells
-        img_cell.width = img_col_width
-        details_cell.width = details_col_width
-
-        # ── Left cell: product image ─────────────────────────────────────
         img_path = p.get('image_path') or ''
+
+        # BUG-22 (KAU §6): when a product has NO uploaded image, skip the
+        # placeholder tile entirely and emit a full-width details-only card.
+        # Previously a greyed-out "No photo" tile sat on the left of every
+        # photoless product; KAU asked for empty blocks to be hidden.
         if img_path:
-            # First paragraph of a table cell exists by default — write into it.
+            # 1 row × 2 cols. Image on the left (2 inches), details on the right.
+            card = doc.add_table(rows=1, cols=2)
+            card.style = 'Light Grid Accent 1'
+            card.autofit = False
+            img_col_width = Inches(2.0)
+            details_col_width = Inches(4.5)
+            card.columns[0].width = img_col_width
+            card.columns[1].width = details_col_width
+            img_cell, details_cell = card.rows[0].cells
+            img_cell.width = img_col_width
+            details_cell.width = details_col_width
+
+            # Left cell: product image.
             para = img_cell.paragraphs[0]
             para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             try:
@@ -1034,16 +1036,13 @@ def _render_products(doc, project) -> None:
             except Exception:  # noqa: BLE001 — bad image path shouldn't kill the DOCX
                 para.add_run('(image unavailable)').italic = True
         else:
-            # WP-12 (UAT): PDF shows a "No photo" placeholder box when the
-            # product has no uploaded image. Previously the Word version
-            # emitted an empty cell with no indication; now matches the
-            # PDF so a reviewer sees the shape of the card either way.
-            placeholder = img_cell.paragraphs[0]
-            placeholder.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            ph_run = placeholder.add_run('No photo')
-            ph_run.italic = True
-            ph_run.font.size = Pt(10)
-            ph_run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+            # 1-column full-width card — no image placeholder.
+            card = doc.add_table(rows=1, cols=1)
+            card.style = 'Light Grid Accent 1'
+            card.autofit = False
+            card.columns[0].width = Inches(6.5)
+            details_cell = card.rows[0].cells[0]
+            details_cell.width = Inches(6.5)
 
         # ── Right cell: product details ──────────────────────────────────
         details_cell.text = ''  # clear default empty paragraph
