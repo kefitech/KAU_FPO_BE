@@ -166,7 +166,7 @@ ROLE_HIERARCHY = {
 # Add new entries here as new features are built.
 SUB_ADMIN_PERMISSIONS = [
     ('can_approve_fpo',                  'Can approve or reject FPO applications'),
-    ('can_view_all_fpos',                'Can view all FPO profiles'),
+    ('can_view_all_fpos',                'Can view FPO applications in every district (read-only outside own district)'),
     ('can_request_info',                 'Can request additional info from FPO'),
     ('can_verify_documents',             'Can mark FPO documents as verified'),
     ('can_generate_reports',             'Can export FPO summary reports'),

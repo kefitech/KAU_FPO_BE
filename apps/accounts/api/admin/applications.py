@@ -19,14 +19,17 @@ Endpoints:
     PATCH/DELETE  …/training-sessions/{session_id}/comments/{comment_id}/      — author edits; author or super admin deletes
 
 Permissions:
-    list / detail / verify-document  → super_admin OR sub_admin with can_view_all_fpos
+    list / detail / tier views       → super_admin OR any sub_admin
+    verify-document                  → super_admin OR sub_admin with can_verify_documents
     reject / approve / (de)activate  → super_admin OR sub_admin with can_approve_fpo
     request-info                     → super_admin OR sub_admin with can_request_info
     training-sessions (+ comments)   → super_admin OR sub_admin with can_manage_trainings
     set-user-limit                   → super_admin only
 
 Row-level security (KAU suggestion #1):
-    Sub-admins only see FPOs in their own district (SubAdminDistrictAssignment).
+    Sub-admins see FPOs in their own district (SubAdminDistrictAssignment). With
+    can_view_all_fpos the read endpoints (list, detail, tier history/assessment)
+    also show every other district; every action stays limited to their own.
     Every lookup goes through scope_fpo_queryset(), so an out-of-scope FPO is a 404.
 """
 
@@ -48,7 +51,7 @@ from apps.database.models.government import GovernmentOfficialProfile
 from apps.cbbo.training_comments import TrainingSessionCommentSerializer, admin_designation
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
-from apps.core.permissions.fpo_scope import is_super_admin, scope_fpo_queryset
+from apps.core.permissions.fpo_scope import can_manage_fpo, is_super_admin, scope_fpo_queryset
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -111,6 +114,7 @@ class _ApplicationListSerializer(serializers.ModelSerializer):
     current_tier       = serializers.CharField(source='tier', default=None)
     status_display     = serializers.CharField(source='get_status_display', read_only=True)
     district_display   = serializers.SerializerMethodField()
+    can_manage         = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
@@ -123,8 +127,13 @@ class _ApplicationListSerializer(serializers.ModelSerializer):
             'office_email', 'office_phone',
             'email_verified', 'phone_verified',
             'primary_user_id', 'primary_user_name', 'primary_user_email', 'primary_user_phone',
+            'can_manage',
             'created_at', 'updated_at',
         ]
+
+    def get_can_manage(self, obj):
+        # False for other districts' FPOs a sub-admin sees only via can_view_all_fpos
+        return can_manage_fpo(self.context, obj)
 
     def get_primary_user_name(self, obj):
         if obj.primary_user:
@@ -151,6 +160,7 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
     district_display    = serializers.SerializerMethodField()
     block_taluk_display = serializers.SerializerMethodField()
     bank_name_display   = serializers.SerializerMethodField()
+    can_manage          = serializers.SerializerMethodField()
 
     class Meta:
         model  = FPO
@@ -176,14 +186,19 @@ class _ApplicationDetailSerializer(serializers.ModelSerializer):
             'primary_user',
             'documents', 'status_history',
             'claim_origin',
+            'can_manage',
             'created_at', 'updated_at',
         ]
+
+    def get_can_manage(self, obj):
+        # False for other districts' FPOs a sub-admin sees only via can_view_all_fpos
+        return can_manage_fpo(self.context, obj)
 
     def get_district_display(self, obj):
         from apps.core.utils.constants import get_district_name
         lang = getattr(self.context.get('request'), 'language', 'en')
         return get_district_name(obj.district, language=lang) if obj.district else None
- 
+
     def get_block_taluk_display(self, obj):
         from apps.core.models.generic import MasterLookup
         lang = getattr(self.context.get('request'), 'language', 'en')
@@ -341,12 +356,9 @@ class _AdminEditFPOSerializer(serializers.Serializer):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _can_view(user):
-    if user.groups.filter(name=UserRole.SUPER_ADMIN).exists():
-        return True
-    return (
-        user.groups.filter(name=UserRole.SUB_ADMIN).exists()
-        and user.has_perm('accounts.can_view_all_fpos')
-    )
+    # Which FPOs a sub-admin sees (own district, or all with can_view_all_fpos)
+    # is decided by scope_fpo_queryset(..., read_only=True).
+    return user.groups.filter(name__in=[UserRole.SUPER_ADMIN, UserRole.SUB_ADMIN]).exists()
 
 
 def _can_act(user):
@@ -389,9 +401,12 @@ def _can_manage_trainings(user):
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _get_fpo(fpo_id, user):
-    """Fetch an FPO within `user`'s row-level scope. None if missing or out of scope."""
-    qs = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), user)
+def _get_fpo(fpo_id, user, read_only=False):
+    """
+    Fetch an FPO within `user`'s row-level scope. None if missing or out of scope.
+    Only read endpoints pass read_only=True — actions stay within the sub-admin's district.
+    """
+    qs = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), user, read_only=read_only)
     return qs.select_related(
         'primary_user', 'primary_user__profile',
     ).filter(id=fpo_id).first()
@@ -480,7 +495,7 @@ class ApplicationListView(APIView):
             )
 
         qs = scope_fpo_queryset(
-            FPO.objects.filter(is_deleted=False), request.user,
+            FPO.objects.filter(is_deleted=False), request.user, read_only=True,
         ).select_related(
             'primary_user', 'primary_user__profile',
         )
@@ -522,7 +537,7 @@ class ApplicationDetailView(APIView):
             )
 
         fpo = scope_fpo_queryset(
-            FPO.objects.filter(is_deleted=False), request.user,
+            FPO.objects.filter(is_deleted=False), request.user, read_only=True,
         ).select_related(
             'primary_user', 'primary_user__profile', 'claimed_from_fpo',
         ).prefetch_related(
@@ -1065,7 +1080,7 @@ class ApplicationTierHistoryView(APIView):
         ).exists():
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        fpo = scope_fpo_queryset(FPO.objects.all(), request.user).filter(id=fpo_id).first()
+        fpo = scope_fpo_queryset(FPO.objects.all(), request.user, read_only=True).filter(id=fpo_id).first()
         if not fpo:
             return StandardResponse.error('FPO not found.', status_code=status.HTTP_404_NOT_FOUND)
 
@@ -1107,7 +1122,7 @@ class ApplicationTierAssessmentView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        fpo = _get_fpo(fpo_id, request.user)
+        fpo = _get_fpo(fpo_id, request.user, read_only=True)
         if not fpo:
             return StandardResponse.error(t('fpo.fpo_not_found', request.language), status_code=status.HTTP_404_NOT_FOUND)
 
