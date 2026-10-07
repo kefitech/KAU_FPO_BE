@@ -129,6 +129,24 @@ CONFIG_SEEDS = [
         '(not an error). KAU RCD B.4.',
         '%', '0', '100',
     ),
+    # ── BUG-29 (KAU §6) — contingency sizing ────────────────────────────
+    # The testing team flagged that contingency was being auto-checked
+    # against project_cost_variance_pct (10%) when it is really a
+    # different concept — variance tolerance sizes the MoF vs cost gap;
+    # contingency sizes a buffer against capex risk. Separating them so
+    # KAU can tune each independently.
+    (
+        'contingency_default_pct', 'variance', 'decimal', '10.00',
+        'Contingency % of hard cost',
+        'Default contingency reserve as a percentage of hard-asset cost '
+        '(civil + machinery + equipment + vehicles + electrification + utilities). '
+        'The wizard pre-fills cost_contingencies at this percentage when the FPO '
+        'has not entered one. The Finance validator warns when the entered '
+        'contingency falls below this threshold so the FPO can explicitly '
+        'justify a lower buffer in the Financial Analysis narrative. '
+        'BUG-29 (KAU §6).',
+        '%', '0', '100',
+    ),
 
     # ── Retention & archival (C.4) ──────────────────────────────────────
     (

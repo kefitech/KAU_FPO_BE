@@ -255,16 +255,22 @@ def validate_section(section) -> dict[str, Any]:
     hard_cost = _sum(section, _HARD_COST_FIELDS)
     contingency = Decimal(str(section.cost_contingencies or 0))
     if hard_cost > 0:
-        threshold_pct = DPRConfig.get_decimal('project_cost_variance_pct', Decimal('10'))
+        # BUG-29 (KAU §6): previously compared contingency against
+        # `project_cost_variance_pct` (10% MoF-vs-cost tolerance) which was
+        # semantically wrong. Now reads the dedicated
+        # `contingency_default_pct` DPRConfig key (default 10%) so KAU
+        # can tune the contingency floor without changing the MoF variance
+        # tolerance. The two concepts stay separate.
+        threshold_pct = DPRConfig.get_decimal('contingency_default_pct', Decimal('10'))
         expected_contingency = (hard_cost * threshold_pct / Decimal('100')).quantize(Decimal('0.01'))
         if contingency < expected_contingency:
             actual_pct = (contingency * Decimal('100') / hard_cost).quantize(Decimal('0.01'))
             warnings.append(_warn(
                 'contingency_below_tolerance', 'cost_contingencies',
                 f'Contingency (₹{contingency:,.0f} = {actual_pct}% of hard cost) is below '
-                f'the configured {threshold_pct}% tolerance (expected ≥ ₹{expected_contingency:,.0f}). '
+                f'the configured {threshold_pct}% contingency floor (expected ≥ ₹{expected_contingency:,.0f}). '
                 f'Consider raising the contingency line or add a note in the Financial Analysis '
-                f'narrative explaining why a smaller buffer is adequate.',
+                f'narrative explaining why a smaller buffer is adequate for this project.',
             ))
 
     return {
