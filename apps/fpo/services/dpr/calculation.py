@@ -607,7 +607,19 @@ def compute_cost_and_mof(project) -> tuple[ProjectCostBreakdown, MeansOfFinanceB
     cost_total, cost_map = _sum_fields(finance_section, COST_FIELDS)
     mof_total, mof_map = _sum_fields(finance_section, MOF_FIELDS)
 
-    delta = mof_total - cost_total
+    # BUG-33 (KAU §6 retest r2/r3): the cash-credit / WC loan is an
+    # operating facility, NOT project-cost financing — it must not enter
+    # the cost-vs-MoF reconciliation. The r2 fix only patched the
+    # finance_validators warning; the tester's forced recalcs showed
+    # `variance.mof_total` (THIS dataclass) still carried the ₹1.24 Cr
+    # CC limit and flagged a 50% variance. Exclude it here too. The
+    # loan stays inside mof.total/by_field because the Y0 cash flow and
+    # the balance-sheet wc_loan_outstanding line both legitimately see
+    # the inflow.
+    wc_loan_amount = mof_map.get('mof_working_capital_loan', Decimal('0'))
+    mof_total_for_variance = mof_total - wc_loan_amount
+
+    delta = mof_total_for_variance - cost_total
     if cost_total > 0:
         pct = (abs(delta) / cost_total) * Decimal('100')
     else:
@@ -619,11 +631,11 @@ def compute_cost_and_mof(project) -> tuple[ProjectCostBreakdown, MeansOfFinanceB
         MeansOfFinanceBreakdown(total=mof_total, by_field=mof_map),
         CostMofVariance(
             cost_total=cost_total,
-            mof_total=mof_total,
+            mof_total=mof_total_for_variance,
             delta=delta,
             pct=pct,
             threshold_pct=threshold,
-            exceeds_threshold=(pct > threshold) if cost_total > 0 and mof_total > 0 else False,
+            exceeds_threshold=(pct > threshold) if cost_total > 0 and mof_total_for_variance > 0 else False,
         ),
     )
 
@@ -2026,6 +2038,27 @@ def build_balance_sheet(
         net_fa = gross_fa - accum_dep
         cash = cash_flow.rows[year].closing_cash if year < len(cash_flow.rows) else Decimal('0')
         wc = wc_margin
+        # BUG-33 (KAU §6 retest r3): the WC-loan proceeds arrive as Y0 cash
+        # (they're inside mof.total → closing_cash), but the same rupees
+        # are then DEPLOYED into working capital — they can't sit on the
+        # balance sheet twice (as cash AND as the WC asset). The tester's
+        # ledger showed exactly this: cash ₹1.24 Cr + working_capital
+        # ₹1.36 Cr with only ₹1.24 Cr of WC loan on the liability side →
+        # invariant_delta = the WC loan, in all 11 years.
+        # Deployed-from-cash = the WC asset growth beyond the margin
+        # (which was already paid out of cash via cost.total) MINUS the
+        # un-arranged shortfall (phantom borrowing, no cash movement).
+        # Algebra: deployed = (R − M) − gap = min(L + M, R) − M, which
+        # zeroes the invariant in both the shortfall and surplus-loan
+        # cases.
+        if wc_statement is not None and wc_statement.wc_requirement_used > 0:
+            _wc_growth_beyond_margin = max(
+                Decimal('0'),
+                wc_statement.wc_requirement_used - wc_statement.margin_for_working_capital,
+            )
+            _cash_deployed_into_wc = _wc_growth_beyond_margin - wc_statement.funding_gap
+            if _cash_deployed_into_wc > 0:
+                cash = cash - _cash_deployed_into_wc
         total_assets = land + cwip + net_fa + cash + wc
 
         # ── Equity ──
