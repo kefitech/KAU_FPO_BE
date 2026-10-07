@@ -203,7 +203,9 @@ def _write_summary_sheet(ws, project, r: CalculationResult) -> None:
     if ratios:
         pairs = [
             ('Total project cost (₹)', r.cost.total, 'num'),
-            ('Total means of finance (₹)', r.mof.total, 'num'),
+            # BUG-37: headline MoF excludes the WC facility (cash credit) —
+            # it is an operating line, not project funding.
+            ('Total means of finance (₹)', r.mof.project_funding_total, 'num'),
             ('MoF − Cost delta (₹)', r.variance.delta, 'num'),
             ('Variance %', r.variance.pct, 'pct'),
             ('Discount rate', ratios.discount_rate_pct, 'pct'),
@@ -280,11 +282,22 @@ def _write_cost_mof_sheet(ws, r: CalculationResult) -> None:
     _write_section_title(ws, row, 1, 'B. Means of Finance — Line-item Breakdown')
     row += 1
     _write_header(ws, row, ['MoF line', 'Amount (₹)']); row += 1
+    # BUG-37: the WC facility is listed after the TOTAL as a separate
+    # facility line — it never counts toward project funding.
     for k, v in sorted(r.mof.by_field.items()):
+        if k == 'mof_working_capital_loan':
+            continue
         ws.cell(row=row, column=1, value=k)
         _num_cell(ws, row, 2, v); row += 1
     ws.cell(row=row, column=1, value='TOTAL').font = Font(bold=True)
-    _num_cell(ws, row, 2, r.mof.total); row += 2
+    _num_cell(ws, row, 2, r.mof.project_funding_total); row += 1
+    if r.mof.wc_facility:
+        ws.cell(
+            row=row, column=1,
+            value='Working-capital facility (cash credit) — outside project funding',
+        ).font = Font(italic=True)
+        _num_cell(ws, row, 2, r.mof.wc_facility); row += 1
+    row += 1
 
     _write_section_title(ws, row, 1, 'C. Cost ↔ MoF Reconciliation')
     row += 1

@@ -57,9 +57,19 @@ class ProjectCostBreakdown:
 
 @dataclass
 class MeansOfFinanceBreakdown:
-    """Sum of the ~12 MoF fields on DPRSectionFinance."""
+    """Sum of the ~12 MoF fields on DPRSectionFinance.
+
+    BUG-37 (KAU §6 retest r3): the cash-credit / WC loan is an operating
+    FACILITY, not project-cost financing. Display layers (MoF table,
+    capital schedule, FACTS funding block) must use
+    `project_funding_total` and present `wc_facility` as a separate line
+    below the table. `total` keeps ALL inflows (incl. the CC limit)
+    because the Y0 cash flow genuinely receives that money.
+    """
     total: Decimal
     by_field: dict[str, Decimal]
+    wc_facility: Decimal = Decimal('0')           # mof_working_capital_loan
+    project_funding_total: Decimal = Decimal('0')  # total − wc_facility
 
 
 @dataclass
@@ -121,7 +131,8 @@ class CapitalSchedule:
     implementation_period_months: int
     rows: list[CapitalScheduleRow]
     # Total-check fields — a good schedule ends with cumulative_cost == cost.total
-    # and cumulative_mof == mof.total. Callers assert these to catch drift.
+    # and cumulative_mof == mof.project_funding_total (the WC facility is
+    # a revolving operating line, never part of the capital schedule).
     final_cost: Decimal
     final_mof: Decimal
     distribution_note: str          # human-readable description of the source used
@@ -628,7 +639,11 @@ def compute_cost_and_mof(project) -> tuple[ProjectCostBreakdown, MeansOfFinanceB
 
     return (
         ProjectCostBreakdown(total=cost_total, by_field=cost_map),
-        MeansOfFinanceBreakdown(total=mof_total, by_field=mof_map),
+        MeansOfFinanceBreakdown(
+            total=mof_total, by_field=mof_map,
+            wc_facility=wc_loan_amount,
+            project_funding_total=mof_total_for_variance,
+        ),
         CostMofVariance(
             cost_total=cost_total,
             mof_total=mof_total_for_variance,
@@ -748,6 +763,10 @@ def _schedule_from_tranches(
         month_idx = max(1, int(t.expected_month))
         amt = _decimal(t.amount)
         if t.tranche_type in DPRCapitalTranche.INFLOW_TYPES:
+            # BUG-37: WC facility drawdowns are not project funding —
+            # keep them out of the schedule's funding line.
+            if t.finance_field == 'mof_working_capital_loan':
+                continue
             mof_by_month[month_idx] += amt
         elif t.tranche_type in DPRCapitalTranche.OUTFLOW_TYPES:
             cost_by_month[month_idx] += amt
@@ -809,7 +828,11 @@ def _schedule_uniform_fallback(
     """
     n = max(1, implementation_months)
     total_cost = cost.total
-    total_mof = mof.total
+    # BUG-37: the capital schedule tracks PROJECT funding against project
+    # cost. The working-capital facility (cash credit) is a revolving
+    # operating line, not project funding — including it overstated
+    # cumulative funds and showed a phantom negative unfunded balance.
+    total_mof = mof.project_funding_total
 
     monthly_cost = (total_cost / n).quantize(Decimal('0.01'))
     monthly_mof = (total_mof / n).quantize(Decimal('0.01'))

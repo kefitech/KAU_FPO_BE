@@ -798,8 +798,19 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
         ('9',  'Total project cost',                _fmt_inr_table(r.cost.total), True),
     ]
     cost_sub_rows = _breakdown_rows(r.cost.by_field, COST_LABELS)
-    mof_row = ('10', 'Means of finance', _fmt_inr_table(r.mof.total), True)
-    mof_sub_rows = _breakdown_rows(r.mof.by_field, MOF_LABELS)
+    # BUG-37: WC facility (cash credit) is not project funding — headline
+    # shows project_funding_total; the facility gets its own sub-row.
+    mof_row = ('10', 'Means of finance', _fmt_inr_table(r.mof.project_funding_total), True)
+    mof_sub_rows = _breakdown_rows(
+        {k: v for k, v in r.mof.by_field.items()
+         if k != 'mof_working_capital_loan'},
+        MOF_LABELS,
+    )
+    if r.mof.wc_facility:
+        mof_sub_rows.append((
+            'Working-capital facility (cash credit) — outside project cost',
+            r.mof.wc_facility,
+        ))
     bottom_rows: list[tuple[str, str, str, bool]] = [
         ('11', 'Debt : Equity ratio',                     _debt_equity_ratio_display(r.mof.by_field), False),
         ('12', 'Profit after tax (PAT) — first 3 years', _pat_first_three(), False),
@@ -969,8 +980,17 @@ def _render_cost_breakdown(doc, r: CalculationResult) -> None:
 
 
 def _render_means_of_finance(doc, r: CalculationResult) -> None:
-    """PDF §3 Means of Finance — sources table with total."""
-    rows = _breakdown_rows(r.mof.by_field, MOF_LABELS)
+    """PDF §3 Means of Finance — sources table with total.
+
+    BUG-37: the WC facility (cash credit) is excluded from the sources
+    table and shown as a separate note below it — it funds operations,
+    not the project, so it never counts toward Total Means of Finance.
+    """
+    rows = _breakdown_rows(
+        {k: v for k, v in r.mof.by_field.items()
+         if k != 'mof_working_capital_loan'},
+        MOF_LABELS,
+    )
     if not rows:
         return
     _add_heading(doc, '3. Means of Finance', level=1, bookmark='sec_3')
@@ -991,11 +1011,24 @@ def _render_means_of_finance(doc, r: CalculationResult) -> None:
         table.rows[i].cells[1].text = _fmt_inr_table(value) if isinstance(value, Decimal) else str(value)
     total_cells = table.rows[-1].cells
     total_cells[0].text = 'Total Means of Finance'
-    total_cells[1].text = _fmt_inr_table(r.mof.total)
+    total_cells[1].text = _fmt_inr_table(r.mof.project_funding_total)
     for cell in total_cells:
         for para in cell.paragraphs:
             for run in para.runs:
                 run.bold = True
+    if r.mof.wc_facility:
+        note = doc.add_paragraph()
+        note_run = note.add_run(
+            'In addition to the project funding above, a working-capital '
+            'facility (cash credit) of ₹ '
+            f'{_fmt_inr_table(r.mof.wc_facility)} is proposed. This is a '
+            'revolving operating line used to fund day-to-day working '
+            'capital — it is not part of the project cost or its funding, '
+            'and is covered in the Working Capital Statement (§6B).'
+        )
+        note_run.font.size = Pt(8)
+        note_run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+        note_run.italic = True
 
 
 def _render_products(doc, project) -> None:

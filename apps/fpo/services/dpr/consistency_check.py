@@ -109,6 +109,11 @@ def expected_metrics(result: CalculationResult) -> list[ExpectedMetric]:
         ExpectedMetric(
             'Means of finance',
             _filter_none([
+                # BUG-37: narrative quotes project_funding_total as the MoF
+                # headline; mof.total kept in the accept window for any
+                # chapter that references the all-inflows figure, and the
+                # WC-loan line stays accepted as the separate facility amount.
+                result.mof.project_funding_total,
                 result.mof.total,
                 mof_bf.get('mof_promoters_contribution'),
                 mof_bf.get('mof_bank_term_loan'),

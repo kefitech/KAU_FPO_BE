@@ -467,7 +467,11 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         '',
         '--- Project cost + finance ---',
         f'Total project cost:         {_fmt_inr(cost.total)}',
-        f'Total means of finance:     {_fmt_inr(mof.total)}',
+        # BUG-37: the WC facility (cash credit) is NOT project funding —
+        # the headline MoF figure here is project funding only, and the
+        # facility is stated separately below so the LLM never presents
+        # it as a source that funds the project cost.
+        f'Total means of finance:     {_fmt_inr(mof.project_funding_total)}',
     ]
 
     # DPR-10 (UAT): Emit EVERY non-zero funding source — the previous version
@@ -482,7 +486,8 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         ('mof_share_capital',              'Member share capital'),
         ('mof_internal_accruals',          'Internal accruals'),
         ('mof_bank_term_loan',             'Bank / term loan'),
-        ('mof_working_capital_loan',       'Working capital loan'),
+        # BUG-37: 'mof_working_capital_loan' deliberately absent — the WC
+        # facility is emitted as a separate line below, not a funding source.
         ('mof_government_grant',           'Government grant'),
         ('mof_government_subsidy',         'Government subsidy'),
         ('mof_nabard_assistance',          'NABARD assistance'),
@@ -491,7 +496,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         ('mof_other_financial_assistance', 'Other financial assistance'),
         ('mof_other_sources',              'Other sources'),
     ]
-    mof_total_dec = mof.total or Decimal('0')
+    mof_total_dec = mof.project_funding_total or Decimal('0')
     listed_total = Decimal('0')
     nonzero_source_count = 0
     for key, label in _MOF_LABELS:
@@ -516,6 +521,16 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'(this MUST equal the Total means of finance line; '
         f'{"MATCH" if listed_total == mof_total_dec else "mismatch — flag in prose"})'
     )
+    # BUG-37: the WC facility is stated OUTSIDE the funding mix with an
+    # explicit instruction so no chapter counts it toward project funding.
+    if mof.wc_facility and mof.wc_facility > 0:
+        lines.append(
+            f'Working-capital facility (cash credit), separate from project '
+            f'funding:  {_fmt_inr(mof.wc_facility)}  (a revolving operating '
+            f'line for day-to-day working capital — NEVER present this as a '
+            f'source funding the project cost, and NEVER add it to the means '
+            f'of finance; see the Working Capital Statement)'
+        )
     # Aggregate subsidy summary line — rule 14 anchors on this phrase, so
     # keep it stable even when the per-source breakdown above is empty.
     lines.append(f'Government subsidy/grant (aggregate):  {subsidy_display}')
@@ -1506,48 +1521,100 @@ def generate_chapter(
     # Anthropic / OpenAI / Google / mock based on `cfg.provider`, so
     # switching vendors is admin config only.
     prompt = build_prompt(project, chapter, kb_entries, calc_facts=calc_facts)
-    try:
-        # 5000 max_tokens supports the 400-900 word per-chapter briefs.
-        # Gemini 3.6-flash uses roughly half the budget on internal reasoning
-        # so effective visible output is ~2500 tokens (~1800 words).
-        response: LLMResponse = call_llm(cfg, prompt, max_tokens=5000)
-    except LLMError as e:
-        # Log the failure so it appears in the admin usage table, then bubble
-        # up as NarrativeError so the API layer returns 503.
-        # DPR-10 (UAT): include chapter key in reference_id so admin usage
-        # table can trace which chapter failed on which model.
+
+    # BUG-26 (KAU §6 retest r3): Gemini still emits broken Indian comma
+    # groupings (`13,00,00,00` for 13,00,000) in roughly half of chapters
+    # despite the formatting rules. Per the tester's recommendation we now
+    # auto-retry server-side: up to 3 LLM attempts, stopping at the first
+    # clean one and otherwise keeping the attempt with the fewest broken
+    # numbers (which the scrubber has already masked as `[?]` + flagged
+    # needs_review). Every attempt is individually logged to AIUsageLog
+    # (retries carry a `#r<N>` suffix on reference_id) and counted against
+    # the monthly budget cap.
+    _MAX_BUG26_ATTEMPTS = 3
+    best: Optional[tuple[int, str, list]] = None  # (broken_count, text, hits)
+    for attempt in range(1, _MAX_BUG26_ATTEMPTS + 1):
+        ref_id = f'{project.id}:{chapter}' + (f'#r{attempt}' if attempt > 1 else '')
+        try:
+            # 5000 max_tokens supports the 400-900 word per-chapter briefs.
+            # Gemini 3.6-flash uses roughly half the budget on internal
+            # reasoning so effective visible output is ~2500 tokens.
+            response: LLMResponse = call_llm(cfg, prompt, max_tokens=5000)
+        except LLMError as e:
+            # Log the failure so it appears in the admin usage table.
+            # DPR-10 (UAT): include chapter key in reference_id so admin
+            # usage table can trace which chapter failed on which model.
+            AIUsageLog.objects.create(
+                service=AIUsageLog.Service.DPR_NARRATIVES,
+                fpo=project.fpo,
+                user=requested_by,
+                provider=cfg.provider,
+                model_used=cfg.model_name or 'unknown',
+                input_tokens=0, output_tokens=0, total_tokens=0,
+                cost_usd=Decimal('0'), cost_inr=Decimal('0'),
+                success=False,
+                error_message=str(e)[:500],
+                reference_id=ref_id,
+            )
+            if best is not None:
+                # A retry attempt failed but an earlier attempt produced
+                # usable (if imperfect) text — ship the best we have.
+                break
+            raise NarrativeError(f'LLM provider failure: {e}') from e
+
+        # Wrap the raw LLM output with the chapter title + KB citation
+        # footer. Presentation lives here rather than in the gateway so
+        # switching provider doesn't reshape the narrative structure.
+        text = _assemble_chapter_text(chapter, response.text, kb_entries)
+
+        # KAU 2026-09-19 anti-hallucination scrubber: catch any leftover
+        # `[X ...]`, `[Name of the CEO]`, `[Rs. X Lakhs]` etc. placeholders
+        # the LLM emitted despite the HARD RULES and replace them with
+        # "Not available". Hits are recorded on DPRAIContent.placeholder_hits
+        # so admin can see WHICH chapters were incomplete.
+        text, scrubber_hits = scrub_placeholders(text, chapter=chapter)
+
+        # BUG-26: catch broken Indian comma groupings and mask as `[?]`.
+        text, broken_number_hits = scrub_broken_numbers(text)
+        scrubber_hits.extend(broken_number_hits)
+
+        # Convert USD → INR using the configured rate, then record + apply
+        # the spend against the monthly cap (auto-disables if breached).
+        cost_inr = response.cost_usd * cfg.usd_to_inr_rate
         AIUsageLog.objects.create(
             service=AIUsageLog.Service.DPR_NARRATIVES,
             fpo=project.fpo,
             user=requested_by,
-            provider=cfg.provider,
-            model_used=cfg.model_name or 'unknown',
-            input_tokens=0, output_tokens=0, total_tokens=0,
-            cost_usd=Decimal('0'), cost_inr=Decimal('0'),
-            success=False,
-            error_message=str(e)[:500],
-            reference_id=f'{project.id}:{chapter}',
+            provider=response.provider,
+            model_used=response.model,
+            input_tokens=response.input_tokens,
+            output_tokens=response.output_tokens,
+            total_tokens=response.input_tokens + response.output_tokens,
+            cost_usd=response.cost_usd,
+            cost_inr=cost_inr,
+            success=True,
+            reference_id=ref_id,
         )
-        raise NarrativeError(f'LLM provider failure: {e}') from e
+        # Update running budget totals — no-op for mock (cost=0) but keeps
+        # the cap enforced for real providers.
+        if response.cost_usd > 0:
+            cfg.record_usage(
+                cost_inr=float(cost_inr),
+                tokens=response.input_tokens + response.output_tokens,
+            )
 
-    # Wrap the raw LLM output with the chapter title + KB citation footer.
-    # Presentation lives here rather than in the gateway so switching provider
-    # doesn't reshape the narrative structure.
-    text = _assemble_chapter_text(chapter, response.text, kb_entries)
+        if best is None or len(broken_number_hits) < best[0]:
+            best = (len(broken_number_hits), text, scrubber_hits)
+        if not broken_number_hits:
+            break  # clean attempt — no retry needed
+        # Budget cap may have auto-disabled the service mid-loop — stop
+        # retrying rather than erroring on a disabled config.
+        cfg.refresh_from_db()
+        if not cfg.is_enabled:
+            break
 
-    # KAU 2026-09-19 anti-hallucination scrubber: catch any leftover `[X ...]`,
-    # `[Name of the CEO]`, `[Rs. X Lakhs]` etc. placeholders the LLM emitted
-    # despite the HARD RULES and replace them with "Not available". Hits are
-    # recorded on DPRAIContent.placeholder_hits so admin can see WHICH
-    # chapters were incomplete without diffing the text against the prompt.
-    text, scrubber_hits = scrub_placeholders(text, chapter=chapter)
-
-    # BUG-26 (KAU §6): catch broken Indian comma groupings Gemini sometimes
-    # emits (`25,00,00,00`, `4,38,00,0`). Replace the broken number with
-    # `[?]` so a bank reviewer sees the gap instead of a misleading figure.
-    # Appends to the same scrubber_hits list so needs_review covers both.
-    text, broken_number_hits = scrub_broken_numbers(text)
-    scrubber_hits.extend(broken_number_hits)
+    assert best is not None  # loop either sets best or raises
+    _, text, scrubber_hits = best
 
     # Round-7 fallback (2026-10-05): make the Executive Summary viability
     # sentence deterministic. Gemini sometimes drops the DSCR+IRR+payback
@@ -1556,34 +1623,6 @@ def generate_chapter(
     # a synthesised viability sentence from calc_result so a bank
     # reviewer always sees the summary.
     text = _ensure_exec_viability_sentence(text, chapter, calc_result)
-
-    # Convert USD → INR using the configured rate, then record + apply the
-    # spend against the monthly cap (auto-disables if breached).
-    # DPR-10 (UAT): include chapter key in reference_id so admin usage table
-    # shows which model wrote each chapter — critical for tracing a fallback
-    # that produced wrong quantities to the specific chapter + model combo.
-    cost_inr = response.cost_usd * cfg.usd_to_inr_rate
-    AIUsageLog.objects.create(
-        service=AIUsageLog.Service.DPR_NARRATIVES,
-        fpo=project.fpo,
-        user=requested_by,
-        provider=response.provider,
-        model_used=response.model,
-        input_tokens=response.input_tokens,
-        output_tokens=response.output_tokens,
-        total_tokens=response.input_tokens + response.output_tokens,
-        cost_usd=response.cost_usd,
-        cost_inr=cost_inr,
-        success=True,
-        reference_id=f'{project.id}:{chapter}',
-    )
-    # Update running budget totals — no-op for mock (cost=0) but keeps the
-    # cap enforced for real providers.
-    if response.cost_usd > 0:
-        cfg.record_usage(
-            cost_inr=float(cost_inr),
-            tokens=response.input_tokens + response.output_tokens,
-        )
 
     # Write candidate — never touch original_ai or user_edited here.
     row = ensure_row(project, chapter)

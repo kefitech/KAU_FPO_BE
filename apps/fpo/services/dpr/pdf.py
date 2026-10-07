@@ -555,7 +555,13 @@ def render_html_for_project(
         # Project-at-Glance breakdown rows — pre-computed so the template
         # renders human-readable labels without extra filter machinery.
         'cost_breakdown_rows': _breakdown_rows(result.cost.by_field, COST_LABELS),
-        'mof_breakdown_rows':  _breakdown_rows(result.mof.by_field, MOF_LABELS),
+        # BUG-37: the WC facility (cash credit) is not project funding — the
+        # template shows it as a separate line against r.mof.wc_facility.
+        'mof_breakdown_rows':  _breakdown_rows(
+            {k: v for k, v in result.mof.by_field.items()
+             if k != 'mof_working_capital_loan'},
+            MOF_LABELS,
+        ),
         # Debt-to-equity as banking-convention ratio (e.g. "1.50 : 1"),
         # not raw rupees — per KAU 2026-09-19 reviewer feedback.
         'debt_equity_ratio_display': _debt_equity_ratio_display(result.mof.by_field),
