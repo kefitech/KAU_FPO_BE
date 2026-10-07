@@ -866,9 +866,12 @@ _HARD_RULES = (
     '4. NO restating the chapter title as the first line.\n'
     '5. Write in flowing paragraphs separated by a blank line.\n'
     '6. DO NOT cite the knowledge base inline. Never write "[KB #ID]", '
-    '"[KB#4]", "(KB 10)" or similar in-prose markers. The PDF renders a '
-    'separate "Sources: KB #4, KB #10, ..." footer under each chapter — '
-    'cite there, not inline.\n'
+    '"[KB#4]", "(KB 10)", "Sources: KB #...", "Grounded in:" or any '
+    'similar in-prose or trailing-footer markers. BUG-27 (KAU §6): the '
+    'PDF no longer renders a per-chapter Sources footer because the IDs '
+    'were repeated across every chapter and read as noise to the KAU '
+    'reviewer. Provenance is stored on DPRAIContent and visible to admin '
+    'in the AI Content Health panel — never emit KB IDs in prose.\n'
     '7. GROUNDING: Every number in your output MUST come from the PROJECT '
     'FACTS block above. Do not invent, estimate, approximate, or infer '
     'numeric values. Do not present generic industry statistics as '
@@ -1022,8 +1025,10 @@ _LENIENT_RULES = (
     'or references to this brief itself.\n'
     '4. NO restating the chapter title as the first line.\n'
     '5. Write in flowing paragraphs separated by a blank line.\n'
-    '6. DO NOT cite the knowledge base inline. Never write "[KB #ID]" or '
-    'similar in-prose markers — the PDF renders a separate Sources footer.\n'
+    '6. DO NOT cite the knowledge base inline. Never write "[KB #ID]", '
+    '"Sources: KB #...", "Grounded in:" or any similar footer. BUG-27 '
+    '(KAU §6): no per-chapter Sources footer is rendered any more; '
+    'provenance is tracked in the admin AI Content Health panel.\n'
     '7. KNOWLEDGE SOURCE: You may combine the PROJECT FACTS block, the '
     'knowledge base entries, AND your own general knowledge of industry '
     'best practice / open-source technical standards / environmental norms. '
@@ -1337,14 +1342,19 @@ def _assemble_chapter_text(
 
         <chapter title>
         <LLM body>
-        Grounded in:
-          - [KB #<id>] <title>
-          ...
 
     Kept separate from the LLM call so the same shape works for every
     provider (Claude / Gemini / GPT / mock). Providers that already emit
     their own title get it de-duped naturally by the diff view — the label
     is a short prefix.
+
+    BUG-27 (KAU §6): the earlier version appended 'Sources: KB #4, KB #10,
+    ...' to every chapter. Every chapter cited the same bucket because
+    kb_entries was computed once for the whole generation, so the IDs
+    weren't real per-chapter citations — just the full retrieval set
+    repeated 11 times. KAU reviewer saw it as noise. The IDs still live
+    on DPRAIContent.candidate_regen_kb_ids / active_kb_ids where admin
+    can inspect provenance, but we no longer render them on-page.
     """
     # Chapter label removed — the PDF template renders <h2> for each chapter,
     # so echoing the label at the top of the body would duplicate it.
@@ -1352,16 +1362,7 @@ def _assemble_chapter_text(
     # leading '###', '**' bold markdown, trailing "Grounded in:" that some
     # runs regenerate on their own inside the body.
     body = _strip_prompt_echoes(body, chapter)
-
-    if kb_entries:
-        # One-line compact citation footer — reads clean in prose PDFs.
-        # Capped at 6 refs; more than that becomes visual noise.
-        ids = ', '.join(f'KB #{e.id}' for e in kb_entries[:6])
-        grounded = f'Sources: {ids}.'
-    else:
-        grounded = ''
-
-    return f'{body.strip()}\n\n{grounded}' if grounded else body.strip()
+    return body.strip()
 
 
 def _strip_prompt_echoes(body: str, chapter: str) -> str:
@@ -1401,8 +1402,8 @@ def _strip_prompt_echoes(body: str, chapter: str) -> str:
     # echoes from the FACTS block header rather than paraphrasing in prose.
     text = re.sub(r'\s*\[system_default\]', '', text, flags=re.IGNORECASE)
     # DPR-03 (UAT) — strip inline `[KB #n]` / `[KB#n]` citations from the body.
-    # The chapter already renders a separate "Sources: KB #4, KB #10 ..."
-    # footer; the inline markers read as debug output to a bank reviewer.
+    # BUG-27 (KAU §6): the chapter no longer renders a Sources footer either,
+    # so these inline markers are purely noise.
     text = re.sub(r'\s*\[KB\s*#?\d+\]', '', text, flags=re.IGNORECASE)
     # DPR-03 (UAT) — scrub vendor / version strings the LLM occasionally
     # borrows from FACTS-block headers ("Kefitech 2026-09-19 basis") or
