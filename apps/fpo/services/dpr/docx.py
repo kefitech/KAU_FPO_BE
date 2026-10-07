@@ -1260,6 +1260,98 @@ def _add_loan_repayment_table(doc, rows: list[dict]) -> None:
             cells[j].text = _fmt_inr_table(row.get(k))
 
 
+_WC_BASIS_DISPLAY_DOCX = {
+    'seasonal_peak':   'Seasonal peak amount (KAU §2.4 C3 — overrides operating-cycle)',
+    'operating_cycle': 'Operating-cycle method (KAU §2.4)',
+    'margin_only':     'Fallback: WC margin on cost of project',
+    'none':            'Not computed — days/costs not entered',
+}
+
+
+def _render_working_capital_statement(doc, r: CalculationResult) -> None:
+    """BUG-06 (KAU §2.4) — Working Capital Statement in the Word export.
+
+    Mirrors the PDF §6B layout: basis + days + annual opex + requirement
+    + seasonal override + funding reconciliation + optional shortfall row.
+    Skips when the project has no WC statement (should always be present
+    once compute() runs, but defensive).
+    """
+    wc = getattr(r, 'working_capital_statement', None)
+    if wc is None:
+        return
+    _add_heading(doc, '6B. Working Capital Statement (KAU §2.4 operating-cycle method)',
+                 level=1, bookmark='sec_6b')
+    basis_label = _WC_BASIS_DISPLAY_DOCX.get(wc.basis_used, wc.basis_used)
+    _add_para(
+        doc,
+        f'Basis: {basis_label}  ·  Operating cycle: {wc.operating_cycle_days} days '
+        f'({wc.inventory_days} inventory + {wc.receivable_days} receivable − '
+        f'{wc.payable_days} payable)',
+        italic=True, size=9,
+    )
+
+    rows: list[tuple[str, str, bool]] = [
+        ('Annual opex (WC basis)',
+         _fmt_inr_table(wc.annual_wc_opex), False),
+        ('WC requirement — operating-cycle method',
+         _fmt_inr_table(wc.wc_requirement_operating_cycle), False),
+    ]
+    if wc.is_seasonal and wc.peak_amount:
+        rows.append((
+            'Seasonal override — peak-period amount (KAU §2.4 C3)',
+            _fmt_inr_table(wc.peak_amount), False,
+        ))
+    rows.append((
+        'WC requirement used in projections',
+        _fmt_inr_table(wc.wc_requirement_used), True,
+    ))
+    rows.append((
+        'Funded by: WC loan',
+        _fmt_inr_table(wc.mof_working_capital_loan), False,
+    ))
+    rows.append((
+        'Funded by: WC margin on cost of project',
+        _fmt_inr_table(wc.margin_for_working_capital), False,
+    ))
+    rows.append((
+        'Total funded WC',
+        _fmt_inr_table(wc.funded_wc_total), True,
+    ))
+    if wc.funding_gap > 0:
+        rows.append((
+            f'SHORTFALL vs requirement ({wc.funding_gap_pct_of_requirement}%)',
+            _fmt_inr_table(wc.funding_gap), True,
+        ))
+
+    table = doc.add_table(rows=len(rows), cols=2)
+    table.style = 'Light Grid Accent 1'
+    for i, (label, value, bold) in enumerate(rows):
+        cells = table.rows[i].cells
+        cells[0].text = label
+        cells[1].text = value
+        if bold:
+            for cell in cells:
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        run.bold = True
+    _tag_header_row_repeat(table)
+
+    if wc.peak_notes:
+        _add_para(
+            doc,
+            f'Peak-period notes: {wc.peak_notes}',
+            italic=True, size=9,
+        )
+    _add_para(
+        doc,
+        'The DPR uses the operating-cycle method per KAU §2.4 (Pre-UAT reply, '
+        'Approved as-is). For seasonal enterprises the FPO may enter a '
+        'peak-period amount, which overrides the operating-cycle estimate for '
+        'projection purposes.',
+        italic=True, size=8,
+    )
+
+
 def _render_ratios(doc, r: CalculationResult) -> None:
     """Financial Appraisal (§10) — explicit label + formatter per ratio.
 
@@ -1548,6 +1640,7 @@ def _render_toc(doc, project, ai: dict, has_products: bool,
         ('4. Capital Investment Schedule', 'sec_4'),
         ('5. Depreciation Schedule (SLM)', 'sec_5'),
         ('6. Loan Repayment Schedule', 'sec_6'),
+        ('6B. Working Capital Statement (KAU §2.4)', 'sec_6b'),
         ('7. Projected Profit & Loss', 'sec_7'),
         ('8. Projected Cash Flow', 'sec_8'),
         ('9. Projected Balance Sheet', 'sec_9'),
@@ -1917,6 +2010,8 @@ def render_docx_for_project(
             _add_para(doc, '   ·   '.join(loan_bits), italic=True, size=9)
         _embed_data_url_chart(doc, repayment_schedule_bar(sched.rows))
         _add_loan_repayment_table(doc, _rows_from_interest(result))
+    # §6B Working Capital Statement (KAU §2.4, BUG-06)
+    _render_working_capital_statement(doc, result)
     # §7 P&L (+ chart)
     if result.profit_loss:
         _add_heading(doc, '7. Projected Profit & Loss', level=1, bookmark='sec_7')

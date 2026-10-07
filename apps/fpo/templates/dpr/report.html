@@ -231,6 +231,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <li><a href="#sec-4">4.  Capital Investment Schedule</a></li>
       <li><a href="#sec-5">5.  Depreciation Schedule (SLM, ₹)</a></li>
       <li><a href="#sec-6">6.  Loan Repayment Schedule (₹)</a></li>
+      {% if r.working_capital_statement %}<li><a href="#sec-6b">6B. Working Capital Statement (KAU §2.4)</a></li>{% endif %}
       <li><a href="#sec-7">7.  Projected Profit &amp; Loss</a></li>
       <li><a href="#sec-8">8.  Projected Cash Flow</a></li>
       <li><a href="#sec-9">9.  Projected Balance Sheet</a></li>
@@ -471,6 +472,75 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <div class="chart-caption">Figure — Principal + interest per year over the loan tenure</div>
     </div>
     {% endif %}
+  {% endif %}
+
+  {% comment %}
+    BUG-06 (KAU §2.4) — Working Capital Statement. Section inserted between
+    Loan Repayment Schedule and Projected P&L so the WC figure the P&L
+    (opening cash) consumes is explained in-document. Only renders when
+    the operating-cycle computation actually produced something — projects
+    on margin_only / none fall back to a shorter note.
+  {% endcomment %}
+  {% if r.working_capital_statement %}
+    <h2 id="sec-6b">6B. Working Capital Statement (KAU §2.4 operating-cycle method)</h2>
+    <p style="font-size: 9pt; margin-bottom: 3mm;">
+      Basis: <strong>{{ r.working_capital_statement.basis_used }}</strong>
+      · Operating cycle: <strong>{{ r.working_capital_statement.operating_cycle_days }} days</strong>
+      ({{ r.working_capital_statement.inventory_days }} inventory + {{ r.working_capital_statement.receivable_days }} receivable − {{ r.working_capital_statement.payable_days }} payable)
+    </p>
+    <table>
+      <thead>
+        <tr><th>Item</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="label">Annual opex (WC basis)</td>
+          <td>₹ {{ r.working_capital_statement.annual_wc_opex|money }}</td>
+        </tr>
+        <tr>
+          <td class="label">WC requirement — operating-cycle method</td>
+          <td>₹ {{ r.working_capital_statement.wc_requirement_operating_cycle|money }}</td>
+        </tr>
+        {% if r.working_capital_statement.is_seasonal and r.working_capital_statement.peak_amount %}
+          <tr>
+            <td class="label">Seasonal override — peak-period amount (KAU §2.4 C3)</td>
+            <td>₹ {{ r.working_capital_statement.peak_amount|money }}</td>
+          </tr>
+        {% endif %}
+        <tr style="background: #f4f6f9;">
+          <td class="label"><strong>WC requirement used in projections</strong></td>
+          <td><strong>₹ {{ r.working_capital_statement.wc_requirement_used|money }}</strong></td>
+        </tr>
+        <tr>
+          <td class="label">Funded by: WC loan</td>
+          <td>₹ {{ r.working_capital_statement.mof_working_capital_loan|money }}</td>
+        </tr>
+        <tr>
+          <td class="label">Funded by: WC margin on cost of project</td>
+          <td>₹ {{ r.working_capital_statement.margin_for_working_capital|money }}</td>
+        </tr>
+        <tr class="total">
+          <td class="label">Total funded WC</td>
+          <td>₹ {{ r.working_capital_statement.funded_wc_total|money }}</td>
+        </tr>
+        {% if r.working_capital_statement.funding_gap %}
+          <tr style="background: #fde8e8; color: #991b1b;">
+            <td class="label"><strong>SHORTFALL vs requirement</strong></td>
+            <td><strong>₹ {{ r.working_capital_statement.funding_gap|money }} ({{ r.working_capital_statement.funding_gap_pct_of_requirement|money }}%)</strong></td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    {% if r.working_capital_statement.peak_notes %}
+      <p style="font-size: 8.5pt; margin-top: 2mm; font-style: italic;">
+        <strong>Peak-period notes:</strong> {{ r.working_capital_statement.peak_notes }}
+      </p>
+    {% endif %}
+    <p style="font-size: 8.5pt; margin-top: 2mm; color: #555;">
+      The DPR uses the operating-cycle method per KAU §2.4 (Pre-UAT reply, Approved as-is).
+      For seasonal enterprises the FPO may enter a peak-period amount, which overrides the
+      operating-cycle estimate for projection purposes.
+    </p>
   {% endif %}
 
   {# ── 8. Projected P&L ──────────────────────────────────────────────── #}

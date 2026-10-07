@@ -729,6 +729,55 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     else:
         lines.append('Overall project risk class:  not yet computed')
 
+    # BUG-06 (KAU §2.4) — Working Capital Statement based on the
+    # operating-cycle method KAU approved. Previously the FACTS block
+    # surfaced only the single-line cost_margin_for_working_capital, so
+    # the narrative had no way to describe stock/inventory/debtor/creditor
+    # cycles — it fabricated 'cash credit' sentences without a WC loan
+    # anywhere in the model. This block gives Financial Analysis, Risk
+    # Analysis and Market Analysis the real numbers.
+    _WC_BASIS_DISPLAY = {
+        'seasonal_peak':   'Seasonal peak amount entered by the FPO (overrides the operating-cycle estimate because the enterprise has substantial seasonal procurement — KAU §2.4 clarification)',
+        'operating_cycle': 'Operating-cycle method per KAU §2.4 — (inventory days + receivable days − payable days) ÷ 365 × annual WC-basis opex',
+        'margin_only':     'Fallback: project did not enter any period-in-days inputs; the single-line WC margin entered on cost is used as the requirement',
+        'none':            'Not computed — the FPO entered neither days nor annual WC costs nor a WC margin',
+    }
+    wc = getattr(result, 'working_capital_statement', None)
+    lines.append('')
+    lines.append('--- Working Capital Statement (KAU §2.4 operating-cycle method) ---')
+    if wc is not None:
+        basis_note = _WC_BASIS_DISPLAY.get(wc.basis_used, wc.basis_used)
+        lines.append(f'Basis used:                  {wc.basis_used}  —  {basis_note}')
+        lines.append(f'Inventory holding days:      {wc.inventory_days}')
+        lines.append(f'Credit to customers (days):  {wc.receivable_days}')
+        lines.append(f'Credit from suppliers (days): {wc.payable_days}')
+        lines.append(f'Operating cycle (days):      {wc.operating_cycle_days}')
+        lines.append(f'Annual opex (WC basis):      {_fmt_inr(wc.annual_wc_opex) if wc.annual_wc_opex else "₹ 0 (no WC costs entered)"}')
+        if wc.wc_opex_breakdown:
+            lines.append('WC opex breakdown (annual):')
+            for label, amount in wc.wc_opex_breakdown.items():
+                lines.append(f'  - {label}: {_fmt_inr(amount)}')
+        lines.append(f'WC requirement (op-cycle):   {_fmt_inr(wc.wc_requirement_operating_cycle) if wc.wc_requirement_operating_cycle else "N/A — days or costs missing"}')
+        if wc.is_seasonal:
+            lines.append(f'Seasonal override active:    Yes — peak amount {_fmt_inr(wc.peak_amount)} replaces the operating-cycle estimate for projection purposes')
+            if wc.peak_notes:
+                notes = wc.peak_notes.replace("\n", " ")[:200]
+                lines.append(f'  Peak-period notes:         {notes}')
+        else:
+            lines.append('Seasonal override active:    No')
+        lines.append(f'WC requirement used in DPR:  {_fmt_inr(wc.wc_requirement_used)}  (feeds the Y0 balance sheet + cash flow)')
+        lines.append(f'  Funded by: WC loan {_fmt_inr(wc.mof_working_capital_loan)} + WC margin on cost {_fmt_inr(wc.margin_for_working_capital)} = {_fmt_inr(wc.funded_wc_total)}')
+        if wc.funding_gap > 0:
+            lines.append(
+                f'  SHORTFALL:                 {_fmt_inr(wc.funding_gap)} '
+                f'({wc.funding_gap_pct_of_requirement}% of requirement) is NOT funded — '
+                'FPO should either raise bank cash-credit limit or defer part of operating cycle.'
+            )
+        else:
+            lines.append('  Funding gap:               None — WC requirement is fully funded.')
+    else:
+        lines.append('Working Capital Statement not yet computed.')
+
     # BUG-08 (KAU §6) — surface the FPO's statutory compliance list with
     # each item's current status, so chapters can neither claim an
     # "upgraded FSSAI licence" when the FPO has not applied for one, nor
@@ -993,6 +1042,28 @@ _HARD_RULES = (
     '"approximately 3,780 t" because 3,780 × 92% recovery ≈ 3,478 t '
     'rice. The AI\'s role is to describe the process, not to redo '
     'the arithmetic.\n'
+    '9g. WORKING CAPITAL NARRATIVE MUST MATCH THE WC STATEMENT. '
+    'BUG-06 (KAU §6 + §2.4): the FACTS block\'s "Working Capital '
+    'Statement" section gives the authoritative numbers: inventory + '
+    'receivable + payable days, operating-cycle days, annual WC opex, '
+    'computed WC requirement, basis_used (`operating_cycle` / '
+    '`seasonal_peak` / `margin_only` / `none`), funding sources (WC '
+    'loan + WC margin), and any funding gap. Financial Analysis and '
+    'Risk Analysis chapters MUST describe the operating cycle using '
+    'these exact numbers. Specifically:\n'
+    '    - DO NOT mention "cash credit", "CC limit", "overdraft" or '
+    '      any WC debt facility unless the "Funded by:" line shows a '
+    '      non-zero WC loan AND/OR the Statement\'s SHORTFALL line '
+    '      recommends raising one.\n'
+    '    - If basis_used = "seasonal_peak", explicitly explain that '
+    '      the peak amount overrides the operating-cycle estimate (KAU '
+    '      §2.4 clarification for seasonal procurement enterprises).\n'
+    '    - If basis_used = "margin_only" OR "none", DO NOT describe '
+    '      an operating cycle — the FPO has not entered the days/costs '
+    '      yet; just say the project uses the entered WC margin as a '
+    '      lump-sum estimate.\n'
+    '    - If a SHORTFALL exists, Financial Analysis MUST state the '
+    '      gap amount and quote the Statement\'s guidance verbatim.\n'
     '9f. DO NOT CONFLATE PEOPLE COUNTS OR LOCATIONS ACROSS DIFFERENT '
     'FACTS LINES. BUG-01 (KAU §6): the testing team saw narratives '
     'referencing "14 members" when the FACTS block\'s "Shareholder-'

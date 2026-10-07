@@ -436,6 +436,66 @@ class RiskAssessment:
 
 
 @dataclass
+class WorkingCapitalStatement:
+    """BUG-06 (KAU §6) + KAU §2.4 operating-cycle method.
+
+    Spec: §2.3.18 Cat C of the KAU Data Collection Module v1.0 enumerates
+    the inputs (annual cost components + inventory days + receivable days
+    + payable days + optional seasonal override). Approval: KAU PreUAT
+    reply §2.4 "Approved as-is + allow user to specify peak-period
+    figures for seasonal enterprises".
+
+    Formula:
+      operating_cycle_days = inventory_days + receivable_days - payable_days
+      annual_wc_opex = Σ(wc_*)           (10 annual cost components)
+      wc_requirement = annual_wc_opex × (operating_cycle_days / 365)
+
+    Seasonal override (C3): if the FPO ticks `wc_is_seasonal=True` and
+    enters a peak amount, the peak amount REPLACES the operating-cycle
+    estimate for projection purposes — because a seasonal-procurement
+    enterprise (e.g. pepper aggregator buying 9 Cr of stock in a 90-day
+    window) would otherwise under-size WC under a simple annual-average
+    cycle calculation.
+
+    `basis_used` tells the reader which path the number came from:
+      - 'seasonal_peak'    — seasonal override active, peak_amount used
+      - 'operating_cycle'  — days + annual costs used (default path)
+      - 'margin_only'      — fallback: no days entered, old wc_margin used
+      - 'none'             — no WC data at all; wc_requirement_used = 0
+
+    Reconciliation vs funding:
+      funded_wc = mof_working_capital_loan + cost_margin_for_working_capital
+      funding_gap = max(0, wc_requirement_used − funded_wc)
+      If > 0, the DPR shows a shortfall warning in the WC Statement and
+      the narrative FACTS block flags it so the AI can note the gap.
+    """
+    # Inputs (verbatim from Finance section)
+    inventory_days: Decimal              # credit_period_from_customers_days? no — inventory_holding_period_days
+    receivable_days: Decimal             # credit_period_to_customers_days
+    payable_days: Decimal                # credit_period_from_suppliers_days
+    annual_wc_opex: Decimal              # Σ wc_* fields
+    wc_opex_breakdown: dict              # {label: Decimal} for the Statement table
+    operating_cycle_days: Decimal        # derived = inv + recv − payable
+
+    # Outputs
+    wc_requirement_operating_cycle: Decimal  # annual_wc_opex × cycle/365
+    wc_requirement_used: Decimal             # final figure used in BS/CF/P&L
+    basis_used: str                          # see docstring
+
+    # Seasonal override (C3)
+    is_seasonal: bool
+    peak_amount: Decimal
+    peak_notes: str
+
+    # Funding reconciliation
+    mof_working_capital_loan: Decimal
+    margin_for_working_capital: Decimal
+    funded_wc_total: Decimal
+    funding_gap: Decimal
+    funding_gap_pct_of_requirement: Decimal   # Decimal 0..100
+
+
+@dataclass
 class CalculationResult:
     """Top-level result. Sub-phases fill in the currently-empty dicts.
 
@@ -455,6 +515,7 @@ class CalculationResult:
     balance_sheet: Optional[BalanceSheet] = None
     ratios: Optional[FinancialRatios] = None
     risk_assessment: Optional[RiskAssessment] = None
+    working_capital_statement: Optional[WorkingCapitalStatement] = None  # BUG-06 / §2.4
     # Sanity-warning strings surfaced in the PDF's Financial Appraisal
     # chapter — flags implausible ratios that a banker would want to see
     # verified (DSCR > 10x, payback < 1yr, EBITDA margin > 60%, PAT
@@ -1678,6 +1739,126 @@ def _sum_by_group(mof: MeansOfFinanceBreakdown, group: frozenset[str]) -> Decima
     return sum((v for k, v in mof.by_field.items() if k in group), start=Decimal('0'))
 
 
+def build_working_capital_statement(project) -> WorkingCapitalStatement:
+    """BUG-06 (KAU §6) — operating-cycle WC statement per KAU §2.4 approval.
+
+    Reads the Finance section's 10 wc_* annual cost components + 3
+    period-in-days fields and computes the operating-cycle WC
+    requirement. Applies the C3 seasonal override when
+    `wc_is_seasonal=True` and `wc_peak_amount` is set.
+
+    Reconciles the computed requirement against the user's declared
+    `mof_working_capital_loan + cost_margin_for_working_capital` so the
+    DPR can surface a funding gap when the FPO under-sized the WC
+    tranche.
+
+    Always returns a WorkingCapitalStatement (never None) — a project
+    with no WC inputs gets zeroes with `basis_used='none'`.
+    """
+    fin = getattr(project, 'section_finance', None)
+
+    def _d(attr: str) -> Decimal:
+        if fin is None:
+            return Decimal('0')
+        v = getattr(fin, attr, None)
+        if v is None:
+            return Decimal('0')
+        try:
+            return Decimal(str(v))
+        except (TypeError, ValueError, ArithmeticError):
+            return Decimal('0')
+
+    # 10 annual WC cost components — labels match the Finance section fields.
+    wc_opex_fields = [
+        ('wc_raw_materials',       'Raw materials'),
+        ('wc_labour_salaries',     'Labour & salaries'),
+        ('wc_utilities',           'Utilities'),
+        ('wc_transportation',      'Transportation'),
+        ('wc_admin_expenses',      'Administrative expenses'),
+        ('wc_marketing_expenses',  'Marketing expenses'),
+        ('wc_packaging_materials', 'Packaging materials'),
+        ('wc_consumables',         'Consumables'),
+        ('wc_repairs_maintenance', 'Repairs & maintenance'),
+        ('wc_miscellaneous',       'Miscellaneous'),
+    ]
+    wc_opex_breakdown: dict = {}
+    annual_wc_opex = Decimal('0')
+    for attr, label in wc_opex_fields:
+        v = _d(attr)
+        if v > 0:
+            wc_opex_breakdown[label] = v
+            annual_wc_opex += v
+
+    inventory_days = _d('inventory_holding_period_days')
+    receivable_days = _d('credit_period_to_customers_days')
+    payable_days = _d('credit_period_from_suppliers_days')
+    operating_cycle_days = inventory_days + receivable_days - payable_days
+    # Guard against negative cycle (payables exceed receivables + inventory).
+    # Shouldn't happen in a real DPR but can appear in incomplete entries.
+    if operating_cycle_days < 0:
+        operating_cycle_days = Decimal('0')
+
+    if annual_wc_opex > 0 and operating_cycle_days > 0:
+        wc_requirement_oc = (
+            annual_wc_opex * operating_cycle_days / Decimal('365')
+        ).quantize(Decimal('0.01'))
+    else:
+        wc_requirement_oc = Decimal('0')
+
+    is_seasonal = bool(getattr(fin, 'wc_is_seasonal', False)) if fin else False
+    peak_amount = _d('wc_peak_amount')
+    peak_notes = (
+        (getattr(fin, 'wc_peak_period_notes', '') or '').strip()
+        if fin else ''
+    )
+
+    margin_for_wc = _d('cost_margin_for_working_capital')
+
+    # Which figure drives the balance sheet + narrative?
+    if is_seasonal and peak_amount > 0:
+        wc_requirement_used = peak_amount
+        basis_used = 'seasonal_peak'
+    elif wc_requirement_oc > 0:
+        wc_requirement_used = wc_requirement_oc
+        basis_used = 'operating_cycle'
+    elif margin_for_wc > 0:
+        wc_requirement_used = margin_for_wc
+        basis_used = 'margin_only'
+    else:
+        wc_requirement_used = Decimal('0')
+        basis_used = 'none'
+
+    mof_wc_loan = Decimal('0')
+    if fin is not None:
+        mof_wc_loan = _d('mof_working_capital_loan')
+    funded_wc_total = mof_wc_loan + margin_for_wc
+    funding_gap = max(Decimal('0'), wc_requirement_used - funded_wc_total)
+    funding_gap_pct = (
+        (funding_gap * Decimal('100') / wc_requirement_used).quantize(Decimal('0.01'))
+        if wc_requirement_used > 0 else Decimal('0')
+    )
+
+    return WorkingCapitalStatement(
+        inventory_days=inventory_days,
+        receivable_days=receivable_days,
+        payable_days=payable_days,
+        annual_wc_opex=annual_wc_opex,
+        wc_opex_breakdown=wc_opex_breakdown,
+        operating_cycle_days=operating_cycle_days,
+        wc_requirement_operating_cycle=wc_requirement_oc,
+        wc_requirement_used=wc_requirement_used,
+        basis_used=basis_used,
+        is_seasonal=is_seasonal,
+        peak_amount=peak_amount,
+        peak_notes=peak_notes,
+        mof_working_capital_loan=mof_wc_loan,
+        margin_for_working_capital=margin_for_wc,
+        funded_wc_total=funded_wc_total,
+        funding_gap=funding_gap,
+        funding_gap_pct_of_requirement=funding_gap_pct,
+    )
+
+
 def build_balance_sheet(
     cost: ProjectCostBreakdown,
     mof: MeansOfFinanceBreakdown,
@@ -1686,6 +1867,7 @@ def build_balance_sheet(
     profit_loss: ProfitLoss,
     cash_flow: CashFlow,
     projection_years: int,
+    wc_statement: Optional[WorkingCapitalStatement] = None,
 ) -> BalanceSheet:
     """Build the N+1 year balance sheet and enforce A.3's
 
@@ -1733,7 +1915,14 @@ def build_balance_sheet(
     gross_fa_after_y0 = cwip_y0
 
     # Working capital = the margin the FPO earmarked
-    wc_margin = cost.by_field.get('cost_margin_for_working_capital', Decimal('0'))
+    # BUG-06 (KAU §2.4): prefer the WC Statement's wc_requirement_used
+    # (operating-cycle method, with optional seasonal override) over the
+    # single-line cost_margin_for_working_capital — the margin stays as a
+    # fallback for projects that never entered any days / annual costs.
+    if wc_statement is not None and wc_statement.wc_requirement_used > 0:
+        wc_margin = wc_statement.wc_requirement_used
+    else:
+        wc_margin = cost.by_field.get('cost_margin_for_working_capital', Decimal('0'))
 
     rows: list[BalanceSheetRow] = []
     max_delta = Decimal('0')
@@ -2374,8 +2563,15 @@ def compute(project) -> CalculationResult:
     interest = build_interest_schedule(project, projection_years)
     profit_loss = build_profit_loss(project, depreciation, interest, projection_years)
     cash_flow = build_cash_flow(cost, mof, profit_loss, interest, projection_years)
+    # BUG-06 (KAU §2.4) — compute WC statement from the operating-cycle
+    # inputs the Finance section already captures (10 wc_* costs + 3
+    # period-in-days + seasonal override). Must run BEFORE balance_sheet
+    # so the BS can use wc_requirement_used as its WC asset rather than
+    # the fixed `cost_margin_for_working_capital` single line.
+    wc_statement = build_working_capital_statement(project)
     balance_sheet = build_balance_sheet(
         cost, mof, depreciation, interest, profit_loss, cash_flow, projection_years,
+        wc_statement=wc_statement,
     )
     ratios = build_ratios(profit_loss, interest, cash_flow, project=project)
     risk_assessment = build_risk_assessment(project)
@@ -2395,6 +2591,7 @@ def compute(project) -> CalculationResult:
         balance_sheet=balance_sheet,
         ratios=ratios,
         risk_assessment=risk_assessment,
+        working_capital_statement=wc_statement,
         sanity_warnings=sanity_warnings,
     )
 
