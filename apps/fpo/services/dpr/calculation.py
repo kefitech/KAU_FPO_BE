@@ -1152,41 +1152,103 @@ def _amortise_reducing_balance(
     """Equal annual principal + declining interest on the outstanding balance.
 
     Post-moratorium principal instalment = post-moratorium starting balance
-    / remaining repayment years. When `moratorium_treatment='capitalised'`,
+    / effective repayment years. When `moratorium_treatment='capitalised'`,
     the starting balance is the loan amount grown by accrued moratorium
     interest so the total repayment reflects the capitalised interest.
+
+    BUG-07 (KAU §6): earlier version used `moratorium_months // 12` which
+    silently dropped any sub-year moratorium (a stated 6-month moratorium
+    was effectively zero in the schedule, so Y1 principal + interest fired
+    as if the loan was fully in repayment from month 1). The fix carries
+    the moratorium as a Decimal number of years and honours the fractional
+    part in the first repayment year.
     """
     rows: list[InterestScheduleRow] = []
     balance = loan_amount
-    moratorium_years = moratorium_months // 12
-    repayment_years = max(0, tenure_years - moratorium_years) if tenure_years > 0 else 0
     annual_rate = rate_pct / Decimal('100')
+    moratorium_full_years = moratorium_months // 12
+    partial_fraction = (
+        (Decimal(moratorium_months % 12) / Decimal('12'))
+        if moratorium_months > 0 else Decimal('0')
+    )
+    moratorium_total_years_dec = Decimal(moratorium_months) / Decimal('12')
+    effective_repayment_years = (
+        max(Decimal('0'), Decimal(tenure_years) - moratorium_total_years_dec)
+        if tenure_years > 0 else Decimal('0')
+    )
 
     # If moratorium interest is capitalised, project the balance forward
-    # through the moratorium first so the post-moratorium equal-principal
-    # calculation is based on the grown balance.
+    # through the FULL moratorium (full years + fractional months) first
+    # so the post-moratorium equal-principal calc uses the grown balance.
     post_moratorium_balance = balance
-    if moratorium_treatment == 'capitalised' and moratorium_years > 0 and balance > 0:
-        post_moratorium_balance = (
-            balance * ((Decimal('1') + annual_rate) ** moratorium_years)
-        ).quantize(Decimal('0.01'))
+    if moratorium_treatment == 'capitalised' and moratorium_months > 0 and balance > 0:
+        # Compound for full years, then simple interest for the fractional tail.
+        if moratorium_full_years > 0:
+            post_moratorium_balance = (
+                post_moratorium_balance
+                * ((Decimal('1') + annual_rate) ** moratorium_full_years)
+            )
+        if partial_fraction > 0:
+            post_moratorium_balance = (
+                post_moratorium_balance
+                * (Decimal('1') + annual_rate * partial_fraction)
+            )
+        post_moratorium_balance = post_moratorium_balance.quantize(Decimal('0.01'))
+
     annual_principal = (
-        (post_moratorium_balance / Decimal(repayment_years)).quantize(Decimal('0.01'))
-        if repayment_years > 0 else Decimal('0')
+        (post_moratorium_balance / effective_repayment_years).quantize(Decimal('0.01'))
+        if effective_repayment_years > 0 else Decimal('0')
     )
 
     for year in range(1, projection_years + 1):
         opening = balance
         interest = (opening * annual_rate).quantize(Decimal('0.01'))
 
-        if year <= moratorium_years and loan_amount > 0 and moratorium_treatment == 'capitalised':
-            # Capitalised — interest added to balance, no cash payment
-            principal = Decimal('0')
-            balance = (opening + interest).quantize(Decimal('0.01'))
-        elif year <= moratorium_years or loan_amount == 0 or year > tenure_years:
-            # Serviced (interest paid separately) or no-loan / post-tenure guard
+        is_full_moratorium_year = year <= moratorium_full_years
+        is_partial_year = (
+            partial_fraction > 0 and year == moratorium_full_years + 1
+        )
+        past_tenure = loan_amount == 0 or year > tenure_years
+
+        if is_full_moratorium_year and loan_amount > 0:
+            if moratorium_treatment == 'capitalised':
+                principal = Decimal('0')
+                balance = (opening + interest).quantize(Decimal('0.01'))
+            else:
+                # Serviced — interest paid separately, principal deferred.
+                principal = Decimal('0')
+                balance = opening
+        elif past_tenure:
             principal = Decimal('0')
             balance = opening
+        elif is_partial_year:
+            # Mixed year: `partial_fraction` of the year is still moratorium,
+            # `(1 - partial_fraction)` is repayment. Interest is accrued the
+            # whole year on the opening balance either way; principal is
+            # scaled down pro-rata so the FY1 ratio matches real-world
+            # convention (BUG-07, KAU §6).
+            repayment_fraction = Decimal('1') - partial_fraction
+            if moratorium_treatment == 'capitalised':
+                # First `partial_fraction` months: interest added to balance.
+                opening_for_repayment = (
+                    opening * (Decimal('1') + annual_rate * partial_fraction)
+                ).quantize(Decimal('0.01'))
+                # Interest row shows the FULL year of interest (capitalised
+                # + serviced portions) so the P&L stays faithful.
+                serviced_interest = (
+                    opening_for_repayment * annual_rate * repayment_fraction
+                ).quantize(Decimal('0.01'))
+                capitalised_interest = (opening_for_repayment - opening).quantize(Decimal('0.01'))
+                interest = (serviced_interest + capitalised_interest).quantize(Decimal('0.01'))
+                principal = (annual_principal * repayment_fraction).quantize(Decimal('0.01'))
+                principal = min(principal, opening_for_repayment)
+                balance = (opening_for_repayment - principal).quantize(Decimal('0.01'))
+            else:
+                # Serviced — interest paid all 12 months on opening; principal
+                # for the repayment-fraction months only.
+                principal = (annual_principal * repayment_fraction).quantize(Decimal('0.01'))
+                principal = min(principal, opening)
+                balance = (opening - principal).quantize(Decimal('0.01'))
         else:
             principal = min(annual_principal, opening).quantize(Decimal('0.01'))
             balance = (opening - principal).quantize(Decimal('0.01'))
@@ -1219,32 +1281,45 @@ def _amortise_emi(
 
     Standard EMI formula (annualised for DPR granularity):
         EMI = P × r × (1+r)^n / ((1+r)^n − 1)
-      where P = principal after moratorium, r = annual rate, n = repayment years.
+      where P = principal after moratorium, r = annual rate, n = effective
+      repayment years (fractional under BUG-07, KAU §6).
 
     Zero-interest edge case: equal-principal fallback so we never divide by zero.
     """
     rows: list[InterestScheduleRow] = []
     balance = loan_amount
-    moratorium_years = moratorium_months // 12
-    repayment_years = max(0, tenure_years - moratorium_years) if tenure_years > 0 else 0
     annual_rate = rate_pct / Decimal('100')
+    moratorium_full_years = moratorium_months // 12
+    partial_fraction = (
+        (Decimal(moratorium_months % 12) / Decimal('12'))
+        if moratorium_months > 0 else Decimal('0')
+    )
+    moratorium_total_years_dec = Decimal(moratorium_months) / Decimal('12')
+    effective_repayment_years = (
+        max(Decimal('0'), Decimal(tenure_years) - moratorium_total_years_dec)
+        if tenure_years > 0 else Decimal('0')
+    )
 
-    # Same capitalisation logic as reducing-balance — grow the EMI base if
-    # moratorium interest is capitalised.
+    # Same capitalisation logic as reducing-balance — grow the EMI base
+    # through the full moratorium (full years + fractional tail) when
+    # interest is capitalised.
     emi_base = balance
-    if moratorium_treatment == 'capitalised' and moratorium_years > 0 and balance > 0:
-        emi_base = (
-            balance * ((Decimal('1') + annual_rate) ** moratorium_years)
-        ).quantize(Decimal('0.01'))
+    if moratorium_treatment == 'capitalised' and moratorium_months > 0 and balance > 0:
+        if moratorium_full_years > 0:
+            emi_base = emi_base * ((Decimal('1') + annual_rate) ** moratorium_full_years)
+        if partial_fraction > 0:
+            emi_base = emi_base * (Decimal('1') + annual_rate * partial_fraction)
+        emi_base = emi_base.quantize(Decimal('0.01'))
 
-    if repayment_years > 0 and loan_amount > 0:
+    if effective_repayment_years > 0 and loan_amount > 0:
         if annual_rate > 0:
-            one_plus_r_n = (Decimal('1') + annual_rate) ** repayment_years
+            # EMI formula tolerates a fractional n via Decimal exponent.
+            one_plus_r_n = (Decimal('1') + annual_rate) ** effective_repayment_years
             annual_emi = (
                 emi_base * annual_rate * one_plus_r_n / (one_plus_r_n - Decimal('1'))
             ).quantize(Decimal('0.01'))
         else:
-            annual_emi = (emi_base / Decimal(repayment_years)).quantize(Decimal('0.01'))
+            annual_emi = (emi_base / effective_repayment_years).quantize(Decimal('0.01'))
     else:
         annual_emi = Decimal('0')
 
@@ -1252,14 +1327,46 @@ def _amortise_emi(
         opening = balance
         interest = (opening * annual_rate).quantize(Decimal('0.01'))
 
-        if year <= moratorium_years and loan_amount > 0 and moratorium_treatment == 'capitalised':
-            principal = Decimal('0')
-            balance = (opening + interest).quantize(Decimal('0.01'))
-        elif year <= moratorium_years or loan_amount == 0 or year > tenure_years:
+        is_full_moratorium_year = year <= moratorium_full_years
+        is_partial_year = (
+            partial_fraction > 0 and year == moratorium_full_years + 1
+        )
+        past_tenure = loan_amount == 0 or year > tenure_years
+
+        if is_full_moratorium_year and loan_amount > 0:
+            if moratorium_treatment == 'capitalised':
+                principal = Decimal('0')
+                balance = (opening + interest).quantize(Decimal('0.01'))
+            else:
+                principal = Decimal('0')
+                balance = opening
+        elif past_tenure:
             principal = Decimal('0')
             balance = opening
+        elif is_partial_year:
+            repayment_fraction = Decimal('1') - partial_fraction
+            if moratorium_treatment == 'capitalised':
+                opening_for_repayment = (
+                    opening * (Decimal('1') + annual_rate * partial_fraction)
+                ).quantize(Decimal('0.01'))
+                # Full-year interest in the row = capitalised portion + serviced portion.
+                serviced_interest = (
+                    opening_for_repayment * annual_rate * repayment_fraction
+                ).quantize(Decimal('0.01'))
+                capitalised_interest = (opening_for_repayment - opening).quantize(Decimal('0.01'))
+                interest = (serviced_interest + capitalised_interest).quantize(Decimal('0.01'))
+                # EMI principal is scaled by `repayment_fraction` because we're
+                # only in repayment for that portion of the year.
+                principal = ((annual_emi - serviced_interest) * repayment_fraction).quantize(Decimal('0.01'))
+                principal = max(Decimal('0'), min(principal, opening_for_repayment))
+                balance = (opening_for_repayment - principal).quantize(Decimal('0.01'))
+            else:
+                # Serviced — opening balance stays flat during moratorium; the
+                # EMI engine pays its scaled principal in the repayment portion.
+                principal = ((annual_emi - interest) * repayment_fraction).quantize(Decimal('0.01'))
+                principal = max(Decimal('0'), min(principal, opening))
+                balance = (opening - principal).quantize(Decimal('0.01'))
         else:
-            # Principal share = EMI − interest; guard against final-year rounding.
             principal = (annual_emi - interest).quantize(Decimal('0.01'))
             principal = max(Decimal('0'), min(principal, opening))
             balance = (opening - principal).quantize(Decimal('0.01'))
