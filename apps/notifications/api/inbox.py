@@ -27,14 +27,24 @@ from apps.database.models import InAppNotification, NotificationTemplate
 from apps.notifications.categories import CATEGORY_KEYS, category_for_code, category_q
 
 
+def notification_link(notif):
+    """The optional in-app destination the sender put in the context as `link`
+    (e.g. '/fpo/products?view=inquiries'). Internal paths only — never a URL."""
+    link = (notif.log.context or {}).get('link') if notif.log else None
+    if isinstance(link, str) and link.startswith('/') and not link.startswith('//'):
+        return link
+    return None
+
+
 class InAppNotificationSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     body = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
 
     class Meta:
         model  = InAppNotification
-        fields = ['id', 'title', 'body', 'category', 'is_read', 'read_at', 'created_at']
+        fields = ['id', 'title', 'body', 'category', 'link', 'is_read', 'read_at', 'created_at']
         read_only_fields = ['id', 'is_read', 'read_at', 'created_at']
 
     def _get_language(self):
@@ -72,6 +82,9 @@ class InAppNotificationSerializer(serializers.ModelSerializer):
     def get_category(self, obj):
         code = obj.log.template_code.code if obj.log and obj.log.template_code else None
         return category_for_code(code)
+
+    def get_link(self, obj):
+        return notification_link(obj)
 
 
 @extend_schema_view(

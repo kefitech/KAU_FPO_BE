@@ -106,6 +106,9 @@ TEMPLATE_CODES = [
     # Marketplace inquiries → FPO inbox (link opens the matching tab on /fpo/products)
     ('inquiry_received', 'in_app', "In-app: a verified buyer sent an inquiry on one of the FPO's products", ['buyer_name', 'product_name', 'quantity', 'unit', 'link']),
     ('inquiry_received_public', 'in_app', 'In-app: a visitor sent an inquiry from the public Market Hub', ['buyer_name', 'product_name', 'link']),
+    # External buyer self-registration → district sub-admins (link opens pending buyers on /admin/buyers;
+    # buyer_id drives the unread dot on that row)
+    ('buyer_registration_pending', 'in_app', 'In-app: an external buyer registered in the sub-admin\'s district and awaits verification', ['buyer_name', 'district', 'district_ml', 'link', 'buyer_id']),
 ]
 
 
@@ -1057,6 +1060,17 @@ TEMPLATES = [
         'inquiry_received_public', 'in_app', 'ml',
         'പുതിയ മാർക്കറ്റ് ഹബ് അന്വേഷണം — {{product_name}}',
         '<strong>{{buyer_name}}</strong> പൊതു മാർക്കറ്റ് ഹബ്ബിൽ നിന്ന് <strong>{{product_name}}</strong> സംബന്ധിച്ച് അന്വേഷണം അയച്ചു. കാണാനും മറുപടി നൽകാനും മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ തുറക്കുക.',
+    ),
+    # External buyer registration (in-app → district sub-admins)
+    (
+        'buyer_registration_pending', 'in_app', 'en',
+        'New buyer registration — {{buyer_name}}',
+        '<strong>{{buyer_name}}</strong> registered as an external buyer in {{district}} and is awaiting verification. Open Buyer Directory to review.',
+    ),
+    (
+        'buyer_registration_pending', 'in_app', 'ml',
+        'പുതിയ ക്രേതാവ് രജിസ്ട്രേഷൻ — {{buyer_name}}',
+        '<strong>{{buyer_name}}</strong> {{district_ml}} ജില്ലയിൽ ബാഹ്യ ക്രേതാവായി രജിസ്റ്റർ ചെയ്തു, പരിശോധനയ്ക്കായി കാത്തിരിക്കുന്നു. അവലോകനം ചെയ്യാൻ ക്രേതാവ് ഡയറക്ടറി തുറക്കുക.',
     ),
 ]
 
