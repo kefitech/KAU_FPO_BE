@@ -800,10 +800,12 @@ Author: Athul Gopan (Kefi Tech Solutions)
         {% if p.image_path %}
           <img class="prod-img" src="file://{{ p.image_path }}" alt="{{ p.name }}" />
         {% endif %}
-        {# BUG-22 (KAU §6): the "No photo" placeholder box is dropped
-           entirely when the product has no image. The product-card--no-image
-           modifier lets the card stretch the info block to full width so
-           the layout stays tidy without a greyed-out empty tile. #}
+        {% comment %}
+          BUG-22 (KAU §6): the "No photo" placeholder box is dropped entirely
+          when the product has no image. The product-card--no-image modifier
+          lets the card stretch the info block to full width so the layout
+          stays tidy without a greyed-out empty tile.
+        {% endcomment %}
         <div class="prod-info">
           <div class="prod-name">
             {{ p.name }}

@@ -155,65 +155,87 @@ def validate_section(section) -> dict[str, Any]:
         ))
 
     # BUG-16 (KAU §6) — land ownership vs cost / lease rent consistency.
-    # Reads the Location section to see how the FPO declared land ownership,
-    # then checks that the Finance section carries the matching costs:
-    #   - Owned by FPO / Owned by Members / Proposed to Purchase
-    #     → cost_land_purchase + cost_land_development should be > 0
-    #   - Leased / Rented
-    #     → warn that lease rent must appear in operating cost (op_admin_
-    #       expenses or op_miscellaneous — there is no dedicated op_rent
-    #       field in Finance section).
+    # Reads the Location section's declared land ownership (M2M to
+    # DPRLandOwnershipType). Fires in three cases that KAU's §6 retest
+    # specifically flagged:
+    #   (a) ownership not declared at all → warn (the DPR currently can
+    #       ship with land cost ₹0 and the reader has no idea whether
+    #       the land is owned, leased or imaginary).
+    #   (b) Owned by FPO / Owned by Members / Proposed to Purchase
+    #       + land capex ₹0 → warn (acquisition cost missing or needs
+    #       a "held on books at nil incremental cost" footnote).
+    #   (c) Leased / Rented → ALWAYS warn to confirm the annual lease
+    #       rent is captured somewhere in operating cost. The earlier
+    #       guard "only fire when op_admin + op_misc are both zero"
+    #       silently skipped the check whenever the FPO had entered
+    #       any admin opex, which is almost every project — exactly
+    #       the gap the KAU §6 retest caught.
     try:
         location_section = getattr(section.project, 'section_location', None)
     except Exception:  # noqa: BLE001 — section_location may not exist yet on fresh projects
         location_section = None
+
+    ownership_codes: set[str] = set()
     if location_section is not None:
-        ownership_codes = set()
         try:
             ownership_codes = set(
                 location_section.land_ownership_types.values_list('code', flat=True)
             )
         except Exception:  # noqa: BLE001
-            pass
-        owns_or_proposes_to_buy = ownership_codes & {
-            'owned_fpo', 'owned_members', 'proposed_purchase',
-        }
-        is_leased_or_rented = ownership_codes & {'leased', 'rented'}
-        land_capex = (
-            (Decimal(str(section.cost_land_purchase or 0)))
-            + (Decimal(str(section.cost_land_development or 0)))
-        )
+            ownership_codes = set()
+    land_capex = (
+        (Decimal(str(section.cost_land_purchase or 0)))
+        + (Decimal(str(section.cost_land_development or 0)))
+    )
 
-        if owns_or_proposes_to_buy and land_capex == 0:
-            codes_display = ', '.join(sorted(owns_or_proposes_to_buy))
-            warnings.append(_warn(
-                'land_owned_no_capex', 'cost_land_purchase',
-                f'Land ownership declared as {codes_display} but no land cost '
-                f'in capex (land purchase + development both ₹0). Either enter '
-                f'the land acquisition / development cost on the Finance section, '
-                f'or add a note in the Promoter Profile that the land is held on '
-                f'the FPO/members\' books at nil incremental cost.',
-            ))
+    # (a) ownership not declared — always worth a nudge, because land cost
+    # ₹0 is only acceptable if the reader knows the land is held on books.
+    if not ownership_codes:
+        warnings.append(_warn(
+            'land_ownership_undeclared', 'land_ownership_types',
+            'Land ownership has not been declared on the Location section. '
+            'Please tick the applicable option(s) — Owned by FPO, Owned by '
+            'Members, Leased, Rented, Government Land, or Proposed to '
+            'Purchase. A DPR with ₹0 land cost and no ownership tag reads '
+            'as incomplete to a bank reviewer.',
+        ))
 
-        if is_leased_or_rented:
-            # There's no dedicated op_rent field; lease rent typically lives
-            # under op_admin_expenses or op_miscellaneous. Can only check that
-            # at least one of those two is non-zero to catch the "forgot to
-            # enter the rent" case.
-            op_admin = Decimal(str(getattr(section, 'op_admin_expenses', 0) or 0))
-            op_misc = Decimal(str(getattr(section, 'op_miscellaneous', 0) or 0))
-            codes_display = ', '.join(sorted(is_leased_or_rented))
-            if op_admin + op_misc == 0:
-                warnings.append(_warn(
-                    'land_leased_no_rent', 'op_admin_expenses',
-                    f'Land ownership declared as {codes_display} but neither '
-                    f'op_admin_expenses nor op_miscellaneous carry a value — '
-                    f'this suggests lease / rent has not been captured in '
-                    f'operating cost. There is no dedicated rent field; '
-                    f'enter the annual lease/rent under op_admin_expenses or '
-                    f'op_miscellaneous (whichever is cleaner for your DPR), '
-                    f'or document the arrangement if rent is zero.',
-                ))
+    owns_or_proposes_to_buy = ownership_codes & {
+        'owned_fpo', 'owned_members', 'proposed_purchase',
+    }
+    is_leased_or_rented = ownership_codes & {'leased', 'rented'}
+
+    # (b) Ownership declared as owned / proposed-purchase but no land capex.
+    if owns_or_proposes_to_buy and land_capex == 0:
+        codes_display = ', '.join(sorted(owns_or_proposes_to_buy))
+        warnings.append(_warn(
+            'land_owned_no_capex', 'cost_land_purchase',
+            f'Land ownership declared as {codes_display} but no land cost '
+            f'in capex (land purchase + development both ₹0). Either enter '
+            f'the land acquisition / development cost on the Finance section, '
+            f'or add a note in the Promoter Profile that the land is held on '
+            f'the FPO/members\' books at nil incremental cost.',
+        ))
+
+    # (c) Ownership declared as leased / rented — ALWAYS warn to confirm
+    # the annual lease rent is captured somewhere in operating cost.
+    # There is no dedicated op_rent field; it usually lives under
+    # op_admin_expenses or op_miscellaneous. The warning fires regardless
+    # of whether those fields have a value, because the reviewer needs to
+    # verify that the specific lease-rent amount is in there (and not
+    # bundled under something unrelated).
+    if is_leased_or_rented:
+        codes_display = ', '.join(sorted(is_leased_or_rented))
+        warnings.append(_warn(
+            'land_leased_confirm_rent', 'op_admin_expenses',
+            f'Land ownership declared as {codes_display} — confirm the '
+            f'annual lease / rent amount is captured in operating cost. '
+            f'There is no dedicated rent field; enter it under '
+            f'op_admin_expenses or op_miscellaneous (whichever is cleaner '
+            f'for your DPR) and reference the arrangement in Promoter '
+            f'Profile. If rent is contractually ₹0 (e.g. nominal lease '
+            f'to a member), document that explicitly.',
+        ))
 
     # BUG-18 (KAU §6) — contingency below configured tolerance. Hard cost is
     # the sum of fixed-asset lines (land, civil, machinery, equipment,
