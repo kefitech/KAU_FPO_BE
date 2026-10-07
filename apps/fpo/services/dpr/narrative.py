@@ -670,6 +670,33 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
                      'typical sector risks generically and recommend the FPO '
                      'populate the §2.3.22 Risk Register before submission)')
 
+    # BUG-05 (KAU §6) — surface the OVERALL project risk class + the
+    # per-category classes computed by the calc engine, so Exec Summary and
+    # Conclusion state the classification instead of silently describing the
+    # project as "strong" while Project at a Glance shows "High". The
+    # classification rule is: any High category → overall High; else any
+    # Moderate → overall Moderate; else Low. (See RiskAssessment docstring
+    # in calculation.py for the full semantics incl. not_assessed.)
+    _OVERALL_RISK_DISPLAY = {
+        'low':          'Low (acceptable for financing without special conditions)',
+        'moderate':     'Moderate (financiable with standard risk management clauses)',
+        'high':         'High (bank will likely attach additional conditions and may require tighter covenants)',
+        'not_assessed': 'Not assessed (risks entered but probability + impact missing — the FPO must score each risk before submission)',
+    }
+    ra = getattr(result, 'risk_assessment', None)
+    lines.append('')
+    lines.append('--- Overall project risk classification (calc engine output) ---')
+    if ra is not None:
+        overall_display = _OVERALL_RISK_DISPLAY.get(ra.overall_class, ra.overall_class)
+        lines.append(f'Overall project risk class:  {ra.overall_class.upper()}  —  {overall_display}')
+        lines.append(f'Risk register coverage:      {ra.total_risks_scored} of {ra.total_risks_added} risks scored')
+        if ra.categories:
+            lines.append('Per-category classes (worst-case per category):')
+            for cat in ra.categories:
+                lines.append(f'  - {cat.category_label}:  {cat.category_class.upper()}')
+    else:
+        lines.append('Overall project risk class:  not yet computed')
+
     # BUG-08 (KAU §6) — surface the FPO's statutory compliance list with
     # each item's current status, so chapters can neither claim an
     # "upgraded FSSAI licence" when the FPO has not applied for one, nor
@@ -882,6 +909,19 @@ _HARD_RULES = (
     '"approximately 3,780 t" because 3,780 × 92% recovery ≈ 3,478 t '
     'rice. The AI\'s role is to describe the process, not to redo '
     'the arithmetic.\n'
+    '9d. OVERALL PROJECT RISK — MUST APPEAR IN EXEC SUMMARY AND CONCLUSION. '
+    'BUG-05 (KAU §6): the FACTS block\'s "Overall project risk '
+    'classification" section carries the calc engine\'s overall class '
+    '(LOW / MODERATE / HIGH / NOT_ASSESSED). The Executive Summary MUST '
+    'state the overall class once in one sentence (e.g. "The project '
+    'carries an overall MODERATE risk rating, driven primarily by [the '
+    'highest-rated per-category class]"). The Conclusion MUST do the '
+    'same and MUST NOT describe the project as "strong", "attractive", '
+    '"compelling" or any similarly positive term if the overall class is '
+    'HIGH — a bank reviewer will see those adjectives as inconsistent '
+    'with the risk rating they already read on the first page. If the '
+    'overall class is NOT_ASSESSED, state that risks are entered but not '
+    'yet scored and the FPO must complete the scoring before submission.\n'
     '9c. STATUTORY STATUS — QUOTE, NEVER UPGRADE. BUG-08 (KAU §6): the '
     '"Statutory compliance list" FACTS block gives the real-time status '
     'of every statutory item ("Available", "Applied", "Under review", '
@@ -1680,8 +1720,13 @@ _CHAPTER_BRIEF = {
         'Replace the braces with the actual values from the FACTS '
         'block. The Executive Summary is INVALID if this three-ratio '
         'viability sentence is missing; do NOT substitute Debt:Equity, '
-        'NPV, break-even, or EBITDA for the viability line. Do not '
-        're-list revenue / EBITDA / PAT / NPV / break-even / Y1 '
+        'NPV, break-even, or EBITDA for the viability line. BUG-05 '
+        '(KAU §6) — ALSO MANDATORY: state the overall project risk '
+        'class in one sentence after the viability line, quoting the '
+        'exact class from the "Overall project risk classification" '
+        'FACTS section (LOW / MODERATE / HIGH / NOT_ASSESSED) and '
+        'naming the per-category driver when it is HIGH or MODERATE. '
+        'Do not re-list revenue / EBITDA / PAT / NPV / break-even / Y1 '
         'figures elsewhere in the chapter — the Financial Analysis '
         'chapter carries those. 400-600 words.'
     ),
@@ -1769,10 +1814,17 @@ _CHAPTER_BRIEF = {
     'conclusion': (
         'Summarise, in neutral bank-appraisal language, the overall case '
         'for the project — how its technical feasibility, market position, '
-        'financing structure, and identified risks fit together. You may '
-        'reference AT MOST two headline ratios (pick DSCR and IRR, or '
-        'DSCR and payback) in a single passing phrase — never list the '
-        'full ratio set and never quote revenue / EBITDA / PAT / NPV / '
+        'financing structure, and identified risks fit together. BUG-05 '
+        '(KAU §6) — MANDATORY: state the overall project risk class '
+        'quoting the exact class from the "Overall project risk '
+        'classification" FACTS section, and if that class is HIGH or '
+        'MODERATE, name the per-category driver(s) and acknowledge the '
+        'need for additional covenants / risk management clauses — do '
+        'NOT describe the project as "strong", "attractive" or '
+        '"compelling" when the risk class is HIGH. You may reference '
+        'AT MOST two headline ratios (pick DSCR and IRR, or DSCR and '
+        'payback) in a single passing phrase — never list the full '
+        'ratio set and never quote revenue / EBITDA / PAT / NPV / '
         'break-even values; the Financial Analysis chapter carries all '
         'of those. Note any material assumptions from the Key Assumptions '
         'Used table + any limitations. Do NOT recommend loan sanction, '
