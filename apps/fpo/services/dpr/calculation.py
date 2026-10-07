@@ -191,8 +191,9 @@ class ProfitLossRow:
     ebitda: Decimal                 # revenue − operating cost
     depreciation: Decimal           # from DepreciationSchedule.total_depreciation_by_year
     ebit: Decimal                   # ebitda − depreciation
-    interest: Decimal               # from InterestSchedule (loan amortisation)
-    pbt: Decimal                    # ebit − interest (profit before tax)
+    interest: Decimal               # from InterestSchedule (TERM LOAN amortisation only)
+    wc_interest: Decimal            # BUG-32 (KAU §6 retest r2): WC loan + shortfall × wc_interest_rate
+    pbt: Decimal                    # ebit − interest − wc_interest (profit before tax)
     tax: Decimal                    # pbt × tax_rate (0 if pbt < 0)
     pat: Decimal                    # pbt − tax (profit after tax)
 
@@ -498,6 +499,13 @@ class WorkingCapitalStatement:
     funded_wc_total: Decimal
     funding_gap: Decimal
     funding_gap_pct_of_requirement: Decimal   # Decimal 0..100
+
+    # BUG-32 (KAU §6 retest r2) — interest on working-capital borrowings.
+    # Charged annually on (WC loan + un-arranged shortfall) at the
+    # admin-configurable wc_interest_rate_default_pct (defaults to the
+    # term-loan default). Shown as its own P&L line + in §6B.
+    wc_interest_rate_pct: Decimal = Decimal('0')
+    wc_interest_annual: Decimal = Decimal('0')
 
 
 @dataclass
@@ -1556,6 +1564,7 @@ def build_profit_loss(
     depreciation: DepreciationSchedule,
     interest: InterestSchedule,
     projection_years: int,
+    wc_statement: Optional[WorkingCapitalStatement] = None,
 ) -> ProfitLoss:
     """N-year P&L projection.
 
@@ -1563,7 +1572,13 @@ def build_profit_loss(
              weighted-average growth rate (falls back to inflation_rate_pct).
     Opex:    Y1 from opex fields; escalated by inflation_rate_pct each year.
     Depreciation: from 3c DepreciationSchedule.total_depreciation_by_year.
-    Interest: from InterestSchedule (loan amortisation).
+    Interest: from InterestSchedule (TERM LOAN amortisation).
+    WC interest (BUG-32, KAU §6 retest r2): annual charge on
+         (mof_working_capital_loan + un-arranged shortfall) at
+         wc_interest_rate_default_pct, held constant across Y1..YN
+         (WC debt is modelled flat in this convention). Reduces PBT
+         alongside the term-loan interest and is rendered as its own
+         'Interest on working capital' P&L line.
     Tax: PBT × tax_rate_pct (from DPRConfig). Zero when PBT is negative
          (no MAT / carry-forward modelled at this pass — noted for 3h ratios).
     """
@@ -1599,10 +1614,16 @@ def build_profit_loss(
         dep = depreciation.total_depreciation_by_year.get(year, Decimal('0'))
         int_row = interest.rows[year - 1] if year - 1 < len(interest.rows) else None
         int_charge = int_row.interest if int_row else Decimal('0')
+        # BUG-32: annual interest on WC borrowings (loan + shortfall),
+        # flat across projection years.
+        wc_int_charge = (
+            wc_statement.wc_interest_annual
+            if wc_statement is not None else Decimal('0')
+        )
 
         ebitda = current_rev - current_opex
         ebit = ebitda - dep
-        pbt = ebit - int_charge
+        pbt = ebit - int_charge - wc_int_charge
         tax = (pbt * tax_rate / Decimal('100')).quantize(Decimal('0.01')) if pbt > 0 else Decimal('0')
         pat = pbt - tax
 
@@ -1617,6 +1638,7 @@ def build_profit_loss(
             depreciation=dep,
             ebit=ebit,
             interest=int_charge,
+            wc_interest=wc_int_charge,
             pbt=pbt,
             tax=tax,
             pat=pat,
@@ -1841,9 +1863,19 @@ def build_working_capital_statement(project) -> WorkingCapitalStatement:
     margin_for_wc = _d('cost_margin_for_working_capital')
 
     # Which figure drives the balance sheet + narrative?
+    # BUG-35 (KAU §6 retest r2): when both seasonal peak and operating-
+    # cycle estimates exist, use the HIGHER of the two — the peak is a
+    # conservative floor only, not a cap. A seasonal override entered
+    # LOWER than the operating cycle estimate would otherwise understate
+    # WC. Keep the basis_used label distinct so §6B can show the user
+    # when the OC estimate overrode an entered peak.
     if is_seasonal and peak_amount > 0:
-        wc_requirement_used = peak_amount
-        basis_used = 'seasonal_peak'
+        if peak_amount >= wc_requirement_oc or wc_requirement_oc == 0:
+            wc_requirement_used = peak_amount
+            basis_used = 'seasonal_peak'
+        else:
+            wc_requirement_used = wc_requirement_oc
+            basis_used = 'operating_cycle_higher_than_peak'
     elif wc_requirement_oc > 0:
         wc_requirement_used = wc_requirement_oc
         basis_used = 'operating_cycle'
@@ -1864,6 +1896,25 @@ def build_working_capital_statement(project) -> WorkingCapitalStatement:
         if wc_requirement_used > 0 else Decimal('0')
     )
 
+    # BUG-32 (KAU §6 retest r2): interest on WC borrowings. Rate comes
+    # from the new wc_interest_rate_default_pct DPRConfig key, falling
+    # back to the term-loan default rate (banks typically price CC at
+    # or slightly above the term-loan rate). Charged annually on the
+    # full WC debt (arranged loan + un-arranged shortfall) — the
+    # shortfall carries interest too because the model books it as a
+    # short-term borrowing (BUG-30); pricing it at the same rate stops
+    # the 'free money' distortion the testing team measured (₹23 L/yr
+    # missing on similar-03, more than its Y1 PAT).
+    wc_interest_rate = DPRConfig.get_decimal(
+        'wc_interest_rate_default_pct',
+        DPRConfig.get_decimal('loan_interest_rate_default_pct', Decimal('10.5')),
+    )
+    wc_debt_total = mof_wc_loan + funding_gap
+    wc_interest_annual = (
+        (wc_debt_total * wc_interest_rate / Decimal('100')).quantize(Decimal('0.01'))
+        if wc_debt_total > 0 else Decimal('0')
+    )
+
     return WorkingCapitalStatement(
         inventory_days=inventory_days,
         receivable_days=receivable_days,
@@ -1882,6 +1933,8 @@ def build_working_capital_statement(project) -> WorkingCapitalStatement:
         funded_wc_total=funded_wc_total,
         funding_gap=funding_gap,
         funding_gap_pct_of_requirement=funding_gap_pct,
+        wc_interest_rate_pct=wc_interest_rate,
+        wc_interest_annual=wc_interest_annual,
     )
 
 
@@ -2111,13 +2164,38 @@ def _irr(cash_flows: list[Decimal]) -> tuple[Optional[Decimal], bool]:
     return None, False
 
 
-def _free_cash_flows(cash_flow: CashFlow) -> list[Decimal]:
+def _free_cash_flows(
+    cash_flow: CashFlow,
+    wc_statement: Optional['WorkingCapitalStatement'] = None,
+) -> list[Decimal]:
     """Free cash flows for NPV/IRR — excludes financing activities so we
     measure project economics independent of how it was financed.
     Free CF = CFO + CFI (i.e. operating + investing).
     Y0: full capex outflow. Y1..YN: CFO from operations.
+
+    BUG-34 (KAU §6 retest r2): the project investment must include the
+    FULL working-capital requirement (operating-cycle / seasonal basis),
+    not just the margin line that happens to sit inside project cost.
+    Testing team moved the WC requirement from ₹20.8 L to ₹2.30 Cr and
+    IRR stayed at 21.99% — because the Y0 investing outflow only
+    carried the margin. Treatment per standard appraisal convention:
+      Y0: additional outflow of (wc_requirement_used − margin), i.e.
+          the slice of WC investment not already inside cost.total.
+      YN (final projection year): the FULL wc_requirement_used is
+          recovered as a terminal inflow (working capital is released
+          when the projection window closes).
     """
-    return [(row.cash_from_operations + row.cash_from_investing) for row in cash_flow.rows]
+    flows = [(row.cash_from_operations + row.cash_from_investing) for row in cash_flow.rows]
+    if wc_statement is not None and flows:
+        wc_total = wc_statement.wc_requirement_used
+        margin_in_cost = wc_statement.margin_for_working_capital
+        extra_wc_outflow = max(Decimal('0'), wc_total - margin_in_cost)
+        # Y0: invest the WC slice not already inside cost.total.
+        flows[0] = flows[0] - extra_wc_outflow
+        # Final year: recover the full WC investment.
+        if wc_total > 0:
+            flows[-1] = flows[-1] + wc_total
+    return flows
 
 
 def _build_dscr(profit_loss: ProfitLoss, interest: InterestSchedule) -> tuple[list[DSCRRow], Optional[Decimal], Optional[Decimal]]:
@@ -2138,8 +2216,11 @@ def _build_dscr(profit_loss: ProfitLoss, interest: InterestSchedule) -> tuple[li
     for pl_row, int_row in zip(profit_loss.rows, interest.rows):
         interest_charge = int_row.interest
         principal = int_row.principal
-        denom = interest_charge + principal
-        numer = pl_row.pat + pl_row.depreciation + interest_charge
+        # BUG-32 (KAU §6 retest r2): WC interest is part of annual debt
+        # service and part of the cash restored in the numerator addback.
+        wc_int = getattr(pl_row, 'wc_interest', Decimal('0')) or Decimal('0')
+        denom = interest_charge + principal + wc_int
+        numer = pl_row.pat + pl_row.depreciation + interest_charge + wc_int
         dscr = None
         if denom > 0:
             dscr = (numer / denom).quantize(Decimal('0.01'))
@@ -2283,6 +2364,7 @@ def build_ratios(
     interest: InterestSchedule,
     cash_flow: CashFlow,
     project=None,
+    wc_statement: Optional[WorkingCapitalStatement] = None,
 ) -> FinancialRatios:
     """Assemble the appraisal ratios block.
 
@@ -2290,9 +2372,13 @@ def build_ratios(
     NPV / IRR / DSCR / payback / break-even-year still work. When passed,
     the operating break-even (fixed / contribution — Kefitech 2026-09-19
     P6.1) is computed and populated on the returned FinancialRatios.
+
+    BUG-34 (KAU §6 retest r2): `wc_statement` threads the full WC
+    requirement into the NPV/IRR free cash flows (Y0 extra outflow +
+    terminal recovery) and WC interest into the DSCR debt service.
     """
     discount_rate = DPRConfig.get_decimal('discount_rate_pct', Decimal('12'))
-    fcfs = _free_cash_flows(cash_flow)
+    fcfs = _free_cash_flows(cash_flow, wc_statement=wc_statement)
 
     npv = _npv(fcfs, discount_rate)
     irr, irr_converged = _irr(fcfs)
@@ -2608,19 +2694,22 @@ def compute(project) -> CalculationResult:
     capital_schedule = build_capital_schedule(project, cost, mof, implementation_months)
     depreciation = build_depreciation_schedule(cost, projection_years)
     interest = build_interest_schedule(project, projection_years)
-    profit_loss = build_profit_loss(project, depreciation, interest, projection_years)
-    cash_flow = build_cash_flow(cost, mof, profit_loss, interest, projection_years)
-    # BUG-06 (KAU §2.4) — compute WC statement from the operating-cycle
-    # inputs the Finance section already captures (10 wc_* costs + 3
-    # period-in-days + seasonal override). Must run BEFORE balance_sheet
-    # so the BS can use wc_requirement_used as its WC asset rather than
-    # the fixed `cost_margin_for_working_capital` single line.
+    # BUG-06 (KAU §2.4) + BUG-32 (retest r2) — the WC statement now feeds
+    # the P&L (WC interest line), so it must be built BEFORE profit_loss.
     wc_statement = build_working_capital_statement(project)
+    profit_loss = build_profit_loss(
+        project, depreciation, interest, projection_years,
+        wc_statement=wc_statement,
+    )
+    cash_flow = build_cash_flow(cost, mof, profit_loss, interest, projection_years)
     balance_sheet = build_balance_sheet(
         cost, mof, depreciation, interest, profit_loss, cash_flow, projection_years,
         wc_statement=wc_statement,
     )
-    ratios = build_ratios(profit_loss, interest, cash_flow, project=project)
+    ratios = build_ratios(
+        profit_loss, interest, cash_flow, project=project,
+        wc_statement=wc_statement,
+    )
     risk_assessment = build_risk_assessment(project)
     sanity_warnings = _compute_sanity_warnings(ratios, profit_loss)
 

@@ -129,6 +129,19 @@ CONFIG_SEEDS = [
         '(not an error). KAU RCD B.4.',
         '%', '0', '100',
     ),
+    # ── BUG-32 (KAU §6 retest r2) — WC interest rate ────────────────────
+    (
+        'wc_interest_rate_default_pct', 'financial', 'decimal', '10.50',
+        'Working capital interest rate',
+        'Annual interest rate charged on working-capital borrowings — both '
+        'the arranged WC loan (mof_working_capital_loan) and any un-arranged '
+        'shortfall booked as short-term borrowings. Defaults to the term-loan '
+        'default rate; banks typically price cash credit at or slightly above '
+        'the term-loan rate. Shown as its own P&L line (Interest on working '
+        'capital) and in the §6B Working Capital Statement. BUG-32 (KAU §6).',
+        '%', '0', '30',
+    ),
+
     # ── BUG-29 (KAU §6) — contingency sizing ────────────────────────────
     # The testing team flagged that contingency was being auto-checked
     # against project_cost_variance_pct (10%) when it is really a

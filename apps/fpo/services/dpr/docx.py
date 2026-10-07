@@ -1139,7 +1139,8 @@ def _rows_from_pl(r: CalculationResult) -> list[dict]:
         ('EBITDA', 'ebitda'),
         ('Depreciation', 'depreciation'),
         ('EBIT', 'ebit'),
-        ('Interest', 'interest'),
+        ('Interest — term loan', 'interest'),
+        ('Interest on working capital', 'wc_interest'),
         ('PBT', 'pbt'),
         ('Tax', 'tax'),
         ('PAT', 'pat'),
@@ -1265,6 +1266,7 @@ def _add_loan_repayment_table(doc, rows: list[dict]) -> None:
 _WC_BASIS_DISPLAY_DOCX = {
     'seasonal_peak':   'Seasonal peak amount (KAU §2.4 C3 — overrides operating-cycle)',
     'operating_cycle': 'Operating-cycle method (KAU §2.4)',
+    'operating_cycle_higher_than_peak': 'Operating-cycle method (entered seasonal peak was lower — peak is a floor, not a cap)',
     'margin_only':     'Fallback: WC margin on cost of project',
     'none':            'Not computed — days/costs not entered',
 }
@@ -1323,6 +1325,11 @@ def _render_working_capital_statement(doc, r: CalculationResult) -> None:
         rows.append((
             f'SHORTFALL vs requirement ({wc.funding_gap_pct_of_requirement}%)',
             _fmt_inr_table(wc.funding_gap), True,
+        ))
+    if getattr(wc, 'wc_interest_annual', None):
+        rows.append((
+            f'Interest on WC borrowings @ {wc.wc_interest_rate_pct}% p.a. (charged in P&L)',
+            f'{_fmt_inr_table(wc.wc_interest_annual)} / year', False,
         ))
 
     table = doc.add_table(rows=len(rows), cols=2)

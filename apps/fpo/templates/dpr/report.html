@@ -529,6 +529,12 @@ Author: Athul Gopan (Kefi Tech Solutions)
             <td><strong>₹ {{ r.working_capital_statement.funding_gap|money }} ({{ r.working_capital_statement.funding_gap_pct_of_requirement|money }}%)</strong></td>
           </tr>
         {% endif %}
+        {% if r.working_capital_statement.wc_interest_annual %}
+          <tr>
+            <td class="label">Interest on WC borrowings @ {{ r.working_capital_statement.wc_interest_rate_pct|money }}% p.a. (charged in P&amp;L)</td>
+            <td>₹ {{ r.working_capital_statement.wc_interest_annual|money }} / year</td>
+          </tr>
+        {% endif %}
       </tbody>
     </table>
     {% if r.working_capital_statement.peak_notes %}
@@ -564,8 +570,10 @@ Author: Athul Gopan (Kefi Tech Solutions)
         {% for row in r.profit_loss.rows %}<td>{{ row.depreciation|money }}</td>{% endfor %}</tr>
       <tr class="subtotal"><td class="label">EBIT</td>
         {% for row in r.profit_loss.rows %}<td>{{ row.ebit|money }}</td>{% endfor %}</tr>
-      <tr><td class="label">Interest</td>
+      <tr><td class="label">Interest — term loan</td>
         {% for row in r.profit_loss.rows %}<td>{{ row.interest|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">Interest on working capital</td>
+        {% for row in r.profit_loss.rows %}<td>{{ row.wc_interest|money }}</td>{% endfor %}</tr>
       <tr class="subtotal"><td class="label">PBT</td>
         {% for row in r.profit_loss.rows %}<td>{{ row.pbt|money }}</td>{% endfor %}</tr>
       <tr><td class="label">Tax</td>

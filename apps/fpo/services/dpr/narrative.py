@@ -803,6 +803,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     _WC_BASIS_DISPLAY = {
         'seasonal_peak':   'Seasonal peak amount entered by the FPO (overrides the operating-cycle estimate because the enterprise has substantial seasonal procurement — KAU §2.4 clarification)',
         'operating_cycle': 'Operating-cycle method per KAU §2.4 — (inventory days + receivable days − payable days) ÷ 365 × annual WC-basis opex',
+        'operating_cycle_higher_than_peak': 'Operating-cycle method per KAU §2.4 — the entered seasonal peak is LOWER than the operating-cycle estimate, so the operating-cycle figure is used instead (BUG-35: peak is a floor, never a cap)',
         'margin_only':     'Fallback: project did not enter any period-in-days inputs; the single-line WC margin entered on cost is used as the requirement',
         'none':            'Not computed — the FPO entered neither days nor annual WC costs nor a WC margin',
     }
@@ -829,7 +830,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
                 lines.append(f'  Peak-period notes:         {notes}')
         else:
             lines.append('Seasonal override active:    No')
-        lines.append(f'WC requirement used in DPR:  {_fmt_inr(wc.wc_requirement_used)}  (feeds the Y0 balance sheet + cash flow)')
+        lines.append(f'WC requirement used in DPR:  {_fmt_inr(wc.wc_requirement_used)}  (feeds the Y0 balance sheet + cash flow + IRR investment)')
         lines.append(f'  Funded by: WC loan {_fmt_inr(wc.mof_working_capital_loan)} + WC margin on cost {_fmt_inr(wc.margin_for_working_capital)} = {_fmt_inr(wc.funded_wc_total)}')
         if wc.funding_gap > 0:
             lines.append(
@@ -839,6 +840,17 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
             )
         else:
             lines.append('  Funding gap:               None — WC requirement is fully funded.')
+        # BUG-32 (KAU §6 retest r2): interest on WC borrowings is now
+        # charged in the P&L as its own line. The AI must mention this
+        # cost whenever discussing debt service / profitability.
+        if wc.wc_interest_annual > 0:
+            lines.append(
+                f'Interest on WC borrowings:   {_fmt_inr(wc.wc_interest_annual)} per year '
+                f'@ {wc.wc_interest_rate_pct}% p.a. on the WC debt (loan + shortfall) — '
+                'charged in the P&L as "Interest on working capital" and included in debt service for DSCR.'
+            )
+        else:
+            lines.append('Interest on WC borrowings:   None — no WC debt (loan + shortfall both zero).')
     else:
         lines.append('Working Capital Statement not yet computed.')
 

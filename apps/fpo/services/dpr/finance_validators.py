@@ -80,8 +80,16 @@ def validate_section(section) -> dict[str, Any]:
     # threshold is treated as rounding / assumption noise and doesn't warrant a
     # warning. Above threshold shows a percentage-based message so the user
     # understands the magnitude, not just the rupee gap.
+    #
+    # BUG-33 (KAU §6 retest r2): mof_working_capital_loan is a cash-credit
+    # facility drawn against operations, NOT a source of project-cost
+    # financing. Testing team entered ₹1.7 Cr WC loan on a ₹2.5 Cr project
+    # and got a 68% variance warning because MoF totalled ₹4.2 Cr vs
+    # cost ₹2.5 Cr. WC loan belongs under a separate 'Working capital
+    # facility' line in the DPR, excluded from the cost/MoF reconciliation.
     total_cost = _sum(section, COST_FIELDS)
-    total_mof = _sum(section, MOF_FIELDS)
+    _MOF_FIELDS_FOR_VARIANCE = [f for f in MOF_FIELDS if f != 'mof_working_capital_loan']
+    total_mof = _sum(section, _MOF_FIELDS_FOR_VARIANCE)
     if total_cost > 0 and total_mof > 0:
         variance_pct = (abs(total_cost - total_mof) / total_cost) * Decimal('100')
         threshold_pct = DPRConfig.get_decimal('project_cost_variance_pct', Decimal('10'))

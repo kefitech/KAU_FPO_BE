@@ -456,6 +456,32 @@ def _pre_final_validation(project) -> list[dict]:
                 ),
             })
 
+    # BUG-36 (KAU §6 retest r2): block final DPR when the Working Capital
+    # Statement shows an un-arranged shortfall. BUG-30 lets the balance
+    # sheet balance by booking the gap as `wc_shortfall_borrowings`, but
+    # that borrowing has no cost + no arranged lender. Shipping a DPR
+    # with a silent shortfall misleads KAU reviewers. The FPO must
+    # either raise a cash-credit limit (increase mof_working_capital_loan)
+    # or reduce the operating-cycle estimate before the DPR goes out.
+    if result is not None and getattr(result, 'working_capital_statement', None) is not None:
+        wc = result.working_capital_statement
+        if wc.funding_gap > 0:
+            errors.append({
+                'chapter': 'working_capital',
+                'reason': (
+                    f'Working capital funding gap of ₹{wc.funding_gap:,.0f} '
+                    f'({wc.funding_gap_pct_of_requirement}% of the requirement) '
+                    f'is currently un-arranged — the Working Capital Statement '
+                    f'shows the shortfall as a short-term borrowing but no '
+                    f'lender has been identified. Enter a mof_working_capital_'
+                    f'loan amount in Finance → Means of Finance that covers '
+                    f'the shortfall, or reduce the operating-cycle estimate '
+                    f'(fewer inventory / receivable days, or lower annual WC '
+                    f'opex). Required before a KAU-facing DPR can be '
+                    f'generated.'
+                ),
+            })
+
     # Finance §Cat E — Section E must have at least one revenue assumption
     # before the versioned/banker PDF can be produced. The calc engine has a
     # Products-section fallback that keeps Preview useful during wizard
