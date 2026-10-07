@@ -154,6 +154,97 @@ def validate_section(section) -> dict[str, Any]:
             'Latest Annual Turnover is required when FPO is already operational.',
         ))
 
+    # BUG-16 (KAU §6) — land ownership vs cost / lease rent consistency.
+    # Reads the Location section to see how the FPO declared land ownership,
+    # then checks that the Finance section carries the matching costs:
+    #   - Owned by FPO / Owned by Members / Proposed to Purchase
+    #     → cost_land_purchase + cost_land_development should be > 0
+    #   - Leased / Rented
+    #     → warn that lease rent must appear in operating cost (op_admin_
+    #       expenses or op_miscellaneous — there is no dedicated op_rent
+    #       field in Finance section).
+    try:
+        location_section = getattr(section.project, 'section_location', None)
+    except Exception:  # noqa: BLE001 — section_location may not exist yet on fresh projects
+        location_section = None
+    if location_section is not None:
+        ownership_codes = set()
+        try:
+            ownership_codes = set(
+                location_section.land_ownership_types.values_list('code', flat=True)
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        owns_or_proposes_to_buy = ownership_codes & {
+            'owned_fpo', 'owned_members', 'proposed_purchase',
+        }
+        is_leased_or_rented = ownership_codes & {'leased', 'rented'}
+        land_capex = (
+            (Decimal(str(section.cost_land_purchase or 0)))
+            + (Decimal(str(section.cost_land_development or 0)))
+        )
+
+        if owns_or_proposes_to_buy and land_capex == 0:
+            codes_display = ', '.join(sorted(owns_or_proposes_to_buy))
+            warnings.append(_warn(
+                'land_owned_no_capex', 'cost_land_purchase',
+                f'Land ownership declared as {codes_display} but no land cost '
+                f'in capex (land purchase + development both ₹0). Either enter '
+                f'the land acquisition / development cost on the Finance section, '
+                f'or add a note in the Promoter Profile that the land is held on '
+                f'the FPO/members\' books at nil incremental cost.',
+            ))
+
+        if is_leased_or_rented:
+            # There's no dedicated op_rent field; lease rent typically lives
+            # under op_admin_expenses or op_miscellaneous. Can only check that
+            # at least one of those two is non-zero to catch the "forgot to
+            # enter the rent" case.
+            op_admin = Decimal(str(getattr(section, 'op_admin_expenses', 0) or 0))
+            op_misc = Decimal(str(getattr(section, 'op_miscellaneous', 0) or 0))
+            codes_display = ', '.join(sorted(is_leased_or_rented))
+            if op_admin + op_misc == 0:
+                warnings.append(_warn(
+                    'land_leased_no_rent', 'op_admin_expenses',
+                    f'Land ownership declared as {codes_display} but neither '
+                    f'op_admin_expenses nor op_miscellaneous carry a value — '
+                    f'this suggests lease / rent has not been captured in '
+                    f'operating cost. There is no dedicated rent field; '
+                    f'enter the annual lease/rent under op_admin_expenses or '
+                    f'op_miscellaneous (whichever is cleaner for your DPR), '
+                    f'or document the arrangement if rent is zero.',
+                ))
+
+    # BUG-18 (KAU §6) — contingency below configured tolerance. Hard cost is
+    # the sum of fixed-asset lines (land, civil, machinery, equipment,
+    # utilities, electrification, vehicles, water supply, site + office +
+    # furniture) — excludes soft costs (pre-op, preliminary, technical
+    # consultancy), contingency itself, WC margin, and IDC. Contingency
+    # below `project_cost_variance_pct` of hard cost is flagged so the FPO
+    # can decide to bump it or defend the lower number in prose.
+    _HARD_COST_FIELDS = [
+        'cost_land_purchase', 'cost_land_development',
+        'cost_civil_works', 'cost_buildings', 'cost_site_development',
+        'cost_plant_machinery',
+        'cost_equipment', 'cost_furniture_fixtures', 'cost_office_equipment',
+        'cost_vehicles',
+        'cost_electrification', 'cost_water_supply', 'cost_utilities',
+    ]
+    hard_cost = _sum(section, _HARD_COST_FIELDS)
+    contingency = Decimal(str(section.cost_contingencies or 0))
+    if hard_cost > 0:
+        threshold_pct = DPRConfig.get_decimal('project_cost_variance_pct', Decimal('10'))
+        expected_contingency = (hard_cost * threshold_pct / Decimal('100')).quantize(Decimal('0.01'))
+        if contingency < expected_contingency:
+            actual_pct = (contingency * Decimal('100') / hard_cost).quantize(Decimal('0.01'))
+            warnings.append(_warn(
+                'contingency_below_tolerance', 'cost_contingencies',
+                f'Contingency (₹{contingency:,.0f} = {actual_pct}% of hard cost) is below '
+                f'the configured {threshold_pct}% tolerance (expected ≥ ₹{expected_contingency:,.0f}). '
+                f'Consider raising the contingency line or add a note in the Financial Analysis '
+                f'narrative explaining why a smaller buffer is adequate.',
+            ))
+
     return {
         'errors': errors,
         'warnings': warnings,
