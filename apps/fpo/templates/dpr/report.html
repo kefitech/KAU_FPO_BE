@@ -290,9 +290,9 @@ Author: Athul Gopan (Kefi Tech Solutions)
         {% if project.primary_commodity %}{{ project.primary_commodity.get_name|default:project.primary_commodity.code }}{% endif %}{% if project.project_types.all %}{% if project.primary_commodity %} — {% endif %}{% for pt in project.project_types.all %}{{ pt }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% if not project.primary_commodity and not project.project_types.all %}—{% endif %}
       </td></tr>
       <tr><td class="rownum">4</td>  <td class="k">District</td>                           <td class="v">{% if project.fpo.district %}{{ project.fpo.get_district_display }}, Kerala{% else %}—{% endif %}</td></tr>
-      <tr><td class="rownum">5</td>  <td class="k">Legal structure</td>                    <td class="v">{{ project.fpo.legal_structure|default:"—" }}</td></tr>
+      <tr><td class="rownum">5</td>  <td class="k">Legal structure</td>                    <td class="v">{{ project.fpo.legal_structure|enum_display:"legal_structure"|default:"—" }}</td></tr>
       <tr><td class="rownum">6</td>  <td class="k">Number of members / shareholders</td>   <td class="v">{{ project.fpo.total_members|default_if_none:"—" }}</td></tr>
-      <tr><td class="rownum">7</td>  <td class="k">Promoting agency</td>                   <td class="v">{{ project.fpo.promoting_agency|default:"—" }}</td></tr>
+      <tr><td class="rownum">7</td>  <td class="k">Promoting agency</td>                   <td class="v">{{ project.fpo.promoting_agency|enum_display:"promoting_agency"|default:"—" }}</td></tr>
       <tr><td class="rownum">8</td>  <td class="k">Facilitating agency</td>                <td class="v">{{ project.fpo.facilitating_agency_name|default:"—" }}</td></tr>
 
       <tr><td class="rownum">9</td>  <td class="k">Total project cost</td>                 <td class="v"><strong>₹ {{ r.cost.total|money }}</strong></td></tr>

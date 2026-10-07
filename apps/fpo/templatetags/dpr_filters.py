@@ -166,3 +166,20 @@ def last_net_block(rows) -> Decimal:
 def year_total(depreciation, year: int) -> Decimal:
     """Total depreciation across all classes for a given year."""
     return depreciation.total_depreciation_by_year.get(int(year), Decimal('0'))
+
+
+@register.filter
+def enum_display(code, category: str) -> str:
+    """Map a raw code value to its human label via the Translation table.
+
+    Usage in the DPR template:
+        {{ project.fpo.legal_structure|enum_display:'legal_structure' }}
+        → 'Producer Companies Act'  (not 'producer_companies')
+
+    BUG-20 (KAU Section 6): FPO stores several fields as plain CharField
+    codes (`producer_companies`, `nabard`, `ceo`) that leaked to the PDF
+    and the AI prompt as-is. Resolves via `<category>.<code>` translation
+    key, falling back to a title-cased code if the translation is missing.
+    """
+    from apps.fpo.services.dpr.enum_display import enum_display as _resolve
+    return _resolve(category, code)

@@ -113,7 +113,12 @@ def collect_system_assumptions(project=None) -> list[Assumption]:
     for cfg_key, label, code_default, override_field in _SYSTEM_RATE_KEYS:
         platform_default = DPRConfig.get_decimal(cfg_key, code_default)
         override = _project_override(project, override_field)
-        if override is not None:
+        # BUG-19 (KAU Section 6): only mark as "overrides platform default"
+        # when the project value is actually DIFFERENT from the default. A
+        # project that enters 10.50% matching the default should read as
+        # "10.50% (platform default)", not the self-contradicting
+        # "Project-entered 10.50% overrides the platform default of 10.50%".
+        if override is not None and override != platform_default:
             rows.append(Assumption(
                 key=cfg_key, label=label,
                 value=override,
