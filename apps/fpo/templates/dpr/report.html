@@ -869,9 +869,11 @@ Author: Athul Gopan (Kefi Tech Solutions)
     <div class="ai-narrative">{{ pdf_ai.swot|linebreaks }}</div>
   {% endif %}
   {% if pdf_ai.risk_analysis %}
-    {# DPR-04 (UAT) — Risk Analysis AI chapter. The narrative is generated but
-       was missing from the PDF; this block + its TOC entry + its sec-risk-ai
-       anchor close the gap. #}
+    {% comment %}
+      DPR-04 (UAT) — Risk Analysis AI chapter. The narrative is generated but
+      was missing from the PDF; this block + its TOC entry + its sec-risk-ai
+      anchor close the gap.
+    {% endcomment %}
     <h2 id="sec-risk-ai">Risk Analysis</h2>
     <div class="ai-narrative-label">AI-generated narrative · KAU platform</div>
     {% if pdf_ai_stale.risk_analysis %}<div class="ai-stale-note">⚠ Content may be outdated — {{ pdf_ai_stale.risk_analysis }}</div>{% endif %}
