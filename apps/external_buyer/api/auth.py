@@ -65,6 +65,7 @@ class RegisterBuyerUserView(APIView):
                 'first_name': user.first_name,
                 'last_name':  user.last_name,
                 'phone':      user.profile.phone,
+                'district':   user.buyer_profile.location,
             },
             message="Registration successful. Your buyer account is pending KAU verification.",
         )
