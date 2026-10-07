@@ -333,17 +333,49 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'{baseline_util}%' if baseline_util is not None else _NOT_PROVIDED
     )
 
+    # BUG-01 (KAU §6): clearly label every value with its source so the AI
+    # stops conflating different concepts in prose.
+    #   - FPO HQ district  (fpo.district)                      ≠ project site district  (location.district)
+    #   - Shareholder-member count (fpo.total_members)         ≠ employees (baseline.num_employees)
+    #                                                          ≠ beneficiaries (ess.*_beneficiaries)
+    #   - FPO legal structure (fpo.legal_structure)            is independent of loan source
+    location_section = getattr(project, 'section_location', None)
+    project_site_district = (
+        (getattr(location_section, 'district', '') or '').strip()
+        if location_section else ''
+    )
+    project_site_village = (
+        (getattr(location_section, 'village', '') or '').strip()
+        if location_section else ''
+    )
+    fpo_hq_district = (
+        (getattr(fpo, 'district', '') or '').strip() if fpo else ''
+    )
+    # Surface BOTH districts explicitly so the narrative can distinguish
+    # them. When the two differ, the narrative must honour both.
+    if project_site_district and project_site_village:
+        site_display = f'{project_site_village}, {project_site_district}'
+    elif project_site_district:
+        site_display = project_site_district
+    elif project_site_village:
+        site_display = f'{project_site_village} (district not entered)'
+    else:
+        site_display = 'Not provided (project implementation site)'
+    fpo_hq_display = fpo_hq_district or 'Not provided (FPO HQ)'
+
     lines = [
         '=== PROJECT FACTS (use these values verbatim; do not estimate) ===',
         f'Project title:              {project.title or "Not provided by the FPO"}',
         f'FPO / promoter:             {fpo_name}',
+        f'FPO HQ district:            {fpo_hq_display}  (where the FPO is registered)',
+        f'Project implementation site: {site_display}  (where this specific project will be built — can differ from FPO HQ)',
         f'Primary commodity:          {commodity}',
         '',
         '--- Promoter / institutional identity ---',
         f'CEO name:                   {ceo_name}',
         f'CEO qualification:          {ceo_qual}',
         f'CEO experience:             {ceo_exp_display}',
-        f'Total member farmers:       {total_members_display}',
+        f'Shareholder-member count:   {total_members_display}  (registration — these are the FPO\'s member-farmer shareholders, NOT employees, NOT project beneficiaries)',
         f'Women members:              {women_members_display}',
         f'Board of Directors:         {board_display}',
         f'Board meeting frequency:    {board_freq_display}',
@@ -365,7 +397,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'Existing products / services:           {baseline_products}',
         f'Existing certifications held:           {baseline_certs}',
         f'Existing market coverage:               {baseline_market}',
-        f'Employees on roll (current):            {baseline_employees_display}',
+        f'Employees on current FPO payroll:       {baseline_employees_display}  (operational headcount — NOT members, NOT project beneficiaries)',
         f'Previous experience / track record:     {baseline_prev_exp}',
         f'Major existing operational challenges:  {baseline_challenges}',
         '',
@@ -961,6 +993,27 @@ _HARD_RULES = (
     '"approximately 3,780 t" because 3,780 × 92% recovery ≈ 3,478 t '
     'rice. The AI\'s role is to describe the process, not to redo '
     'the arithmetic.\n'
+    '9f. DO NOT CONFLATE PEOPLE COUNTS OR LOCATIONS ACROSS DIFFERENT '
+    'FACTS LINES. BUG-01 (KAU §6): the testing team saw narratives '
+    'referencing "14 members" when the FACTS block\'s "Shareholder-'
+    'member count" line read 250 — the AI had conflated the employees-'
+    'on-payroll line (14 people) with the member-shareholder line (250 '
+    'farmers). Also saw the cover referencing one district while the '
+    'narrative placed the project in another ~400 km away — the AI '
+    'conflated FPO HQ district with project implementation site. '
+    'DISAMBIGUATION RULES — treat each of these as a DIFFERENT concept '
+    'and quote only against the matching FACTS line:\n'
+    '    - Shareholder-member count (fpo registration) ≠ Employees on '
+    '      current FPO payroll ≠ Project beneficiaries (ESS section).\n'
+    '    - FPO HQ district (where the FPO is registered) ≠ Project '
+    '      implementation site district (where the specific project is '
+    '      being built). Both are surfaced in FACTS; honour BOTH when '
+    '      they differ (e.g. "The Thiruvananthapuram-registered FPO '
+    '      will build the processing unit in Panamaram, Wayanad.").\n'
+    '    - FPO legal structure (e.g. Producer Companies Act, '
+    '      Co-operative Act) is independent of the loan source '
+    '      (NABARD / NCDC / commercial bank). Do NOT infer the FPO\'s '
+    '      legal form from the lender or vice versa.\n'
     '9e. NUMBER FORMATTING + UNIT CONVERSION ARE BOTH FORBIDDEN. BUG-26 '
     'and BUG-25 (KAU §6): Gemini sometimes rewrites `₹ 25,00,000` as '
     '`₹ 25,00,00,00` (broken Indian grouping — the final group must be '
