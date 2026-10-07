@@ -79,8 +79,19 @@ class NarrativeError(Exception):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _fmt_inr(amount: Optional[Decimal]) -> str:
-    """Render a Decimal ₹ amount as `₹ 12,34,567.89` (Indian numbering).
-    Returns 'Not available' for None."""
+    """Render a Decimal ₹ amount as `₹ 12,34,567` (Indian numbering).
+
+    BUG-26 (KAU §6 retest, root cause): previously emitted `₹ 25,00,000.00`
+    with the trailing `.00` always present. Gemini was reading those two
+    zero-decimals as if they belonged to the Indian grouping and output
+    `25,00,00,00` — pattern-match analysis of broken outputs showed
+    EXACTLY the trailing-decimal digits had been shifted into the comma
+    grouping. Dropping the `.00` when the fractional is zero removes the
+    attack surface entirely. Non-zero fractionals (rare on money, common
+    on ratios) are rendered as before.
+
+    Returns 'Not available' for None.
+    """
     if amount is None:
         return 'Not available'
     # Split into integer + fractional
@@ -99,7 +110,14 @@ def _fmt_inr(amount: Optional[Decimal]) -> str:
             pieces.insert(0, head)
         int_part = ','.join(pieces) + ',' + tail
     sign = '-' if negative else ''
-    return f'₹ {sign}{int_part}.{dec_part or "00"}'
+    # BUG-26: drop the trailing `.00` / `.000` when the fractional is zero
+    # so Gemini can't mistake trailing zeros for additional grouping digits.
+    if not dec_part or dec_part.rstrip('0') == '':
+        return f'₹ {sign}{int_part}'
+    # Non-zero fraction: strip trailing zeros but keep the decimal (e.g.
+    # `.50` → `.5`, `.25` stays `.25`).
+    dec_display = dec_part.rstrip('0') or '00'
+    return f'₹ {sign}{int_part}.{dec_display}'
 
 
 def _fmt_pct(v: Optional[Decimal]) -> str:
@@ -254,7 +272,24 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     area_display = f'{area_acres} acres' if area_acres is not None else _NOT_PROVIDED
     women_pct = getattr(project, 'women_shareholding_pct', None)
     women_display = f'{women_pct}%' if women_pct is not None else _NOT_PROVIDED
-    landholding = (getattr(project, 'landholding_summary', '') or '').strip() or _NOT_PROVIDED
+    # BUG-01 retest: strip "N members" patterns from the free-text
+    # landholding_summary so Gemini can't extract a competing member
+    # count. The Shareholder-member count line is the ONLY authoritative
+    # source. We also strip "N shareholders" and "N farmers" variants
+    # because Gemini has treated them as member counts in prior runs.
+    _landholding_raw = (getattr(project, 'landholding_summary', '') or '').strip()
+    if _landholding_raw:
+        _COUNT_PHRASE_RE = re.compile(
+            r'\b\d{1,3}(?:,\d{2,3})*\s*(?:members?|shareholders?|farmers?|farmer-?members?)\b',
+            re.IGNORECASE,
+        )
+        _landholding_scrubbed = _COUNT_PHRASE_RE.sub(
+            '[member count — see Shareholder-member count line above]',
+            _landholding_raw,
+        )
+        landholding = _landholding_scrubbed
+    else:
+        landholding = _NOT_PROVIDED
     board_freq_raw = getattr(project, 'board_meeting_frequency', '') or ''
     board_freq_display = (
         dict((k, v) for k, v in [
@@ -339,8 +374,10 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     #   - Shareholder-member count (fpo.total_members)         ≠ employees (baseline.num_employees)
     #                                                          ≠ beneficiaries (ess.*_beneficiaries)
     #   - FPO legal structure (fpo.legal_structure)            is independent of loan source
+    from .enum_display import enum_display as _ed
+    from apps.core.utils.constants import get_district_name
     location_section = getattr(project, 'section_location', None)
-    project_site_district = (
+    project_site_district_code = (
         (getattr(location_section, 'district', '') or '').strip()
         if location_section else ''
     )
@@ -348,25 +385,52 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         (getattr(location_section, 'village', '') or '').strip()
         if location_section else ''
     )
-    fpo_hq_district = (
+    fpo_hq_district_code = (
         (getattr(fpo, 'district', '') or '').strip() if fpo else ''
     )
+    # BUG-01 retest (KAU §6): resolve district codes to display names. The
+    # earlier version printed the raw code (e.g. "TVM") which Gemini then
+    # quoted verbatim in prose. constants.get_district_name() reads from
+    # DISTRICTS_BILINGUAL (authoritative source for the 14 Kerala
+    # districts). Falls back to the code if unknown.
+    fpo_hq_display = (
+        get_district_name(fpo_hq_district_code, 'en')
+        if fpo_hq_district_code else 'Not provided (FPO HQ)'
+    )
+    site_district_display = (
+        get_district_name(project_site_district_code, 'en')
+        if project_site_district_code else ''
+    )
+
     # Surface BOTH districts explicitly so the narrative can distinguish
     # them. When the two differ, the narrative must honour both.
-    if project_site_district and project_site_village:
-        site_display = f'{project_site_village}, {project_site_district}'
-    elif project_site_district:
-        site_display = project_site_district
+    if site_district_display and project_site_village:
+        site_display = f'{project_site_village}, {site_district_display}'
+    elif site_district_display:
+        site_display = site_district_display
     elif project_site_village:
         site_display = f'{project_site_village} (district not entered)'
     else:
         site_display = 'Not provided (project implementation site)'
-    fpo_hq_display = fpo_hq_district or 'Not provided (FPO HQ)'
+
+    # BUG-01 retest: surface the FPO's legal structure explicitly so the
+    # narrative stops asserting "a Producer Company registered in TVM
+    # district" when the registration is actually a state co-operative.
+    # Resolved via the enum display helper so KAU reviewers see the human
+    # label ("Co-operative Society", "Companies Act 2013"), not the code.
+    legal_structure_code = (
+        (getattr(fpo, 'legal_structure', '') or '').strip() if fpo else ''
+    )
+    legal_structure_display = (
+        _ed('legal_structure', legal_structure_code)
+        if legal_structure_code else 'Not provided (FPO legal structure)'
+    )
 
     lines = [
         '=== PROJECT FACTS (use these values verbatim; do not estimate) ===',
         f'Project title:              {project.title or "Not provided by the FPO"}',
         f'FPO / promoter:             {fpo_name}',
+        f'FPO legal structure:        {legal_structure_display}  (this is the FPO\'s CONSTITUTION — not derived from the loan source. If this says "Co-operative Society", the FPO is NOT a Producer Company and vice versa.)',
         f'FPO HQ district:            {fpo_hq_display}  (where the FPO is registered)',
         f'Project implementation site: {site_display}  (where this specific project will be built — can differ from FPO HQ)',
         f'Primary commodity:          {commodity}',
@@ -1064,27 +1128,39 @@ _HARD_RULES = (
     '      lump-sum estimate.\n'
     '    - If a SHORTFALL exists, Financial Analysis MUST state the '
     '      gap amount and quote the Statement\'s guidance verbatim.\n'
-    '9f. DO NOT CONFLATE PEOPLE COUNTS OR LOCATIONS ACROSS DIFFERENT '
-    'FACTS LINES. BUG-01 (KAU §6): the testing team saw narratives '
-    'referencing "14 members" when the FACTS block\'s "Shareholder-'
-    'member count" line read 250 — the AI had conflated the employees-'
-    'on-payroll line (14 people) with the member-shareholder line (250 '
-    'farmers). Also saw the cover referencing one district while the '
-    'narrative placed the project in another ~400 km away — the AI '
-    'conflated FPO HQ district with project implementation site. '
-    'DISAMBIGUATION RULES — treat each of these as a DIFFERENT concept '
-    'and quote only against the matching FACTS line:\n'
-    '    - Shareholder-member count (fpo registration) ≠ Employees on '
-    '      current FPO payroll ≠ Project beneficiaries (ESS section).\n'
-    '    - FPO HQ district (where the FPO is registered) ≠ Project '
-    '      implementation site district (where the specific project is '
-    '      being built). Both are surfaced in FACTS; honour BOTH when '
-    '      they differ (e.g. "The Thiruvananthapuram-registered FPO '
-    '      will build the processing unit in Panamaram, Wayanad.").\n'
-    '    - FPO legal structure (e.g. Producer Companies Act, '
-    '      Co-operative Act) is independent of the loan source '
-    '      (NABARD / NCDC / commercial bank). Do NOT infer the FPO\'s '
-    '      legal form from the lender or vice versa.\n'
+    '9f. DO NOT CONFLATE PEOPLE COUNTS, LOCATIONS, OR LEGAL STRUCTURE '
+    'ACROSS DIFFERENT FACTS LINES. BUG-01 (KAU §6, two rounds): the '
+    'testing team saw narratives referencing "14 members" alongside '
+    '"250 shareholder-members", cover district differing from narrative '
+    'project site, and "a Producer Company registered in TVM district" '
+    'when the registration is a state co-operative. These failures all '
+    'come from the AI picking stray numbers / cues out of free-text '
+    'fields and treating them as authoritative. RULES — follow all of '
+    'the following, no exceptions:\n'
+    '    (a) The ONLY authoritative source for the member count is the '
+    '    "Shareholder-member count" FACTS line. If "250 members" appears '
+    '    inside the "Landholding pattern" prose or any other free-text '
+    '    field, that is NOT a member count — it has already been '
+    '    scrubbed to the sentinel "[member count — see Shareholder-'
+    '    member count line above]" where visible. Do NOT quote member '
+    '    counts from Landholding pattern, Previous experience, Market '
+    '    coverage, PSC Members, or any other free-text line.\n'
+    '    (b) Shareholder-member count (fpo registration) ≠ Employees '
+    '    on current FPO payroll ≠ Project beneficiaries (ESS section). '
+    '    Never substitute one for another.\n'
+    '    (c) FPO HQ district (where the FPO is registered) ≠ Project '
+    '    implementation site district (where the specific project is '
+    '    being built). Both are surfaced in FACTS as resolved display '
+    '    names ("Thiruvananthapuram", "Wayanad") — never quote the raw '
+    '    code (TVM, WYD). When they differ the narrative must honour '
+    '    BOTH (e.g. "The Thiruvananthapuram-registered FPO will build '
+    '    the processing unit in Panamaram, Wayanad.").\n'
+    '    (d) FPO legal structure is a SEPARATE FACTS line ("FPO legal '
+    '    structure"). Quote it verbatim — if it reads "Co-operative '
+    '    Society", do NOT write "Producer Company"; if it reads '
+    '    "Companies Act 2013", do NOT write "Co-operative". Do NOT '
+    '    infer the FPO\'s constitution from the loan source (NABARD, '
+    '    NCDC, commercial bank) — the two are unrelated.\n'
     '9e. NUMBER FORMATTING + UNIT CONVERSION ARE BOTH FORBIDDEN. BUG-26 '
     'and BUG-25 (KAU §6): Gemini sometimes rewrites `₹ 25,00,000` as '
     '`₹ 25,00,00,00` (broken Indian grouping — the final group must be '

@@ -58,9 +58,14 @@ _TEST_PLACEHOLDER_PATTERNS = frozenset({
 def is_test_placeholder(value) -> bool:
     """True when a free-text field value looks like a test / dummy entry.
 
-    Catches the exact literal placeholders (TEST, OPK, TBD, …) and short
-    strings under 5 characters that are almost always typos or test
-    scaffolding (real agency names run at least a word). Case-insensitive.
+    Matches the exact placeholder vocabulary (case-insensitive): TEST,
+    OPK, TODO, XXX, TBD, TBA, NA, N/A, NONE, NIL, DUMMY, SAMPLE,
+    PLACEHOLDER. Case-insensitive, trimmed.
+
+    BUG-24 (KAU §6 retest, revision): the earlier version also rejected
+    anything under 5 characters, which hid legitimate agency acronyms
+    (ATMA, KVK, SFAC, NCDC). Testing team asked for exact-blocklist
+    only — kept here.
 
     None / empty → False so the caller's own default kicks in.
     """
@@ -69,18 +74,7 @@ def is_test_placeholder(value) -> bool:
     s = str(value).strip()
     if not s:
         return False
-    lower = s.lower()
-    if lower in _TEST_PLACEHOLDER_PATTERNS:
-        return True
-    # Strings under 5 chars (after strip) are almost certainly not a real
-    # agency name. KAU §6 flagged "OPK" (3 chars) and "TEST" (4) — both
-    # fit this bucket. Legitimate agency codes like "NABARD" (6), "SFAC"
-    # (4) are too short on their own either, but those live in the
-    # `promoting_agency` field with its own MasterLookup, not here in
-    # `facilitating_agency_name` which is free text.
-    if len(s) < 5:
-        return True
-    return False
+    return s.lower() in _TEST_PLACEHOLDER_PATTERNS
 
 
 def display_or_undisclosed(value) -> str:
