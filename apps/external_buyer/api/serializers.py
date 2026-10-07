@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.core.services.translation import t
+from apps.core.utils.constants import District
 
 User = get_user_model()
 
@@ -27,7 +28,9 @@ class RegisterBuyerUserSerializer(serializers.Serializer):
     credentials always match what was actually verified via OTP.
 
     Creates a User, assigns the external_buyer group, and creates a pending
-    BuyerDirectory row linked to the new user.
+    BuyerDirectory row linked to the new user. The chosen district is stored on
+    BuyerDirectory.location so the pending application reaches that district's
+    sub-admin, not only the super admin.
     """
 
     first_name = serializers.CharField(
@@ -41,6 +44,10 @@ class RegisterBuyerUserSerializer(serializers.Serializer):
     organisation = serializers.CharField(
         max_length=300, required=False, allow_blank=True,
         help_text="Company / organisation name (optional)"
+    )
+    district = serializers.ChoiceField(
+        choices=District.choices, required=True,
+        help_text='3-letter Kerala district code (e.g. "TSR"). Routes the application to that district\'s sub-admin.'
     )
     password = serializers.CharField(
         write_only=True, required=True,
@@ -107,6 +114,7 @@ class RegisterBuyerUserSerializer(serializers.Serializer):
         validated_data.pop('confirm_password')
         password     = validated_data.pop('password')
         organisation = validated_data.pop('organisation', '')
+        district     = validated_data.pop('district')
         first_name   = validated_data['first_name']
         last_name    = validated_data['last_name']
 
@@ -131,6 +139,7 @@ class RegisterBuyerUserSerializer(serializers.Serializer):
             organisation=organisation,
             contact_email=email,
             contact_phone=phone,
+            location=district,
             fpo=None,
             status=BuyerDirectory.Status.PENDING,
         )
