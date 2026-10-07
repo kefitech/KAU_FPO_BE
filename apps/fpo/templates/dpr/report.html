@@ -658,6 +658,10 @@ Author: Athul Gopan (Kefi Tech Solutions)
         {% for row in r.balance_sheet.rows %}<td>{{ row.total_equity|money }}</td>{% endfor %}</tr>
       <tr><td class="label">&nbsp;&nbsp;Term loan outstanding</td>
         {% for row in r.balance_sheet.rows %}<td>{{ row.term_loan_outstanding|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;WC loan outstanding</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.wc_loan_outstanding|money }}</td>{% endfor %}</tr>
+      <tr><td class="label">&nbsp;&nbsp;WC gap — short-term borrowings (to be arranged)</td>
+        {% for row in r.balance_sheet.rows %}<td>{{ row.wc_shortfall_borrowings|money }}</td>{% endfor %}</tr>
       <tr><td class="label">&nbsp;&nbsp;Other liabilities</td>
         {% for row in r.balance_sheet.rows %}<td>{{ row.other_liabilities|money }}</td>{% endfor %}</tr>
       <tr class="subtotal"><td class="label">Total Liabilities</td>

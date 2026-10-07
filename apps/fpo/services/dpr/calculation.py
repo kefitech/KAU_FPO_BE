@@ -304,7 +304,12 @@ class BalanceSheetRow:
     retained_earnings: Decimal          # cumulative PAT
     total_equity: Decimal
     term_loan_outstanding: Decimal      # from InterestSchedule.closing_balance
-    other_liabilities: Decimal          # placeholder for WC loan / creditors (Y0 seeded)
+    wc_loan_outstanding: Decimal        # from MoF mof_working_capital_loan
+    wc_shortfall_borrowings: Decimal    # BUG-30: WC requirement − funded WC;
+                                        # booked as a short-term liability so
+                                        # the invariant holds when the FPO
+                                        # under-sized its WC loan.
+    other_liabilities: Decimal          # placeholder for creditors (Y0 seeded)
     total_liabilities: Decimal
     total_equity_and_liabilities: Decimal
 
@@ -1730,7 +1735,11 @@ _TERM_LOAN_FIELDS = frozenset({
     'mof_venture_capital',        # treated as long-term liability at first pass
 })
 _OTHER_LIABILITY_FIELDS = frozenset({
-    'mof_working_capital_loan',
+    # BUG-30 (KAU §6 retest): mof_working_capital_loan was previously
+    # lumped into 'other_liabilities' as a convenience. Now that the
+    # Balance Sheet has a dedicated 'WC loan outstanding' column (fed
+    # from the WorkingCapitalStatement), it must NOT also appear here
+    # or we double-count the funding.
     'mof_other_sources',
 })
 
@@ -1959,7 +1968,26 @@ def build_balance_sheet(
         else:
             int_row = interest.rows[year - 1] if year - 1 < len(interest.rows) else None
             loan_out = int_row.closing_balance if int_row else initial_term_loan
-        total_liabilities = loan_out + other_liabilities
+
+        # BUG-30 (KAU §6 retest): the WC asset was booked at the full
+        # wc_requirement_used but only mof_working_capital_loan + margin
+        # were on the funding side — the shortfall gap broke the
+        # invariant on every year. Book the shortfall as a short-term
+        # liability ("WC gap — short-term borrowing to be arranged")
+        # so the balance sheet balances and the reader sees the gap
+        # explicitly. Lender covenant will be the FPO's responsibility.
+        wc_loan_outstanding = Decimal('0')
+        wc_shortfall_borrowings = Decimal('0')
+        if wc_statement is not None:
+            wc_loan_outstanding = wc_statement.mof_working_capital_loan
+            # Funding gap already excludes the WC margin which was
+            # booked into cost → funded via MoF + cash flow mechanics.
+            # The gap is the un-arranged borrowing the invariant needs.
+            wc_shortfall_borrowings = wc_statement.funding_gap
+        total_liabilities = (
+            loan_out + wc_loan_outstanding + wc_shortfall_borrowings
+            + other_liabilities
+        )
 
         total_eq_and_liab = total_equity + total_liabilities
         delta = total_assets - total_eq_and_liab
@@ -1981,6 +2009,8 @@ def build_balance_sheet(
             retained_earnings=retained,
             total_equity=total_equity,
             term_loan_outstanding=loan_out,
+            wc_loan_outstanding=wc_loan_outstanding,
+            wc_shortfall_borrowings=wc_shortfall_borrowings,
             other_liabilities=other_liabilities,
             total_liabilities=total_liabilities,
             total_equity_and_liabilities=total_eq_and_liab,

@@ -1203,6 +1203,8 @@ def _rows_from_balance_sheet(r: CalculationResult) -> list[dict]:
         ('Retained earnings', 'retained_earnings'),
         ('Total equity', 'total_equity'),
         ('Term loan outstanding', 'term_loan_outstanding'),
+        ('WC loan outstanding', 'wc_loan_outstanding'),
+        ('WC gap — short-term borrowings (to be arranged)', 'wc_shortfall_borrowings'),
         ('Other liabilities', 'other_liabilities'),
         ('Total liabilities', 'total_liabilities'),
         ('Total equity & liabilities', 'total_equity_and_liabilities'),

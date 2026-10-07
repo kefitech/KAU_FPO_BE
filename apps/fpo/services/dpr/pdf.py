@@ -428,6 +428,34 @@ def _pre_final_validation(project) -> list[dict]:
                 'reason':  cw.message,
             })
 
+    # BUG-30 (KAU §6 retest): hard-block final generation when the
+    # balance sheet invariant (Assets = Equity + Liabilities) fails on
+    # any year. The testing team found a ₹7.8L gap on similar-03 that
+    # printed on every year of the PDF without blocking generation — a
+    # banker-facing DPR must not ship with an unbalanced BS.
+    from .calculation import compute
+    try:
+        result = compute(project)
+    except Exception:  # noqa: BLE001 — if compute itself fails, other gates will catch it
+        result = None
+    if result is not None and getattr(result, 'balance_sheet', None) is not None:
+        bs = result.balance_sheet
+        if not getattr(bs, 'all_years_balanced', True):
+            max_delta = getattr(bs, 'max_invariant_delta', Decimal('0'))
+            unbalanced_years = sorted({r.year for r in bs.rows if not r.invariant_ok})
+            errors.append({
+                'chapter': 'balance_sheet',
+                'reason': (
+                    f'Balance Sheet invariant (Assets = Equity + Liabilities) '
+                    f'fails on year(s) {unbalanced_years}. Maximum gap: '
+                    f'₹{max_delta:,.0f}. This is a calc engine error — do not '
+                    f'ship this DPR until the gap closes. If the gap equals '
+                    f'the WC funding shortfall, the FPO must either raise a '
+                    f'cash credit line (increase mof_working_capital_loan) '
+                    f'or reduce the operating-cycle estimate.'
+                ),
+            })
+
     # Finance §Cat E — Section E must have at least one revenue assumption
     # before the versioned/banker PDF can be produced. The calc engine has a
     # Products-section fallback that keeps Preview useful during wizard
