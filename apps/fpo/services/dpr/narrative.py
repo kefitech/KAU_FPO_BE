@@ -837,6 +837,55 @@ def scrub_placeholders(text: str, chapter: Optional[str] = None) -> tuple[str, l
     return cleaned, hits
 
 
+# BUG-26 (KAU §6): Gemini intermittently emits broken Indian comma grouping
+# in numbers it sees in the FACTS block (`25,00,00,00` for ₹25,00,000;
+# `4,38,00,0 litres`; `2,85,00,00 kg`). Testing team saw this hit 5 of 11
+# chapters in one run on contrasting-03 and similar-01. The fix is a
+# post-generation scrubber that validates every comma-grouped number
+# against the Indian + Western conventions; invalid groupings get replaced
+# with `[?]` and the chapter is flagged needs_review=True so the admin
+# can see where regeneration is required. The scrubber errs on the side
+# of flagging — we would rather KAU see `[?]` than `4,38,00,0 litres`.
+#
+# Valid Indian grouping (4+ digits):  ^\d{1,2}(?:,\d{2})*,\d{3}$
+#   e.g. 1,234 (4d), 12,345 (5d), 1,23,456 (6d), 12,34,567 (7d), 1,23,45,678 (8d)
+# Valid Western grouping (4+ digits): ^\d{1,3}(?:,\d{3})+$
+#   e.g. 1,234, 12,345, 123,456, 1,234,567
+# 1-3 digit numbers never need commas, so a bare 1-3 digit number is also OK.
+#
+# Broken examples the scrubber catches:
+#   25,00,00,00   (ends with ,00 — final group must be 3 digits)
+#   4,38,00,0     (ends with ,0  — same)
+#   2,85,00,00    (same)
+#   1,05,00,00,0  (same + 11 digits)
+_VALID_INDIAN_RE = re.compile(r'^\d{1,2}(?:,\d{2})*,\d{3}$')
+_VALID_WESTERN_RE = re.compile(r'^\d{1,3}(?:,\d{3})+$')
+_COMMA_GROUPED_RE = re.compile(r'\d+(?:,\d+)+')
+
+
+def scrub_broken_numbers(text: str) -> tuple[str, list[dict]]:
+    """Replace invalidly-grouped comma numbers with `[?]`, return hit list.
+
+    Only touches sequences that already contain at least one comma — bare
+    decimal numbers are left alone. Returns `(cleaned_text, hits)` where
+    hits is `[{'raw': '4,38,00,0', 'count': 1}, …]` so the caller can
+    stamp DPRAIContent.placeholder_hits + needs_review.
+    """
+    hits_by_raw: dict[str, int] = {}
+
+    def _replace(m):
+        raw = m.group(0)
+        if _VALID_INDIAN_RE.match(raw) or _VALID_WESTERN_RE.match(raw):
+            return raw
+        hits_by_raw[raw] = hits_by_raw.get(raw, 0) + 1
+        return '[?]'
+
+    cleaned = _COMMA_GROUPED_RE.sub(_replace, text)
+    hits = [{'raw': raw, 'count': n, 'bug': 'BUG-26-broken-grouping'}
+            for raw, n in hits_by_raw.items()]
+    return cleaned, hits
+
+
 # KAU 2026-09-26 finalisation feedback: for two chapters the strict grounding
 # was making the narrative sound mechanical and short. KAU asked us to restore
 # the older expansive style for these, allow AI's general/global knowledge to
@@ -912,6 +961,20 @@ _HARD_RULES = (
     '"approximately 3,780 t" because 3,780 × 92% recovery ≈ 3,478 t '
     'rice. The AI\'s role is to describe the process, not to redo '
     'the arithmetic.\n'
+    '9e. NUMBER FORMATTING + UNIT CONVERSION ARE BOTH FORBIDDEN. BUG-26 '
+    'and BUG-25 (KAU §6): Gemini sometimes rewrites `₹ 25,00,000` as '
+    '`₹ 25,00,00,00` (broken Indian grouping — the final group must be '
+    'exactly 3 digits) and `6,50,000 kg` as `6,500 tonnes` (wrong '
+    'conversion: 6,50,000 kg is actually 650 tonnes, not 6,500). Both '
+    'are failure modes. RULE: every number that appears in the FACTS '
+    'block MUST be quoted VERBATIM — same digits, same commas (do not '
+    'reformat Indian grouping, do not swap to Western grouping, do not '
+    'add or drop zeros), same unit (do not convert kg → tonnes, litres '
+    '→ ml, hectares → acres, lakh → crore, or any other unit '
+    'transformation). If the FACTS block shows a number as '
+    '"6,50,000 kg", write "6,50,000 kg" in prose. The post-processor '
+    'replaces any invalidly-grouped number with `[?]` so broken numbers '
+    'are visible to the reviewer rather than silently wrong.\n'
     '9d. OVERALL PROJECT RISK — MUST APPEAR IN EXEC SUMMARY AND CONCLUSION. '
     'BUG-05 (KAU §6): the FACTS block\'s "Overall project risk '
     'classification" section carries the calc engine\'s overall class '
@@ -1058,6 +1121,13 @@ _LENIENT_RULES = (
     'are the FACTS block\'s "FPO track record" section and its "Primary '
     'commodity" line. Do not read activity cues from the FPO name, '
     'email, or project title (BUG-03, KAU §6).\n'
+    '9e. NUMBER FORMATTING + UNIT CONVERSION ARE FORBIDDEN. BUG-26 + '
+    'BUG-25 (KAU §6): quote every number from the FACTS block VERBATIM '
+    '— same digits, same commas (do NOT reformat Indian grouping), '
+    'same unit (do NOT convert kg → tonnes or any other unit). '
+    '"6,50,000 kg" must stay "6,50,000 kg", never "6,500 tonnes" '
+    '(6,50,000 kg is actually 650 tonnes, not 6,500). The post-processor '
+    'replaces invalidly-grouped numbers with `[?]`.\n'
     '10. NO METADATA TAGS. Never emit `[system_default]`, `[KB #n]`, '
     '`(system)` or similar metadata markers in the output.\n'
     '11. PROVENANCE OF ASSUMPTIONS. The "Rates actually used by the calc '
@@ -1259,6 +1329,13 @@ def generate_chapter(
     # recorded on DPRAIContent.placeholder_hits so admin can see WHICH
     # chapters were incomplete without diffing the text against the prompt.
     text, scrubber_hits = scrub_placeholders(text, chapter=chapter)
+
+    # BUG-26 (KAU §6): catch broken Indian comma groupings Gemini sometimes
+    # emits (`25,00,00,00`, `4,38,00,0`). Replace the broken number with
+    # `[?]` so a bank reviewer sees the gap instead of a misleading figure.
+    # Appends to the same scrubber_hits list so needs_review covers both.
+    text, broken_number_hits = scrub_broken_numbers(text)
+    scrubber_hits.extend(broken_number_hits)
 
     # Round-7 fallback (2026-10-05): make the Executive Summary viability
     # sentence deterministic. Gemini sometimes drops the DSCR+IRR+payback
