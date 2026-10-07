@@ -781,10 +781,15 @@ COST_FIELD_TO_ASSET_CLASS: dict[str, str] = {
     'cost_equipment':             'equipment',
     'cost_furniture_fixtures':    'equipment',
     'cost_office_equipment':      'equipment',
-    'cost_vehicles':              'equipment',
-    'cost_electrification':       'equipment',
-    'cost_water_supply':          'equipment',
-    'cost_utilities':             'equipment',
+    # BUG-23 (KAU §6): split out electrification + vehicles so the
+    # depreciation table doesn't label a utilities-heavy project as
+    # "Equipment & vehicles" when no vehicles exist. Water supply + the
+    # catch-all 'utilities' line are grouped under electrification since
+    # they share the same depreciation rate and asset-life convention.
+    'cost_vehicles':              'vehicles',
+    'cost_electrification':       'electrification',
+    'cost_water_supply':          'electrification',
+    'cost_utilities':             'electrification',
     'cost_pre_operative_expenses':   'pre_operative',
     'cost_preliminary_expenses':     'pre_operative',
     'cost_technical_consultancy':    'pre_operative',
@@ -843,12 +848,14 @@ def _allocate_idc(idc_amount: Decimal, class_totals: dict[str, Decimal]) -> dict
 # For 'land' and 'other' the rate is 0 (not depreciated). Pre-operative uses
 # straight-line amortisation over projection_years (bank convention).
 _ASSET_CLASS_META: dict[str, tuple[str, Optional[str]]] = {
-    'land':          ('Land',                 None),  # non-depreciable
-    'buildings':     ('Buildings & civil',    'depreciation_rate_building_pct'),
-    'machinery':     ('Plant & machinery',    'depreciation_rate_machinery_pct'),
-    'equipment':     ('Equipment & vehicles', 'depreciation_rate_equipment_pct'),
-    'pre_operative': ('Pre-operative expenses (amortised)',  None),  # amortised, not depreciated
-    'other':         ('Other capex',          None),  # non-depreciable
+    'land':            ('Land',                      None),  # non-depreciable
+    'buildings':       ('Buildings & civil',         'depreciation_rate_building_pct'),
+    'machinery':       ('Plant & machinery',         'depreciation_rate_machinery_pct'),
+    'equipment':       ('Equipment & furniture',     'depreciation_rate_equipment_pct'),
+    'vehicles':        ('Vehicles',                  'depreciation_rate_equipment_pct'),
+    'electrification': ('Electrification & utilities', 'depreciation_rate_equipment_pct'),
+    'pre_operative':   ('Pre-operative expenses (amortised)', None),  # amortised, not depreciated
+    'other':           ('Other capex',               None),  # non-depreciable
 }
 
 
@@ -914,8 +921,19 @@ def build_depreciation_schedule(
 
     for class_key, (label, _cfg_key) in _ASSET_CLASS_META.items():
         initial = class_totals[class_key]
+        # BUG-23 (KAU §6): list only categories that have capex. Earlier
+        # version emitted zero-cost rows (Vehicles ₹0, Other capex ₹0 etc.)
+        # which cluttered the depreciation schedule and misled reviewers.
+        if initial <= 0:
+            continue
         rate = _class_rate_pct(class_key)
         is_depreciable = rate > 0 or class_key == 'pre_operative'
+        # BUG-23 (KAU §6): the Pre-operative row used to show rate 0% while
+        # amortising ₹X/yr on a 10-year window (effectively 10%). Surface
+        # the actual straight-line amortisation rate so the row's charge
+        # column is consistent with the rate column.
+        if class_key == 'pre_operative' and projection_years > 0:
+            rate = (Decimal('100') / Decimal(projection_years)).quantize(Decimal('0.01'))
 
         rows: list[AssetClassRow] = []
         gross = initial
