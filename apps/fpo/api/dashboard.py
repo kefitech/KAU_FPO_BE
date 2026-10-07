@@ -19,6 +19,7 @@ from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO, FPODocument, FPOUserMembership
 from apps.database.models.notification import InAppNotification
 from apps.core.utils.constants import REQUIRED_DOCUMENTS
+from apps.notifications.api.inbox import notification_link
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,11 +122,7 @@ def _notifications_summary(user, lang: str):
     previews = []
     for notif in qs[:3]:
         title, body = _render_notification(notif, lang)
-        # Optional in-app destination set by the sender (e.g. new inquiries →
-        # '/fpo/products?view=inquiries'). Internal paths only — never a URL.
-        link = ((notif.log.context or {}).get('link') if notif.log else None) or None
-        if not (isinstance(link, str) and link.startswith('/') and not link.startswith('//')):
-            link = None
+        link = notification_link(notif)
         previews.append({
             'id':         notif.id,
             'title':      title,

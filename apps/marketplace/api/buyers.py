@@ -12,7 +12,7 @@ import string
 
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework import filters
 from apps.core.models.generic import AuditLog
@@ -28,9 +28,28 @@ from apps.core.utils.validators import validate_password_strength
 from apps.core.views import TranslatedViewSet
 from apps.database.models import BuyerDirectory
 from apps.marketplace.serializers import BuyerDirectorySerializer
+from apps.marketplace.services import clear_buyer_registration_alerts, unread_buyer_registration_alerts
 from apps.notifications.services import send_notification
 
 User = get_user_model()
+
+
+class AdminBuyerDirectorySerializer(BuyerDirectorySerializer):
+    """
+    Adds `unread_notification_id`: the caller's unread registration alert for a
+    pending buyer, or null. The table shows a dot while it is set and marks the
+    notification read (POST /api/notifications/inbox/{id}/read/) when the row is opened.
+    """
+
+    unread_notification_id = serializers.SerializerMethodField()
+
+    class Meta(BuyerDirectorySerializer.Meta):
+        fields = BuyerDirectorySerializer.Meta.fields + ['unread_notification_id']
+
+    def get_unread_notification_id(self, obj):
+        if obj.status != BuyerDirectory.Status.PENDING:
+            return None
+        return self.context.get('unread_buyer_alerts', {}).get(obj.id)
 
 
 def _resolve_buyer_user(buyer):
@@ -79,7 +98,7 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
     including external buyers with no district, which stay super-admin only.
     """
 
-    serializer_class = BuyerDirectorySerializer
+    serializer_class = AdminBuyerDirectorySerializer
     permission_classes = [IsAuthenticated, IsSubAdminOrSuperAdmin]
     pagination_class = StandardPagination
 
@@ -105,6 +124,12 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
             Q(fpo__district=district)                       # FPO buying from other FPOs
             | Q(fpo__isnull=True, location=district)        # external buyer in this district
         )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.action in ('list', 'retrieve'):
+            context['unread_buyer_alerts'] = unread_buyer_registration_alerts(self.request.user)
+        return context
 
     def get_queryset(self):
         from django.db.models import Q
@@ -170,6 +195,7 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
         buyer.is_verified = True
         buyer.status = BuyerDirectory.Status.VERIFIED
         buyer.save(update_fields=['is_verified', 'status', 'updated_at'])
+        clear_buyer_registration_alerts(buyer)
         return StandardResponse.success(
             data=BuyerDirectorySerializer(buyer).data,
             message=t('marketplace.buyer_verified', self.get_language())
@@ -181,6 +207,7 @@ class BuyerDirectoryViewSet(TranslatedViewSet):
         buyer.is_verified = False
         buyer.status = BuyerDirectory.Status.REJECTED
         buyer.save(update_fields=['is_verified', 'status', 'updated_at'])
+        clear_buyer_registration_alerts(buyer)
         return StandardResponse.success(
             data=BuyerDirectorySerializer(buyer).data,
             message=t('marketplace.buyer_rejected', self.get_language())

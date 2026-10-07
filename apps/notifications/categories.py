@@ -22,7 +22,7 @@ CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
     ('recommendations', ('recommendation_', 'model_')),
     ('expert',          ('expert_',)),
     ('training',        ('fpo_training_', 'training_')),
-    ('marketplace',     ('inquiry_',)),
+    ('marketplace',     ('inquiry_', 'buyer_')),
     # KAU #4 — Schemes & Subsidies bucket. `scheme_` covers approved codes
     # (scheme_published, scheme_updated, etc.); `subsidy_` reserved for the
     # subsidy-specific codes planned in the next release.

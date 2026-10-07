@@ -1040,6 +1040,14 @@ def seed_ui_translations(languages):
         ('admin_dashboard.chart_district_subtitle_statewide', 'FPOs registered in every district of Kerala — hover for details', 'കേരളത്തിലെ എല്ലാ ജില്ലകളിലും രജിസ്റ്റർ ചെയ്ത FPO-കൾ — വിശദാംശങ്ങൾക്ക് ഹോവർ ചെയ്യുക'),
         # Dashboard status donut — centre label when no section is hovered
         ('admin_dashboard.donut_total',         'Total FPOs',                               'ആകെ FPO-കൾ'),
+        # Sub-admin dashboard — assigned district + recent notifications (e.g. new buyer registrations)
+        ('admin_dashboard.assigned_district',   'Assigned district',                        'നിയോഗിച്ച ജില്ല'),
+        ('admin_dashboard.no_district_assigned', 'No district assigned yet',                'ഇതുവരെ ജില്ല നിയോഗിച്ചിട്ടില്ല'),
+        ('admin_dashboard.card_notifications_title', 'Recent Notifications',               'സമീപകാല അറിയിപ്പുകൾ'),
+        ('admin_dashboard.no_notifications',    'No notifications yet',                     'അറിയിപ്പുകൾ ഒന്നും ഇല്ല'),
+        ('admin_dashboard.view_all_notifications', 'View all notifications →',              'എല്ലാ അറിയിപ്പുകളും കാണുക →'),
+        # Buyer Directory — dot on a pending row the sub-admin hasn't opened yet
+        ('buyers_table.new_registration',       'New registration',                         'പുതിയ രജിസ്ട്രേഷൻ'),
         # Shown instead of the row menu on CBBOs / officials a sub-admin can only view
         ('cbbos_table.view_only',               'View only',                                'കാണാൻ മാത്രം'),
         ('government_table.view_only',          'View only',                                'കാണാൻ മാത്രം'),
@@ -4911,6 +4919,8 @@ def seed_products_page_translations(languages):
          'ലോഡ് ചെയ്യുന്നു...'),
         ('product_form.commodity_placeholder',    'Select a commodity',
          'ഒരു ചരക്ക് തിരഞ്ഞെടുക്കുക'),
+        ('product_form.commodity_empty',          'No commodity found',
+         'ചരക്ക് കണ്ടെത്തിയില്ല'),
         ('product_form.description_en_label',     'Description (English)',
          'വിവരണം (ഇംഗ്ലീഷ്)'),
         ('product_form.description_ml_label',     'Description (Malayalam)',

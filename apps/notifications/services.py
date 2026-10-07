@@ -154,6 +154,25 @@ def notify_super_admins(code: str, context: dict = None, channel: str = 'in_app'
             logger.exception("notify_super_admins: failed to send '%s' to admin %s", code, admin.pk)
 
 
+def notify_district_sub_admins(district: str, code: str, context: dict = None, channel: str = 'in_app') -> None:
+    """
+    Send one notification per active sub-admin assigned to `district` (e.g. 'TSR').
+    Same isolation as notify_super_admins; a district with no sub-admin sends nothing.
+    """
+    from apps.core.utils.constants import UserRole
+
+    if not district:
+        return
+    sub_admins = User.objects.filter(
+        groups__name=UserRole.SUB_ADMIN, is_active=True, district_assignment__district=district,
+    )
+    for sub_admin in sub_admins:
+        try:
+            send_notification(user=sub_admin, code=code, channel=channel, context=context or {})
+        except Exception:
+            logger.exception("notify_district_sub_admins: failed to send '%s' to sub-admin %s", code, sub_admin.pk)
+
+
 def _get_recipient(user_id: int, channel: str) -> str:
     """Extract the correct recipient address from the user based on channel."""
     try:

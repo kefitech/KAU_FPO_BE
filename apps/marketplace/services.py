@@ -166,3 +166,52 @@ def get_buyer_redirect(user):
     if buyer is None:
         return None
     return {'status': buyer.status}
+
+
+# ── External buyer registration alerts ──────────────────────────────────────
+# One in-app notification per district sub-admin when an external buyer
+# registers. Its context carries buyer_id, which the admin Buyer Directory
+# uses to dot the row until that sub-admin opens it.
+
+BUYER_REGISTRATION_PENDING = 'buyer_registration_pending'
+
+
+def notify_buyer_registration(buyer):
+    """Alert the sub-admins of the buyer's district (BuyerDirectory.location)."""
+    from django.utils.html import escape
+
+    from apps.core.utils.constants import DISTRICTS_BILINGUAL
+    from apps.notifications.services import notify_district_sub_admins
+
+    district_en, district_ml = DISTRICTS_BILINGUAL.get(buyer.location, (buyer.location, buyer.location))
+    notify_district_sub_admins(buyer.location, BUYER_REGISTRATION_PENDING, {
+        # In-app bodies render as HTML and the template engine substitutes verbatim.
+        'buyer_name':  escape(buyer.name),
+        'district':    district_en,
+        'district_ml': district_ml,
+        'link':        '/admin/buyers?status=pending',
+        'buyer_id':    buyer.id,
+    })
+
+
+def unread_buyer_registration_alerts(user):
+    """{buyer_id: notification_id} for this user's unread registration alerts."""
+    from apps.database.models import InAppNotification
+
+    rows = InAppNotification.objects.filter(
+        user=user, is_read=False, log__template_code__code=BUYER_REGISTRATION_PENDING,
+    ).values_list('log__context__buyer_id', 'id')
+    return {buyer_id: notif_id for buyer_id, notif_id in rows if buyer_id is not None}
+
+
+def clear_buyer_registration_alerts(buyer):
+    """Mark every admin's alert for this buyer read — once verified/rejected it needs no attention."""
+    from django.utils import timezone
+
+    from apps.database.models import InAppNotification
+
+    InAppNotification.objects.filter(
+        is_read=False,
+        log__template_code__code=BUYER_REGISTRATION_PENDING,
+        log__context__buyer_id=buyer.id,
+    ).update(is_read=True, read_at=timezone.now())

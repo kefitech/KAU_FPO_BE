@@ -5,15 +5,29 @@ Public registration endpoint for external buyers.
 URL: POST /api/external-buyer/register/
 """
 
+import logging
+
+from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.throttles import RegisterThrottle
+from apps.marketplace.services import notify_buyer_registration
 from apps.notifications.services import send_notification
 
 from .serializers import RegisterBuyerUserSerializer
+
+logger = logging.getLogger(__name__)
+
+
+def _notify_sub_admins(buyer):
+    # Registration is already saved — a failed alert must not fail the request.
+    try:
+        notify_buyer_registration(buyer)
+    except Exception:
+        logger.exception("Failed to alert sub-admins about buyer %s", buyer.pk)
 
 
 class RegisterBuyerUserView(APIView):
@@ -22,7 +36,8 @@ class RegisterBuyerUserView(APIView):
 
     Self-registration for external buyers. Creates account, assigns the
     external_buyer group, and creates a pending BuyerDirectory row awaiting
-    KAU verification. Requires phone + email to already be OTP-verified.
+    KAU verification, then alerts the chosen district's sub-admins in-app.
+    Requires phone + email to already be OTP-verified.
     """
 
     permission_classes = [AllowAny]
@@ -57,6 +72,10 @@ class RegisterBuyerUserView(APIView):
             )
         except Exception:
             pass
+
+        # In-app alert to the sub-admins of the buyer's district
+        buyer = user.buyer_profile
+        transaction.on_commit(lambda: _notify_sub_admins(buyer))
 
         return StandardResponse.created(
             data={
