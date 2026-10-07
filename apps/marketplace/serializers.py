@@ -383,6 +383,8 @@ class InquiryCreateSerializer(serializers.ModelSerializer):
         model = Inquiry
         fields = ['id', 'quantity_requested', 'message']
         read_only_fields = ['id']
+        # The model's TextField is unbounded; the inquiry dialog caps it at 500 chars.
+        extra_kwargs = {'message': {'max_length': 500}}
 
     def validate_quantity_requested(self, value):
         if value <= 0:
