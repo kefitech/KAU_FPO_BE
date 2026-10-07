@@ -494,6 +494,36 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     else:
         lines.append('  (no products entered — do NOT invent product details)')
 
+    # BUG-13 (KAU §6) — surface the FPO-entered raw-material annual
+    # requirements verbatim so the Technical / Market chapters cannot
+    # recompute them from output ÷ recovery %. similar-03 narrated
+    # "approximately 3,780 tonnes" of paddy when the input was 4,070 t;
+    # same shape in similar-01 v1.
+    raw_material_section = getattr(project, 'section_raw_material', None)
+    raw_material_rows = (
+        list(raw_material_section.materials.order_by('order'))
+        if raw_material_section else []
+    )
+    lines.append('')
+    lines.append('--- Raw materials (verbatim annual requirements — quote these, NEVER recompute) ---')
+    if raw_material_rows:
+        for rm in raw_material_rows[:15]:
+            variety = (rm.variety_grade or '').strip()
+            name_bit = f'{rm.name}' + (f' ({variety})' if variety else '')
+            qty = rm.estimated_annual_requirement
+            unit = getattr(rm.unit_of_purchase, 'code', '') if rm.unit_of_purchase_id else ''
+            qty_display = _fmt_qty(qty, unit) if qty is not None else 'quantity n/a'
+            price = (
+                _fmt_inr(rm.approx_purchase_price)
+                if rm.approx_purchase_price is not None else 'price n/a'
+            )
+            lines.append(
+                f'  - {name_bit}: {qty_display}/yr @ {price}/{unit or "unit"}'
+            )
+    else:
+        lines.append('  (no raw materials entered — Technical chapter must '
+                     'describe the process generically; do NOT invent input quantities)')
+
     # DPR-07 (UAT) — surface machinery by name + purpose so the technical
     # chapter cannot describe equipment the FPO did not enter.
     machinery_section = getattr(project, 'section_machinery', None)
@@ -639,6 +669,50 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         lines.append('  (no risks entered — Risk Analysis chapter should discuss '
                      'typical sector risks generically and recommend the FPO '
                      'populate the §2.3.22 Risk Register before submission)')
+
+    # BUG-08 (KAU §6) — surface the FPO's statutory compliance list with
+    # each item's current status, so chapters can neither claim an
+    # "upgraded FSSAI licence" when the FPO has not applied for one, nor
+    # treat a Not Applicable item as planned. Each row quotes the
+    # registration name (or custom label), the status (`available`,
+    # `applied`, `under_review`, `approved`, `rejected`, `proposed_to_obtain`,
+    # `not_applicable`), the issuing authority if known, and the expected
+    # approval date if applied/under_review.
+    compliance_section = getattr(project, 'section_compliance', None)
+    compliance_rows = (
+        list(compliance_section.items.select_related('registration').order_by('order'))
+        if compliance_section else []
+    )
+    _COMPLIANCE_STATUS_DISPLAY = {
+        'available':          'Available (FPO already holds this)',
+        'approved':           'Approved (certificate issued)',
+        'applied':            'Applied (not yet granted — treat as proposed, not held)',
+        'under_review':       'Under review (not yet granted — treat as proposed)',
+        'proposed_to_obtain': 'Proposed to obtain (FPO plans to apply)',
+        'rejected':           'Rejected',
+        'not_applicable':     'Not applicable to this project',
+        '':                   'Status not disclosed by the FPO',
+    }
+    lines.append('')
+    lines.append('--- Statutory compliance list (verbatim — quote the FACTS status, never upgrade it) ---')
+    if compliance_rows:
+        for c in compliance_rows[:25]:
+            if c.registration_id and c.registration:
+                name = str(c.registration)
+            else:
+                name = (c.custom_name or '').strip() or 'Unnamed compliance item'
+            status_display = _COMPLIANCE_STATUS_DISPLAY.get(c.status, c.status or 'Status not disclosed')
+            authority = (c.issuing_authority or '').strip()
+            auth_bit = f', issuing authority: {authority}' if authority else ''
+            exp_bit = (
+                f', expected approval: {c.expected_date_of_approval}'
+                if c.expected_date_of_approval else ''
+            )
+            lines.append(f'  - {name}: {status_display}{auth_bit}{exp_bit}')
+    else:
+        lines.append('  (no statutory items entered — Promoter / Implementation / '
+                     'Environmental chapters MUST NOT claim the FPO holds, has '
+                     'applied for, or will "upgrade/renew" any licence)')
 
     # KAU 2026-09-19 P2.1 + DPR-10 (UAT): surface the rates the calc engine
     # ACTUALLY used — project overrides win over platform defaults, and the
@@ -786,6 +860,40 @@ _HARD_RULES = (
     '"Utilities / infrastructure" sections, or the knowledge base. If '
     'the utilities list says "no utility items entered", treat those '
     'systems as NOT IN SCOPE — do not describe them as planned.\n'
+    '9a. NEVER INFER HISTORY OR ACTIVITIES FROM THE FPO NAME. BUG-03 '
+    '(KAU §6): a FPO called "Arecanut (Areca Nut) Farming Producer '
+    'Company" that aggregates only black pepper DOES NOT have a '
+    '"historical focus on arecanut and raw spice trade" — the name is '
+    'a legacy label, not an activity. The ONLY sources for the FPO\'s '
+    'history, past commodities, past activities, or track record are '
+    '(a) the "FPO track record" block in the FACTS section (declared '
+    'turnover, baseline turnover, existing products, existing market '
+    'coverage, previous experience) and (b) the "Primary commodity" + '
+    '"Products planned" entries. Do NOT read sector / commodity / '
+    'activity cues from the FPO name, email domain, or project title '
+    'under any circumstance.\n'
+    '9b. QUOTE RAW-MATERIAL QUANTITIES VERBATIM. BUG-13 (KAU §6): the '
+    '"Raw materials" FACTS block lists the FPO\'s declared annual '
+    'requirement per raw material with its unit. Technical, Market and '
+    'Environmental chapters MUST quote these numbers verbatim and MUST '
+    'NOT recompute input quantities from output × recovery %, process '
+    'yield, or any other derivation. If the FACTS block says "4,070 t '
+    'paddy / yr", write "4,070 tonnes of paddy per year" — never '
+    '"approximately 3,780 t" because 3,780 × 92% recovery ≈ 3,478 t '
+    'rice. The AI\'s role is to describe the process, not to redo '
+    'the arithmetic.\n'
+    '9c. STATUTORY STATUS — QUOTE, NEVER UPGRADE. BUG-08 (KAU §6): the '
+    '"Statutory compliance list" FACTS block gives the real-time status '
+    'of every statutory item ("Available", "Applied", "Under review", '
+    '"Proposed to obtain", "Approved", "Rejected", "Not applicable", '
+    '"Status not disclosed"). The Implementation Plan, Promoter Profile, '
+    'and Compliance chapters MUST quote these statuses verbatim and '
+    'MUST NOT (a) claim an "upgrade" or "renewal" of a licence unless '
+    'status reads "Available" or "Approved"; (b) imply the FPO holds a '
+    'licence whose status is "Proposed to obtain"; (c) describe a "Not '
+    'applicable" item as planned. If the compliance list is empty, DO '
+    'NOT invent any registration — write that statutory approvals need '
+    'to be mapped out before implementation.\n'
     '10. PROVENANCE OF ASSUMPTIONS. The "Rates actually used by the calc '
     'engine" section lists every rate the engine applied, with each row '
     'tagged as either "project-entered — overrides platform default of X%" '
@@ -900,6 +1008,11 @@ _LENIENT_RULES = (
     'recommended/typical approach the FPO should consider — never state '
     'it as planned or budgeted. Use the FACTS block or leave the detail '
     'generic.\n'
+    '9a. NEVER INFER HISTORY OR ACTIVITIES FROM THE FPO NAME. The ONLY '
+    'sources for the FPO\'s history, past commodities, or track record '
+    'are the FACTS block\'s "FPO track record" section and its "Primary '
+    'commodity" line. Do not read activity cues from the FPO name, '
+    'email, or project title (BUG-03, KAU §6).\n'
     '10. NO METADATA TAGS. Never emit `[system_default]`, `[KB #n]`, '
     '`(system)` or similar metadata markers in the output.\n'
     '11. PROVENANCE OF ASSUMPTIONS. The "Rates actually used by the calc '
