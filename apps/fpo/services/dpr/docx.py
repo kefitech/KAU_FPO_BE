@@ -1195,13 +1195,26 @@ def _rows_from_cashflow(r: CalculationResult) -> list[dict]:
     # upstream, so showing it as its own line double-counted it visually.
     if not r.cash_flow or not r.cash_flow.rows:
         return []
+    # BUG-38: WC lines mirror the PDF — shown only when Y0 carries a value
+    # so non-WC projects don't get three all-zero rows.
+    y0 = r.cash_flow.rows[0]
     fields = [
         ('PAT', 'pat'),
         ('Depreciation add-back', 'depreciation_addback'),
         ('CF from Operations', 'cash_from_operations'),
         ('Capex', 'capex'),
+    ]
+    if y0.wc_investment:
+        fields.append(('Investment in working capital', 'wc_investment'))
+    fields += [
         ('CF from Investing', 'cash_from_investing'),
-        ('MoF inflow', 'mof_inflow'),
+        ('Means of finance (project funding)', 'mof_inflow'),
+    ]
+    if y0.wc_facility_drawdown:
+        fields.append(('Working-capital facility drawdown (cash credit)', 'wc_facility_drawdown'))
+    if y0.wc_shortfall_borrowing:
+        fields.append(('WC shortfall borrowing (to be arranged)', 'wc_shortfall_borrowing'))
+    fields += [
         ('Loan repayment', 'loan_principal_repayment'),
         ('CF from Financing', 'cash_from_financing'),
         ('Net cash flow', 'net_cash_flow'),

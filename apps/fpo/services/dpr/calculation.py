@@ -276,13 +276,19 @@ class CashFlowRow:
     capex: Decimal                      # negative for cash outflow
     cash_from_investing: Decimal
     # ── Financing activities ──
-    mof_inflow: Decimal                 # promoter + loan + subsidy
+    mof_inflow: Decimal                 # PROJECT funding only (BUG-38) — excludes the WC facility
     loan_principal_repayment: Decimal   # negative
     cash_from_financing: Decimal
     # ── Totals ──
     net_cash_flow: Decimal
     opening_cash: Decimal
     closing_cash: Decimal
+    # ── BUG-38 (KAU §6 retest r4): explicit working-capital cash lines ──
+    # Y0 only; zero in operating years. These make the CF statement tie
+    # to the balance-sheet cash line exactly (no BS-side adjustment).
+    wc_investment: Decimal = Decimal('0')           # negative — full wc_requirement_used deployed (investing)
+    wc_facility_drawdown: Decimal = Decimal('0')    # positive — cash-credit limit drawn (financing)
+    wc_shortfall_borrowing: Decimal = Decimal('0')  # positive — un-arranged gap, mirrors the BS liability (financing)
 
 
 @dataclass
@@ -1697,15 +1703,24 @@ def build_cash_flow(
     profit_loss: ProfitLoss,
     interest: InterestSchedule,
     projection_years: int,
+    wc_statement: Optional[WorkingCapitalStatement] = None,
 ) -> CashFlow:
     """N+1-year cash flow using the indirect method.
 
     Y0 (construction period):
         - PAT / depreciation are zero (no operations)
-        - Investing: entire capex outflow, capitalised at project start
-        - Financing: entire MoF inflow (contributions + loan + subsidy)
-        - Working capital margin absorbed into Y0 investing (initial WC)
-        - Net Y0 cash flow = MoF − Cost. Zero when balanced (variance = 0).
+        - Investing: capex outflow + explicit investment in working capital
+          (BUG-38). When a WC Statement exists with wc_requirement_used > 0,
+          the margin line is excluded from the capex outflow (that cash is
+          not spent on capex — it is deployed into WC as part of the full
+          requirement R, shown on its own `wc_investment` line).
+        - Financing: project funding (`mof.project_funding_total`) + the
+          WC facility drawdown + the un-arranged shortfall borrowing, each
+          on its own line (BUG-38 — the CC limit is never presented as
+          project funding).
+        - Net Y0 closing cash equals the balance-sheet cash line exactly —
+          the BS reads it with NO adjustment (replaces the r3 BUG-33
+          BS-side deduction).
 
     Y1..YN (operations):
         - Operating: PAT + depreciation (non-cash addback). WC change assumed
@@ -1727,12 +1742,30 @@ def build_cash_flow(
     rows: list[CashFlowRow] = []
 
     # ── Y0 — construction period ────────────────────────────────────────
-    # The full MoF hits the bank in Y0 and the full capex leaves; WC margin
-    # sits in the bank until operations begin (already inside cost.total via
-    # `cost_margin_for_working_capital`).
+    # BUG-38: financing is split into project funding / WC facility
+    # drawdown / shortfall borrowing, and the working-capital deployment
+    # is an explicit investing outflow. The margin line inside cost.total
+    # is cash earmarked for WC, not capex spend — when the WC Statement is
+    # active (R > 0) it is excluded from the capex outflow and absorbed
+    # into the full `wc_investment` of R instead (no double-count).
+    #
+    # Ledger (R > 0): closing = (P + L + gap) − (cost − M) − R
+    # which equals the pre-BUG-38 BS cash: (P + L) − cost − (R − M) + gap.
+    # When R = 0 (margin-only / no WC data): legacy shape — capex = cost,
+    # no wc_investment line; the margin itself is the WC asset.
+    y0_project_funding = mof.project_funding_total
+    y0_wc_drawdown = mof.wc_facility
+    y0_wc_shortfall = Decimal('0')
+    y0_wc_investment = Decimal('0')
     y0_capex = cost.total
-    y0_mof_inflow = mof.total
-    y0_net = y0_mof_inflow - y0_capex
+    if wc_statement is not None and wc_statement.wc_requirement_used > 0:
+        y0_wc_investment = wc_statement.wc_requirement_used
+        y0_wc_shortfall = wc_statement.funding_gap
+        y0_capex = cost.total - wc_statement.margin_for_working_capital
+
+    y0_cfi = -y0_capex - y0_wc_investment
+    y0_cff = y0_project_funding + y0_wc_drawdown + y0_wc_shortfall
+    y0_net = y0_cff + y0_cfi
     rows.append(CashFlowRow(
         year=0,
         pat=Decimal('0'),
@@ -1740,13 +1773,16 @@ def build_cash_flow(
         working_capital_change=Decimal('0'),
         cash_from_operations=Decimal('0'),
         capex=-y0_capex,
-        cash_from_investing=-y0_capex,
-        mof_inflow=y0_mof_inflow,
+        cash_from_investing=y0_cfi,
+        mof_inflow=y0_project_funding,
         loan_principal_repayment=Decimal('0'),
-        cash_from_financing=y0_mof_inflow,
+        cash_from_financing=y0_cff,
         net_cash_flow=y0_net,
         opening_cash=Decimal('0'),
         closing_cash=y0_net,
+        wc_investment=-y0_wc_investment,
+        wc_facility_drawdown=y0_wc_drawdown,
+        wc_shortfall_borrowing=y0_wc_shortfall,
     ))
 
     # ── Y1..YN — operations ─────────────────────────────────────────────
@@ -2059,29 +2095,13 @@ def build_balance_sheet(
                 start=Decimal('0'),
             )
         net_fa = gross_fa - accum_dep
+        # BUG-38 (replaces the r3 BUG-33 BS-side deduction): the cash flow
+        # statement now carries the WC deployment, the facility drawdown
+        # and the shortfall borrowing as explicit Y0 lines, so its closing
+        # cash IS the balance-sheet cash — no adjustment here. The two
+        # statements must tie to the rupee on every year.
         cash = cash_flow.rows[year].closing_cash if year < len(cash_flow.rows) else Decimal('0')
         wc = wc_margin
-        # BUG-33 (KAU §6 retest r3): the WC-loan proceeds arrive as Y0 cash
-        # (they're inside mof.total → closing_cash), but the same rupees
-        # are then DEPLOYED into working capital — they can't sit on the
-        # balance sheet twice (as cash AND as the WC asset). The tester's
-        # ledger showed exactly this: cash ₹1.24 Cr + working_capital
-        # ₹1.36 Cr with only ₹1.24 Cr of WC loan on the liability side →
-        # invariant_delta = the WC loan, in all 11 years.
-        # Deployed-from-cash = the WC asset growth beyond the margin
-        # (which was already paid out of cash via cost.total) MINUS the
-        # un-arranged shortfall (phantom borrowing, no cash movement).
-        # Algebra: deployed = (R − M) − gap = min(L + M, R) − M, which
-        # zeroes the invariant in both the shortfall and surplus-loan
-        # cases.
-        if wc_statement is not None and wc_statement.wc_requirement_used > 0:
-            _wc_growth_beyond_margin = max(
-                Decimal('0'),
-                wc_statement.wc_requirement_used - wc_statement.margin_for_working_capital,
-            )
-            _cash_deployed_into_wc = _wc_growth_beyond_margin - wc_statement.funding_gap
-            if _cash_deployed_into_wc > 0:
-                cash = cash - _cash_deployed_into_wc
         total_assets = land + cwip + net_fa + cash + wc
 
         # ── Equity ──
@@ -2232,11 +2252,11 @@ def _free_cash_flows(
     BUG-34 (KAU §6 retest r2): the project investment must include the
     FULL working-capital requirement (operating-cycle / seasonal basis),
     not just the margin line that happens to sit inside project cost.
-    Testing team moved the WC requirement from ₹20.8 L to ₹2.30 Cr and
-    IRR stayed at 21.99% — because the Y0 investing outflow only
-    carried the margin. Treatment per standard appraisal convention:
-      Y0: additional outflow of (wc_requirement_used − margin), i.e.
-          the slice of WC investment not already inside cost.total.
+    BUG-38 (r4): the WC deployment now lives INSIDE the cash flow's Y0
+    investing activities (`wc_investment`, with the margin excluded from
+    capex), so Y0 needs no adjustment here any more — CFO + CFI already
+    totals −(cost − M) − R, identical to the old −cost − (R − M).
+    Only the terminal-year recovery remains this helper's job:
       YN (final projection year): the FULL wc_requirement_used is
           recovered as a terminal inflow (working capital is released
           when the projection window closes).
@@ -2244,10 +2264,6 @@ def _free_cash_flows(
     flows = [(row.cash_from_operations + row.cash_from_investing) for row in cash_flow.rows]
     if wc_statement is not None and flows:
         wc_total = wc_statement.wc_requirement_used
-        margin_in_cost = wc_statement.margin_for_working_capital
-        extra_wc_outflow = max(Decimal('0'), wc_total - margin_in_cost)
-        # Y0: invest the WC slice not already inside cost.total.
-        flows[0] = flows[0] - extra_wc_outflow
         # Final year: recover the full WC investment.
         if wc_total > 0:
             flows[-1] = flows[-1] + wc_total
@@ -2757,7 +2773,10 @@ def compute(project) -> CalculationResult:
         project, depreciation, interest, projection_years,
         wc_statement=wc_statement,
     )
-    cash_flow = build_cash_flow(cost, mof, profit_loss, interest, projection_years)
+    cash_flow = build_cash_flow(
+        cost, mof, profit_loss, interest, projection_years,
+        wc_statement=wc_statement,
+    )
     balance_sheet = build_balance_sheet(
         cost, mof, depreciation, interest, profit_loss, cash_flow, projection_years,
         wc_statement=wc_statement,

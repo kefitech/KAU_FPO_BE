@@ -454,14 +454,26 @@ def _write_cash_flow_sheet(ws, r: CalculationResult) -> None:
     years = [row.year for row in cf.rows]
     _write_header(ws, 2, ['Line item', ''] + [f'Y{y}' for y in years])
 
+    # BUG-38: WC lines included only when Y0 carries a value.
+    y0 = cf.rows[0]
     lines = [
         ('PAT', 'pat'),
         ('Depreciation add-back', 'depreciation_addback'),
         ('WC change', 'working_capital_change'),
         ('Cash from operations', 'cash_from_operations'),
         ('Capex', 'capex'),
+    ]
+    if y0.wc_investment:
+        lines.append(('Investment in working capital', 'wc_investment'))
+    lines += [
         ('Cash from investing', 'cash_from_investing'),
-        ('MoF inflow', 'mof_inflow'),
+        ('Means of finance (project funding)', 'mof_inflow'),
+    ]
+    if y0.wc_facility_drawdown:
+        lines.append(('WC facility drawdown (cash credit)', 'wc_facility_drawdown'))
+    if y0.wc_shortfall_borrowing:
+        lines.append(('WC shortfall borrowing (to be arranged)', 'wc_shortfall_borrowing'))
+    lines += [
         ('Loan principal repayment', 'loan_principal_repayment'),
         ('Cash from financing', 'cash_from_financing'),
         ('Net cash flow', 'net_cash_flow'),

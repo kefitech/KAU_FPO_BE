@@ -620,10 +620,22 @@ Author: Athul Gopan (Kefi Tech Solutions)
         {% for row in r.cash_flow.rows %}<td>{{ row.cash_from_operations|money }}</td>{% endfor %}</tr>
       <tr><td class="label">Capex</td>
         {% for row in r.cash_flow.rows %}<td>{{ row.capex|money }}</td>{% endfor %}</tr>
+      {% if r.cash_flow.rows.0.wc_investment %}
+      <tr><td class="label">Investment in working capital</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.wc_investment|money }}</td>{% endfor %}</tr>
+      {% endif %}
       <tr class="subtotal"><td class="label">CF from Investing</td>
         {% for row in r.cash_flow.rows %}<td>{{ row.cash_from_investing|money }}</td>{% endfor %}</tr>
-      <tr><td class="label">MoF inflow</td>
+      <tr><td class="label">Means of finance (project funding)</td>
         {% for row in r.cash_flow.rows %}<td>{{ row.mof_inflow|money }}</td>{% endfor %}</tr>
+      {% if r.cash_flow.rows.0.wc_facility_drawdown %}
+      <tr><td class="label">Working-capital facility drawdown (cash credit)</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.wc_facility_drawdown|money }}</td>{% endfor %}</tr>
+      {% endif %}
+      {% if r.cash_flow.rows.0.wc_shortfall_borrowing %}
+      <tr><td class="label">WC shortfall borrowing (to be arranged)</td>
+        {% for row in r.cash_flow.rows %}<td>{{ row.wc_shortfall_borrowing|money }}</td>{% endfor %}</tr>
+      {% endif %}
       <tr><td class="label">Loan repayment</td>
         {% for row in r.cash_flow.rows %}<td>{{ row.loan_principal_repayment|money }}</td>{% endfor %}</tr>
       <tr class="subtotal"><td class="label">CF from Financing</td>
