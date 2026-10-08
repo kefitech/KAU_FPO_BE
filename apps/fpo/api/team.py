@@ -9,7 +9,9 @@ POST  /api/fpo/me/team/bulk-invite/          — invite multiple via JSON
 POST  /api/fpo/me/team/bulk-invite-file/     — invite multiple via Excel/CSV
 POST  /api/fpo/me/team/bulk-activate/        — activate multiple by user_ids
 POST  /api/fpo/me/team/bulk-deactivate/      — deactivate multiple by user_ids
+POST  /api/fpo/me/team/bulk-delete/          — delete multiple by user_ids
 POST  /api/fpo/me/team/{id}/deactivate/      — deactivate single user
+DELETE /api/fpo/me/team/{id}/                — delete single user (permanent)
 GET   /api/fpo/me/team/available-permissions/ — actions the primary can grant a member
 GET   /api/fpo/me/team/{id}/permissions/     — a member's permissions
 POST  /api/fpo/me/team/{id}/permissions/     — add/remove/replace a member's permissions
@@ -17,7 +19,9 @@ POST  /api/fpo/me/team/bulk-permissions/     — grant/revoke permissions for ma
 
 Rules:
 - FPO must be APPROVED before inviting members
-- Only the primary user can invite / activate / deactivate
+- Only the primary user can invite / activate / deactivate / delete
+- Deleting a member permanently removes their account (as the admin CBBO /
+  sub-admin delete does), so the email can be invited again
 - No secondary user limit (KAU confirmed)
 - Invited users are auto-activated (no approval step)
 - Invited users must change password on first login
@@ -52,6 +56,7 @@ from apps.core.services.fpo_permission import (
 )
 from apps.core.services.translation import t
 from apps.core.utils.constants import FPOStatus, UserRole
+from apps.core.utils.messages import FPOMessages, msg
 from apps.core.utils.responses import StandardResponse
 from django.contrib.contenttypes.models import ContentType
 from apps.database.models.fpo import FPO, FPOUserMembership
@@ -61,6 +66,47 @@ User = get_user_model()
 
 
 EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+# Team member name / phone rules. Mirrored in the invite forms
+# (KAU_FPO_FE …/team/_components/member-rules.ts) and stated in the bulk-invite template.
+NAME_MAX_LENGTH = 20
+# English or Malayalam letters only — no spaces, digits or symbols
+# (U+0D00–U+0D63 letters and vowel signs, U+0D7A–U+0D7F chillus, ZWNJ/ZWJ used in Malayalam spelling)
+NAME_REGEX  = re.compile(r'^[A-Za-z\u0D00-\u0D63\u0D7A-\u0D7F\u200C\u200D]+$')
+PHONE_REGEX = re.compile(r'^\d{10}$')
+
+
+# (too long, not letters-only) message per name field
+_NAME_MESSAGES = {
+    'first_name': (FPOMessages.TEAM_FIRST_NAME_TOO_LONG, FPOMessages.TEAM_FIRST_NAME_LETTERS_ONLY),
+    'last_name':  (FPOMessages.TEAM_LAST_NAME_TOO_LONG, FPOMessages.TEAM_LAST_NAME_LETTERS_ONLY),
+}
+
+
+def _name_error(value, field, lang='en'):
+    """Why `value` is not a valid member name, or None. Blank is checked separately."""
+    too_long, letters_only = _NAME_MESSAGES[field]
+    if len(value) > NAME_MAX_LENGTH:
+        return msg(too_long, lang, max=NAME_MAX_LENGTH)
+    if not NAME_REGEX.match(value):
+        return msg(letters_only, lang)
+    return None
+
+
+def _phone_error(value, lang='en'):
+    """Why `value` is not a valid phone, or None. Phone is optional, so blank passes."""
+    if value and not PHONE_REGEX.match(value):
+        return msg(FPOMessages.TEAM_PHONE_INVALID, lang)
+    return None
+
+
+def _cell_text(value):
+    """An .xlsx cell as text. Excel may store a typed phone number as a float (9876543210.0)."""
+    if value is None:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return str(value).strip()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -105,34 +151,55 @@ def _last_deactivated_by_admin(membership):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TeamInviteSerializer(serializers.Serializer):
-    first_name = serializers.CharField(max_length=150)
-    last_name  = serializers.CharField(max_length=150)
+    first_name = serializers.CharField()
+    last_name  = serializers.CharField()
     email      = serializers.EmailField()
-    phone      = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    phone      = serializers.CharField(required=False, allow_blank=True)
     permissions = serializers.ListField(
         child=serializers.CharField(), required=False,
         help_text='Action codes to grant. Omit to give the role defaults; any grantable code left out is revoked.',
     )
 
+    @property
+    def _lang(self):
+        return self.context.get('lang', 'en')
+
+    def validate_first_name(self, value):
+        return self._check(_name_error(value, 'first_name', self._lang), value)
+
+    def validate_last_name(self, value):
+        return self._check(_name_error(value, 'last_name', self._lang), value)
+
+    def validate_phone(self, value):
+        return self._check(_phone_error(value, self._lang), value)
+
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError('A user with this email already exists.')
+            raise serializers.ValidationError(msg(FPOMessages.TEAM_EMAIL_REGISTERED, self._lang))
         return value.lower()
 
     def validate_permissions(self, value):
-        return _validate_grantable(value)
+        return _validate_grantable(value, lang=self._lang)
+
+    @staticmethod
+    def _check(error, value):
+        if error:
+            raise serializers.ValidationError(error)
+        return value
 
 
 def _secondary_group():
     return Group.objects.get(name='secondary')
 
 
-def _validate_grantable(codes, role=None):
+def _validate_grantable(codes, role=None, lang='en'):
     """Reject codes the primary is not allowed to grant (outside the role ceiling)."""
     grantable = set(get_grantable_actions(role or _secondary_group()).values_list('code', flat=True))
     invalid = sorted(set(codes) - grantable)
     if invalid:
-        raise serializers.ValidationError(f'These permissions cannot be granted: {", ".join(invalid)}.')
+        raise serializers.ValidationError(
+            msg(FPOMessages.TEAM_PERMISSIONS_NOT_GRANTABLE, lang, codes=', '.join(invalid))
+        )
     return list(dict.fromkeys(codes))
 
 
@@ -161,7 +228,7 @@ def _permission_rows(role, lang, effective=None):
         rows.append({
             'code':        action.code,
             'label':       action.get_label(lang),
-            'description': action.description,
+            'description': action.get_description(lang),
             'page':        action.menu_item.path if action.menu_item else None,
             # Role default is "allowed" — the ceiling already allows every grantable action
             'is_allowed':  True if effective is None else effective.get(action.code, False),
@@ -279,13 +346,14 @@ class TeamInviteView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        lang = getattr(request, 'language', 'en')
         if fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error(
-                'Team members can only be invited after the FPO is approved.',
+                msg(FPOMessages.TEAM_FPO_NOT_APPROVED, lang),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = TeamInviteSerializer(data=request.data)
+        serializer = TeamInviteSerializer(data=request.data, context={'lang': lang})
         if not serializer.is_valid():
             return StandardResponse.validation_error(errors=serializer.errors)
 
@@ -329,7 +397,6 @@ class TeamInviteView(APIView):
                 set_member_permissions(membership, data['permissions'])
 
         # Send welcome notification
-        lang = getattr(request, 'language', 'en')
         send_notification(
             user=user,
             code='welcome',
@@ -406,7 +473,10 @@ class TeamMemberPermissionsView(APIView):
             .first()
         )
         if not membership or not membership.role:
-            return None, StandardResponse.error('Team member not found.', status_code=status.HTTP_404_NOT_FOUND)
+            return None, StandardResponse.error(
+                msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, getattr(request, 'language', 'en')),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         return membership, None
 
     def _response(self, request, membership, message):
@@ -441,7 +511,9 @@ class TeamMemberPermissionsView(APIView):
         if not serializer.is_valid():
             return StandardResponse.validation_error(errors=serializer.errors)
         try:
-            codes = _validate_grantable(serializer.validated_data['permissions'], membership.role)
+            codes = _validate_grantable(
+                serializer.validated_data['permissions'], membership.role, getattr(request, 'language', 'en'),
+            )
         except serializers.ValidationError as exc:
             return StandardResponse.validation_error(errors={'permissions': exc.detail})
 
@@ -485,9 +557,10 @@ class TeamBulkPermissionsView(APIView):
         if not serializer.is_valid():
             return StandardResponse.validation_error(errors=serializer.errors)
         data = serializer.validated_data
+        lang = getattr(request, 'language', 'en')
         try:
-            grant  = _validate_grantable(data['grant'])
-            revoke = _validate_grantable(data['revoke'])
+            grant  = _validate_grantable(data['grant'], lang=lang)
+            revoke = _validate_grantable(data['revoke'], lang=lang)
         except serializers.ValidationError as exc:
             return StandardResponse.validation_error(errors={'permissions': exc.detail})
 
@@ -500,11 +573,11 @@ class TeamBulkPermissionsView(APIView):
         with transaction.atomic():
             for uid in dict.fromkeys(data['user_ids']):
                 if uid == fpo.primary_user_id:
-                    failed.append({'user_id': uid, 'reason': 'The primary user always has every permission.'})
+                    failed.append({'user_id': uid, 'reason': msg(FPOMessages.TEAM_PRIMARY_HAS_ALL_PERMISSIONS, lang)})
                     continue
                 membership = memberships.get(uid)
                 if not membership or not membership.role:
-                    failed.append({'user_id': uid, 'reason': 'Team member not found.'})
+                    failed.append({'user_id': uid, 'reason': msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, lang)})
                     continue
                 set_member_permissions(membership, grant, 'add')
                 set_member_permissions(membership, revoke, 'remove')
@@ -540,25 +613,26 @@ class TeamDeactivateView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        lang = getattr(request, 'language', 'en')
         try:
             membership = FPOUserMembership.objects.select_related('user').get(
                 fpo=fpo, user_id=user_id, is_deleted=False,
             )
         except FPOUserMembership.DoesNotExist:
             return StandardResponse.error(
-                'Team member not found.',
+                msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, lang),
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if membership.user == request.user:
             return StandardResponse.error(
-                'You cannot deactivate yourself.',
+                msg(FPOMessages.TEAM_CANNOT_DEACTIVATE_SELF, lang),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         if not membership.is_active:
             return StandardResponse.error(
-                'This team member is already inactive.',
+                msg(FPOMessages.TEAM_ALREADY_INACTIVE, lang),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -583,6 +657,98 @@ class TeamDeactivateView(APIView):
         )
 
 
+def _delete_members(fpo, user_ids, requester, lang='en'):
+    """
+    Permanently delete team members' accounts. Their membership, profile and
+    permission overrides go with them; FPO records they created (products,
+    bookings, …) stay, with the creator cleared. The emails are free to invite again.
+
+    Every member is checked first, then all allowed accounts are deleted in ONE
+    query: each delete call clears created_by/updated_by on ~140 tables (~450
+    queries, 2–3 s) whether it removes one user or fifty, so a per-user loop
+    outlasts the frontend's 30 s request timeout on a bulk delete.
+
+    Call inside a transaction. Returns (deleted, failed) — deleted is a list of
+    (user_id, name, email), failed a list of (user_id, reason).
+    """
+    # Lock the rows so a concurrent delete of the same members (e.g. a retried
+    # request) waits, then finds them gone instead of deleting them twice.
+    memberships = {
+        m.user_id: m
+        for m in FPOUserMembership.objects.select_for_update(of=('self',))
+        .select_related('user', 'role')
+        .filter(fpo=fpo, user_id__in=user_ids, is_deleted=False)
+    }
+
+    deleted, failed = [], []
+    for uid in dict.fromkeys(user_ids):
+        membership = memberships.get(uid)
+        if uid == requester.id:
+            reason = msg(FPOMessages.TEAM_CANNOT_DELETE_SELF, lang)
+        elif not membership:
+            reason = msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, lang)
+        # Deleting would let the primary re-invite someone an admin locked out
+        elif _last_deactivated_by_admin(membership):
+            reason = msg(FPOMessages.TEAM_ADMIN_DEACTIVATED_DELETE, lang)
+        elif membership.user.groups.exclude(
+            name__in=[UserRole.FPO_MANAGER] + ([membership.role.name] if membership.role else []),
+        ).exists():
+            reason = msg(FPOMessages.TEAM_OTHER_ROLES, lang)
+        else:
+            user = membership.user
+            deleted.append((uid, user.get_full_name() or user.email, user.email))
+            continue
+        failed.append((uid, reason))
+
+    if deleted:
+        User.objects.filter(id__in=[uid for uid, _, _ in deleted]).delete()
+    return deleted, failed
+
+
+class TeamDeleteView(APIView):
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Team'],
+        summary='Delete team member',
+        description=(
+            'Permanently deletes a secondary user\'s account. They can no longer log in, and '
+            'the email can be invited again. Products, bookings and other FPO records they '
+            'created are kept. Only the primary user can do this; members deactivated by an '
+            'admin can only be removed by an admin.'
+        ),
+        responses={200: None, 400: None, 404: None},
+    )
+    def delete(self, request, user_id):
+        fpo = _get_primary_fpo(request.user)
+        if not fpo:
+            return StandardResponse.error(
+                'Only the primary user can delete team members.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        lang = getattr(request, 'language', 'en')
+        with transaction.atomic():
+            deleted, failed = _delete_members(fpo, [user_id], request.user, lang)
+        if failed:
+            reason = failed[0][1]
+            not_found = reason == msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, lang)
+            return StandardResponse.error(
+                reason,
+                status_code=status.HTTP_404_NOT_FOUND if not_found else status.HTTP_400_BAD_REQUEST,
+            )
+
+        _, name, email = deleted[0]
+        AuditLogService.log(
+            user=request.user,
+            action=AuditLog.Action.DELETE,
+            instance=fpo,
+            request=request,
+            changes={'deleted_user': email},
+        )
+        return StandardResponse.success(message=f'{name} has been deleted.')
+
+
 class TeamResetPasswordView(APIView):
     permission_classes = [IsFPOManager]
 
@@ -604,20 +770,24 @@ class TeamResetPasswordView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        lang = getattr(request, 'language', 'en')
         try:
             membership = FPOUserMembership.objects.select_related('user', 'user__profile').get(
                 fpo=fpo, user_id=user_id, is_deleted=False,
             )
         except FPOUserMembership.DoesNotExist:
-            return StandardResponse.error('Team member not found.', status_code=status.HTTP_404_NOT_FOUND)
+            return StandardResponse.error(
+                msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, lang), status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         if membership.user == request.user:
-            return StandardResponse.error('You cannot reset your own password here.',
-                                          status_code=status.HTTP_400_BAD_REQUEST)
+            return StandardResponse.error(
+                msg(FPOMessages.TEAM_CANNOT_RESET_OWN_PASSWORD, lang), status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not (membership.is_active and membership.user.is_active):
             return StandardResponse.error(
-                t('admin.reset_password_inactive_user', getattr(request, 'language', 'en')),
+                t('admin.reset_password_inactive_user', lang),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -661,35 +831,31 @@ def _create_member(fpo, row, inviter, lang):
     Returns (user, temp_password) on success.
     Raises ValueError with a human-readable message on failure.
     """
-    email      = (row.get('email') or '').strip().lower()      # CHANGED: handles None value, not just missing key
-    first_name = (row.get('first_name') or '').strip()          # CHANGED
-    last_name  = (row.get('last_name') or '').strip()           # CHANGED
-    phone      = (row.get('phone') or '').strip()                # CHANGED
+    # str() — JSON rows may send the phone as a number
+    email      = str(row.get('email') or '').strip().lower()
+    first_name = str(row.get('first_name') or '').strip()
+    last_name  = str(row.get('last_name') or '').strip()
+    phone      = str(row.get('phone') or '').strip()
 
-    missing = []                                                  # NEW
-    if not first_name:                                             # NEW
-        missing.append('first_name')                              # NEW
-    if not last_name:                                              # NEW
-        missing.append('last_name')                                # NEW
-    if not email:                                                  # NEW
-        missing.append('email')                                    # NEW
-
-    if missing:                                                    # NEW (replaces old if/raise below)
-        if len(missing) == 1:                                       # NEW
-            raise ValueError(f'{missing[0]} is required.')          # NEW
-        elif len(missing) == 2:                                     # NEW
-            raise ValueError(f'{missing[0]} and {missing[1]} are required.')  # NEW
-        else:                                                        # NEW
-            raise ValueError(f'{", ".join(missing[:-1])}, and {missing[-1]} are required.')  # NEW
-        
-    if not EMAIL_REGEX.match(email):  
-        raise ValueError('Invalid Email')                                # NEW
-
-    if User.objects.filter(email__iexact=email).exists():
-        raise ValueError(f'{email} is already registered.')
+    # Reasons are shown per row in the "Some Invitations Failed" dialog, next
+    # to the row's name and email — keep them short and in plain words, and
+    # list every problem in the row so it can be fixed in one go.
+    problems = [
+        error for error in (
+            not first_name and msg(FPOMessages.TEAM_FIRST_NAME_REQUIRED, lang),
+            first_name and _name_error(first_name, 'first_name', lang),
+            not last_name and msg(FPOMessages.TEAM_LAST_NAME_REQUIRED, lang),
+            last_name and _name_error(last_name, 'last_name', lang),
+            not email and msg(FPOMessages.TEAM_EMAIL_REQUIRED, lang),
+            email and not EMAIL_REGEX.match(email) and msg(FPOMessages.TEAM_EMAIL_INVALID, lang),
+            _phone_error(phone, lang),
+        ) if error
+    ]
+    if problems:
+        raise ValueError(' '.join(problems))
 
     if User.objects.filter(email__iexact=email).exists():
-        raise ValueError(f'{email} is already registered.')
+        raise ValueError(msg(FPOMessages.TEAM_EMAIL_REGISTERED, lang))
 
     temp_password = secrets.token_urlsafe(10)
 
@@ -777,9 +943,10 @@ class TeamBulkInviteView(APIView):
                 'Only the primary user can invite team members.',
                 status_code=status.HTTP_403_FORBIDDEN,
             )
+        lang = getattr(request, 'language', 'en')
         if fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error(
-                'Team members can only be invited after the FPO is approved.',
+                msg(FPOMessages.TEAM_FPO_NOT_APPROVED, lang),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -787,7 +954,6 @@ class TeamBulkInviteView(APIView):
         if not serializer.is_valid():
             return StandardResponse.validation_error(errors=serializer.errors)
 
-        lang    = getattr(request, 'language', 'en')
         members = serializer.validated_data['members']
         success, failed = [], []
 
@@ -846,46 +1012,60 @@ class TeamBulkInviteFileView(APIView):
                 'Only the primary user can invite team members.',
                 status_code=status.HTTP_403_FORBIDDEN,
             )
+        lang = getattr(request, 'language', 'en')
         if fpo.status != FPOStatus.APPROVED:
             return StandardResponse.error(
-                'Team members can only be invited after the FPO is approved.',
+                msg(FPOMessages.TEAM_FPO_NOT_APPROVED, lang),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         file = request.FILES.get('file')
         if not file:
-            return StandardResponse.error('No file uploaded. Send file as multipart form field "file".',
+            return StandardResponse.error(msg(FPOMessages.TEAM_FILE_MISSING, lang),
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
         filename = file.name.lower()
-        rows = []
+        rows = []  # (sheet row number, {column: value}) — row 1 is the header
 
         try:
             if filename.endswith('.csv'):
                 content = file.read().decode('utf-8-sig')
                 reader  = csv.DictReader(io.StringIO(content))
-                rows    = list(reader)
+                for i, row in enumerate(reader, start=2):
+                    rows.append((i, {
+                        (k or '').strip().lower(): (v or '').strip() for k, v in row.items()
+                    }))
             elif filename.endswith('.xlsx'):
                 wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-                ws = wb.active
+                # The downloaded template opens on its Instructions sheet, so
+                # wb.active would read the instructions. Read the Members sheet
+                # by name; a plain single-sheet file falls back to the active one.
+                ws = next(
+                    (wb[name] for name in wb.sheetnames if name.strip().lower() == 'members'),
+                    wb.active,
+                )
                 headers = [str(c.value).strip().lower() if c.value else '' for c in next(ws.iter_rows())]
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    rows.append(dict(zip(headers, [str(v).strip() if v is not None else '' for v in row])))
+                for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    rows.append((i, dict(zip(headers, [_cell_text(v) for v in row]))))
+                wb.close()
             else:
-                return StandardResponse.error('Only .xlsx and .csv files are supported.',
+                return StandardResponse.error(msg(FPOMessages.TEAM_FILE_TYPE, lang),
                                               status_code=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return StandardResponse.error(f'Could not parse file: {e}',
+        except Exception:
+            return StandardResponse.error(msg(FPOMessages.TEAM_FILE_UNREADABLE, lang),
                                           status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Rows the user cleared (e.g. the template's sample rows) are still
+        # returned by the sheet — skip them rather than report them as failures.
+        rows = [(i, row) for i, row in rows if any(row.values())]
 
         if not rows:
-            return StandardResponse.error('File is empty or has no data rows.',
+            return StandardResponse.error(msg(FPOMessages.TEAM_FILE_EMPTY, lang),
                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        lang = getattr(request, 'language', 'en')
         success, failed = [], []
 
-        for i, row in enumerate(rows, start=2):  # start=2 because row 1 is header
+        for i, row in rows:
             try:
                 user, _ = _create_member(fpo, row, request.user, lang)
                 success.append({'row': i, 'email': user.email, 'name': user.get_full_name()})
@@ -945,6 +1125,7 @@ class TeamBulkInviteTemplateView(APIView):
     )
     def get(self, request):
         from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.worksheet.datavalidation import DataValidation
 
         fpo = _get_primary_fpo(request.user)
         if fpo is None:
@@ -976,11 +1157,12 @@ class TeamBulkInviteTemplateView(APIView):
         instructions = [
             '1. Open the "Members" sheet.',
             '2. Fill one row per secondary user under the header row. Remove the sample rows before uploading.',
-            '3. email must be unique and not already in use on the platform.',
-            '4. phone is optional — 10 digits if provided.',
-            '5. All invited users land as secondary members of your FPO; they must change their password on first login.',
-            '6. Save the file (keep it as .xlsx) and upload via FPO Portal → Team → Bulk Invite → Upload File.',
-            '7. Rows that fail validation (duplicate email, invalid phone, missing name, etc.) come back listed in the upload result.',
+            f'3. first_name and last_name: letters only (English or Malayalam), up to {NAME_MAX_LENGTH} characters each — no spaces, numbers or symbols.',
+            '4. email must be unique and not already in use on the platform.',
+            '5. phone is optional — exactly 10 digits if provided.',
+            '6. All invited users land as secondary members of your FPO; they must change their password on first login.',
+            '7. Save the file (keep it as .xlsx) and upload via FPO Portal → Team → Bulk Invite → Upload File.',
+            '8. Rows that fail validation (duplicate email, invalid phone, invalid name, etc.) come back listed in the upload result.',
         ]
         for i, line in enumerate(instructions, start=4):
             info[f'A{i}'] = line
@@ -990,10 +1172,10 @@ class TeamBulkInviteTemplateView(APIView):
         info['A13'] = 'Column reference'
         info['A13'].font = Font(name='Calibri', size=12, bold=True, color=KAU_ORANGE)
         col_reference = [
-            ('first_name', 'Required. Secondary user\'s first name.'),
-            ('last_name',  'Optional. Secondary user\'s last name.'),
+            ('first_name', f'Required. Secondary user\'s first name. Letters only, up to {NAME_MAX_LENGTH} characters.'),
+            ('last_name',  f'Required. Secondary user\'s last name. Letters only, up to {NAME_MAX_LENGTH} characters.'),
             ('email',      'Required. Login email. Must be unique across the platform.'),
-            ('phone',      'Optional. 10-digit Indian mobile number.'),
+            ('phone',      'Optional. Exactly 10 digits, e.g. 9876543210.'),
         ]
         for i, (name, desc) in enumerate(col_reference, start=14):
             info[f'A{i}'] = name
@@ -1038,6 +1220,32 @@ class TeamBulkInviteTemplateView(APIView):
         ws.freeze_panes = 'A2'
         for col, w in {'A': 18, 'B': 18, 'C': 36, 'D': 16}.items():
             ws.column_dimensions[col].width = w
+
+        # Excel-side checks so mistakes show up while typing. Excel can't test
+        # "letters only" without regex, so names get the length rule here and
+        # the full rule on upload (_create_member).
+        last_row = 1001
+        name_rule = DataValidation(
+            type='textLength', operator='lessThanOrEqual', formula1=str(NAME_MAX_LENGTH), allow_blank=True,
+            showInputMessage=True, promptTitle='Name',
+            prompt=f'Letters only, up to {NAME_MAX_LENGTH} characters. No spaces, numbers or symbols.',
+            showErrorMessage=True, errorTitle='Name too long',
+            error=f'Names can have at most {NAME_MAX_LENGTH} characters.',
+        )
+        name_rule.add(f'A2:B{last_row}')
+        phone_rule = DataValidation(
+            type='custom', allow_blank=True,
+            formula1='OR(D2="",AND(LEN(D2)=10,ISNUMBER(--D2),--D2>=1000000000,--D2=INT(--D2)))',
+            showInputMessage=True, promptTitle='Phone (optional)', prompt='Exactly 10 digits, e.g. 9876543210.',
+            showErrorMessage=True, errorTitle='Invalid phone number',
+            error='Phone number must be exactly 10 digits.',
+        )
+        phone_rule.add(f'D2:D{last_row}')
+        ws.add_data_validation(name_rule)
+        ws.add_data_validation(phone_rule)
+        # Text format keeps typed phone numbers exactly as entered
+        for (cell,) in ws.iter_rows(min_row=2, max_row=last_row, min_col=4, max_col=4):
+            cell.number_format = '@'
 
         # ── Sheet 3 — Role Codes reference ────────────────────────────────
         ref = wb.create_sheet('Role Codes')
@@ -1117,6 +1325,54 @@ class TeamBulkDeactivateView(APIView):
         return _bulk_toggle(request, activate=False)
 
 
+class TeamBulkDeleteView(APIView):
+    permission_classes = [IsFPOManager]
+
+    @extend_schema(
+        tags=['FPO - Team'],
+        summary='Bulk delete team members',
+        description=(
+            'Permanently deletes several secondary users by their user IDs (see the single '
+            'delete for what is kept). Members that cannot be deleted are reported in '
+            '`errors`; the rest are deleted together.'
+        ),
+        request=BulkActionSerializer,
+        responses={200: None},
+    )
+    def post(self, request):
+        fpo = _get_primary_fpo(request.user)
+        if not fpo:
+            return StandardResponse.error(
+                'Only the primary user can delete team members.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = BulkActionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return StandardResponse.validation_error(errors=serializer.errors)
+
+        with transaction.atomic():
+            deleted, not_deleted = _delete_members(
+                fpo, serializer.validated_data['user_ids'], request.user, getattr(request, 'language', 'en'),
+            )
+
+        success = [{'user_id': uid, 'name': name} for uid, name, _ in deleted]
+        failed  = [{'user_id': uid, 'reason': reason} for uid, reason in not_deleted]
+        for _, _, email in deleted:
+            AuditLogService.log(
+                user=request.user,
+                action=AuditLog.Action.DELETE,
+                instance=fpo,
+                request=request,
+                changes={'deleted_user': email},
+            )
+
+        return StandardResponse.success(
+            data={'success': len(success), 'failed': len(failed), 'results': success, 'errors': failed},
+            message=f'{len(success)} member(s) deleted, {len(failed)} failed.',
+        )
+
+
 def _bulk_toggle(request, activate: bool):
     fpo = _get_primary_fpo(request.user)
     if not fpo:
@@ -1130,11 +1386,12 @@ def _bulk_toggle(request, activate: bool):
         return StandardResponse.validation_error(errors=serializer.errors)
 
     user_ids = serializer.validated_data['user_ids']
+    lang = getattr(request, 'language', 'en')
     success, failed = [], []
 
     for uid in user_ids:
         if uid == request.user.id:
-            failed.append({'user_id': uid, 'reason': 'Cannot modify yourself.'})
+            failed.append({'user_id': uid, 'reason': msg(FPOMessages.TEAM_CANNOT_MODIFY_SELF, lang)})
             continue
         try:
             membership = FPOUserMembership.objects.select_related('user').get(
@@ -1144,14 +1401,14 @@ def _bulk_toggle(request, activate: bool):
                 failed.append({
                     'user_id': uid,
                     'name' : membership.user.get_full_name(),
-                    'reason': 'Already inactive.'})
+                    'reason': msg(FPOMessages.TEAM_ALREADY_INACTIVE, lang)})
                 continue
 
             if activate and _last_deactivated_by_admin(membership):
                 failed.append({
                     'user_id': uid,
                     'name' : membership.user.get_full_name(),
-                    'reason': 'This member was deactivated by an admin. Contact admin to reactivate.',
+                    'reason': msg(FPOMessages.TEAM_ADMIN_DEACTIVATED_REACTIVATE, lang),
                 })
                 continue
 
@@ -1173,7 +1430,7 @@ def _bulk_toggle(request, activate: bool):
 
 
         except FPOUserMembership.DoesNotExist:
-            failed.append({'user_id': uid, 'reason': 'Team member not found.'})
+            failed.append({'user_id': uid, 'reason': msg(FPOMessages.TEAM_MEMBER_NOT_FOUND, lang)})
 
     # if success:
     #     action = AuditLog.Action.FPO_USER_ACTIVATE if activate else AuditLog.Action.FPO_USER_DEACTIVATE

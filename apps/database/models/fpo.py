@@ -766,6 +766,14 @@ class FPOAction(BaseModel):
             return result
         return self.code
 
+    def get_description(self, language: str = 'en') -> str:
+        from apps.core.services.translation import t
+        key = f'fpo_action.{self.code}_description'
+        result = t(key, language=language)
+        if result != key:
+            return result
+        return self.description
+
 
 class RoleActionPermission(BaseModel):
     """

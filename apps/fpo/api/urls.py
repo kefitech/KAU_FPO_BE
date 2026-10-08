@@ -28,9 +28,9 @@ from .profile import FPOProfileView
 from .claim import FPOClaimView, FPOClaimRespondView, FPOClaimDocumentUploadView, FPOClaimDocumentDeleteView
 from .schemes import SchemeListPublicView, SchemeDetailPublicView
 from .team import (
-    TeamListView, TeamInviteView, TeamDeactivateView,
+    TeamListView, TeamInviteView, TeamDeactivateView, TeamDeleteView,
     TeamBulkInviteView, TeamBulkInviteFileView, TeamBulkInviteTemplateView,
-    TeamBulkActivateView, TeamBulkDeactivateView,
+    TeamBulkActivateView, TeamBulkDeactivateView, TeamBulkDeleteView,
     TeamResetPasswordView,
     TeamAvailablePermissionsView, TeamMemberPermissionsView, TeamBulkPermissionsView,
 )
@@ -102,6 +102,8 @@ urlpatterns = [
     path('me/team/bulk-invite-template/',       TeamBulkInviteTemplateView.as_view(), name='fpo-team-bulk-invite-template'),
     path('me/team/bulk-activate/',              TeamBulkActivateView.as_view(),   name='fpo-team-bulk-activate'),
     path('me/team/bulk-deactivate/',            TeamBulkDeactivateView.as_view(), name='fpo-team-bulk-deactivate'),
+    path('me/team/bulk-delete/',                TeamBulkDeleteView.as_view(),     name='fpo-team-bulk-delete'),
+    path('me/team/<int:user_id>/',                TeamDeleteView.as_view(),         name='fpo-team-delete'),
     path('me/team/<int:user_id>/deactivate/',     TeamDeactivateView.as_view(),     name='fpo-team-deactivate'),
     path('me/team/<int:user_id>/reset-password/', TeamResetPasswordView.as_view(),  name='fpo-team-reset-password'),
     path('me/team/available-permissions/',        TeamAvailablePermissionsView.as_view(), name='fpo-team-available-permissions'),

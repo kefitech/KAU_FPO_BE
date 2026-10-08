@@ -6261,6 +6261,220 @@ def seed_cbbo_portal_translations(languages):
     return count
 
 
+def seed_fpo_team_translations(languages):
+    """
+    FPO portal → My Team page (fpo_team.*) — /fpo/team and its dialogs.
+
+    The one source for this page's labels in both languages. Runs after
+    seed_frontend_ui_translations, which writes English into the Malayalam
+    rows, so the Malayalam here is what ends up in the database.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    fpo_team_keys = [
+        # ── Page header, search, columns ──
+        ('page_title',                 'My Team', 'എന്റെ ടീം'),
+        ('loading',                    'Loading…', 'ലോഡ് ചെയ്യുന്നു…'),
+        ('members_count',              '{count} members', '{count} അംഗങ്ങൾ'),
+        ('members_count_filtered',     '{shown} / {count} members', '{shown} / {count} അംഗങ്ങൾ'),
+        ('btn_invite',                 'Invite Member', 'അംഗത്തെ ക്ഷണിക്കുക'),
+        ('btn_bulk_invite',            'Bulk Invite', 'ബൾക്ക് ക്ഷണം'),
+        ('search_placeholder',         'Search by name, email or phone…',
+         'പേര്, ഇമെയിൽ അല്ലെങ്കിൽ ഫോൺ ഉപയോഗിച്ച് തിരയുക…'),
+        ('aria_clear_search',          'Clear search', 'തിരയൽ മായ്ക്കുക'),
+        ('col_toggle_btn',             'Columns', 'നിരകൾ'),
+        ('col_toggle_label',           'Toggle columns', 'നിരകൾ കാണിക്കുക / മറയ്ക്കുക'),
+        ('col_name',                   'Name', 'പേര്'),
+        ('col_email',                  'Email', 'ഇമെയിൽ'),
+        ('col_phone',                  'Phone', 'ഫോൺ'),
+        ('col_role',                   'Role', 'റോൾ'),
+        ('col_status',                 'Status', 'സ്ഥിതി'),
+        ('col_joined',                 'Joined', 'ചേർന്ന തീയതി'),
+        ('col_permissions',            'Permissions', 'അനുമതികൾ'),
+        ('role_primary',               'Primary User', 'പ്രാഥമിക ഉപയോക്താവ്'),
+        ('role_secondary',             'Secondary User', 'ദ്വിതീയ ഉപയോക്താവ്'),
+        ('badge_active',               'Active', 'സജീവം'),
+        ('badge_inactive',             'Inactive', 'നിഷ്ക്രിയം'),
+        ('permissions_count',          '{count} of {total}', '{total}-ൽ {count}'),
+        ('permissions_none_short',     'None', 'ഒന്നുമില്ല'),
+        ('empty_state',                'No team members yet.', 'ഇതുവരെ ടീം അംഗങ്ങളില്ല.'),
+        ('empty_state_invite_hint',    'Use "Invite Member" to add someone.',
+         'ആരെയെങ്കിലും ചേർക്കാൻ "അംഗത്തെ ക്ഷണിക്കുക" ഉപയോഗിക്കുക.'),
+        ('empty_search',               'No members match your search.', 'തിരയലുമായി പൊരുത്തപ്പെടുന്ന അംഗങ്ങളില്ല.'),
+        ('aria_select_all',            'Select all', 'എല്ലാം തിരഞ്ഞെടുക്കുക'),
+        ('aria_select_member',         'Select {name}', '{name} തിരഞ്ഞെടുക്കുക'),
+        ('member_fallback',            'User {id}', 'ഉപയോക്താവ് {id}'),
+        ('pagination_no_results',      'No results', 'ഫലങ്ങളൊന്നുമില്ല'),
+        ('pagination_showing',         'Showing {from}–{to} of {total}', '{total}-ൽ {from}–{to} കാണിക്കുന്നു'),
+        ('pagination_rows_per_page',   'Rows per page', 'ഓരോ പേജിലും വരികൾ'),
+        ('pagination_page_of',         'Page {page} of {totalPages}', 'പേജ് {page} / {totalPages}'),
+
+        # ── Bulk action bar ──
+        ('bulk_selected',              '{count} selected', '{count} തിരഞ്ഞെടുത്തു'),
+        ('hint_shift_select',          'Tip: Shift+click a box to select a range',
+         'സൂചന: ഒരു ശ്രേണി തിരഞ്ഞെടുക്കാൻ Shift അമർത്തിപ്പിടിച്ച് ബോക്സിൽ ക്ലിക്ക് ചെയ്യുക'),
+        ('btn_bulk_permissions',       'Permissions', 'അനുമതികൾ'),
+        ('btn_activate',               'Activate', 'സജീവമാക്കുക'),
+        ('btn_activating',             'Activating…', 'സജീവമാക്കുന്നു…'),
+        ('btn_deactivate',             'Deactivate', 'നിഷ്ക്രിയമാക്കുക'),
+        ('btn_deactivating',           'Deactivating…', 'നിഷ്ക്രിയമാക്കുന്നു…'),
+        ('btn_deleting',               'Deleting…', 'ഇല്ലാതാക്കുന്നു…'),
+        ('btn_resetting',              'Resetting…', 'റീസെറ്റ് ചെയ്യുന്നു…'),
+        ('btn_cancel',                 'Cancel', 'റദ്ദാക്കുക'),
+        ('btn_close',                  'Close', 'അടയ്ക്കുക'),
+        ('btn_save',                   'Save', 'സേവ് ചെയ്യുക'),
+        ('btn_saving',                 'Saving…', 'സേവ് ചെയ്യുന്നു…'),
+        ('bulk_delete_title',          'Delete team members', 'ടീം അംഗങ്ങളെ ഇല്ലാതാക്കുക'),
+        ('bulk_delete_description',
+         '{count} member(s) will be permanently deleted and can no longer log in. Products and bookings '
+         'they created stay with your FPO. This cannot be undone.',
+         '{count} അംഗങ്ങളെ സ്ഥിരമായി ഇല്ലാതാക്കും; അവർക്ക് ഇനി ലോഗിൻ ചെയ്യാൻ കഴിയില്ല. അവർ സൃഷ്ടിച്ച '
+         'ഉൽപ്പന്നങ്ങളും ബുക്കിംഗുകളും നിങ്ങളുടെ FPO-യിൽ തന്നെ നിലനിൽക്കും. ഇത് പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('toast_bulk_activated',         '{count} member(s) activated', '{count} അംഗങ്ങളെ സജീവമാക്കി'),
+        ('toast_bulk_activated_partial', '{success} activated, {failed} failed',
+         '{success} പേരെ സജീവമാക്കി, {failed} പരാജയപ്പെട്ടു'),
+        ('toast_bulk_activate_failed',   'Bulk activate failed', 'അംഗങ്ങളെ സജീവമാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_bulk_deactivated',         '{count} member(s) deactivated', '{count} അംഗങ്ങളെ നിഷ്ക്രിയമാക്കി'),
+        ('toast_bulk_deactivated_partial', '{success} deactivated, {failed} failed',
+         '{success} പേരെ നിഷ്ക്രിയമാക്കി, {failed} പരാജയപ്പെട്ടു'),
+        ('toast_bulk_deactivate_failed',   'Bulk deactivate failed', 'അംഗങ്ങളെ നിഷ്ക്രിയമാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_bulk_deleted',           '{count} member(s) deleted', '{count} അംഗങ്ങളെ ഇല്ലാതാക്കി'),
+        ('toast_bulk_deleted_partial',   '{success} deleted, {failed} failed',
+         '{success} പേരെ ഇല്ലാതാക്കി, {failed} പരാജയപ്പെട്ടു'),
+        ('toast_bulk_delete_failed',     'Bulk delete failed', 'അംഗങ്ങളെ ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല'),
+
+        # ── Row menu ──
+        ('action_permissions',         'Permissions', 'അനുമതികൾ'),
+        ('action_deactivate',          'Deactivate', 'നിഷ്ക്രിയമാക്കുക'),
+        ('action_reactivate',          'Activate', 'സജീവമാക്കുക'),
+        ('action_reset_password',      'Reset Password', 'രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യുക'),
+        ('action_delete',              'Delete', 'ഇല്ലാതാക്കുക'),
+        ('reset_password_title',       'Reset Password', 'രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യുക'),
+        ('reset_password_description',
+         "A temporary password will be sent to {name}'s email. They must change it on next login.",
+         '{name} എന്ന ഇമെയിലിലേക്ക് ഒരു താൽക്കാലിക രഹസ്യവാക്ക് അയയ്ക്കും. അടുത്ത ലോഗിനിൽ അത് മാറ്റണം.'),
+        ('delete_title',               'Delete team member', 'ടീം അംഗത്തെ ഇല്ലാതാക്കുക'),
+        ('delete_description',
+         '{name} will be permanently deleted and can no longer log in. Products and bookings they created '
+         'stay with your FPO. This cannot be undone.',
+         '{name} എന്ന അംഗത്തെ സ്ഥിരമായി ഇല്ലാതാക്കും; അവർക്ക് ഇനി ലോഗിൻ ചെയ്യാൻ കഴിയില്ല. അവർ സൃഷ്ടിച്ച '
+         'ഉൽപ്പന്നങ്ങളും ബുക്കിംഗുകളും നിങ്ങളുടെ FPO-യിൽ തന്നെ നിലനിൽക്കും. ഇത് പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+        ('toast_activated',            'Member reactivated', 'അംഗത്തെ വീണ്ടും സജീവമാക്കി'),
+        ('toast_activate_failed',      'Failed to reactivate member', 'അംഗത്തെ വീണ്ടും സജീവമാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_deactivated',          'Member deactivated', 'അംഗത്തെ നിഷ്ക്രിയമാക്കി'),
+        ('toast_deactivate_failed',    'Failed to deactivate member', 'അംഗത്തെ നിഷ്ക്രിയമാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_deleted',              'Member deleted', 'അംഗത്തെ ഇല്ലാതാക്കി'),
+        ('toast_delete_failed',        'Failed to delete member', 'അംഗത്തെ ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_password_reset',       "Temporary password sent to member's email",
+         'താൽക്കാലിക രഹസ്യവാക്ക് അംഗത്തിന്റെ ഇമെയിലിലേക്ക് അയച്ചു'),
+        ('toast_password_reset_failed', 'Failed to reset password', 'രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+
+        # ── Permissions dialogs ──
+        ('permissions_dialog_title',   'Member Permissions', 'അംഗത്തിന്റെ അനുമതികൾ'),
+        ('permissions_dialog_description',
+         'Choose what {name} can do. Without a permission they can still view the page but cannot make changes.',
+         '{name} എന്തൊക്കെ ചെയ്യാമെന്ന് തിരഞ്ഞെടുക്കുക. അനുമതി ഇല്ലെങ്കിലും പേജ് കാണാം, പക്ഷേ മാറ്റങ്ങൾ വരുത്താൻ കഴിയില്ല.'),
+        ('bulk_permissions_title',     'Change Permissions', 'അനുമതികൾ മാറ്റുക'),
+        ('bulk_permissions_description',
+         'Permissions for the {count} selected member(s). A half-ticked box means only some of them have it '
+         '— leave it to keep it as it is. Untick everything to remove all permissions.',
+         'തിരഞ്ഞെടുത്ത {count} അംഗങ്ങളുടെ അനുമതികൾ. പാതി ടിക്ക് ചെയ്ത ബോക്സ് എന്നാൽ ചിലർക്ക് മാത്രമേ ആ അനുമതി '
+         'ഉള്ളൂ — അതേപടി നിലനിർത്താൻ അത് മാറ്റാതെ വിടുക. എല്ലാ അനുമതികളും നീക്കാൻ എല്ലാം അൺടിക്ക് ചെയ്യുക.'),
+        ('permissions_none',           'No permissions can be granted to team members right now.',
+         'ഇപ്പോൾ ടീം അംഗങ്ങൾക്ക് നൽകാവുന്ന അനുമതികളൊന്നുമില്ല.'),
+        ('toast_permissions_saved',    'Permissions updated', 'അനുമതികൾ പുതുക്കി'),
+        ('toast_permissions_failed',   'Failed to update permissions', 'അനുമതികൾ പുതുക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_bulk_permissions_saved', 'Permissions updated for {count} member(s)',
+         '{count} അംഗങ്ങളുടെ അനുമതികൾ പുതുക്കി'),
+
+        # ── Invite dialog ──
+        ('invite_dialog_title',        'Invite Team Member', 'ടീം അംഗത്തെ ക്ഷണിക്കുക'),
+        ('invite_dialog_description',  'Fill in the details of the person you want to invite to join your team.',
+         'നിങ്ങളുടെ ടീമിലേക്ക് ക്ഷണിക്കാൻ ആഗ്രഹിക്കുന്ന ആളുടെ വിവരങ്ങൾ നൽകുക.'),
+        ('invite_field_first_name',    'First Name', 'ആദ്യ നാമം'),
+        ('invite_field_last_name',     'Last Name', 'അവസാന നാമം'),
+        ('invite_field_email',         'Email Address', 'ഇമെയിൽ വിലാസം'),
+        ('invite_field_phone',         'Phone Number', 'ഫോൺ നമ്പർ'),
+        ('invite_field_permissions',   'Permissions', 'അനുമതികൾ'),
+        ('invite_placeholder_first_name', 'First name', 'ആദ്യ നാമം'),
+        ('invite_placeholder_last_name',  'Last name', 'അവസാന നാമം'),
+        ('invite_placeholder_email',   'member@example.com', 'member@example.com'),
+        ('invite_placeholder_phone',   '10-digit mobile (optional)', '10 അക്ക മൊബൈൽ നമ്പർ (ഐച്ഛികം)'),
+        ('invite_note_temp_password',  'An email with a temporary password will be sent to the invited member.',
+         'ക്ഷണിക്കപ്പെട്ട അംഗത്തിന് ഒരു താൽക്കാലിക രഹസ്യവാക്ക് അടങ്ങിയ ഇമെയിൽ അയയ്ക്കും.'),
+        ('invite_btn_cancel',          'Cancel', 'റദ്ദാക്കുക'),
+        ('invite_btn_send',            'Send Invite', 'ക്ഷണം അയയ്ക്കുക'),
+        ('invite_btn_sending',         'Sending…', 'അയയ്ക്കുന്നു…'),
+        ('invite_toast_sent',          'Invitation sent successfully', 'ക്ഷണം വിജയകരമായി അയച്ചു'),
+        ('invite_toast_failed',        'Failed to send invitation', 'ക്ഷണം അയയ്ക്കാൻ കഴിഞ്ഞില്ല'),
+        ('validation_first_name_required', 'First name is required', 'ആദ്യ നാമം നിർബന്ധമാണ്'),
+        ('validation_first_name_max',  'First name can have at most {max} characters',
+         'ആദ്യ നാമത്തിൽ പരമാവധി {max} അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ'),
+        ('validation_first_name_letters', 'First name can contain letters only', 'ആദ്യ നാമത്തിൽ അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ'),
+        ('validation_last_name_required', 'Last name is required', 'അവസാന നാമം നിർബന്ധമാണ്'),
+        ('validation_last_name_max',   'Last name can have at most {max} characters',
+         'അവസാന നാമത്തിൽ പരമാവധി {max} അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ'),
+        ('validation_last_name_letters', 'Last name can contain letters only', 'അവസാന നാമത്തിൽ അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ'),
+        ('validation_email_required',  'Email is required', 'ഇമെയിൽ നിർബന്ധമാണ്'),
+        ('validation_email_invalid',   'Enter a valid email address', 'സാധുവായ ഒരു ഇമെയിൽ വിലാസം നൽകുക'),
+        ('validation_phone_digits',    'Phone number must be exactly 10 digits', 'ഫോൺ നമ്പർ കൃത്യം 10 അക്കങ്ങൾ ആയിരിക്കണം'),
+
+        # ── Bulk invite dialog ──
+        ('bulk_invite_dialog_title',   'Bulk Invite Members', 'അംഗങ്ങളെ ഒന്നിച്ച് ക്ഷണിക്കുക'),
+        ('bulk_invite_description',
+         'Invite multiple team members at once by either filling in their details or uploading a file.',
+         'വിവരങ്ങൾ നൽകിയോ ഒരു ഫയൽ അപ്‌ലോഡ് ചെയ്തോ ഒന്നിലധികം ടീം അംഗങ്ങളെ ഒരേസമയം ക്ഷണിക്കുക.'),
+        ('bulk_invite_tab_manual',     'Add Manually', 'നേരിട്ട് ചേർക്കുക'),
+        ('bulk_invite_tab_file',       'Upload File', 'ഫയൽ അപ്‌ലോഡ്'),
+        ('bulk_invite_btn_add_row',    'Add Row', 'വരി ചേർക്കുക'),
+        ('aria_remove_row',            'Remove row', 'വരി നീക്കം ചെയ്യുക'),
+        ('bulk_invite_btn_send',       'Send {count} Invites', '{count} ക്ഷണങ്ങൾ അയയ്ക്കുക'),
+        ('bulk_invite_btn_cancel',     'Cancel', 'റദ്ദാക്കുക'),
+        ('bulk_invite_error_no_rows',  'Add at least one member with a name and email',
+         'പേരും ഇമെയിലും ഉള്ള ഒരു അംഗത്തെയെങ്കിലും ചേർക്കുക'),
+        ('bulk_invite_file_title',     'Upload .xlsx or .csv file', '.xlsx അല്ലെങ്കിൽ .csv ഫയൽ അപ്‌ലോഡ് ചെയ്യുക'),
+        ('bulk_invite_file_required',  'Required columns:', 'നിർബന്ധിത നിരകൾ:'),
+        ('bulk_invite_file_optional',  'Optional:', 'ഐച്ഛികം:'),
+        ('bulk_invite_file_header_row', 'Row 1 must be the header row', 'ഒന്നാം വരി തലക്കെട്ട് വരി ആയിരിക്കണം'),
+        ('bulk_invite_btn_choose_file', 'Choose File', 'ഫയൽ തിരഞ്ഞെടുക്കുക'),
+        ('aria_remove_file',           'Remove file', 'ഫയൽ നീക്കം ചെയ്യുക'),
+        ('bulk_invite_btn_download_template', 'Download Template', 'ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്യുക'),
+        ('bulk_invite_toast_template_failed', 'Failed to download template', 'ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+        ('bulk_invite_btn_upload',     'Upload & Invite', 'അപ്‌ലോഡ് ചെയ്ത് ക്ഷണിക്കുക'),
+        ('bulk_invite_btn_uploading',  'Uploading…', 'അപ്‌ലോഡ് ചെയ്യുന്നു…'),
+        ('bulk_invite_error_no_file',  'Please select a file', 'ദയവായി ഒരു ഫയൽ തിരഞ്ഞെടുക്കുക'),
+        ('bulk_invite_toast_success',  'Invitations sent', 'ക്ഷണങ്ങൾ അയച്ചു'),
+        ('bulk_invite_toast_partial',  '{success} invited successfully, {failed} failed — see details',
+         '{success} പേരെ ക്ഷണിച്ചു, {failed} പരാജയപ്പെട്ടു — വിശദാംശങ്ങൾ കാണുക'),
+        ('bulk_invite_toast_failed',   'Failed to send invitations', 'ക്ഷണങ്ങൾ അയയ്ക്കാൻ കഴിഞ്ഞില്ല'),
+        ('failed_dialog_title',        'Some Invitations Failed', 'ചില ക്ഷണങ്ങൾ പരാജയപ്പെട്ടു'),
+        ('failed_dialog_count',        '{count} invite(s) could not be sent.', '{count} ക്ഷണങ്ങൾ അയയ്ക്കാൻ കഴിഞ്ഞില്ല.'),
+        ('failed_dialog_rows_file',    'Row numbers match the rows in your file.',
+         'വരി നമ്പറുകൾ നിങ്ങളുടെ ഫയലിലെ വരികളുമായി യോജിക്കുന്നു.'),
+        ('failed_dialog_rows_manual',  'Row numbers match the rows you entered.',
+         'വരി നമ്പറുകൾ നിങ്ങൾ നൽകിയ വരികളുമായി യോജിക്കുന്നു.'),
+        ('failed_col_row',             'Row', 'വരി'),
+        ('failed_col_reason',          'Reason', 'കാരണം'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in fpo_team_keys:
+        full_key = f'fpo_team.{key}'
+        Translation.objects.update_or_create(
+            category=category, key=full_key, language=lang_en,
+            defaults={'value': en_value, 'context': 'FPO My Team page (/fpo/team)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=full_key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'FPO My Team page (/fpo/team)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -6387,6 +6601,12 @@ def seed_translations():
     total_count += cbbo_portal_count
 
     # Step 10: Apply known fixes (broken placeholders, wrong values)
+    # After seed_frontend_ui_translations (which puts English in the ML rows)
+    print("\nSeeding FPO My Team page translations...")
+    team_count = seed_fpo_team_translations(languages)
+    print(f"✅ Seeded {team_count} My Team translations")
+    total_count += team_count
+
     print("\nApplying translation fixes...")
     seed_fixes(languages)
     print(f"✅ Fixes applied")

@@ -284,6 +284,112 @@ class FPOMessages:
         "നിങ്ങളുടെ FPO രജിസ്ട്രേഷൻ അംഗീകരിക്കപ്പെട്ടു. അപേക്ഷ ഐഡി: {application_id}."
     )
 
+    # Team (FPO portal → My Team): reasons shown in invite / bulk-action results
+    TEAM_FIRST_NAME_REQUIRED: Tuple[str, str] = (
+        "First name is required.",
+        "ആദ്യ നാമം നിർബന്ധമാണ്."
+    )
+    TEAM_LAST_NAME_REQUIRED: Tuple[str, str] = (
+        "Last name is required.",
+        "അവസാന നാമം നിർബന്ധമാണ്."
+    )
+    TEAM_EMAIL_REQUIRED: Tuple[str, str] = (
+        "Email is required.",
+        "ഇമെയിൽ നിർബന്ധമാണ്."
+    )
+    TEAM_FIRST_NAME_TOO_LONG: Tuple[str, str] = (
+        "First name can have at most {max} characters.",
+        "ആദ്യ നാമത്തിൽ പരമാവധി {max} അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ."
+    )
+    TEAM_LAST_NAME_TOO_LONG: Tuple[str, str] = (
+        "Last name can have at most {max} characters.",
+        "അവസാന നാമത്തിൽ പരമാവധി {max} അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ."
+    )
+    TEAM_FIRST_NAME_LETTERS_ONLY: Tuple[str, str] = (
+        "First name can contain letters only.",
+        "ആദ്യ നാമത്തിൽ അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ."
+    )
+    TEAM_LAST_NAME_LETTERS_ONLY: Tuple[str, str] = (
+        "Last name can contain letters only.",
+        "അവസാന നാമത്തിൽ അക്ഷരങ്ങൾ മാത്രമേ പാടുള്ളൂ."
+    )
+    TEAM_EMAIL_INVALID: Tuple[str, str] = (
+        "Enter a valid email address.",
+        "സാധുവായ ഒരു ഇമെയിൽ വിലാസം നൽകുക."
+    )
+    TEAM_PHONE_INVALID: Tuple[str, str] = (
+        "Phone number must be exactly 10 digits.",
+        "ഫോൺ നമ്പർ കൃത്യം 10 അക്കങ്ങൾ ആയിരിക്കണം."
+    )
+    TEAM_EMAIL_REGISTERED: Tuple[str, str] = (
+        "This email is already registered.",
+        "ഈ ഇമെയിൽ ഇതിനകം രജിസ്റ്റർ ചെയ്തിട്ടുണ്ട്."
+    )
+    TEAM_PERMISSIONS_NOT_GRANTABLE: Tuple[str, str] = (
+        "These permissions cannot be granted: {codes}.",
+        "ഈ അനുമതികൾ നൽകാൻ കഴിയില്ല: {codes}."
+    )
+    TEAM_MEMBER_NOT_FOUND: Tuple[str, str] = (
+        "Team member not found.",
+        "ടീം അംഗത്തെ കണ്ടെത്തിയില്ല."
+    )
+    TEAM_CANNOT_DELETE_SELF: Tuple[str, str] = (
+        "You cannot delete yourself.",
+        "നിങ്ങൾക്ക് സ്വയം ഇല്ലാതാക്കാൻ കഴിയില്ല."
+    )
+    TEAM_CANNOT_DEACTIVATE_SELF: Tuple[str, str] = (
+        "You cannot deactivate yourself.",
+        "നിങ്ങൾക്ക് സ്വയം നിഷ്ക്രിയമാക്കാൻ കഴിയില്ല."
+    )
+    TEAM_CANNOT_MODIFY_SELF: Tuple[str, str] = (
+        "You cannot change your own account here.",
+        "നിങ്ങളുടെ സ്വന്തം അക്കൗണ്ട് ഇവിടെ മാറ്റാൻ കഴിയില്ല."
+    )
+    TEAM_CANNOT_RESET_OWN_PASSWORD: Tuple[str, str] = (
+        "You cannot reset your own password here.",
+        "നിങ്ങളുടെ സ്വന്തം രഹസ്യവാക്ക് ഇവിടെ റീസെറ്റ് ചെയ്യാൻ കഴിയില്ല."
+    )
+    TEAM_ALREADY_INACTIVE: Tuple[str, str] = (
+        "This team member is already inactive.",
+        "ഈ ടീം അംഗം ഇതിനകം നിഷ്ക്രിയമാണ്."
+    )
+    TEAM_ADMIN_DEACTIVATED_REACTIVATE: Tuple[str, str] = (
+        "This member was deactivated by an admin. Contact admin to reactivate.",
+        "ഈ അംഗത്തെ ഒരു അഡ്മിൻ നിഷ്ക്രിയമാക്കിയതാണ്. വീണ്ടും സജീവമാക്കാൻ അഡ്മിനെ ബന്ധപ്പെടുക."
+    )
+    TEAM_ADMIN_DEACTIVATED_DELETE: Tuple[str, str] = (
+        "This member was deactivated by an admin. Contact admin to remove them.",
+        "ഈ അംഗത്തെ ഒരു അഡ്മിൻ നിഷ്ക്രിയമാക്കിയതാണ്. നീക്കം ചെയ്യാൻ അഡ്മിനെ ബന്ധപ്പെടുക."
+    )
+    TEAM_OTHER_ROLES: Tuple[str, str] = (
+        "This account has other roles on the platform. Contact admin to remove it.",
+        "ഈ അക്കൗണ്ടിന് പ്ലാറ്റ്‌ഫോമിൽ മറ്റ് റോളുകളുമുണ്ട്. നീക്കം ചെയ്യാൻ അഡ്മിനെ ബന്ധപ്പെടുക."
+    )
+    TEAM_PRIMARY_HAS_ALL_PERMISSIONS: Tuple[str, str] = (
+        "The primary user always has every permission.",
+        "പ്രാഥമിക ഉപയോക്താവിന് എല്ലായ്പ്പോഴും എല്ലാ അനുമതികളും ഉണ്ട്."
+    )
+    TEAM_FPO_NOT_APPROVED: Tuple[str, str] = (
+        "Team members can only be invited after the FPO is approved.",
+        "FPO അംഗീകരിച്ചതിനു ശേഷം മാത്രമേ ടീം അംഗങ്ങളെ ക്ഷണിക്കാൻ കഴിയൂ."
+    )
+    TEAM_FILE_MISSING: Tuple[str, str] = (
+        "No file uploaded. Choose an .xlsx or .csv file.",
+        "ഫയൽ അപ്‌ലോഡ് ചെയ്തിട്ടില്ല. ഒരു .xlsx അല്ലെങ്കിൽ .csv ഫയൽ തിരഞ്ഞെടുക്കുക."
+    )
+    TEAM_FILE_TYPE: Tuple[str, str] = (
+        "Only .xlsx and .csv files are supported.",
+        ".xlsx, .csv ഫയലുകൾ മാത്രമേ പിന്തുണയ്ക്കൂ."
+    )
+    TEAM_FILE_UNREADABLE: Tuple[str, str] = (
+        "Could not read the file. Save it as .xlsx or .csv and try again.",
+        "ഫയൽ വായിക്കാൻ കഴിഞ്ഞില്ല. .xlsx അല്ലെങ്കിൽ .csv ആയി സേവ് ചെയ്ത് വീണ്ടും ശ്രമിക്കുക."
+    )
+    TEAM_FILE_EMPTY: Tuple[str, str] = (
+        "The file is empty or has no data rows.",
+        "ഫയൽ ശൂന്യമാണ്, അല്ലെങ്കിൽ ഡാറ്റ വരികളൊന്നുമില്ല."
+    )
+
 
 class DocumentMessages:
     """Document upload and management messages."""
