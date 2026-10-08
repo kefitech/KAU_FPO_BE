@@ -2,6 +2,7 @@
 Admin Dashboard Stats API
 ==========================
 GET /api/admin/dashboard/stats/
+GET /api/admin/dashboard/districts/<district>/blocks/   (map drill-down — super admins; sub-admins own district, or all with can_view_all_fpos)
 
 Returns all data needed for the admin dashboard in one call:
 - Stat cards (totals)
@@ -22,9 +23,12 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.views import APIView
 
+from apps.core.models.generic import MasterLookup
 from apps.core.utils.constants import FPOStatus, District, DISTRICTS_BILINGUAL, UserRole
 from apps.core.utils.responses import StandardResponse
-from apps.core.permissions.fpo_scope import scope_fpo_queryset
+from apps.core.permissions.fpo_scope import (
+    VIEW_ALL_PERM, get_sub_admin_district, is_sub_admin, is_super_admin, scope_fpo_queryset,
+)
 from apps.database.models.fpo import FPO, FPODocument, FPOOwnershipClaim, ClaimStatus
 
 
@@ -99,8 +103,9 @@ class AdminDashboardStatsView(APIView):
 
         # ── District Distribution ─────────────────────────────────────────────
         # Statewide for everyone, sub-admins included, so the map can compare their
-        # district with the rest of Kerala. It only shows a count per district (no
-        # drill-down); every other figure here stays scoped to the caller's FPOs.
+        # district with the rest of Kerala. It only shows a count per district (the block
+        # drill-down is AdminDashboardDistrictBlocksView, which applies the sub-admin's
+        # read scope); every other figure here stays scoped to the caller's FPOs.
         district_counts = (
             FPO.objects.filter(is_deleted=False).exclude(district='')
             .values('district')
@@ -171,4 +176,61 @@ class AdminDashboardStatsView(APIView):
                 'pending_actions':      pending_actions,
             },
             message='Dashboard stats loaded.',
+        )
+
+
+class AdminDashboardDistrictBlocksView(APIView):
+
+    @extend_schema(
+        tags=['Admin - Dashboard'],
+        summary='FPO count per block in a district',
+        description=(
+            'Drives the dashboard map drill-down. Super admins, and sub-admins with '
+            '`can_view_all_fpos`, can open any district; other sub-admins only their own '
+            'assigned district (others are 403).\n\n'
+            '- **blocks** — every block of the district with its FPO count, counted like '
+            '`district_distribution` (all non-deleted FPOs)\n'
+            '- **unassigned** — FPOs in the district whose block is blank or belongs to '
+            'another district, so they fall in none of its blocks\n'
+        ),
+        responses={200: None},
+    )
+    def get(self, request, district):
+        # Same districts the caller can read FPOs in (scope_fpo_queryset with read_only=True)
+        user = request.user
+        sub_admin_can_view = is_sub_admin(user) and (
+            user.has_perm(VIEW_ALL_PERM) or get_sub_admin_district(user) == district
+        )
+        if not (is_super_admin(user) or sub_admin_can_view):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        if district not in District.values:
+            return StandardResponse.error('Unknown district.', status_code=status.HTTP_404_NOT_FOUND)
+
+        counts = dict(
+            FPO.objects.filter(is_deleted=False, district=district)
+            .order_by()
+            .values_list('block_taluk')
+            .annotate(count=Count('id'))
+        )
+        blocks = MasterLookup.objects.filter(
+            category='block', is_active=True, metadata__district=district,
+        ).order_by('display_order')
+
+        block_list = [
+            {
+                'code':  block.code,
+                'name':  block.get_name(request.language),
+                'count': counts.get(block.code, 0),
+            }
+            for block in blocks
+        ]
+        total = sum(counts.values())
+
+        return StandardResponse.success(
+            data={
+                'district':   district,
+                'total':      total,
+                'unassigned': total - sum(b['count'] for b in block_list),
+                'blocks':     block_list,
+            },
         )
