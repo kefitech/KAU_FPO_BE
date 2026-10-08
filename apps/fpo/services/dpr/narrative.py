@@ -1058,6 +1058,79 @@ def scrub_broken_numbers(text: str) -> tuple[str, list[dict]]:
     return cleaned, hits
 
 
+# ── KAU contradiction review 2026-10-08, Pattern 1 — scale-corruption guard ──
+# The scrubber above only catches MALFORMED groupings. The 8 Oct review of
+# the six sample DPRs found the dangerous variant: the LLM re-groups an
+# amount into a perfectly VALID Indian grouping that is 100× (or 10×/1000×)
+# the real figure — `13,00,000` becomes `13,00,00,000`, `8,000` becomes
+# `8,00,000`, `9,75,00,000` becomes `9,75,000`. Well-formed, so it sailed
+# through, and the auto-retry never fired. Guard: every comma-grouped
+# figure in the output must exist in the PROMPT (FACTS + KB + brief —
+# grounding rule 7 says the model may only quote given numbers). A figure
+# whose ×10^k / ÷10^k counterpart IS in the prompt is a scale corruption →
+# masked `[?]` + retried. An unknown large figure (≥ ₹1 lakh, no scale
+# counterpart, not ±1 of a prompt figure) is NOT masked — it may be a
+# legitimate derivation — but is flagged and also triggers the retry.
+
+# Decimal-bearing grouped number, e.g. `1,37,30,498.63`.
+_GROUPED_WITH_DECIMAL_RE = re.compile(r'\d+(?:,\d+)+(?:\.\d+)?')
+# Prompt side also allows bare digit runs (plain integers ≥ 4 digits).
+_PROMPT_FIGURE_RE = re.compile(r'\d+(?:,\d+)+(?:\.\d+)?|\d{4,}(?:\.\d+)?')
+
+_SCALE_FACTORS = (10, 100, 1000, 10000)
+
+
+def _canon_figure(raw: str) -> int:
+    """`'1,37,30,498.63'` → 13730498 (commas stripped, fraction dropped)."""
+    return int(raw.replace(',', '').split('.')[0] or '0')
+
+
+def extract_prompt_figures(prompt: str) -> set[int]:
+    """Every numeric figure the LLM was shown — the allowed vocabulary."""
+    return {_canon_figure(m.group(0)) for m in _PROMPT_FIGURE_RE.finditer(prompt)}
+
+
+def verify_figures_against_prompt(
+    text: str,
+    allowed: set[int],
+) -> tuple[str, list[dict]]:
+    """Catch well-formed but scale-corrupted figures; flag unknown ones.
+
+    Run AFTER scrub_broken_numbers (so every remaining grouped figure is
+    validly formatted). Returns `(cleaned_text, hits)` in the same shape
+    as the scrubber so the caller stamps the same bookkeeping fields.
+    """
+    hits_by_raw: dict[str, dict] = {}
+
+    def _check(m):
+        raw = m.group(0)
+        v = _canon_figure(raw)
+        if v < 1000 or v in allowed or (v - 1) in allowed or (v + 1) in allowed:
+            return raw
+        for k in _SCALE_FACTORS:
+            if v % k == 0 and (v // k) in allowed and (v // k) >= 1000:
+                hits_by_raw.setdefault(raw, {'bug': 'BUG-26-scale-corruption',
+                                             'detail': f'{raw} looks like {v // k:,} ×{k}',
+                                             'count': 0})['count'] += 1
+                return '[?]'
+            if (v * k) in allowed:
+                hits_by_raw.setdefault(raw, {'bug': 'BUG-26-scale-corruption',
+                                             'detail': f'{raw} looks like {v * k:,} ÷{k}',
+                                             'count': 0})['count'] += 1
+                return '[?]'
+        if v >= 100000:
+            # Unknown ≥ ₹1 lakh figure — flagged (needs_review + retry) but
+            # left in place: it could be a legitimate derived value.
+            hits_by_raw.setdefault(raw, {'bug': 'BUG-26-unknown-figure',
+                                         'detail': f'{raw} not found in prompt facts',
+                                         'count': 0})['count'] += 1
+        return raw
+
+    cleaned = _GROUPED_WITH_DECIMAL_RE.sub(_check, text)
+    hits = [{'raw': raw, **info} for raw, info in hits_by_raw.items()]
+    return cleaned, hits
+
+
 # KAU 2026-09-26 finalisation feedback: for two chapters the strict grounding
 # was making the narrative sound mechanical and short. KAU asked us to restore
 # the older expansive style for these, allow AI's general/global knowledge to
@@ -1532,7 +1605,11 @@ def generate_chapter(
     # (retries carry a `#r<N>` suffix on reference_id) and counted against
     # the monthly budget cap.
     _MAX_BUG26_ATTEMPTS = 3
-    best: Optional[tuple[int, str, list]] = None  # (broken_count, text, hits)
+    # KAU review 2026-10-08 Pattern 1: the allowed numeric vocabulary is
+    # whatever the prompt contains — scale-corrupted / unknown figures in
+    # the output count as corruption and drive the same retry loop.
+    prompt_figures = extract_prompt_figures(prompt)
+    best: Optional[tuple[int, str, list]] = None  # (corruption_count, text, hits)
     for attempt in range(1, _MAX_BUG26_ATTEMPTS + 1):
         ref_id = f'{project.id}:{chapter}' + (f'#r{attempt}' if attempt > 1 else '')
         try:
@@ -1578,6 +1655,13 @@ def generate_chapter(
         text, broken_number_hits = scrub_broken_numbers(text)
         scrubber_hits.extend(broken_number_hits)
 
+        # KAU review 2026-10-08 Pattern 1: catch WELL-FORMED figures that are
+        # a ×10^k / ÷10^k corruption of a prompt figure (masked) or unknown
+        # large figures (flagged). Both count as corruption for the retry.
+        text, figure_hits = verify_figures_against_prompt(text, prompt_figures)
+        scrubber_hits.extend(figure_hits)
+        corruption_hits = broken_number_hits + figure_hits
+
         # Convert USD → INR using the configured rate, then record + apply
         # the spend against the monthly cap (auto-disables if breached).
         cost_inr = response.cost_usd * cfg.usd_to_inr_rate
@@ -1603,9 +1687,9 @@ def generate_chapter(
                 tokens=response.input_tokens + response.output_tokens,
             )
 
-        if best is None or len(broken_number_hits) < best[0]:
-            best = (len(broken_number_hits), text, scrubber_hits)
-        if not broken_number_hits:
+        if best is None or len(corruption_hits) < best[0]:
+            best = (len(corruption_hits), text, scrubber_hits)
+        if not corruption_hits:
             break  # clean attempt — no retry needed
         # Budget cap may have auto-disabled the service mid-loop — stop
         # retrying rather than erroring on a disabled config.
