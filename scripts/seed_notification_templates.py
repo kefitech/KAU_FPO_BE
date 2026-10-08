@@ -97,6 +97,9 @@ TEMPLATE_CODES = [
     # FPO Training Sessions (Jobin — P2-08)
     ('fpo_training_scheduled',              'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
     ('fpo_training_scheduled',              'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
+    # KAU admin / sub-admin commented on a session → the CBBO officer or government official
+    # who recorded it (link opens the session on /cbbo/training or /government/training)
+    ('training_comment_added', 'in_app', 'In-app: a KAU admin or sub-admin commented on a training session you recorded', ['author_name', 'author_designation', 'topic', 'fpo_name', 'date', 'comment', 'link', 'session_id']),
    #30 sep arunima
     # Product Stock Expiry (P2-11 Marketplace)
     ('product_stock_expiring_soon',  'email',  'Notify FPO 3 days before a product stock batch expires',        ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
@@ -985,6 +988,19 @@ TEMPLATES = [
         'fpo_training_scheduled', 'in_app', 'en',
         'Training Session Scheduled',
         'A training on "{{topic}}" has been scheduled for {{date}} at {{time}}, venue: {{venue}}, conducted by {{trainer_name}}.',
+    ),
+    # Training-session comment (in-app → session recorder)
+    (
+        'training_comment_added', 'in_app', 'en',
+        'New KAU comment — {{topic}}',
+        '<strong>{{author_name}}</strong> ({{author_designation}}) commented on your training session '
+        '<strong>{{topic}}</strong> for {{fpo_name}} ({{date}}): "{{comment}}"',
+    ),
+    (
+        'training_comment_added', 'in_app', 'ml',
+        'പുതിയ KAU അഭിപ്രായം — {{topic}}',
+        '{{fpo_name}}-നായി നിങ്ങൾ രേഖപ്പെടുത്തിയ <strong>{{topic}}</strong> ({{date}}) പരിശീലന സെഷനിൽ '
+        '<strong>{{author_name}}</strong> ({{author_designation}}) അഭിപ്രായം രേഖപ്പെടുത്തി: "{{comment}}"',
     ),
     #sep 30 arunimma
 

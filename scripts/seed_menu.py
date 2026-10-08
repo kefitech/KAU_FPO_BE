@@ -447,15 +447,30 @@ def seed_menu():
         roles     = [cbbo_group],
         order     = 5,
     )
+    # Read-only directories — the same pages FPOs browse, without contact/booking
+    seed_item(
+        label_key = 'menu.cbbo_schemes',
+        path      = '/cbbo/schemes',
+        icon      = 'book-open',
+        roles     = [cbbo_group],
+        order     = 6,
+    )
+    seed_item(
+        label_key = 'menu.cbbo_experts',
+        path      = '/cbbo/experts',
+        icon      = 'user-check',
+        roles     = [cbbo_group],
+        order     = 7,
+    )
     seed_item(
         label_key = 'menu.cbbo_profile',
         path      = '/cbbo/profile',
         icon      = 'user',
         roles     = [cbbo_group],
-        order     = 6,
+        order     = 8,
     )
     # seed_item only sets order on create — keep My Profile last on existing DBs
-    MenuItem.objects.filter(label_key='menu.cbbo_profile').update(order=6)
+    MenuItem.objects.filter(label_key='menu.cbbo_profile').update(order=8)
 
     # ── Government portal pages (Jobin) ───────────────────────────────────────
 
@@ -493,6 +508,14 @@ def seed_menu():
         icon      = 'graduation-cap',
         roles     = [government_group],
         order     = 5,
+    )
+    # Read-only expert directory — contacting and booking stay FPO-only
+    seed_item(
+        label_key = 'menu.government_experts',
+        path      = '/government/experts',
+        icon      = 'user-check',
+        roles     = [government_group],
+        order     = 6,
     )
 
     # ── Expert portal pages (Jobin) ───────────────────────────────────────────

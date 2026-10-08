@@ -8,6 +8,8 @@ import secrets
 import logging
 from django.conf import settings as django_settings
 from django.contrib.auth.models import User, Group
+from django.db.models import Case, F, IntegerField, Value, When
+from django.db.models.functions import Lower
 
 from rest_framework import serializers, filters
 from rest_framework.decorators import action
@@ -182,12 +184,47 @@ class GovernmentUpdateSerializer(serializers.Serializer):
     department  = serializers.CharField(max_length=200, required=False)
 
 
+# ?ordering=<column id> ('-' prefix for descending) → sort expressions. Keys are the
+# list table's column ids. Text sorts ignore case; Status sorts the way its badge
+# reads: Pending Approval → Active → Inactive.
+_ORDERING = {
+    'first_name':          [Lower('first_name'), Lower('last_name')],
+    'designation':         [Lower('govt_profile__designation')],
+    'email':               [Lower('email')],
+    'jurisdiction_type':   [F('govt_profile__jurisdiction_type')],
+    'registration_status': [Case(
+        When(govt_profile__registration_status='pending', then=Value(0)),
+        When(is_active=True, then=Value(1)),
+        default=Value(2),
+        output_field=IntegerField(),
+    )],
+    'date_joined':         [F('date_joined')],
+}
+
+
+def _apply_ordering(qs, ordering):
+    """Unknown or blank ordering keeps the default newest-first order."""
+    exprs = _ORDERING.get(ordering.lstrip('-'))
+    if not exprs:
+        return qs
+    desc = ordering.startswith('-')
+    # Newest-first tie-break keeps pages stable when many rows share a value
+    return qs.order_by(*[e.desc() if desc else e.asc() for e in exprs], '-date_joined', '-id')
+
+
 @extend_schema_view(
-    list=extend_schema(tags=['Admin - Government'], parameters=[OpenApiParameter(
+    list=extend_schema(tags=['Admin - Government'], parameters=[
+        OpenApiParameter(
             'district', str, required=False,
             description='3-letter district code (e.g. "TSR") to list only that district\'s officials, '
                         'or "state" for state-wide ones.',
-        )]),
+        ),
+        OpenApiParameter(
+            'ordering', str, required=False,
+            description='Sort column: first_name, designation, email, jurisdiction_type, '
+                        'registration_status or date_joined; prefix "-" for descending.',
+        ),
+    ]),
     retrieve=extend_schema(tags=['Admin - Government']),
     create=extend_schema(tags=['Admin - Government']),
     partial_update=extend_schema(
@@ -201,9 +238,8 @@ class GovernmentUpdateSerializer(serializers.Serializer):
 class GovernmentViewSet(TranslatedViewSet):
     permission_classes = [IsSubAdminOrSuperAdmin]
     pagination_class   = StandardPagination
-    filter_backends    = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends    = [filters.SearchFilter]   # ordering: _apply_ordering() in get_queryset
     search_fields      = ['email', 'first_name', 'last_name']
-    ordering_fields    = ['date_joined', 'email']
 
     list_message    = 'admin.government_retrieved'
     create_message  = 'admin.government_created'
@@ -220,6 +256,7 @@ class GovernmentViewSet(TranslatedViewSet):
         # District filter on the list page: ?district=TSR, or ?district=state for state-level.
         if self.action == 'list':
             qs = filter_govt_by_district(qs, self.request.query_params.get('district'))
+            qs = _apply_ordering(qs, self.request.query_params.get('ordering', '').strip())
         return qs
 
     def get_serializer_class(self):

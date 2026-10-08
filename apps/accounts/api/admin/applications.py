@@ -48,7 +48,7 @@ from apps.core.services.translation import t
 from apps.database.models.fpo import FPO, FPODocument, ApplicationStatusHistory, FPOTierHistory, FPOAssessment, AssessmentAnswer, AssessmentUpload
 from apps.database.models.cbbo import TrainingSession, TrainingSessionComment
 from apps.database.models.government import GovernmentOfficialProfile
-from apps.cbbo.training_comments import TrainingSessionCommentSerializer, admin_designation
+from apps.cbbo.training_comments import TrainingSessionCommentSerializer, admin_designation, notify_comment_added
 from apps.core.models.generic import AuditLog
 from apps.core.services.audit import AuditService
 from apps.core.permissions.fpo_scope import can_manage_fpo, is_super_admin, scope_fpo_queryset
@@ -1248,7 +1248,8 @@ class ApplicationTrainingSessionCommentView(APIView):
         summary='Comment on a training session',
         description=(
             'Adds a KAU admin remark to one of the FPO\'s training sessions. The CBBO officer '
-            'or government official who recorded the session sees it on their training page.\n\n'
+            'or government official who recorded the session sees it on their training page, '
+            'and gets an in-app notification (`training_comment_added`) linking to it.\n\n'
             'The author\'s name and designation ("Super Admin" / "Sub-Admin, <district>") are '
             'saved with the comment.\n\n'
             'Super admin, or a sub-admin with `can_manage_trainings` (their district only).'
@@ -1286,6 +1287,7 @@ class ApplicationTrainingSessionCommentView(APIView):
             author_designation=admin_designation(user),
             comment=ser.validated_data['comment'],
         )
+        notify_comment_added(comment)
         return StandardResponse.success(
             data=_AdminTrainingCommentSerializer(comment, context={'request': request}).data,
             message='Comment added.',

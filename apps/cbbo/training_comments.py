@@ -12,13 +12,25 @@ on their own training page. One serializer keeps all three responses identical.
 
 Unread tracking (CBBO + government tables): a comment is unread for a user
 until they open the session, which records `last_read_at` for them.
+
+A new comment also sends the recorder an in-app notification
+(`training_comment_added`) that opens the session on their training page.
 """
+import logging
+
 from django.utils import timezone
+from django.utils.html import escape
+from django.utils.text import Truncator
 from rest_framework import serializers
 
 from apps.core.permissions.fpo_scope import get_sub_admin_district, is_super_admin
 from apps.core.utils.constants import get_district_name
 from apps.database.models.cbbo import TrainingSessionComment, TrainingSessionCommentRead
+from apps.database.models.government import GovernmentOfficialProfile
+
+logger = logging.getLogger(__name__)
+
+TRAINING_COMMENT_ADDED = 'training_comment_added'
 
 
 def admin_designation(user):
@@ -65,3 +77,36 @@ def mark_comments_read(user, session):
     TrainingSessionCommentRead.objects.update_or_create(
         session=session, user=user, defaults={'last_read_at': timezone.now()},
     )
+
+
+def notify_comment_added(comment):
+    """In-app alert to whoever recorded the session — a CBBO officer or a
+    government official. The link opens the session on their own training page.
+    Never raises: a failed notification must not fail the comment."""
+    from apps.notifications.services import send_notification
+
+    session  = comment.session
+    recorder = session.cbbo
+    if not recorder or not recorder.is_active:
+        return
+    is_govt = GovernmentOfficialProfile.objects.filter(user=recorder).exists()
+    portal  = 'government' if is_govt else 'cbbo'
+    try:
+        send_notification(
+            user=recorder,
+            code=TRAINING_COMMENT_ADDED,
+            channel='in_app',
+            # In-app bodies render as HTML and the template engine substitutes verbatim.
+            context={
+                'author_name':        escape(comment.author_name),
+                'author_designation': escape(comment.author_designation),
+                'topic':              escape(session.topic),
+                'fpo_name':           escape(session.fpo.name),
+                'date':               str(session.date),
+                'comment':            escape(Truncator(comment.comment).chars(160)),
+                'link':               f'/{portal}/training?session={session.id}',
+                'session_id':         session.id,
+            },
+        )
+    except Exception:
+        logger.exception('notify_comment_added: failed for comment %s', comment.pk)
