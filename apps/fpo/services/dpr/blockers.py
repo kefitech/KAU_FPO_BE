@@ -41,6 +41,18 @@ _CHECK_TO_SECTION: dict[str, tuple[str, str]] = {
     'manpower_vs_production':       ('hr',           'HR & Organisation'),
     'utilities_vs_production':      ('utilities',    'Utilities & Waste'),
     'salaries_vs_manpower':         ('finance',      'Finance (Operating Costs)'),
+    # KAU contradiction review 2026-10-08 Pattern 15 gate — jump straight
+    # to §2.3.19 where the Building Permit status is set.
+    'building_permit_vs_buildings': ('compliance',   'Statutory Compliance'),
+}
+
+# Blockers whose fix lives OUTSIDE the DPR wizard (e.g. on the FPO profile)
+# — no jump link is possible, but the banner should show a meaningful label
+# instead of the raw chapter slug.
+_UNLINKED_LABELS: dict[str, str] = {
+    # Pattern 14 gate — Total directors is edited on the FPO profile page,
+    # not in any DPR section.
+    'fpo_profile': 'FPO Profile — Board of Directors',
 }
 
 # String chapter values used directly by _pre_final_validation (not chain
@@ -101,6 +113,15 @@ def _classify(raw: dict) -> dict:
             'target':        'wizard',
             'section_key':   chapter,
             'section_label': _SECTION_LABELS[chapter],
+        }
+
+    # Case D — known blocker whose fix lives outside the DPR wizard
+    # (e.g. the FPO profile). No jump link, but a human label.
+    if chapter in _UNLINKED_LABELS:
+        return {
+            'message':       reason,
+            'target':        'unknown',
+            'section_label': _UNLINKED_LABELS[chapter],
         }
 
     # Fallback — unknown chapter (defensive). Surface as generic blocker so

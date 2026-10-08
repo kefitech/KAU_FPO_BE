@@ -523,8 +523,12 @@ def _pre_final_validation(project) -> list[dict]:
     if fpo is not None and getattr(fpo, 'legal_structure', '') in _PRODUCER_CO_STRUCTURES:
         dirs = getattr(fpo, 'total_directors', None)
         if dirs is not None and dirs > 0 and not (5 <= dirs <= 15):
+            # chapter deliberately NOT an AI-chapter key — blockers.py would
+            # otherwise route this to a useless "Regenerate →" link. The fix
+            # lives on the FPO profile, outside the DPR wizard.
             errors.append({
-                'chapter': 'promoter_profile',
+                'chapter': 'fpo_profile',
+                'check':   'board_size_statutory',
                 'reason': (
                     f'Board of Directors has {dirs} member(s) — a Producer '
                     f'Company must have between 5 and 15 directors '
@@ -550,6 +554,7 @@ def _pre_final_validation(project) -> list[dict]:
             if _na_permit:
                 errors.append({
                     'chapter': 'compliance',
+                    'check':   'building_permit_vs_buildings',
                     'reason': (
                         f'Building Permit is marked "Not Applicable" while '
                         f'₹{_buildings_budget:,.0f} of buildings / civil works '
