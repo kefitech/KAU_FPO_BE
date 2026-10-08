@@ -125,7 +125,20 @@ def _fmt_pct(v: Optional[Decimal]) -> str:
 
 
 def _fmt_ratio(v: Optional[Decimal]) -> str:
-    return f'{v}' if v is not None else 'Not available'
+    """Tester finding 2026-10-08: on degenerate data a ratio can be a huge
+    Decimal and the raw f-string printed it UNGROUPED ('32478819.23') —
+    exactly the number shape that tempts the LLM into bad re-grouping
+    (BUG-26). Quantize to 2dp and Indian-group anything ≥ 10,000."""
+    if v is None:
+        return 'Not available'
+    try:
+        d = Decimal(str(v)).quantize(Decimal('0.01'))
+    except (ValueError, ArithmeticError):
+        return str(v)
+    if abs(d) >= Decimal('10000'):
+        return _fmt_inr(d).replace('₹', '').strip()
+    s = str(d)
+    return s[:-3] if s.endswith('.00') else s
 
 
 def _fmt_qty(value, unit: str = '') -> str:
