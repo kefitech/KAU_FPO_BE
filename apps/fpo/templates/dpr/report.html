@@ -339,10 +339,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
   <table>
     <thead><tr><th class="label">Cost head</th><th>Amount (₹)</th></tr></thead>
     <tbody>
-      {% for field, amount in r.cost.by_field.items %}
-        {% if amount %}
-          <tr><td class="label">{{ field|humanise_field }}</td><td>{{ amount|money }}</td></tr>
-        {% endif %}
+      {% for label, amount in cost_breakdown_rows %}
+          <tr><td class="label">{{ label }}</td><td>{{ amount|money }}</td></tr>
       {% endfor %}
       <tr class="total"><td class="label">Total Project Cost</td><td>{{ r.cost.total|money }}</td></tr>
     </tbody>
@@ -360,10 +358,8 @@ Author: Athul Gopan (Kefi Tech Solutions)
   <table>
     <thead><tr><th class="label">Source</th><th>Amount (₹)</th></tr></thead>
     <tbody>
-      {% for field, amount in r.mof.by_field.items %}
-        {% if amount and field != 'mof_working_capital_loan' %}
-          <tr><td class="label">{{ field|humanise_field }}</td><td>{{ amount|money }}</td></tr>
-        {% endif %}
+      {% for label, amount in mof_breakdown_rows %}
+          <tr><td class="label">{{ label }}</td><td>{{ amount|money }}</td></tr>
       {% endfor %}
       <tr class="total"><td class="label">Total Means of Finance</td><td>{{ r.mof.project_funding_total|money }}</td></tr>
     </tbody>
@@ -495,7 +491,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {% if r.working_capital_statement %}
     <h2 id="sec-6b">6B. Working Capital Statement (KAU §2.4 operating-cycle method)</h2>
     <p style="font-size: 9pt; margin-bottom: 3mm;">
-      Basis: <strong>{{ r.working_capital_statement.basis_used }}</strong>
+      Basis: <strong>{{ r.working_capital_statement.basis_used|wc_basis_label }}</strong>
       · Operating cycle: <strong>{{ r.working_capital_statement.operating_cycle_days }} days</strong>
       ({{ r.working_capital_statement.inventory_days }} inventory + {{ r.working_capital_statement.receivable_days }} receivable − {{ r.working_capital_statement.payable_days }} payable)
     </p>
@@ -772,7 +768,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <p style="font-size: 8.5pt; font-style: italic; color: #555; margin-top: 2mm;">
         Fixed cost = salaries, repairs &amp; maintenance, insurance, admin,
         marketing, communication, professional charges, misc + Y1 depreciation
-        + Y1 interest.  Variable cost = raw material, electricity, fuel, water,
+        + Y1 interest (term loan + working capital).  Variable cost = raw material, electricity, fuel, water,
         transportation, packaging (Y1 basis).  Contribution margin = (revenue − variable
         cost) / revenue.  Break-even sales = fixed cost / contribution margin.
       </p>
@@ -1014,6 +1010,13 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {% endcomment %}
   <div class="page-break"></div>
   <h2 id="sec-assumptions">Key Assumptions Used</h2>
+  {% if finance_validation_notes %}
+  <div class="estimated-note">
+    {% for note in finance_validation_notes %}
+    <p style="margin: 1mm 0;"><strong>Note:</strong> {{ note }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
   <p style="font-size: 9pt; margin-bottom: 3mm;">
     {% if preview_mode %}
       The following values are <strong>KAU DPR platform defaults</strong> — not entered by

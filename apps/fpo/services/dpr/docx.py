@@ -120,26 +120,23 @@ def _fmt_inr_table(amount: Optional[Decimal]) -> str:
     (32,812.5 → 32,813, not 32,812 as Python's default ROUND_HALF_EVEN
     produces). Matches typical banking + schedule convention.
     """
-    if amount is None:
-        return '—'
-    from decimal import ROUND_HALF_UP
-    rounded = int(amount.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-    if rounded == 0:
-        return '0'
-    s = _indian_group(str(abs(rounded)))
-    return f'({s})' if rounded < 0 else s
+    # Word↔PDF parity audit 2026-10-08: delegate to the PDF's `money`
+    # filter so the two formats can never drift again — paise shown when a
+    # fraction exists (half-up, carry into rupees), dropped when .00.
+    # The old whole-rupee rounding made every money cell differ from the
+    # PDF ("Word and PDF of the same version identical" — tester P3).
+    from apps.fpo.templatetags.dpr_filters import money as _pdf_money
+    return _pdf_money(amount)
 
 
 def _fmt_pct(v, suffix: str = '%') -> str:
-    """Percentage renderer that strips trailing .00 — `Decimal('68.00')` →
-    `68%` (WP-11)."""
+    """Percentage renderer — parity audit 2026-10-08: delegates to the
+    PDF's `money` filter so `10.50` prints `10.50%` in BOTH formats
+    (previously Word stripped trailing zeros → `10.5%`)."""
     if v is None:
         return '—'
-    s = str(v)
-    # Strip trailing zeros after the decimal point, then a dangling dot.
-    if '.' in s:
-        s = s.rstrip('0').rstrip('.')
-    return f'{s}{suffix}'
+    from apps.fpo.templatetags.dpr_filters import money as _pdf_money
+    return f'{_pdf_money(v)}{suffix}'
 
 
 def _fmt_num(v, suffix: str = '') -> str:
@@ -901,12 +898,15 @@ def _render_project_at_a_glance(doc, project, r: CalculationResult) -> None:
     else:
         period_bits.append('Implementation period: —')
     if r.risk_assessment:
-        period_bits.append(f'Overall project risk: {r.risk_assessment.overall_class.capitalize()}')
+        _RISK_FOOT = {'low': 'Low', 'moderate': 'Moderate', 'high': 'High',
+                      'not_assessed': 'Not assessed'}
+        period_bits.append(f'Overall project risk: '
+                           f'{_RISK_FOOT.get(r.risk_assessment.overall_class, r.risk_assessment.overall_class)}')
     if r.variance:
         if r.variance.exceeds_threshold:
-            period_bits.append(f'Cost/MoF variance {r.variance.pct}% exceeds threshold')
+            period_bits.append(f'Cost/MoF variance {_fmt_pct(r.variance.pct)} exceeds threshold')
         elif r.variance.delta != 0:
-            period_bits.append(f'Cost/MoF variance {r.variance.pct}%')
+            period_bits.append(f'Cost/MoF variance {_fmt_pct(r.variance.pct)}')
         else:
             period_bits.append('Cost/MoF balanced ✓')
 
@@ -1240,21 +1240,23 @@ def _rows_from_balance_sheet(r: CalculationResult) -> list[dict]:
         ('Land', 'land'),
         ('CWIP', 'cwip'),
         ('Gross fixed assets', 'gross_fixed_assets'),
-        ('Accumulated depreciation', 'accumulated_depreciation'),
+        ('Less: Accum. depreciation', 'accumulated_depreciation'),
         ('Net fixed assets', 'net_fixed_assets'),
         ('Working capital', 'working_capital'),
         ('Cash & bank', 'cash_and_bank'),
-        ('Total assets', 'total_assets'),
+        ('Total Assets', 'total_assets'),
         ('Promoter equity', 'promoter_equity'),
-        ('Capital reserve', 'capital_reserve'),
+        ('Capital reserve (subsidy)', 'capital_reserve'),
         ('Retained earnings', 'retained_earnings'),
-        ('Total equity', 'total_equity'),
+        ('Total Equity', 'total_equity'),
         ('Term loan outstanding', 'term_loan_outstanding'),
         ('WC loan outstanding', 'wc_loan_outstanding'),
         ('WC gap — short-term borrowings (to be arranged)', 'wc_shortfall_borrowings'),
         ('Other liabilities', 'other_liabilities'),
-        ('Total liabilities', 'total_liabilities'),
-        ('Total equity & liabilities', 'total_equity_and_liabilities'),
+        ('Total Liabilities', 'total_liabilities'),
+        ('Total Equity + Liabilities', 'total_equity_and_liabilities'),
+        # Parity audit 2026-10-08: PDF shows the A = E + L check row.
+        ('Invariant check (A \u2212 E\u2212L)', 'invariant_delta'),
     ]
     out: list[dict] = []
     for label, attr in fields:
@@ -1309,13 +1311,8 @@ def _add_loan_repayment_table(doc, rows: list[dict]) -> None:
             cells[j].text = _fmt_inr_table(row.get(k))
 
 
-_WC_BASIS_DISPLAY_DOCX = {
-    'seasonal_peak':   'Seasonal peak amount (KAU §2.4 C3 — overrides operating-cycle)',
-    'operating_cycle': 'Operating-cycle method (KAU §2.4)',
-    'operating_cycle_higher_than_peak': 'Operating-cycle method (entered seasonal peak was lower — peak is a floor, not a cap)',
-    'margin_only':     'Fallback: WC margin on cost of project',
-    'none':            'Not computed — days/costs not entered',
-}
+# Parity audit 2026-10-08: single shared map with the PDF filter.
+from apps.fpo.templatetags.dpr_filters import WC_BASIS_LABELS as _WC_BASIS_DISPLAY_DOCX
 
 
 def _render_working_capital_statement(doc, r: CalculationResult) -> None:
@@ -1369,12 +1366,12 @@ def _render_working_capital_statement(doc, r: CalculationResult) -> None:
     ))
     if wc.funding_gap > 0:
         rows.append((
-            f'SHORTFALL vs requirement ({wc.funding_gap_pct_of_requirement}%)',
+            f'SHORTFALL vs requirement ({_fmt_pct(wc.funding_gap_pct_of_requirement)})',
             _fmt_inr_table(wc.funding_gap), True,
         ))
     if getattr(wc, 'wc_interest_annual', None):
         rows.append((
-            f'Interest on WC borrowings @ {wc.wc_interest_rate_pct}% p.a. (charged in P&L)',
+            f'Interest on WC borrowings @ {_fmt_pct(wc.wc_interest_rate_pct)} p.a. (charged in P&L)',
             f'{_fmt_inr_table(wc.wc_interest_annual)} / year', False,
         ))
 
@@ -1429,39 +1426,92 @@ def _render_ratios(doc, r: CalculationResult) -> None:
     dscr_avg = getattr(ratios, 'dscr_avg', None)
     discount_rate = getattr(ratios, 'discount_rate_pct', None)
 
+    # Parity audit 2026-10-08: formats, fallbacks and row set now mirror
+    # report.html §10 — None values keep their row with the PDF's fallback
+    # wording instead of being dropped by _add_two_col_table.
     def _fmt_years(v):
-        if v is None:
-            return '—'
-        s = str(v).rstrip('0').rstrip('.')
-        return f'{s} years'
+        return f'{_fmt_inr_table(v)} years' if v is not None else '—'
 
     def _fmt_dscr(v):
-        if v is None:
-            return '—'
-        return f'{v}x'
+        return f'{_fmt_inr_table(v)}x' if v else 'n/a (no debt)'
 
     rows = [
-        ('NPV' + (f' (@ {_fmt_pct(discount_rate)})' if discount_rate is not None else ''),
+        (f'Net Present Value @ {_fmt_pct(discount_rate)} discount rate'
+            if discount_rate is not None else 'Net Present Value',
             _fmt_inr_table(npv)),
-        ('IRR', _fmt_pct(irr)),
-        ('Payback period', _fmt_years(payback)),
-        ('Break-even year', f'Y{break_even_year}' if break_even_year else '—'),
+        ('Internal Rate of Return (IRR)',
+            _fmt_pct(irr) if irr else 'Not determined — see note below'),
+        ('Payback period', _fmt_years(payback) if payback else 'n/a'),
+        ('Break-even year (cumulative PAT \u2265 0)',
+            f'Year {break_even_year}' if break_even_year else 'Not reached in projection'),
         ('Minimum DSCR', _fmt_dscr(dscr_min)),
         ('Average DSCR', _fmt_dscr(dscr_avg)),
     ]
     _add_two_col_table(doc, rows)
 
-    # Operating break-even sub-table (matches report.html §10 operating-BE panel)
+    # Sanity warnings box (PDF parity — previously Word omitted it).
+    for w in (getattr(r, 'sanity_warnings', None) or []):
+        _add_para(doc, f'\u26a0 {w}', size=8, italic=True)
+
+    # IRR note (PDF parity).
+    if not irr:
+        _add_para(
+            doc,
+            'Note on IRR: IRR could not be determined for the given cash-flow '
+            'pattern. This typically occurs when (a) all projected cash flows '
+            'are of the same sign (no sign change), or (b) the pattern admits '
+            'multiple IRR solutions (non-conventional cash flows). In such '
+            f'cases NPV at the {_fmt_pct(discount_rate)} discount rate is the '
+            'primary appraisal metric.',
+            size=8, italic=True,
+        )
+
+    # Operating break-even sub-table — full 5-row PDF layout.
     be_sales = getattr(ratios, 'break_even_sales_inr', None)
     be_util = getattr(ratios, 'break_even_capacity_utilisation_pct', None)
     contribution = getattr(ratios, 'break_even_contribution_margin_pct', None)
-    if any(v is not None for v in (be_sales, be_util, contribution)):
-        _add_para(doc, 'Operating break-even (Y1 basis)', bold=True, size=11)
+    be_fixed = getattr(ratios, 'break_even_fixed_cost_inr', None)
+    be_variable = getattr(ratios, 'break_even_variable_cost_inr', None)
+    if be_fixed is not None:
+        _add_para(doc, 'Operating Break-even (Y1 basis)', bold=True, size=11)
         _add_two_col_table(doc, [
-            ('Break-even sales', _fmt_inr_table(be_sales)),
-            ('Break-even capacity utilisation', _fmt_pct(be_util)),
-            ('Contribution margin', _fmt_pct(contribution)),
+            ('Fixed cost (Y1)', _fmt_inr_table(be_fixed)),
+            ('Variable cost (Y1)', _fmt_inr_table(be_variable)),
+            ('Contribution margin',
+                _fmt_pct(contribution) if contribution else 'n/a (variable cost \u2265 revenue)'),
+            ('Break-even sales',
+                _fmt_inr_table(be_sales) if be_sales else 'Not attainable'),
+            ('Break-even capacity utilisation',
+                f'{_fmt_pct(be_util)} of Y1 sales' if be_util else 'Not attainable'),
         ])
+        _add_para(
+            doc,
+            'Fixed cost = salaries, repairs & maintenance, insurance, admin, '
+            'marketing, communication, professional charges, misc + Y1 '
+            'depreciation + Y1 interest (term loan + working capital). '
+            'Variable cost = raw material, electricity, fuel, water, '
+            'transportation, packaging (Y1 basis). Contribution margin = '
+            '(revenue \u2212 variable cost) / revenue. Break-even sales = '
+            'fixed cost / contribution margin.',
+            size=8, italic=True,
+        )
+
+    # DSCR by Year table (PDF parity — previously Word omitted it).
+    dscr_rows = getattr(ratios, 'dscr_rows', None) or []
+    if dscr_min and dscr_rows:
+        _add_para(doc, 'DSCR by Year', bold=True, size=11)
+        tbl = doc.add_table(rows=len(dscr_rows) + 1, cols=4)
+        tbl.style = 'Light Grid Accent 1'
+        hdr = tbl.rows[0].cells
+        for j, h in enumerate(['Year', 'Cash available', 'Debt service', 'DSCR']):
+            hdr[j].text = h
+        _style_header_row_navy(tbl)
+        for i, dr in enumerate(dscr_rows, start=1):
+            cells = tbl.rows[i].cells
+            cells[0].text = f'Y{dr.year}'
+            cells[1].text = _fmt_inr_table(dr.numerator)
+            cells[2].text = _fmt_inr_table(dr.denominator)
+            cells[3].text = f'{_fmt_inr_table(dr.dscr)}x' if dr.dscr is not None else '—'
 
 
 def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
@@ -1474,7 +1524,7 @@ def _render_depreciation_schedule(doc, r: CalculationResult) -> None:
     dep = r.depreciation
     if not dep or not dep.classes:
         return
-    _add_heading(doc, '5. Depreciation Schedule (SLM)', level=1, bookmark='sec_5')
+    _add_heading(doc, '5. Depreciation Schedule (SLM, ₹)', level=1, bookmark='sec_5')
     _add_para(
         doc,
         'Straight-Line Method (SLM) at the rates configured for the KAU DPR '
@@ -1527,7 +1577,7 @@ def _render_capital_schedule(doc, r: CalculationResult) -> None:
     sched = getattr(r, 'capital_schedule', None)
     if not sched or not getattr(sched, 'rows', None):
         return
-    _add_heading(doc, '4. Capital Investment Schedule (Implementation Period)', level=1, bookmark='sec_4')
+    _add_heading(doc, '4. Capital Investment Schedule (Implementation Period, ₹)', level=1, bookmark='sec_4')
     _add_para(
         doc,
         getattr(sched, 'distribution_note', '') or (
@@ -1536,7 +1586,7 @@ def _render_capital_schedule(doc, r: CalculationResult) -> None:
         ),
         italic=True,
     )
-    header = ['Month', 'Cost incurred', 'MoF received', 'Cum cost', 'Cum MoF', 'Unfunded']
+    header = ['Month', 'Cost incurred', 'Funds received', 'Cumulative cost', 'Cumulative funds', 'Unfunded balance']
     table = doc.add_table(rows=len(sched.rows) + 1, cols=len(header))
     table.style = 'Light Grid Accent 1'
     for i, h in enumerate(header):
@@ -1554,7 +1604,10 @@ def _render_capital_schedule(doc, r: CalculationResult) -> None:
         cells[2].text = _fmt_inr_table(getattr(row, 'mof_received', None))
         cells[3].text = _fmt_inr_table(getattr(row, 'cumulative_cost', None))
         cells[4].text = _fmt_inr_table(getattr(row, 'cumulative_mof', None))
-        cells[5].text = _fmt_inr_table(getattr(row, 'unfunded', None))
+        # Parity audit 2026-10-08: field is `unfunded_balance` — the old
+        # getattr(row, 'unfunded') never existed, so the column was
+        # permanently '—' in every Word export.
+        cells[5].text = _fmt_inr_table(row.unfunded_balance)
     _fix_table_width_to_text_frame(table)
 
 
@@ -1693,12 +1746,12 @@ def _render_toc(doc, project, ai: dict, has_products: bool,
         ('2. Fixed Capital Investment', 'sec_2'),
         ('3. Means of Finance', 'sec_3'),
         ('4. Capital Investment Schedule', 'sec_4'),
-        ('5. Depreciation Schedule (SLM)', 'sec_5'),
+        ('5. Depreciation Schedule (SLM, ₹)', 'sec_5'),
         ('6. Loan Repayment Schedule', 'sec_6'),
         ('6B. Working Capital Statement (KAU §2.4)', 'sec_6b'),
-        ('7. Projected Profit & Loss', 'sec_7'),
-        ('8. Projected Cash Flow', 'sec_8'),
-        ('9. Projected Balance Sheet', 'sec_9'),
+        ('7. Projected Profit & Loss (₹)', 'sec_7'),
+        ('8. Projected Cash Flow (₹)', 'sec_8'),
+        ('9. Projected Balance Sheet (₹)', 'sec_9'),
         ('10. Financial Appraisal', 'sec_10'),
         ('11. Risk Assessment', 'sec_11'),
     ]
@@ -1826,10 +1879,14 @@ def _render_key_assumptions(doc, project=None) -> None:
     if not rows:
         return
     _add_heading(doc, 'Key Assumptions Used', level=1, bookmark='sec_assumptions')
+    # Parity 2026-10-08: same finance validation notes as the PDF.
+    from .pdf import _finance_validation_notes as _fin_notes
+    for _note in _fin_notes(project):
+        _add_para(doc, f'Note: {_note}', size=8, italic=True)
     table = doc.add_table(rows=len(rows) + 1, cols=3)
     table.style = 'Light Grid Accent 1'
     hdr = table.rows[0].cells
-    for i, label in enumerate(['Parameter', 'Value', 'Source']):
+    for i, label in enumerate(['Assumption', 'Value', 'Source']):
         hdr[i].text = label
         for para in hdr[i].paragraphs:
             for run in para.runs:
@@ -1896,9 +1953,13 @@ def _configure_page_setup(doc, fpo_name: str, project_title: str,
 
     # Running footer — centred version + "Page X of Y" using fields that
     # Word fills on open / F9 refresh.
+    # Parity audit 2026-10-08: the PDF footer carries the generated-at
+    # timestamp and the KAU attribution line; the Word footer had neither.
     footer_para = section.footer.paragraphs[0]
     footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    fpref = footer_para.add_run(f'DPR {version_label}   ·   Page ')
+    _gen_at = datetime.now().strftime('%d %b %Y · %I:%M %p')
+    fpref = footer_para.add_run(
+        f'DPR {version_label}   ·   Generated {_gen_at}   ·   Page ')
     fpref.font.size = Pt(9)
     fpref.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
     # PAGE field
@@ -1920,6 +1981,13 @@ def _configure_page_setup(doc, fpo_name: str, project_title: str,
     num_run._r.append(nb); num_run._r.append(ni); num_run._r.append(ne)
     num_run.font.size = Pt(9)
     num_run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+    # Attribution line (PDF footer centre) — parity audit 2026-10-08.
+    attr_para = section.footer.add_paragraph()
+    attr_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    attr_run = attr_para.add_run(
+        'Prepared using the Kerala Agricultural University DPR platform')
+    attr_run.font.size = Pt(8)
+    attr_run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
 
 
 def _resolve_version_label(project, version_number: Optional[int]) -> str:
@@ -1973,7 +2041,7 @@ def render_docx_for_project(
 
     version_label = _resolve_version_label(project, version_number)
     fpo_name = project.fpo.name if project.fpo_id else '—'
-    _configure_page_setup(doc, fpo_name, project.title or '(untitled)',
+    _configure_page_setup(doc, fpo_name, project.title or 'Untitled Project',
                           version_label)
     generated_at = datetime.now().strftime('%d %b %Y · %I:%M %p')
     _render_cover(doc, project, version_label, generated_at,
@@ -2069,16 +2137,16 @@ def render_docx_for_project(
     _render_working_capital_statement(doc, result)
     # §7 P&L (+ chart)
     if result.profit_loss:
-        _add_heading(doc, '7. Projected Profit & Loss', level=1, bookmark='sec_7')
+        _add_heading(doc, '7. Projected Profit & Loss (₹)', level=1, bookmark='sec_7')
         _embed_data_url_chart(doc, pnl_trend_bar(result.profit_loss.rows))
         _add_multi_year_table(doc, '', _rows_from_pl(result), heading_level=2)
     # §8 Cash Flow
     if result.cash_flow and getattr(result.cash_flow, 'rows', None):
-        _add_heading(doc, '8. Projected Cash Flow', level=1, bookmark='sec_8')
+        _add_heading(doc, '8. Projected Cash Flow (₹)', level=1, bookmark='sec_8')
         _add_multi_year_table(doc, '', _rows_from_cashflow(result), heading_level=2)
     # §9 Balance Sheet
     if result.balance_sheet and getattr(result.balance_sheet, 'rows', None):
-        _add_heading(doc, '9. Projected Balance Sheet', level=1, bookmark='sec_9')
+        _add_heading(doc, '9. Projected Balance Sheet (₹)', level=1, bookmark='sec_9')
         _add_multi_year_table(doc, '', _rows_from_balance_sheet(result), heading_level=2)
     # WP-10 round-4: close the landscape block so §10+ reverts to portrait.
     _end_landscape_section(doc)

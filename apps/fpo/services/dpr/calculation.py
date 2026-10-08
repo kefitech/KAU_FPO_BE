@@ -2553,7 +2553,7 @@ def _pull_risks_from_other_sections(project) -> list[AutoPulledRisk]:
     if rm_section:
         for r in DPRRawMaterialRisk.objects.filter(section=rm_section):
             code = r.risk_type
-            label = _rm_labels.get(code, code) if code != 'other' else (r.risk_type_other or 'Other')
+            label = _rm_labels.get(code, code.replace('_', ' ').title()) if code != 'other' else (r.risk_type_other or 'Other')
             out.append(AutoPulledRisk(
                 source='raw_material',
                 source_label='Raw Material',
@@ -2570,7 +2570,7 @@ def _pull_risks_from_other_sections(project) -> list[AutoPulledRisk]:
     if mk_section:
         for r in DPRMarketingRisk.objects.filter(section=mk_section):
             code = r.risk_type
-            label = _mk_labels.get(code, code) if code != 'other' else (r.risk_type_other or 'Other')
+            label = _mk_labels.get(code, code.replace('_', ' ').title()) if code != 'other' else (r.risk_type_other or 'Other')
             out.append(AutoPulledRisk(
                 source='market',
                 source_label='Market',
@@ -2590,7 +2590,7 @@ def _pull_risks_from_other_sections(project) -> list[AutoPulledRisk]:
         for tech in tech_section.technologies.all():
             for r in DPRTechnologyRisk.objects.filter(technology=tech):
                 code = r.risk_type
-                label = _tech_labels.get(code, code) if code != 'other' else (r.risk_type_other or 'Other')
+                label = _tech_labels.get(code, code.replace('_', ' ').title()) if code != 'other' else (r.risk_type_other or 'Other')
                 out.append(AutoPulledRisk(
                     source='technology',
                     source_label='Technology',
@@ -2607,7 +2607,7 @@ def _pull_risks_from_other_sections(project) -> list[AutoPulledRisk]:
     ess_section = getattr(project, 'section_ess', None)
     if ess_section:
         for r in DPRClimateRiskSelection.objects.filter(section=ess_section).select_related('risk'):
-            label = getattr(r.risk, 'name', None) or getattr(r.risk, 'code', 'Climate risk')
+            label = getattr(r.risk, 'name', None) or getattr(r.risk, 'code', 'climate risk').replace('_', ' ').title()
             if r.risk_other:
                 label = r.risk_other
             out.append(AutoPulledRisk(

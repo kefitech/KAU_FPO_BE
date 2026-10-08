@@ -374,6 +374,24 @@ class DPRValidationError(Exception):
         self.errors = errors
 
 
+def _finance_validation_notes(project) -> list[str]:
+    """Tester P3 (2026-10-08): selected Finance-section validator warnings
+    that a BANK reviewer should see in the document itself, not only in
+    the wizard UI. Currently: the contingency-below-floor warning. Returns
+    plain message strings; empty list = no note rendered."""
+    _PDF_VISIBLE_CODES = {'contingency_below_tolerance'}
+    try:
+        fin = getattr(project, 'section_finance', None)
+        if fin is None:
+            return []
+        from .finance_validators import validate_section
+        result = validate_section(fin)
+        return [w['message'] for w in result.get('warnings', [])
+                if w.get('code') in _PDF_VISIBLE_CODES]
+    except Exception:  # noqa: BLE001 — a validator hiccup must never break rendering
+        return []
+
+
 def _pre_final_validation(project) -> list[dict]:
     """KAU 2026-09-19 P6.5 + Kefitech P6.6 — hard gate before final PDF render.
 
@@ -620,6 +638,10 @@ def render_html_for_project(
         # before the Limitations chapter so bank / KAU reviewer can see
         # which figures are platform defaults vs project-specific.
         'key_assumptions_rows': _key_assumptions_rows(project),
+        # Tester P3 (2026-10-08): the contingency-below-floor warning was
+        # UI-only — a banker reading the PDF never saw it. Surfaced as an
+        # amber note above the Key Assumptions table.
+        'finance_validation_notes': _finance_validation_notes(project),
         # Per-technology process flowcharts. Empty list = section omitted.
         'technologies_with_flow': _technologies_with_flow(project),
         # Product list + cover hero image (first product with a photo).

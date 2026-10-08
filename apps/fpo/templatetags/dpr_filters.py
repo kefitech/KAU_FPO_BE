@@ -5,7 +5,7 @@ Registered as {% load dpr_filters %} in `apps/fpo/templates/dpr/report.html`.
 
 Author: Athul Gopan (Kefi Tech Solutions)
 """
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django import template
 
@@ -30,25 +30,17 @@ def money(value) -> str:
         return str(value)
     neg = d < 0
     d = abs(d)
-    # Split integer + fractional.
+    # Word↔PDF parity audit 2026-10-08: quantize FIRST (half-up) so the
+    # carry propagates into the rupees — previously 1,234.996 printed as
+    # '1,234' because the fraction was formatted separately and the carry
+    # was dropped. ROUND_HALF_UP matches the DOCX renderer exactly.
+    d = d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     int_part = int(d)
-    frac = d - int_part
+    frac_str = f'{d - int_part:.2f}'.split('.')[1]
     int_str = _indian_grouping(int_part)
-    if frac > 0:
-        # BUG-30 minor (KAU §6 retest): the money filter used to strip the
-        # trailing zero in a '.N0' fraction, so values like 49,76,702.30
-        # rendered as '49,76,702.3'. Single-decimal currency reads as
-        # incomplete to a bank reviewer. Always show 2 decimals when any
-        # fractional exists; drop the whole fraction only when it rounds
-        # to zero at 2 dp (meaning the sub-rupee noise is below the
-        # banker-visible resolution).
-        frac_str = f'{frac:.2f}'.split('.')[1]
-        if frac_str == '00':
-            out = int_str
-        else:
-            out = f'{int_str}.{frac_str}'
-    else:
-        out = int_str
+    # BUG-30 minor (KAU §6 retest): always show 2 decimals when any
+    # fraction exists; drop the fraction only when it is exactly .00.
+    out = int_str if frac_str == '00' else f'{int_str}.{frac_str}'
     return f'({out})' if neg else out
 
 
@@ -211,3 +203,20 @@ def disclosed_or_default(value) -> str:
     """
     from apps.fpo.services.dpr.enum_display import display_or_undisclosed
     return display_or_undisclosed(value)
+
+
+# Parity audit 2026-10-08: the PDF §6B printed the raw basis enum
+# (`seasonal_peak`) while the Word export mapped it. Single shared map —
+# docx.py imports this same dict so the two can't drift.
+WC_BASIS_LABELS = {
+    'seasonal_peak':   'Seasonal peak amount (KAU §2.4 C3 — overrides operating-cycle)',
+    'operating_cycle': 'Operating-cycle method (KAU §2.4)',
+    'operating_cycle_higher_than_peak': 'Operating-cycle method (entered seasonal peak was lower — peak is a floor, not a cap)',
+    'margin_only':     'Fallback: WC margin on cost of project',
+    'none':            'Not computed — days/costs not entered',
+}
+
+
+@register.filter
+def wc_basis_label(value) -> str:
+    return WC_BASIS_LABELS.get(str(value or ''), str(value or '—'))
