@@ -9,12 +9,13 @@ POST  /api/admin/schemes/{id}/deactivate/
 
 import re
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
-from django.db.models import Q
+from django.db.models import Case, CharField, F, IntegerField, Q, Value, When
+from django.db.models.functions import Lower
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
@@ -43,6 +44,51 @@ def _can_edit_this_scheme(user, scheme):
     if _is_super_admin(user):
         return True
     return _can_manage_schemes(user) and scheme.created_by_id == user.id
+
+
+# ?ordering=<column id> ('-' prefix for descending) → sort expressions. Keys are the
+# list table's column ids; text sorts ignore case, Category sorts by its label and
+# Status puts Active first. Schemes with no creator stay last either way.
+_ORDERING = {
+    'name_en':            [Lower('name_en')],
+    'administering_body': [Lower('administering_body')],
+    'category_display':   [Case(
+        *[When(category=value, then=Value(label)) for value, label in SchemeCategory.choices],
+        default=F('category'),
+        output_field=CharField(),
+    )],
+    'created_by_name':    [Lower('created_by__first_name'), Lower('created_by__last_name'), Lower('created_by__email')],
+    'is_active':          [Case(When(is_active=True, then=Value(0)), default=Value(1), output_field=IntegerField())],
+}
+
+
+def _apply_ordering(qs, ordering):
+    """Unknown or blank ordering keeps the default display order."""
+    exprs = _ORDERING.get(ordering.lstrip('-'))
+    if not exprs:
+        return qs
+    desc = ordering.startswith('-')
+    return qs.order_by(
+        *[e.desc(nulls_last=True) if desc else e.asc(nulls_last=True) for e in exprs],
+        'order', 'name_en', 'id',
+    )
+
+
+def _search(qs, text):
+    """Every word must match a column the table shows — name (either language),
+    administering body, category label or creator — in any order."""
+    for term in text.split():
+        categories = [value for value, label in SchemeCategory.choices if term.lower() in label.lower()]
+        qs = qs.filter(
+            Q(name_en__icontains=term) |
+            Q(name_ml__icontains=term) |
+            Q(administering_body__icontains=term) |
+            Q(category__in=categories) |
+            Q(created_by__first_name__icontains=term) |
+            Q(created_by__last_name__icontains=term) |
+            Q(created_by__email__icontains=term)
+        )
+    return qs
 
 
 class SchemeSerializer(serializers.ModelSerializer):
@@ -148,6 +194,15 @@ class SchemeListView(APIView):
     @extend_schema(
         tags=['Admin - Schemes'],
         summary='List all schemes',
+        parameters=[
+            OpenApiParameter('search', str, required=False,
+                             description='Words matched against name, administering body, category and creator.'),
+            OpenApiParameter('category', str, required=False, description='Category code, e.g. "credit".'),
+            OpenApiParameter('is_active', str, required=False, description='"true" or "false".'),
+            OpenApiParameter('ordering', str, required=False,
+                             description='name_en, administering_body, category_display, created_by_name or '
+                                         'is_active; prefix "-" for descending.'),
+        ],
         responses={200: SchemeSerializer(many=True)},
     )
     def get(self, request):
@@ -155,23 +210,18 @@ class SchemeListView(APIView):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
         qs = Scheme.objects.filter(is_deleted=False).select_related('created_by').order_by('order', 'name_en')
-
-        search = request.query_params.get('search')
-        if search:
-            qs = qs.filter(
-                Q(name_en__icontains=search) |
-                Q(name_ml__icontains=search) |
-                Q(administering_body__icontains=search) |
-                Q(objective__icontains=search)
-            )
+        qs = _search(qs, request.query_params.get('search') or '')
 
         category = request.query_params.get('category')
         if category:
             qs = qs.filter(category=category)
 
-        is_active = request.query_params.get('is_active')
-        if is_active is not None:
-            qs = qs.filter(is_active=is_active.lower() == 'true')
+        # Anything other than true/false is ignored rather than read as "inactive"
+        is_active = (request.query_params.get('is_active') or '').strip().lower()
+        if is_active in ('true', 'false'):
+            qs = qs.filter(is_active=is_active == 'true')
+
+        qs = _apply_ordering(qs, (request.query_params.get('ordering') or '').strip())
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
