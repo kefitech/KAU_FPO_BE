@@ -749,6 +749,20 @@ class ProfileUpdateView(APIView):
         if profile_fields_changed:
             profile.save(update_fields=profile_fields_changed)
 
+        # External buyers: keep their BuyerDirectory row (Admin > Buyer Directory)
+        # in sync with the personal name/phone edited here.
+        buyer_row = getattr(user, 'buyer_profile', None)
+        if buyer_row is not None:
+            buyer_fields = []
+            if user_fields_changed:
+                buyer_row.name = f"{user.first_name} {user.last_name}".strip()
+                buyer_fields.append('name')
+            if 'phone' in changes:
+                buyer_row.contact_phone = profile.phone
+                buyer_fields.append('contact_phone')
+            if buyer_fields:
+                buyer_row.save(update_fields=buyer_fields)
+
         if changes:
             from apps.core.services.audit import AuditService
             AuditService.log_update(user=user, instance=profile, changes=changes, request=request)
