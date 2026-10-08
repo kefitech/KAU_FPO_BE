@@ -12,6 +12,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 
 from apps.core.permissions.rbac import IsFPOManager
+from apps.core.services.phone_verification import PHONE_OTP_REQUIRED_MESSAGE, consume_phone_token
 from apps.core.services.translation import t
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.validators import validate_indian_phone
@@ -22,6 +23,7 @@ class _ProfileSerializer(serializers.Serializer):
     first_name         = serializers.CharField(max_length=150, required=False)
     last_name          = serializers.CharField(max_length=150, required=False, allow_blank=True)
     phone              = serializers.CharField(max_length=20,  required=False, allow_blank=True)
+    phone_token        = serializers.CharField(required=False, write_only=True)
     preferred_language = serializers.CharField(max_length=10,  required=False)
 
     def validate_phone(self, value):
@@ -84,6 +86,14 @@ class FPOProfileView(APIView):
 
         data    = serializer.validated_data
         profile, _ = UserProfile.objects.get_or_create(user=user)
+
+        # A new phone number is saved only after OTP verification of that number
+        if data.get('phone') and data['phone'] != profile.phone:
+            if not consume_phone_token(data.get('phone_token'), data['phone']):
+                return StandardResponse.validation_error(
+                    errors={'phone': [PHONE_OTP_REQUIRED_MESSAGE]},
+                    message=PHONE_OTP_REQUIRED_MESSAGE,
+                )
 
         user_fields    = []
         profile_fields = []
