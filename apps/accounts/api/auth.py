@@ -34,6 +34,7 @@ from apps.core.utils.throttles import (
 )
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
+from apps.core.services.phone_verification import PHONE_OTP_REQUIRED_MESSAGE, consume_phone_token
 from apps.core.utils.cookies import set_jwt_cookies, clear_jwt_cookies, get_refresh_token_from_cookie
 from apps.core.models.generic import AuditLog
 from apps.core.utils.pagination import StandardPagination
@@ -706,7 +707,7 @@ class ProfileUpdateView(APIView):
         request=ProfileUpdateSerializer,
         responses={200: OpenApiResponse(description="Profile updated")},
         summary="Update user profile",
-        description="Update first name, last name, phone, and/or preferred language for the current user. Send only the fields you want to change.",
+        description="Update first name, last name, phone, and/or preferred language for the current user. Send only the fields you want to change. A new phone number also needs `phone_token` from OTP verification of that number.",
         tags=["Authentication"]
     )
     def patch(self, request, *args, **kwargs):
@@ -718,6 +719,14 @@ class ProfileUpdateView(APIView):
         user    = request.user
         profile, _ = UserProfile.objects.get_or_create(user=user)
         changes = {}
+
+        # A new phone number is saved only after OTP verification of that number
+        if data.get('phone') and data['phone'] != profile.phone:
+            if not consume_phone_token(data.get('phone_token'), data['phone']):
+                return StandardResponse.validation_error(
+                    errors={'phone': [PHONE_OTP_REQUIRED_MESSAGE]},
+                    message=PHONE_OTP_REQUIRED_MESSAGE,
+                )
 
         # User model fields
         user_fields_changed = []

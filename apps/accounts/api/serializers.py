@@ -455,6 +455,7 @@ class ProfileUpdateSerializer(serializers.Serializer):
     first_name         = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text="User's first name")
     last_name          = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text="User's last name")
     phone              = serializers.CharField(max_length=15, required=False, allow_blank=True, help_text="Indian phone number (10 digits)")
+    phone_token        = serializers.CharField(required=False, write_only=True, help_text="Required when changing phone: one-time token from POST /api/fpo/pre-register/verify-otp/ for the new number")
     preferred_language = serializers.CharField(max_length=10, required=False, help_text="Language code e.g. en, ml")
 
     def validate_first_name(self, value):
