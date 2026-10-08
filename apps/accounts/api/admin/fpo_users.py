@@ -29,7 +29,7 @@ from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.validators import validate_password_strength
-from apps.core.permissions.fpo_scope import scope_fpo_queryset
+from apps.core.permissions.fpo_scope import can_manage_fpo, scope_fpo_queryset
 from apps.database.models.fpo import FPO, FPOUserMembership
 from apps.notifications.services import send_notification
 
@@ -117,10 +117,16 @@ class FPOUserListView(APIView):
 
         results = []
 
+        # Read-only listing, so a sub-admin with can_view_all_fpos also sees other districts'
+        # teams (e.g. the Team tab of an FPO they can only view). Activate / deactivate /
+        # reset-password still resolve users within their own district only — `can_manage`
+        # tells the UI which rows those actions work on.
+        manage_ctx = {'request': request}
+
         # --- Primary users (from FPO.primary_user) ---
         if not role_filter or role_filter == 'primary':
             fpo_qs = scope_fpo_queryset(
-                FPO.objects.filter(is_deleted=False), request.user,
+                FPO.objects.filter(is_deleted=False), request.user, read_only=True,
             ).select_related('primary_user', 'primary_user__profile')
 
             if fpo_id:
@@ -149,12 +155,14 @@ class FPOUserListView(APIView):
                     'is_active':  u.is_active,
                     'joined_at':  fpo.created_at,
                     'last_login': u.last_login,
+                    'can_manage': can_manage_fpo(manage_ctx, fpo),
                 })
 
         # --- Secondary users (from FPOUserMembership) ---
         if not role_filter or role_filter == 'secondary':
             mem_qs = scope_fpo_queryset(
                 FPOUserMembership.objects.filter(is_deleted=False), request.user, fpo_field='fpo',
+                read_only=True,
             ).select_related('user', 'user__profile', 'fpo', 'role')
 
             if fpo_id:
@@ -183,6 +191,7 @@ class FPOUserListView(APIView):
                     'is_active':  mem.is_active,
                     'joined_at':  mem.created_at,
                     'last_login': u.last_login,
+                    'can_manage': can_manage_fpo(manage_ctx, mem.fpo),
                 })
 
         paginator = StandardPagination()

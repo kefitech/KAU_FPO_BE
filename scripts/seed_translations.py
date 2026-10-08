@@ -1038,6 +1038,24 @@ def seed_ui_translations(languages):
         ('sub_admins_table.filter_district',    'All Districts',                            'എല്ലാ ജില്ലകളും'),
         # Dashboard district map subtitle for sub-admins — the map is statewide for them too
         ('admin_dashboard.chart_district_subtitle_statewide', 'FPOs registered in every district of Kerala — hover for details', 'കേരളത്തിലെ എല്ലാ ജില്ലകളിലും രജിസ്റ്റർ ചെയ്ത FPO-കൾ — വിശദാംശങ്ങൾക്ക് ഹോവർ ചെയ്യുക'),
+        # Dashboard district map — super-admin drill-down into a district's blocks
+        ('admin_dashboard.chart_district_subtitle_drilldown', 'FPOs registered per district — click a district to see its blocks', 'ജില്ല തിരിച്ച് രജിസ്റ്റർ ചെയ്ത FPO-കൾ — ബ്ലോക്കുകൾ കാണാൻ ഒരു ജില്ലയിൽ ക്ലിക്ക് ചെയ്യുക'),
+        ('admin_dashboard.map_block_hint',      'Hover a block for its FPO count, click it to list its FPOs', 'FPO എണ്ണത്തിന് ബ്ലോക്കിൽ ഹോവർ ചെയ്യുക, FPO-കളുടെ പട്ടികയ്ക്ക് ക്ലിക്ക് ചെയ്യുക'),
+        ('admin_dashboard.map_back_to_kerala',  'Back to Kerala',                           'കേരളത്തിലേക്ക് മടങ്ങുക'),
+        # Sub-admins open only their assigned district, from this button on the map
+        ('admin_dashboard.map_view_district',   'View {district}',                          '{district} കാണുക'),
+        ('admin_dashboard.map_legend_block',    'FPOs per block',                           'ബ്ലോക്ക് തിരിച്ച് FPO-കൾ'),
+        ('admin_dashboard.map_legend_none',     'None',                                     'ഇല്ല'),
+        ('admin_dashboard.map_unassigned',      'FPOs without a matching block: {n}',       'ബ്ലോക്ക് പൊരുത്തപ്പെടാത്ത FPO-കൾ: {n}'),
+        ('admin_dashboard.block_fpos_title',    'FPOs in {block} block',                    '{block} ബ്ലോക്കിലെ FPO-കൾ'),
+        ('admin_dashboard.block_fpos_subtitle', '{district} district — click an FPO to open its application', '{district} ജില്ല — അപേക്ഷ തുറക്കാൻ ഒരു FPO-യിൽ ക്ലിക്ക് ചെയ്യുക'),
+        ('admin_dashboard.block_fpos_empty',    'No FPOs registered in this block',         'ഈ ബ്ലോക്കിൽ FPO-കൾ ഒന്നും രജിസ്റ്റർ ചെയ്തിട്ടില്ല'),
+        ('admin_dashboard.block_fpos_showing_first', 'Showing the first {shown} of {total}', 'ആകെ {total}-ൽ ആദ്യത്തെ {shown} എണ്ണം കാണിക്കുന്നു'),
+        ('admin_dashboard.block_fpos_col_fpo',  'FPO',                                      'FPO'),
+        ('admin_dashboard.block_fpos_col_status', 'Status',                                 'സ്ഥിതി'),
+        ('admin_dashboard.block_fpos_col_tier', 'Tier',                                     'ടയർ'),
+        ('admin_dashboard.block_fpos_col_members', 'Members',                               'അംഗങ്ങൾ'),
+        ('admin_dashboard.block_fpos_close',    'Close',                                    'അടയ്ക്കുക'),
         # Dashboard status donut — centre label when no section is hovered
         ('admin_dashboard.donut_total',         'Total FPOs',                               'ആകെ FPO-കൾ'),
         # Sub-admin dashboard — assigned district + recent notifications (e.g. new buyer registrations)
@@ -1050,6 +1068,8 @@ def seed_ui_translations(languages):
         ('buyers_table.new_registration',       'New registration',                         'പുതിയ രജിസ്ട്രേഷൻ'),
         # Shown instead of the row menu on CBBOs / officials a sub-admin can only view
         ('cbbos_table.view_only',               'View only',                                'കാണാൻ മാത്രം'),
+        # FPO Users table — users of FPOs a sub-admin sees only via can_view_all_fpos
+        ('fpo_users_table.view_only',           'View only',                                'കാണാൻ മാത്രം'),
         ('government_table.view_only',          'View only',                                'കാണാൻ മാത്രം'),
         # District filter on the CBBO / Government tables (+ its state-wide option, also the scope badge)
         ('cbbos_table.filter_district',         'All Districts',                            'എല്ലാ ജില്ലകളും'),

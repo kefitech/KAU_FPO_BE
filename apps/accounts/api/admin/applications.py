@@ -478,10 +478,11 @@ class ApplicationListView(APIView):
     @extend_schema(
         tags=['Admin - FPO Applications'],
         summary='List FPO applications',
-        description='Paginated list of all FPO applications. Filter by status, district, tier, or search by name/application_id.',
+        description='Paginated list of all FPO applications. Filter by status, district, block, tier, or search by name/application_id.',
         parameters=[
             OpenApiParameter('status',   description='Filter by FPO status (draft/submitted/under_review/approved/rejected/info_required/suspended)', required=False),
             OpenApiParameter('district', description='Filter by district code (e.g. TSR, KLM)', required=False),
+            OpenApiParameter('block',    description="Filter by block code (MasterLookup category='block', e.g. chalakudy)", required=False),
             OpenApiParameter('tier',     description='Filter by tier (A/B/C/D)', required=False),
             OpenApiParameter('search',   description='Search by FPO name or application_id', required=False),
             OpenApiParameter('ordering', description='Order by field (prefix with "-" for descending), e.g. application_id or -updated_at', required=False),
@@ -502,6 +503,7 @@ class ApplicationListView(APIView):
 
         s        = request.query_params.get('status')
         d        = request.query_params.get('district')
+        block    = request.query_params.get('block')
         tier     = request.query_params.get('tier')
         search   = request.query_params.get('search', '').strip()
 
@@ -509,6 +511,8 @@ class ApplicationListView(APIView):
             qs = qs.filter(status=s)
         if d:
             qs = qs.filter(district=d)
+        if block:
+            qs = qs.filter(block_taluk=block)
         if tier:
             qs = qs.filter(tier=tier)
         if search:

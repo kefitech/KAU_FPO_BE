@@ -54,7 +54,7 @@ from .external_apis import (
 
 from .page_access import RolePageAccessListView, RolePageAccessDetailView
 from .audit_logs import AuditLogListView
-from .dashboard import AdminDashboardStatsView
+from .dashboard import AdminDashboardDistrictBlocksView, AdminDashboardStatsView
 from .ownership_claims import (
     OwnershipClaimListView,
     OwnershipClaimDetailView,
@@ -237,6 +237,7 @@ urlpatterns = [
     path('market-linkage/fpos/<int:fpo_id>/products/',                       AdminMarketLinkageFPOProductsView.as_view(), name='admin-market-linkage-fpo-products'),
     # Dashboard
     path('dashboard/stats/',               AdminDashboardStatsView.as_view(),            name='admin-dashboard-stats'),
+    path('dashboard/districts/<str:district>/blocks/', AdminDashboardDistrictBlocksView.as_view(), name='admin-dashboard-district-blocks'),
     # Audit Logs
     path('audit-logs/',                     AuditLogListView.as_view(),                  name='admin-audit-logs'),
     # Ownership Claims
