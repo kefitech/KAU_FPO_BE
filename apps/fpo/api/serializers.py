@@ -463,7 +463,10 @@ class FPOStep4Serializer(serializers.Serializer):
     annual_turnover = serializers.DecimalField(
         max_digits=15, decimal_places=5,
         required=False, allow_null=True,
-        help_text='Annual turnover in INR (optional)'
+        # BUG-02: the registration wizard captures this in LAKHS of rupees
+        # ("Annual Turnover (Lakhs ₹)") — display layers must multiply by
+        # 1,00,000 before showing a rupee figure.
+        help_text='Annual turnover in ₹ LAKHS (e.g. 25 = ₹25,00,000) (optional)'
     )
     bank_name      = serializers.CharField(max_length=100)
     bank_branch    = serializers.CharField(max_length=100)

@@ -346,8 +346,11 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     fpo_annual_turnover = (
         getattr(fpo, 'annual_turnover', None) if fpo else None
     )
+    # BUG-02 (KAU §6): FPO.annual_turnover is stored in ₹ LAKHS (the
+    # registration wizard labels it "Annual Turnover (Lakhs ₹)") but was
+    # printed as raw rupees — "₹ 0.25" for a ₹25,000 turnover. Convert.
     fpo_annual_turnover_display = (
-        _fmt_inr(fpo_annual_turnover)
+        _fmt_inr(fpo_annual_turnover * Decimal('100000'))
         if fpo_annual_turnover else _NOT_PROVIDED
     )
 

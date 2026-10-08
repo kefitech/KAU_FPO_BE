@@ -374,6 +374,29 @@ class DPRValidationError(Exception):
         self.errors = errors
 
 
+def _land_tenure_note(project) -> str:
+    """BUG-28 / tester P3 (2026-10-08): land-tenure line for §2.
+
+    Reads the Location section's land_ownership_types M2M + the Finance
+    section's op_lease_rent. Empty string = no note rendered."""
+    try:
+        loc = getattr(project, 'section_location', None)
+        if loc is None:
+            return ''
+        labels = [getattr(t, 'label_en', t.code) for t in loc.land_ownership_types.all()]
+        if not labels:
+            return ''
+        note = 'Land tenure: ' + ', '.join(labels)
+        fin = getattr(project, 'section_finance', None)
+        rent = getattr(fin, 'op_lease_rent', None) if fin else None
+        if rent:
+            from apps.fpo.templatetags.dpr_filters import money as _money
+            note += f' \u00b7 Annual lease / rent: \u20b9 {_money(rent)} (charged in operating cost)'
+        return note
+    except Exception:  # noqa: BLE001
+        return ''
+
+
 def _finance_validation_notes(project) -> list[str]:
     """Tester P3 (2026-10-08): selected Finance-section validator warnings
     that a BANK reviewer should see in the document itself, not only in
@@ -533,10 +556,33 @@ def _pre_final_validation(project) -> list[dict]:
             ),
         })
 
+    # Tester Priority-4 (2026-10-08): keyboard-mash junk in name fields
+    # ("sdsasd") must not reach a bank-facing PDF. Heuristic gate — the
+    # DISPLAY blocklist stays exact (BUG-24), this only blocks FINAL
+    # generation. Checked: FPO name, facilitating agency, village, CEO.
+    from .enum_display import looks_like_keyboard_mash
+    fpo = project.fpo if project.fpo_id else None
+    _NAME_FIELDS = [
+        ('FPO name', getattr(fpo, 'name', '') if fpo else ''),
+        ('Facilitating agency', getattr(fpo, 'facilitating_agency_name', '') if fpo else ''),
+        ('Village / town', getattr(fpo, 'village_town', '') if fpo else ''),
+        ('CEO name', getattr(project, 'ceo_name', '') or ''),
+    ]
+    for _label, _val in _NAME_FIELDS:
+        if looks_like_keyboard_mash(_val):
+            errors.append({
+                'chapter': 'fpo_profile',
+                'check':   'placeholder_name_field',
+                'reason': (
+                    f'{_label} looks like placeholder/test text ("{_val}") — '
+                    f'a bank-facing DPR cannot ship with junk identity data. '
+                    f'Correct it before generating a final PDF.'
+                ),
+            })
+
     # KAU contradiction review 2026-10-08, Pattern 14: a Producer Company
     # must have 5–15 directors (Companies Act §378O). Sample DPRs shipped
     # with boards of 1, 3 and 4 — a banker-facing statutory violation.
-    fpo = project.fpo if project.fpo_id else None
     _PRODUCER_CO_STRUCTURES = {'companies_act', 'producer_companies'}
     if fpo is not None and getattr(fpo, 'legal_structure', '') in _PRODUCER_CO_STRUCTURES:
         dirs = getattr(fpo, 'total_directors', None)
@@ -642,6 +688,8 @@ def render_html_for_project(
         # UI-only — a banker reading the PDF never saw it. Surfaced as an
         # amber note above the Key Assumptions table.
         'finance_validation_notes': _finance_validation_notes(project),
+        # BUG-28 — land tenure + lease rent note under §2.
+        'land_tenure_note': _land_tenure_note(project),
         # Per-technology process flowcharts. Empty list = section omitted.
         'technologies_with_flow': _technologies_with_flow(project),
         # Product list + cover hero image (first product with a photo).

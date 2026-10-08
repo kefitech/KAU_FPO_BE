@@ -165,6 +165,11 @@ class DPRSectionFinance(TimeStampedModel, AuditModel):
     op_communication = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     op_professional_charges = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     op_miscellaneous = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    # BUG-28 (KAU §6 / tester P3, 2026-10-08): dedicated annual lease /
+    # rent line for leased or rented land — previously had to be bundled
+    # into admin expenses, so the leased-land validator could never
+    # verify the rent was actually captured.
+    op_lease_rent = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
 
     # ── Cat F: Loan Details ──
     loan_proposed = models.BooleanField(default=False)

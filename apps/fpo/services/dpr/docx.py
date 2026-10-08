@@ -979,6 +979,15 @@ def _render_cost_breakdown(doc, r: CalculationResult) -> None:
         table.rows[i].cells[1].text = _fmt_inr_table(value) if isinstance(value, Decimal) else str(value)
 
 
+
+def _render_land_tenure_note(doc, project) -> None:
+    """BUG-28 — same land-tenure note the PDF shows under §2."""
+    from .pdf import _land_tenure_note
+    note = _land_tenure_note(project)
+    if note:
+        _add_para(doc, note, size=8, italic=True)
+
+
 def _render_means_of_finance(doc, r: CalculationResult) -> None:
     """PDF §3 Means of Finance — sources table with total.
 
@@ -2101,6 +2110,7 @@ def render_docx_for_project(
     # 2. Numbered data chapters §1-§10.
     _render_project_at_a_glance(doc, project, result)
     _render_fixed_capital_investment(doc, result)
+    _render_land_tenure_note(doc, project)
     _render_means_of_finance(doc, result)
     _render_capital_schedule(doc, result)
 

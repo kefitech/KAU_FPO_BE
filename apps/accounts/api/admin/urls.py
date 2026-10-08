@@ -28,6 +28,7 @@ from .fpo_actions import FPOActionViewSet
 from .tier_upgrade_tips import TierUpgradeTipViewSet
 from .fpo_permissions import FPOPermissionMatrixView, FPORolePermissionsView
 from .applications import (
+    ApplicationQAProfileEditView,
     ApplicationListView,
     ApplicationDetailView,
     ApplicationRejectView,
@@ -224,6 +225,7 @@ urlpatterns = [
     path('applications/<int:fpo_id>/approve/',                               ApplicationApproveView.as_view(),         name='admin-applications-approve'),
     path('applications/<int:fpo_id>/verify-document/<int:doc_id>/',          ApplicationVerifyDocumentView.as_view(),  name='admin-applications-verify-doc'),
     path('applications/<int:fpo_id>/set-user-limit/',                        ApplicationSetUserLimitView.as_view(),    name='admin-applications-set-limit'),
+    path('applications/<int:fpo_id>/qa-profile-edit/',                       ApplicationQAProfileEditView.as_view(),   name='admin-applications-qa-edit'),
     path('applications/<int:fpo_id>/assign-tier/',                           ApplicationAssignTierView.as_view(),      name='admin-applications-assign-tier'),
     path('applications/<int:fpo_id>/tier-history/',                          ApplicationTierHistoryView.as_view(),     name='admin-applications-tier-history'),
     path('applications/<int:fpo_id>/tier-assessment/',                       ApplicationTierAssessmentView.as_view(),  name='admin-applications-tier-assessment'),

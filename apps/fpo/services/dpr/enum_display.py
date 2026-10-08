@@ -86,3 +86,37 @@ def display_or_undisclosed(value) -> str:
     if is_test_placeholder(value):
         return 'Not disclosed by the FPO'
     return str(value or '').strip() or 'Not disclosed by the FPO'
+
+
+# ── Tester Priority-4 (2026-10-08): keyboard-mash detector ───────────────────
+# `is_test_placeholder` stays an exact blocklist (BUG-24 — heuristics were
+# rejected for DISPLAY because they ate real acronyms like ATMA/KVK/SFAC).
+# This separate detector is used ONLY by the final-PDF generation gate: it
+# targets keyboard junk ("sdsasd", "asdasd", "qwerty", "aaaa") that the
+# blocklist can't enumerate. Conservative on purpose — acronyms, normal
+# names and Malayalam transliterations all contain vowels or capitals and
+# pass untouched.
+import re as _re
+
+_MASH_SEQUENCES = ('asd', 'sdf', 'dfg', 'fgh', 'qwe', 'wer', 'ert',
+                   'zxc', 'xcv', 'cvb', 'jkl', 'hjk')
+_REPEAT_RE = _re.compile(r'(.)\1\1')          # same char 3+ in a row
+_VOWELS = set('aeiou')
+
+
+def looks_like_keyboard_mash(value) -> bool:
+    """True for junk strings like 'sdsasd' / 'qwerty' / 'aaaa'.
+
+    Only lowercase single-token alphabetic strings are candidates — real
+    names are capitalised and acronyms are uppercase, so both skip the
+    heuristic entirely.
+    """
+    s = str(value or '').strip()
+    if len(s) < 4 or not s.islower() or not s.isalpha():
+        return False
+    if _REPEAT_RE.search(s):
+        return True
+    if any(seq in s for seq in _MASH_SEQUENCES):
+        return True
+    vowel_ratio = sum(c in _VOWELS for c in s) / len(s)
+    return vowel_ratio < 0.15

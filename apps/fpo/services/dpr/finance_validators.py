@@ -44,7 +44,7 @@ OPEX_FIELDS = [
     'op_raw_material', 'op_salaries_wages', 'op_electricity', 'op_water', 'op_fuel',
     'op_transportation', 'op_packaging', 'op_repairs_maintenance', 'op_insurance',
     'op_admin_expenses', 'op_marketing_expenses', 'op_communication',
-    'op_professional_charges', 'op_miscellaneous',
+    'op_professional_charges', 'op_miscellaneous', 'op_lease_rent',  # BUG-28
 ]
 
 
@@ -225,25 +225,21 @@ def validate_section(section) -> dict[str, Any]:
             f'the FPO/members\' books at nil incremental cost.',
         ))
 
-    # (c) Ownership declared as leased / rented — ALWAYS warn to confirm
-    # the annual lease rent is captured somewhere in operating cost.
-    # There is no dedicated op_rent field; it usually lives under
-    # op_admin_expenses or op_miscellaneous. The warning fires regardless
-    # of whether those fields have a value, because the reviewer needs to
-    # verify that the specific lease-rent amount is in there (and not
-    # bundled under something unrelated).
+    # (c) Ownership declared as leased / rented — BUG-28 (2026-10-08):
+    # there is now a dedicated op_lease_rent field, so the check is real:
+    # warn only when the lease-rent line is empty.
     if is_leased_or_rented:
         codes_display = ', '.join(sorted(is_leased_or_rented))
-        warnings.append(_warn(
-            'land_leased_confirm_rent', 'op_admin_expenses',
-            f'Land ownership declared as {codes_display} — confirm the '
-            f'annual lease / rent amount is captured in operating cost. '
-            f'There is no dedicated rent field; enter it under '
-            f'op_admin_expenses or op_miscellaneous (whichever is cleaner '
-            f'for your DPR) and reference the arrangement in Promoter '
-            f'Profile. If rent is contractually ₹0 (e.g. nominal lease '
-            f'to a member), document that explicitly.',
-        ))
+        _lease_rent = Decimal(str(getattr(section, 'op_lease_rent', 0) or 0))
+        if _lease_rent <= 0:
+            warnings.append(_warn(
+                'land_leased_confirm_rent', 'op_lease_rent',
+                f'Land ownership declared as {codes_display} but the '
+                f'annual lease / rent line (op_lease_rent) is empty. Enter '
+                f'the annual rent so the P&L and break-even carry it. If '
+                f'rent is contractually ₹0 (e.g. nominal lease from a '
+                f'member), document that in the Promoter Profile.',
+            ))
 
     # BUG-18 (KAU §6) — contingency below configured tolerance. Hard cost is
     # the sum of fixed-asset lines (land, civil, machinery, equipment,

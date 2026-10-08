@@ -1364,3 +1364,106 @@ class ApplicationTrainingSessionCommentDetailView(APIView):
 
         comment.delete()
         return StandardResponse.success(message='Comment deleted.')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QA profile edit (tester Priority-4 list, 2026-10-08)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _QAProfileEditSerializer(serializers.Serializer):
+    """Whitelisted FPO profile fields QA/admin may correct on test accounts.
+
+    Born from the 2026-10-07 incident where sample-DPR districts were
+    changed via a server-side shell (no audit trail, block/village/GPS left
+    inconsistent). This endpoint gives QA an AUDITED path instead.
+    """
+    facilitating_agency_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    annual_turnover          = serializers.DecimalField(max_digits=15, decimal_places=5, required=False, allow_null=True, min_value=0, help_text='₹ LAKHS (BUG-02 unit)')
+    total_directors          = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=50)
+    women_directors          = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=50)
+    district                 = serializers.CharField(max_length=10, required=False)
+    block_taluk              = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    village_town             = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    pincode                  = serializers.CharField(max_length=6, required=False, allow_blank=True)
+    latitude                 = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    longitude                = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+
+    def validate(self, attrs):
+        td = attrs.get('total_directors')
+        wd = attrs.get('women_directors')
+        if td is not None and wd is not None and wd > td:
+            raise serializers.ValidationError(
+                {'women_directors': 'Women directors cannot exceed total directors.'})
+        # District ↔ block consistency — the exact inconsistency the
+        # 2026-10-07 shell edit created.
+        from apps.core.models.generic import MasterLookup
+        district = attrs.get('district')
+        block = attrs.get('block_taluk')
+        if block:
+            row = MasterLookup.objects.filter(category='block', code=block).first()
+            if row is None:
+                raise serializers.ValidationError(
+                    {'block_taluk': f'Unknown block code "{block}".'})
+            block_district = (row.metadata or {}).get('district') if isinstance(row.metadata, dict) else None
+            target_district = district or self.context.get('current_district')
+            if block_district and target_district and block_district != target_district:
+                raise serializers.ValidationError(
+                    {'block_taluk': f'Block "{block}" belongs to district '
+                                    f'{block_district}, not {target_district}. '
+                                    f'Pass a matching district + block together.'})
+        return attrs
+
+
+class ApplicationQAProfileEditView(APIView):
+    """PATCH whitelisted FPO profile fields with a full audit trail."""
+
+    @extend_schema(
+        tags=['Admin - FPO Applications'],
+        summary='QA edit of whitelisted FPO profile fields (audited)',
+        description=(
+            'Super-admin / permitted sub-admin correction of test-account '
+            'profile data. Only the whitelisted fields are accepted; every '
+            'change writes an fpo_profile_change audit row with old→new '
+            'values. annual_turnover is in ₹ LAKHS (BUG-02). When changing '
+            'district, send the matching block_taluk in the same request — '
+            'cross-district block codes are rejected.'
+        ),
+        request=_QAProfileEditSerializer,
+    )
+    def patch(self, request, fpo_id):
+        if not _can_act(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        fpo = _get_fpo(fpo_id, request.user)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        ser = _QAProfileEditSerializer(
+            data=request.data, context={'current_district': fpo.district})
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+        changes = {}
+        for field, new in ser.validated_data.items():
+            old = getattr(fpo, field)
+            if str(old) != str(new):
+                changes[field] = {'old': str(old), 'new': str(new)}
+                setattr(fpo, field, new)
+        if not changes:
+            return StandardResponse.success(data={}, message='No changes.')
+        fpo.save(update_fields=list(ser.validated_data.keys()) + ['updated_at'])
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.FPO_PROFILE_CHANGE,
+            instance=fpo,
+            changes=changes,
+            request=request,
+        )
+        return StandardResponse.success(
+            data={'changed': changes},
+            message='FPO profile updated (audited).',
+        )

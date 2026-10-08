@@ -345,6 +345,9 @@ Author: Athul Gopan (Kefi Tech Solutions)
       <tr class="total"><td class="label">Total Project Cost</td><td>{{ r.cost.total|money }}</td></tr>
     </tbody>
   </table>
+  {% if land_tenure_note %}
+  <p class="footer-note">{{ land_tenure_note }}</p>
+  {% endif %}
 
   {% if chart_cost_pie %}
   <div class="chart-block">

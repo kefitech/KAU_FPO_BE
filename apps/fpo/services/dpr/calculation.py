@@ -743,7 +743,57 @@ def build_capital_schedule(
     tranches = list(project.capital_tranches.all()) if project.pk else []
     if tranches:
         return _schedule_from_tranches(tranches, cost, mof, implementation_months)
-    return _schedule_uniform_fallback(cost, mof, implementation_months)
+    return _schedule_uniform_fallback(
+        cost, mof, implementation_months,
+        capex_start_month=_capex_start_month_from_permits(project, implementation_months),
+    )
+
+
+def _capex_start_month_from_permits(project, implementation_months: int) -> int:
+    """KAU review 2026-10-08 Pattern 7: the uniform fallback drew capex
+    from Month 1 even when §2.3.19 says the Building Permit / CTE that
+    must precede construction is expected months later. Derive the month
+    capex may start:
+
+      anchor  = earliest implementation-activity proposed_start_date
+                (the project's Month 1 in calendar terms)
+      permit  = latest expected_date_of_approval among building_permit /
+                consent_establish items not already 'available'
+      start   = months between anchor and permit, clamped to the window
+
+    Falls back to 1 (old behaviour) when the project has no dated
+    activities or no pending permit dates — user-declared tranches always
+    bypass this entirely.
+    """
+    try:
+        if not project.pk:
+            return 1
+        impl = getattr(project, 'section_implementation', None)
+        compliance = getattr(project, 'section_compliance', None)
+        if impl is None or compliance is None:
+            return 1
+        starts = [a.proposed_start_date for a in impl.activities.all()
+                  if a.proposed_start_date]
+        if not starts:
+            return 1
+        anchor = min(starts)
+        permit_dates = [
+            item.expected_date_of_approval
+            for item in compliance.items.select_related('registration')
+            if item.registration_id
+            and getattr(item.registration, 'code', '') in ('building_permit', 'consent_establish')
+            and item.expected_date_of_approval
+            and item.status != 'available'
+        ]
+        if not permit_dates:
+            return 1
+        latest = max(permit_dates)
+        months_in = ((latest.year - anchor.year) * 12 + (latest.month - anchor.month)) + 1
+        # Clamp: capex must still fit in the window — leave at least the
+        # final month free so the schedule can complete.
+        return max(1, min(months_in, max(1, implementation_months - 1)))
+    except Exception:  # noqa: BLE001 — scheduling heuristic must never break compute()
+        return 1
 
 
 def _schedule_from_tranches(
@@ -825,6 +875,7 @@ def _schedule_uniform_fallback(
     cost: ProjectCostBreakdown,
     mof: MeansOfFinanceBreakdown,
     implementation_months: int,
+    capex_start_month: int = 1,
 ) -> CapitalSchedule:
     """Uniform-monthly fallback when no tranches are recorded.
 
@@ -840,7 +891,13 @@ def _schedule_uniform_fallback(
     # cumulative funds and showed a phantom negative unfunded balance.
     total_mof = mof.project_funding_total
 
-    monthly_cost = (total_cost / n).quantize(Decimal('0.01'))
+    # KAU review 2026-10-08 Pattern 7: capex is phased from
+    # `capex_start_month` (derived from the Building Permit / CTE expected
+    # dates) instead of always drawing from Month 1. MoF inflows still
+    # spread across the full window (funds are mobilised ahead of spend).
+    start = max(1, min(capex_start_month, n))
+    capex_months = n - start + 1
+    monthly_cost = (total_cost / capex_months).quantize(Decimal('0.01'))
     monthly_mof = (total_mof / n).quantize(Decimal('0.01'))
 
     rows: list[CapitalScheduleRow] = []
@@ -848,7 +905,10 @@ def _schedule_uniform_fallback(
     cum_mof = Decimal('0')
     for month in range(1, n + 1):
         is_last = month == n
-        cost_this = (total_cost - cum_cost) if is_last else monthly_cost
+        if month < start:
+            cost_this = Decimal('0')
+        else:
+            cost_this = (total_cost - cum_cost) if is_last else monthly_cost
         mof_this = (total_mof - cum_mof) if is_last else monthly_mof
         cum_cost += cost_this
         cum_mof += mof_this
@@ -867,10 +927,16 @@ def _schedule_uniform_fallback(
         final_cost=cum_cost,
         final_mof=cum_mof,
         distribution_note=(
-            f'Indicative schedule based on a uniform monthly distribution across '
-            f'{n} months of the implementation period. Actual disbursement will '
-            'follow the sanctioned lender release schedule and project execution '
-            'milestones.'
+            (f'Indicative schedule: capital expenditure phased from month {start} '
+             f'(after the expected Building Permit / Consent-to-Establish dates in '
+             f'\u00a72.3.19), funds mobilised uniformly across {n} months. '
+             'Actual disbursement will follow the sanctioned lender release '
+             'schedule and project execution milestones.')
+            if start > 1 else
+            (f'Indicative schedule based on a uniform monthly distribution across '
+             f'{n} months of the implementation period. Actual disbursement will '
+             'follow the sanctioned lender release schedule and project execution '
+             'milestones.')
         ),
         is_estimated=True,
         reconciliation={},
@@ -1119,7 +1185,7 @@ OPEX_FIELDS = (
     'op_raw_material', 'op_salaries_wages', 'op_electricity', 'op_water', 'op_fuel',
     'op_transportation', 'op_packaging', 'op_repairs_maintenance', 'op_insurance',
     'op_admin_expenses', 'op_marketing_expenses', 'op_communication',
-    'op_professional_charges', 'op_miscellaneous',
+    'op_professional_charges', 'op_miscellaneous', 'op_lease_rent',  # BUG-28
 )
 
 # Split opex line items into buckets so each can be escalated by its own
@@ -1135,7 +1201,7 @@ OPEX_BUCKETS: dict[str, tuple[str, ...]] = {
         'op_water', 'op_transportation', 'op_packaging',
         'op_repairs_maintenance', 'op_insurance', 'op_admin_expenses',
         'op_marketing_expenses', 'op_communication', 'op_professional_charges',
-        'op_miscellaneous',
+        'op_miscellaneous', 'op_lease_rent',  # BUG-28
     ),
 }
 
@@ -2365,7 +2431,7 @@ _BREAK_EVEN_VARIABLE_OPEX = (
 _BREAK_EVEN_FIXED_OPEX = (
     'op_salaries_wages', 'op_repairs_maintenance', 'op_insurance',
     'op_admin_expenses', 'op_marketing_expenses', 'op_communication',
-    'op_professional_charges', 'op_miscellaneous',
+    'op_professional_charges', 'op_miscellaneous', 'op_lease_rent',  # BUG-28
 )
 
 
