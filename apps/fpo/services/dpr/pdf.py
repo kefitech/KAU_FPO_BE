@@ -514,6 +514,51 @@ def _pre_final_validation(project) -> list[dict]:
                 f'Open AI Content → {row.chapter.replace("_", " ").title()} and regenerate before requesting a final DPR.'
             ),
         })
+
+    # KAU contradiction review 2026-10-08, Pattern 14: a Producer Company
+    # must have 5–15 directors (Companies Act §378O). Sample DPRs shipped
+    # with boards of 1, 3 and 4 — a banker-facing statutory violation.
+    fpo = project.fpo if project.fpo_id else None
+    _PRODUCER_CO_STRUCTURES = {'companies_act', 'producer_companies'}
+    if fpo is not None and getattr(fpo, 'legal_structure', '') in _PRODUCER_CO_STRUCTURES:
+        dirs = getattr(fpo, 'total_directors', None)
+        if dirs is not None and dirs > 0 and not (5 <= dirs <= 15):
+            errors.append({
+                'chapter': 'promoter_profile',
+                'reason': (
+                    f'Board of Directors has {dirs} member(s) — a Producer '
+                    f'Company must have between 5 and 15 directors '
+                    f'(Companies Act, §378O). Correct the FPO profile '
+                    f'(Total directors) before generating a final DPR.'
+                ),
+            })
+
+    # KAU contradiction review 2026-10-08, Pattern 15: Building Permit
+    # marked "Not Applicable" while buildings / civil works are budgeted.
+    if fin is not None:
+        _buildings_budget = sum((
+            getattr(fin, 'cost_buildings', None) or Decimal('0'),
+            getattr(fin, 'cost_civil_works', None) or Decimal('0'),
+            getattr(fin, 'cost_site_development', None) or Decimal('0'),
+        ), start=Decimal('0'))
+        compliance = getattr(project, 'section_compliance', None)
+        if _buildings_budget > 0 and compliance is not None:
+            _na_permit = compliance.items.filter(
+                registration__code='building_permit',
+                status='not_applicable',
+            ).exists()
+            if _na_permit:
+                errors.append({
+                    'chapter': 'compliance',
+                    'reason': (
+                        f'Building Permit is marked "Not Applicable" while '
+                        f'₹{_buildings_budget:,.0f} of buildings / civil works '
+                        f'is budgeted in the project cost. Set the Building '
+                        f'Permit status to Available / Applied / Proposed to '
+                        f'Obtain in §2.3.19 Compliance before generating a '
+                        f'final DPR.'
+                    ),
+                })
     return errors
 
 

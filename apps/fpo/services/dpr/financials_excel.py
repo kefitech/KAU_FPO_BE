@@ -244,8 +244,8 @@ def _write_summary_sheet(ws, project, r: CalculationResult) -> None:
             'platform does not imply that KAU has approved, certified or endorsed '
             'its contents. Its acceptance for bank submission, scheme application '
             'or any other purpose is subject to the requirements of the concerned '
-            'bank, implementing agency or authority. Figures are rounded to the '
-            'nearest rupee.'
+            'bank, implementing agency or authority. Figures are stated in rupees; minor '
+            'rounding differences may occur in totals.'
         ),
     )
     disclaimer_cell.font = Font(size=9, italic=True, color='6B6B6B')

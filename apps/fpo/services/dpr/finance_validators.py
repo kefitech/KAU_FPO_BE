@@ -288,6 +288,53 @@ def validate_section(section) -> dict[str, Any]:
                 f'or vice versa).',
             ))
 
+    # KAU contradiction review 2026-10-08, Pattern 2: in five of the six
+    # sample DPRs the narrative/risk register described buying and storing
+    # a whole season's crop while §6B sized working capital on a generic
+    # 20-30 day cycle (seasonal override blank, or ₹30L against ₹9.75 Cr
+    # of pepper). Two warnings:
+    #   (a) a risk row mentions seasonal stocking but wc_is_seasonal is off
+    #   (b) seasonal peak is declared but below ~2 months of WC opex
+    _seasonal_risk_declared = False
+    try:
+        risk_section = getattr(section.project, 'section_risk', None)
+        if risk_section is not None:
+            import re as _re
+            _SEASON_RE = _re.compile(
+                r'season|harvest window|buy and store|stock(?:ing)? (?:the|a) '
+                r'|procure(?:ment)? window', _re.IGNORECASE)
+            for _r in risk_section.items.all():
+                blob = ' '.join([
+                    _r.risk_description or '', _r.mitigation_strategy or '',
+                    _r.risk_code_other or '',
+                ])
+                if _SEASON_RE.search(blob):
+                    _seasonal_risk_declared = True
+                    break
+    except Exception:  # noqa: BLE001 — risk section shape must never break finance validation
+        pass
+    _is_seasonal = bool(getattr(section, 'wc_is_seasonal', False))
+    _peak = Decimal(str(getattr(section, 'wc_peak_amount', 0) or 0))
+    if _seasonal_risk_declared and not _is_seasonal:
+        warnings.append(_warn(
+            'seasonal_risk_without_wc_peak', 'wc_is_seasonal',
+            'The Risk Register describes seasonal procurement / harvest-'
+            'window stocking, but §6B Working Capital has no seasonal '
+            'peak declared (wc_is_seasonal is off). A generic 20-30 day '
+            'operating cycle will understate the peak cash need — enable '
+            'the seasonal pattern and enter the peak-period amount.',
+        ))
+    if _is_seasonal and wc_annual_opex > 0:
+        _two_months = (wc_annual_opex * Decimal('2') / Decimal('12')).quantize(Decimal('0.01'))
+        if _peak < _two_months:
+            warnings.append(_warn(
+                'seasonal_peak_too_low', 'wc_peak_amount',
+                f'Seasonal WC peak (₹{_peak:,.0f}) is below two months of '
+                f'annual WC operating cost (₹{_two_months:,.0f}). For a '
+                f'seasonal buy-and-store plan the peak normally covers the '
+                f'full procurement window — please verify the amount.',
+            ))
+
     hard_cost = _sum(section, _HARD_COST_FIELDS)
     contingency = Decimal(str(section.cost_contingencies or 0))
     if hard_cost > 0:

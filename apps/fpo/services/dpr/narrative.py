@@ -312,6 +312,19 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         if total_dirs and women_dirs is not None else
         (f'{total_dirs} directors' if total_dirs else _NOT_PROVIDED)
     )
+    # KAU review 2026-10-08 Pattern 8 — agencies resolved to display labels
+    # (never raw enum codes) for the governance block below.
+    from apps.fpo.services.dpr.enum_display import (
+        enum_display as _enum_disp, display_or_undisclosed as _disp_or_und,
+    )
+    _pa_code = getattr(fpo, 'promoting_agency', '') if fpo else ''
+    promoting_agency_display = (
+        (_enum_disp('promoting_agency', _pa_code) or _pa_code) if _pa_code
+        else _NOT_PROVIDED
+    )
+    facilitating_agency_display = _disp_or_und(
+        getattr(fpo, 'facilitating_agency_name', '') if fpo else ''
+    )
 
     # PSC — variable-length list, one line per member so the LLM sees the
     # full committee without having to parse JSON.
@@ -443,6 +456,12 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         f'Women members:              {women_members_display}',
         f'Board of Directors:         {board_display}',
         f'Board meeting frequency:    {board_freq_display}',
+        # KAU review 2026-10-08 Pattern 8: promoting agency sat in master
+        # data (NCDC / SFAC / NABARD) but never reached the prompt, so five
+        # of six narratives either omitted it or credited a different
+        # agency. Both agencies now ship with an explicit use-this rule.
+        f'Promoting agency:           {promoting_agency_display}  (the institution that promoted this FPO — name THIS agency in governance/institutional text, never substitute another)',
+        f'Facilitating agency:        {facilitating_agency_display}',
         f'Women shareholding:         {women_display}',
         f'Total area covered:         {area_display}',
         f'Landholding pattern:        {landholding}',
@@ -753,8 +772,12 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     lines.append('--- Risks + FPO-authored mitigations (verbatim) ---')
     if risk_rows:
         for r in risk_rows[:20]:
-            code = (r.risk_code or r.risk_code_other or 'unspecified').strip()
-            cat = (r.risk_category or 'unspecified').strip()
+            # KAU review 2026-10-08 Pattern 9: raw snake_case enum codes in
+            # the FACTS were being echoed verbatim into bank-facing prose
+            # (e.g. "price_volatility", "NO_RISKS"). Humanise before the
+            # LLM ever sees them.
+            code = (r.risk_code or r.risk_code_other or 'unspecified').strip().replace('_', ' ').title()
+            cat = (r.risk_category or 'unspecified').strip().replace('_', ' ').title()
             desc = (r.risk_description or '').strip()
             if len(desc) > 200:
                 desc = desc[:197] + '...'
@@ -805,6 +828,14 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
             lines.append('Per-category classes (worst-case per category):')
             for cat in ra.categories:
                 lines.append(f'  - {cat.category_label}:  {cat.category_class.upper()}')
+        # KAU review 2026-10-08 (C02-10, C03-08): empty / unscored risk
+        # categories were being presented as EVIDENCE of sound governance
+        # ("no financial risks identified reflects prudent management").
+        lines.append(
+            'RULE: a category with no risks entered or no scores means the '
+            'assessment was NOT DONE — describe it as "not yet assessed", '
+            'never as evidence of low risk or sound management.'
+        )
     else:
         lines.append('Overall project risk class:  not yet computed')
 

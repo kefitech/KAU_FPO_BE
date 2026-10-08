@@ -969,7 +969,10 @@ _ASSET_CLASS_META: dict[str, tuple[str, Optional[str]]] = {
     'equipment':       ('Equipment & furniture',     'depreciation_rate_equipment_pct'),
     'vehicles':        ('Vehicles',                  'depreciation_rate_equipment_pct'),
     'electrification': ('Electrification & utilities', 'depreciation_rate_equipment_pct'),
-    'pre_operative':   ('Pre-operative expenses (amortised)', None),  # amortised, not depreciated
+    # KAU review 2026-10-08 Pattern 12: the class merges pre-operative,
+    # preliminary, technical consultancy AND contingencies — say so in the
+    # label instead of silently folding them into "Pre-operative expenses".
+    'pre_operative':   ('Pre-operative, preliminary & contingencies (amortised)', None),  # amortised, not depreciated
     'other':           ('Other capex',               None),  # non-depreciable
 }
 
@@ -2381,7 +2384,7 @@ def _operating_break_even(
     is unavailable or contribution is non-positive.
 
     Formula (standard bank appraisal):
-      fixed_cost   = fixed opex + Y1 depreciation + Y1 interest
+      fixed_cost   = fixed opex + Y1 depreciation + Y1 interest (term + WC)
       variable_cost = variable opex (Y1)
       contribution = revenue − variable_cost
       contribution_margin_pct = contribution / revenue × 100
@@ -2404,7 +2407,11 @@ def _operating_break_even(
     # For a bank-appraisal break-even we anchor on Y1 numbers — the
     # opex above is Y1 opex (which is what _sum_fields returns since
     # DPRSectionFinance stores Y1 values that the P&L then escalates).
-    fixed_cost = fixed_opex + y1.depreciation + y1.interest
+    # KAU review 2026-10-08 Pattern 6: WC interest is charged in the P&L
+    # (BUG-32) so it is a fixed financing cost the break-even must carry —
+    # omitting it understated break-even in five of the six sample DPRs.
+    wc_int = getattr(y1, 'wc_interest', Decimal('0')) or Decimal('0')
+    fixed_cost = fixed_opex + y1.depreciation + y1.interest + wc_int
     variable_cost = variable_opex
 
     contribution = revenue - variable_cost

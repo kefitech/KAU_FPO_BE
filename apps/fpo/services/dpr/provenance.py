@@ -48,7 +48,10 @@ _SYSTEM_RATE_KEYS: list[tuple[str, str, Decimal, Optional[str]]] = [
     ('loan_interest_rate_default_pct',     'Loan interest rate',           Decimal('10.5'),  'rate_of_interest_pct'),
     ('depreciation_rate_building_pct',     'Buildings — SLM depreciation', Decimal('10'),    None),
     ('depreciation_rate_machinery_pct',    'Plant & machinery — SLM depreciation', Decimal('15'), None),
-    ('depreciation_rate_equipment_pct',    'Equipment & vehicles — SLM depreciation', Decimal('15'), None),
+    # KAU review 2026-10-08 Pattern 12: this one rate serves the equipment,
+    # vehicles AND electrification/utilities classes — label must match the
+    # depreciation table instead of saying "Equipment & vehicles" alone.
+    ('depreciation_rate_equipment_pct',    'Equipment, furniture, vehicles & utilities — SLM depreciation', Decimal('15'), None),
     ('project_cost_variance_pct',          'Project cost variance tolerance', Decimal('10'), None),
 ]
 

@@ -689,8 +689,8 @@ def _render_cover(doc, project, version_label: str, generated_at: str,
         'does not imply that KAU has approved, certified or endorsed its '
         'contents. Its acceptance for bank submission, scheme application or '
         'any other purpose is subject to the requirements of the concerned '
-        'bank, implementing agency or authority. Figures are rounded to the '
-        'nearest rupee.'
+        'bank, implementing agency or authority. Figures are stated in rupees; minor '
+        'rounding differences may occur in totals.'
     )
     run_b = p_body.add_run(body)
     run_b.font.size = Pt(8.5)

@@ -11,6 +11,7 @@ Kept separate from the serializer so it can also be called from:
   - AI-content generation gating
 """
 
+from decimal import Decimal
 from typing import Any
 
 
@@ -154,6 +155,37 @@ def validate_section(section) -> dict[str, Any]:
     # ── Category F — Risks are optional at KAU spec level, but we advise ──
     if section.risks.count() == 0:
         warnings.append(_warn('no_risks', 'risks', 'No supply risks specified. Consider identifying at least one for a complete DPR.'))
+
+    # KAU contradiction review 2026-10-08, Pattern 3: in all six sample
+    # DPRs the plant's raw-material requirement far exceeded what the
+    # members could supply (rice mills needing 4,070 t against 450 acres)
+    # with no sourcing statement. Compare each material's requirement
+    # (Cat A) against the FPO's OWN declared annual availability (Cat B)
+    # — same material, same unit, no external yield table needed — and
+    # ask for a non-member sourcing plan when demand exceeds supply.
+    for i, m in enumerate(materials):
+        req = m.estimated_annual_requirement
+        avail = m.estimated_qty_available_annual
+        if req and avail and req > avail:
+            has_sourcing_plan = bool(
+                (m.off_season_strategy or '').strip()
+                or (m.primary_source_other or '').strip()
+                or (m.primary_source_id and getattr(m.primary_source, 'code', '')
+                    not in ('', 'member_farmers', 'own_members'))
+            )
+            if not has_sourcing_plan:
+                pct = (req * Decimal('100') / avail).quantize(Decimal('1'))
+                warnings.append(_warn(
+                    'requirement_exceeds_declared_availability',
+                    f'materials[{i}].estimated_annual_requirement',
+                    f'Annual requirement ({req:,.0f}) is {pct}% of the '
+                    f'declared annual availability ({avail:,.0f}) for this '
+                    f'material. A bank reviewer will ask where the balance '
+                    f'comes from — either raise the declared availability '
+                    f'(if more supply is genuinely reachable), or state a '
+                    f'non-member sourcing plan (primary source / off-season '
+                    f'strategy) covering the shortfall.',
+                ))
 
     return {
         'errors': errors,
