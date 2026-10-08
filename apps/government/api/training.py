@@ -7,7 +7,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 
 from apps.core.utils.pagination import StandardPagination
-from apps.core.utils.constants import FPOStatus
+from apps.core.utils.constants import FPOStatus, MAX_TRAINING_PARTICIPANTS
 from apps.core.utils.responses import StandardResponse
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import TrainingSession, TrainingAttendance
@@ -91,7 +91,7 @@ class _SessionCreateSerializer(serializers.Serializer):
     date = serializers.DateField()
     time = serializers.CharField(max_length=10, required=False, allow_blank=True)
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1)
-    participants_count = serializers.IntegerField(min_value=0, default=0)
+    participants_count = serializers.IntegerField(min_value=0, max_value=MAX_TRAINING_PARTICIPANTS, default=0)
     venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
 
 
@@ -268,7 +268,7 @@ class _SessionUpdateSerializer(serializers.Serializer):
     date = serializers.DateField(required=False)
     time = serializers.CharField(max_length=10, required=False, allow_blank=True)
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1, required=False)
-    participants_count = serializers.IntegerField(min_value=0, required=False)
+    participants_count = serializers.IntegerField(min_value=0, max_value=MAX_TRAINING_PARTICIPANTS, required=False)
     venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
 
 
