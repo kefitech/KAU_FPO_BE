@@ -232,6 +232,8 @@ def _call_anthropic(
             kwargs = {
                 'model': model,
                 'max_tokens': max_tokens,
+                # Match the Gemini path — stable regeneration (2026-10-08).
+                'temperature': 0.2,
                 'messages': [{'role': 'user', 'content': prompt}],
             }
             if system:
@@ -285,6 +287,8 @@ def _call_openai(
             resp = client.chat.completions.create(
                 model=model,
                 max_tokens=max_tokens,
+                # Match the Gemini path — stable regeneration (2026-10-08).
+                temperature=0.2,
                 messages=messages,
             )
         except OpenAIError as e:
@@ -350,6 +354,13 @@ def _call_google(
         max_output_tokens=max_tokens,
         system_instruction=system if system else None,
         thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+        # Tester flag 2026-10-08: with no temperature set, Gemini defaults
+        # to ~1.0 and every Regenerate rewrote the whole chapter even when
+        # the prompt was identical — reviewed text churned on each click.
+        # 0.2 keeps the prose fluent but stable: same inputs → near-
+        # identical wording, and lower sampling variance also reduces the
+        # number-corruption tendency the BUG-26 scrubbers guard against.
+        temperature=0.2,
         response_mime_type=response_mime_type,
         # We never pass tools — disabling AFC skips the SDK's per-call
         # "AFC is enabled" log line and deprecation warning.
