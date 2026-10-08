@@ -3,8 +3,10 @@ from rest_framework.views import APIView
 
 from apps.core.utils.responses import StandardResponse
 from apps.core.services.translation import t
+from apps.database.models.cbbo import TrainingSession
 from apps.database.models.fpo import FPO
 
+from apps.cbbo.api.dashboard import training_trend
 from apps.government.api.scoping import is_government_user, scope_fpo_qs, get_jurisdiction_scope
 
 
@@ -15,6 +17,8 @@ class GovernmentDashboardStatsView(APIView):
       - by_status: {status_display: count}
       - by_district: {district_code: count} — only varies for state-level;
         district-level officials will just see their one district here
+      - training_trend: [{month: 'YYYY-MM', count}] — sessions per month, last
+        12 months, for every FPO in scope (same sessions as the training table)
     """
 
     def get(self, request):
@@ -35,10 +39,15 @@ class GovernmentDashboardStatsView(APIView):
         for fpo in qs.only('district'):
             by_district[fpo.district] = by_district.get(fpo.district, 0) + 1
 
+        sessions = TrainingSession.objects.filter(
+            is_deleted=False, fpo__in=qs.filter(is_deleted=False),
+        )
+
         scope = get_jurisdiction_scope(request.user)
         return StandardResponse.success(data={
             'total': qs.count(),
             'by_status': by_status,
             'by_district': by_district,
             'jurisdiction_type': 'state' if scope and scope.get('type') == 'ALL' else 'district',
+            'training_trend': training_trend(sessions),
         })

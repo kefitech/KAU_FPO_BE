@@ -56,6 +56,7 @@ class _SessionListSerializer(serializers.ModelSerializer):
 
 class _SessionDetailSerializer(serializers.ModelSerializer):
     fpo_name = serializers.CharField(source='fpo.name', read_only=True)
+    district = serializers.CharField(source='fpo.district', read_only=True)
     attendance = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
@@ -63,7 +64,7 @@ class _SessionDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrainingSession
-        fields = ['id', 'fpo', 'fpo_name', 'topic', 'trainer_name', 'date', 'time', 'duration_hours',
+        fields = ['id', 'fpo', 'fpo_name', 'district', 'topic', 'trainer_name', 'date', 'time', 'duration_hours',
                   'participants_count', 'venue', 'attendance', 'created_at', 'updated_at',
                   'created_by_name', 'can_edit', 'comments']
 

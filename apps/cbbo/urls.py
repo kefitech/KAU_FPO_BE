@@ -5,6 +5,7 @@ from django.urls import path
 app_name = 'cbbo'
 
 from apps.cbbo.api.assignments import AssignedFPOListView, AssignedFPODetailView, AssignedFPOVerifyDocumentView
+from apps.cbbo.api.dashboard import CBBODashboardStatsView
 from apps.cbbo.api.reports import ReportListCreateView, ReportDetailView, ReportSubmitView
 from apps.cbbo.api.training import (
     TrainingSessionListCreateView, TrainingSessionDetailView, TrainingAttendanceSetView,
@@ -18,6 +19,8 @@ urlpatterns = [
     path('fpos/', AssignedFPOListView.as_view(), name='cbbo-fpo-list'),
     path('fpos/<int:fpo_id>/', AssignedFPODetailView.as_view(), name='cbbo-fpo-detail'),
     path('fpos/<int:fpo_id>/verify-document/<int:doc_id>/', AssignedFPOVerifyDocumentView.as_view(), name='cbbo-fpo-verify-document'),
+    # dashboard.py
+    path('dashboard/stats/', CBBODashboardStatsView.as_view(), name='cbbo-dashboard-stats'),
     # reports.py
     path('reports/', ReportListCreateView.as_view(), name='cbbo-report-list-create'),
     path('reports/<int:report_id>/', ReportDetailView.as_view(), name='cbbo-report-detail'),
