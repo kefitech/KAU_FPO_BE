@@ -8,7 +8,7 @@ from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
-from apps.core.utils.constants import District, FPOStatus
+from apps.core.utils.constants import District, FPOStatus, MAX_REPORT_PARTICIPANTS
 from apps.core.utils.validators import validate_not_only_symbols
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import CapacityBuildingReport
@@ -60,14 +60,14 @@ class _ReportCreateSerializer(_ReportTextValidationMixin, serializers.Serializer
     fpo_id = serializers.IntegerField()
     date = serializers.DateField()
     activities = serializers.CharField(min_length=10)
-    participants_count = serializers.IntegerField(min_value=0, default=0)
+    participants_count = serializers.IntegerField(min_value=0, max_value=MAX_REPORT_PARTICIPANTS, default=0)
     outcomes = serializers.CharField(required=False, allow_blank=True)
  
  
 class _ReportEditSerializer(_ReportTextValidationMixin, serializers.Serializer):
     date = serializers.DateField(required=False)
     activities = serializers.CharField(min_length=10, required=False)
-    participants_count = serializers.IntegerField(min_value=0, required=False)
+    participants_count = serializers.IntegerField(min_value=0, max_value=MAX_REPORT_PARTICIPANTS, required=False)
     outcomes = serializers.CharField(required=False, allow_blank=True)
  
  

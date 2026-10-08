@@ -25,7 +25,7 @@ from apps.core.services.translation import t
 from apps.core.services.audit import AuditService
 from apps.core.models.generic import AuditLog
 from apps.core.utils.validators import validate_not_only_symbols
-from apps.core.utils.constants import FPOStatus
+from apps.core.utils.constants import FPOStatus, MAX_TRAINING_PARTICIPANTS
 from apps.database.models.fpo import FPO
 from apps.database.models.cbbo import TrainingSession, TrainingAttendance
 from apps.cbbo.training_comments import (
@@ -125,7 +125,7 @@ class _SessionCreateSerializer(_SessionTextValidationMixin, serializers.Serializ
     date = serializers.DateField()
     time = serializers.CharField(max_length=10, required=False, allow_blank=True)
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1)
-    participants_count = serializers.IntegerField(min_value=0, default=0)
+    participants_count = serializers.IntegerField(min_value=0, max_value=MAX_TRAINING_PARTICIPANTS, default=0)
     venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
 
     def validate(self, attrs):
@@ -140,7 +140,7 @@ class _SessionEditSerializer(_SessionTextValidationMixin, serializers.Serializer
     date = serializers.DateField(required=False)
     time = serializers.CharField(max_length=10, required=False, allow_blank=True)
     duration_hours = serializers.DecimalField(max_digits=4, decimal_places=1, min_value=0.1, required=False)
-    participants_count = serializers.IntegerField(min_value=0, required=False)
+    participants_count = serializers.IntegerField(min_value=0, max_value=MAX_TRAINING_PARTICIPANTS, required=False)
     venue = serializers.CharField(max_length=300, required=False, allow_blank=True)
 
 
