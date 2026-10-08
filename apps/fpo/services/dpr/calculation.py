@@ -743,9 +743,15 @@ def build_capital_schedule(
     tranches = list(project.capital_tranches.all()) if project.pk else []
     if tranches:
         return _schedule_from_tranches(tranches, cost, mof, implementation_months)
+    # Admin-configurable (2026-10-08): capital_schedule_permit_phasing = 0
+    # reverts to the uniform month-1 draw.
+    _phasing_on = DPRConfig.get_decimal('capital_schedule_permit_phasing', Decimal('1')) > 0
     return _schedule_uniform_fallback(
         cost, mof, implementation_months,
-        capex_start_month=_capex_start_month_from_permits(project, implementation_months),
+        capex_start_month=(
+            _capex_start_month_from_permits(project, implementation_months)
+            if _phasing_on else 1
+        ),
     )
 
 
@@ -1706,6 +1712,28 @@ def build_profit_loss(
         for bucket in OPEX_BUCKETS
     }
 
+    # KAU review 2026-10-08 Pattern 4 — admin-configurable Year-1 ramp-up.
+    # Default OFF (y1_ramp_up_enabled = 0) → byte-identical to the previous
+    # behaviour (100% of entered quantities from Year 1). When KAU enables
+    # it, Year-1 revenue and the volume-driven opex buckets (raw material,
+    # electricity, fuel) are scaled by the FPO's declared Y1 utilisation
+    # (fallback: y1_capacity_utilisation_default_pct), ramping linearly to
+    # 100% over `ramp_up_years`. Salaries and the 'other' bucket stay at
+    # full value (conservative — fixed costs don't shrink with volume).
+    _ramp_enabled = DPRConfig.get_decimal('y1_ramp_up_enabled', Decimal('0')) > 0
+    _ramp_factor_by_year: dict[int, Decimal] = {}
+    if _ramp_enabled:
+        _ramp_years = max(1, int(DPRConfig.get_decimal('ramp_up_years', Decimal('2'))))
+        _cap = getattr(project, 'section_capacity', None)
+        _util_pct = (
+            getattr(_cap, 'first_year_capacity_utilisation_pct', None) if _cap else None
+        ) or DPRConfig.get_decimal('y1_capacity_utilisation_default_pct', Decimal('80'))
+        _util = min(Decimal('1'), max(Decimal('0.1'), Decimal(str(_util_pct)) / Decimal('100')))
+        for _y in range(1, projection_years + 1):
+            _f = _util + (Decimal('1') - _util) * Decimal(_y - 1) / Decimal(_ramp_years)
+            _ramp_factor_by_year[_y] = min(Decimal('1'), _f)
+    _VOLUME_BUCKETS = ('raw_material', 'electricity', 'fuel')
+
     rows: list[ProfitLossRow] = []
     cumulative_pat = Decimal('0')
     cumulative_pat_by_year: dict[int, Decimal] = {}
@@ -1719,7 +1747,17 @@ def build_profit_loss(
                 bucket: (val * opex_multipliers[bucket]).quantize(Decimal('0.01'))
                 for bucket, val in current_opex_by_bucket.items()
             }
-        current_opex = sum(current_opex_by_bucket.values(), Decimal('0'))
+        if _ramp_enabled:
+            _factor = _ramp_factor_by_year.get(year, Decimal('1'))
+            current_rev_eff = (current_rev * _factor).quantize(Decimal('0.01'))
+            current_opex = sum(
+                ((val * _factor).quantize(Decimal('0.01'))
+                 if bucket in _VOLUME_BUCKETS else val)
+                for bucket, val in current_opex_by_bucket.items()
+            )
+        else:
+            current_rev_eff = current_rev
+            current_opex = sum(current_opex_by_bucket.values(), Decimal('0'))
 
         dep = depreciation.total_depreciation_by_year.get(year, Decimal('0'))
         int_row = interest.rows[year - 1] if year - 1 < len(interest.rows) else None
@@ -1731,7 +1769,7 @@ def build_profit_loss(
             if wc_statement is not None else Decimal('0')
         )
 
-        ebitda = current_rev - current_opex
+        ebitda = current_rev_eff - current_opex
         ebit = ebitda - dep
         pbt = ebit - int_charge - wc_int_charge
         tax = (pbt * tax_rate / Decimal('100')).quantize(Decimal('0.01')) if pbt > 0 else Decimal('0')
@@ -1742,7 +1780,7 @@ def build_profit_loss(
 
         rows.append(ProfitLossRow(
             year=year,
-            revenue=current_rev,
+            revenue=current_rev_eff,
             operating_cost=current_opex,
             ebitda=ebitda,
             depreciation=dep,

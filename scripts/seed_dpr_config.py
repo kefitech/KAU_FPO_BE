@@ -192,6 +192,54 @@ CONFIG_SEEDS = [
         'When disabled, all 22 sections are shown to every FPO (Phase 6 rollback path).',
         '', None, None,
     ),
+    # ── KAU appraisal-convention knobs (2026-10-08) ─────────────────────
+    # Raised in the three-questions letter to KAU; each is admin-settable
+    # so KAU sets the convention themselves and can change it later.
+    (
+        'y1_ramp_up_enabled', 'financial', 'decimal', '0',
+        'Year-1 capacity ramp-up (on/off)',
+        'When 1, Year-1 revenue and the volume-driven operating costs '
+        '(raw material, electricity, fuel) are scaled by the FPO\'s declared '
+        'Year-1 capacity utilisation, ramping linearly to 100% over '
+        'ramp_up_years. When 0 (default), projections sell 100% of the '
+        'entered quantities from Year 1 — the pre-2026-10-08 behaviour. '
+        'KAU contradiction review Pattern 4.',
+        '', '0', '1',
+    ),
+    (
+        'ramp_up_years', 'financial', 'decimal', '2',
+        'Ramp-up duration (years)',
+        'Number of years over which utilisation ramps linearly from the '
+        'Year-1 level to 100%. Only used when y1_ramp_up_enabled = 1.',
+        'years', '1', '5',
+    ),
+    (
+        'y1_capacity_utilisation_default_pct', 'financial', 'decimal', '80',
+        'Default Year-1 utilisation',
+        'Fallback Year-1 capacity utilisation when the FPO has not entered '
+        'one in the Capacity section. Only used when y1_ramp_up_enabled = 1.',
+        '%', '10', '100',
+    ),
+    (
+        'capital_schedule_permit_phasing', 'financial', 'decimal', '1',
+        'Phase capex from permit dates (on/off)',
+        'When 1 (default), the indicative capital schedule starts capital '
+        'expenditure from the month the Building Permit / Consent-to-'
+        'Establish are expected (per \u00a72.3.19), with funds mobilised across '
+        'the full window. When 0, capex draws uniformly from Month 1. '
+        'FPO-declared disbursement tranches always override either mode. '
+        'KAU contradiction review Pattern 7.',
+        '', '0', '1',
+    ),
+    (
+        'narrative_thin_margin_threshold_pct', 'ai', 'decimal', '5',
+        'Thin-margin narrative threshold',
+        'PAT-margin level below which the AI narrative must use neutral '
+        'factual language (no "stable margins" / "resilient" claims) and '
+        'quote the sensitivity analysis instead. KAU contradiction review '
+        'Pattern 10 — consumed by the narrative grounding rules.',
+        '%', '0', '25',
+    ),
 ]
 
 

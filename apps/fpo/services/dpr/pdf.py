@@ -320,6 +320,30 @@ def _key_assumptions_rows(project=None) -> list[dict]:
                 'value_pct': f'{a.value}%',
                 'source': 'KAU platform default',
             })
+    # KAU convention knobs (2026-10-08): surface the Year-1 ramp-up in the
+    # assumptions table when the admin has enabled it — the three-questions
+    # letter commits to the factor being visible here.
+    try:
+        from apps.database.models.dpr.config import DPRConfig
+        if DPRConfig.get_decimal('y1_ramp_up_enabled', Decimal('0')) > 0:
+            cap = getattr(project, 'section_capacity', None) if project else None
+            util = getattr(cap, 'first_year_capacity_utilisation_pct', None) if cap else None
+            ramp_years = int(DPRConfig.get_decimal('ramp_up_years', Decimal('2')))
+            if util:
+                rows.append({
+                    'label': f'Year-1 capacity utilisation (ramp to 100% over {ramp_years} yr)',
+                    'value_pct': f'{util}%',
+                    'source': 'Project-entered',
+                })
+            else:
+                default_util = DPRConfig.get_decimal('y1_capacity_utilisation_default_pct', Decimal('80'))
+                rows.append({
+                    'label': f'Year-1 capacity utilisation (ramp to 100% over {ramp_years} yr)',
+                    'value_pct': f'{default_util}%',
+                    'source': 'KAU platform default',
+                })
+    except Exception:  # noqa: BLE001
+        pass
     return rows
 
 
