@@ -335,6 +335,51 @@ def validate_section(section) -> dict[str, Any]:
                 f'full procurement window — please verify the amount.',
             ))
 
+    # KAU contradiction review 2026-10-08 (C03-02): ₹12 lakh of "internal
+    # accruals" from an FPO registered seven months earlier that only
+    # trades raw milk. Sanity: accruals need trading history — warn when
+    # the FPO is under 2 years old, or accruals exceed 50% of the declared
+    # baseline annual turnover (or there is no baseline turnover at all).
+    _accruals = Decimal(str(getattr(section, 'mof_internal_accruals', 0) or 0))
+    if _accruals > 0:
+        try:
+            from datetime import date as _date
+            fpo = section.project.fpo if section.project.fpo_id else None
+            reg_date = getattr(fpo, 'date_of_registration', None) if fpo else None
+            baseline = getattr(section.project, 'section_baseline', None)
+            base_turnover = Decimal(str(
+                getattr(baseline, 'current_annual_turnover', 0) or 0)) if baseline else Decimal('0')
+            age_months = None
+            if reg_date:
+                today = _date.today()
+                age_months = (today.year - reg_date.year) * 12 + (today.month - reg_date.month)
+            if age_months is not None and age_months < 24:
+                warnings.append(_warn(
+                    'accruals_vs_fpo_age', 'mof_internal_accruals',
+                    f'₹{_accruals:,.0f} of internal accruals, but the FPO was '
+                    f'registered only {age_months} month(s) ago — a bank '
+                    f'reviewer will ask how a young FPO accumulated reserves. '
+                    f'If these are member contributions, record them under '
+                    f'share capital or promoter contribution instead.',
+                ))
+            elif base_turnover <= 0:
+                warnings.append(_warn(
+                    'accruals_without_baseline', 'mof_internal_accruals',
+                    f'₹{_accruals:,.0f} of internal accruals but no baseline '
+                    f'annual turnover is declared — accruals come from past '
+                    f'trading, so either declare the existing turnover in the '
+                    f'Baseline section or reclassify this funding line.',
+                ))
+            elif _accruals > base_turnover * Decimal('0.5'):
+                warnings.append(_warn(
+                    'accruals_vs_baseline_turnover', 'mof_internal_accruals',
+                    f'Internal accruals (₹{_accruals:,.0f}) exceed 50% of the '
+                    f'declared baseline annual turnover (₹{base_turnover:,.0f}) '
+                    f'— unusually high retained surplus; please verify.',
+                ))
+        except Exception:  # noqa: BLE001 — cross-section lookups must never break finance validation
+            pass
+
     hard_cost = _sum(section, _HARD_COST_FIELDS)
     contingency = Decimal(str(section.cost_contingencies or 0))
     if hard_cost > 0:

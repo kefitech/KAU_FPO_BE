@@ -150,6 +150,39 @@ def validate_section(section) -> dict[str, Any]:
                 'Please specify — "Others" was selected but no description provided.',
             ))
 
+    # KAU contradiction review 2026-10-08 Pattern 4: five of six sample
+    # DPRs printed "operating at 80% of rated capacity" while the P&L sold
+    # 100% of the listed product capacities from Year 1. Cross-check the
+    # declared Y1 utilisation against the Products section quantities
+    # (same-unit assumption — skipped when installed capacity is missing).
+    try:
+        util = section.first_year_capacity_utilisation_pct
+        installed = section.installed_capacity
+        products = getattr(section.project, 'section_products', None)
+        if (util is not None and util < 100 and installed and installed > 0
+                and products is not None):
+            from decimal import Decimal
+            total_qty = Decimal('0')
+            for item in products.items.all():
+                if item.annual_quantity:
+                    total_qty += Decimal(str(item.annual_quantity))
+            allowed = Decimal(str(installed)) * Decimal(str(util)) / Decimal('100')
+            if total_qty > 0 and total_qty > allowed * Decimal('1.05'):
+                implied_pct = (total_qty * Decimal('100') / Decimal(str(installed))).quantize(Decimal('1'))
+                warnings.append(_warn(
+                    'utilisation_vs_products_mismatch',
+                    'first_year_capacity_utilisation_pct',
+                    f'Year-1 capacity utilisation is declared as {util}%, but '
+                    f'the Products section quantities total {total_qty:,.0f} '
+                    f'— {implied_pct}% of the installed capacity '
+                    f'({installed:,.0f}). The P&L sells the product '
+                    f'quantities, so the narrative\'s "{util}% of rated '
+                    f'capacity" will contradict the financials. Align the '
+                    f'product quantities with the utilisation (or vice versa).',
+                ))
+    except Exception:  # noqa: BLE001 — cross-section shape must never break this validator
+        pass
+
     return {
         'errors': errors,
         'warnings': warnings,

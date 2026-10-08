@@ -187,6 +187,73 @@ def validate_section(section) -> dict[str, Any]:
                     f'strategy) covering the shortfall.',
                 ))
 
+    # KAU review 2026-10-08 Priority-1 cross-checks (tester list):
+    # (a) requirement vs what the baseline turnover implies the FPO
+    #     currently handles (turnover ÷ purchase price ≈ current volume)
+    # (b) requirement vs members' acreage × indicative commodity yield
+    #     (admin-editable MasterLookup category 'commodity_yield',
+    #      kg per acre per year — see seed_commodity_yields.py)
+    try:
+        _UNIT_TO_KG = {'kg': Decimal('1'), 'quintal': Decimal('100'),
+                       'mt': Decimal('1000'), 'tonnes': Decimal('1000')}
+        baseline = getattr(section.project, 'section_baseline', None)
+        base_turnover = Decimal(str(
+            getattr(baseline, 'current_annual_turnover', 0) or 0)) if baseline else Decimal('0')
+        acreage = Decimal(str(getattr(section.project, 'total_area_acreage', 0) or 0))
+        from apps.core.models.generic import MasterLookup
+
+        for i, m in enumerate(materials):
+            req = m.estimated_annual_requirement
+            price = m.approx_purchase_price
+            unit_code = getattr(m.unit_of_purchase, 'code', '') if m.unit_of_purchase_id else ''
+            kg_factor = _UNIT_TO_KG.get(unit_code)
+
+            # (a) scale-up vs baseline — only when both inputs exist.
+            if req and price and price > 0 and base_turnover > 0:
+                implied_current = base_turnover / Decimal(str(price))
+                if implied_current > 0 and req > implied_current * Decimal('8'):
+                    ratio = (req / implied_current).quantize(Decimal('1'))
+                    warnings.append(_warn(
+                        'requirement_vs_baseline_scaleup',
+                        f'materials[{i}].estimated_annual_requirement',
+                        f'The requirement ({req:,.0f} {unit_code or "units"}) is '
+                        f'~{ratio}x what the baseline turnover implies the FPO '
+                        f'currently handles (₹{base_turnover:,.0f} ÷ '
+                        f'₹{price:,.0f}/unit ≈ {implied_current:,.0f}). A scale-up '
+                        f'beyond ~8x needs an explicit aggregation plan in the '
+                        f'narrative — or revisit the baseline turnover.',
+                    ))
+
+            # (b) member-supply ceiling from acreage × indicative yield.
+            if req and kg_factor and acreage > 0:
+                commodity_code = getattr(m.commodity, 'code', '') if getattr(m, 'commodity_id', None) else ''
+                yield_row = MasterLookup.objects.filter(
+                    category='commodity_yield', code=commodity_code,
+                ).first() if commodity_code else None
+                yield_kg_acre = None
+                if yield_row and isinstance(yield_row.metadata, dict):
+                    try:
+                        yield_kg_acre = Decimal(str(yield_row.metadata.get('kg_per_acre_per_year')))
+                    except Exception:  # noqa: BLE001
+                        yield_kg_acre = None
+                if yield_kg_acre and yield_kg_acre > 0:
+                    req_kg = req * kg_factor
+                    member_ceiling_kg = acreage * yield_kg_acre
+                    if req_kg > member_ceiling_kg:
+                        pct = (req_kg * Decimal('100') / member_ceiling_kg).quantize(Decimal('1'))
+                        warnings.append(_warn(
+                            'requirement_vs_member_acreage',
+                            f'materials[{i}].estimated_annual_requirement',
+                            f'The requirement (≈{req_kg:,.0f} kg/yr) is {pct}% of '
+                            f'what the members\' {acreage:,.0f} acres can grow at '
+                            f'an indicative yield of {yield_kg_acre:,.0f} kg/acre/yr '
+                            f'(≈{member_ceiling_kg:,.0f} kg). State the share '
+                            f'sourced from non-member farmers in the sourcing '
+                            f'plan, or adjust the acreage / requirement.',
+                        ))
+    except Exception:  # noqa: BLE001 — cross-section lookups must never break this validator
+        pass
+
     return {
         'errors': errors,
         'warnings': warnings,

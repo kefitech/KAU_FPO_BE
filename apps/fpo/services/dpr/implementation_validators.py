@@ -52,6 +52,41 @@ def validate_section(section) -> dict[str, Any]:
     if not section.monitoring_frequency:
         errors.append(_err('monitoring_frequency_required', 'monitoring_frequency', 'Monitoring Frequency shall be specified.'))
 
+    # KAU contradiction review 2026-10-08 (S03-02, C02-13, Pattern 7):
+    # civil/construction activities scheduled to START before the expected
+    # approval dates of the Building Permit / CTE that the compliance
+    # section says must precede construction. Warn per offending activity.
+    try:
+        import re as _re
+        _CIVIL_RE = _re.compile(
+            r'civil|construction|building|shed|foundation|erection|'
+            r'site prep|land development', _re.IGNORECASE)
+        compliance = getattr(section.project, 'section_compliance', None)
+        permit_dates = []
+        if compliance is not None:
+            for item in compliance.items.select_related('registration'):
+                code = getattr(item.registration, 'code', '') if item.registration_id else ''
+                if code in ('building_permit', 'consent_establish') and item.expected_date_of_approval:
+                    if item.status != 'available':
+                        permit_dates.append((code, item.expected_date_of_approval))
+        if permit_dates:
+            latest_code, latest_date = max(permit_dates, key=lambda t: t[1])
+            for i, act in enumerate(section.activities.all()):
+                if not act.proposed_start_date:
+                    continue
+                if _CIVIL_RE.search(act.activity_name or '') and act.proposed_start_date < latest_date:
+                    warnings.append(_warn(
+                        'civil_before_permit', f'activities[{i}].proposed_start_date',
+                        f'"{act.activity_name}" starts {act.proposed_start_date:%d %b %Y}, '
+                        f'before the expected approval of '
+                        f'{"the Building Permit" if latest_code == "building_permit" else "the Consent to Establish (CTE)"} '
+                        f'({latest_date:%d %b %Y}). Construction cannot legally begin '
+                        f'before these clearances — move the activity after the '
+                        f'approval date or update the expected date in §2.3.19.',
+                    ))
+    except Exception:  # noqa: BLE001 — cross-section lookups must never break this validator
+        pass
+
     return {
         'errors': errors,
         'warnings': warnings,
