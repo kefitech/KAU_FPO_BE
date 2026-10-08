@@ -42,6 +42,7 @@ from apps.core.services.subadmin_district import (
 )
 from apps.core.views import TranslatedViewSet
 from apps.database.models.fpo import FPO
+from apps.database.models.user import UserProfile
 from apps.database.models.subadmin import (
     SubAdminDistrictAssignment,
     SubAdminDistrictTransfer,
@@ -49,6 +50,17 @@ from apps.database.models.subadmin import (
 from apps.notifications.services import send_notification
 
 logger = logging.getLogger(__name__)
+
+
+PHONE_IN_USE = 'This phone number is already in use by another sub-admin.'
+
+
+def _phone_taken(phone, exclude_user_id=None):
+    """True if another sub-admin already has this (cleaned) phone number."""
+    qs = UserProfile.objects.filter(phone=phone, user__groups__name=UserRole.SUB_ADMIN)
+    if exclude_user_id is not None:
+        qs = qs.exclude(user_id=exclude_user_id)
+    return qs.exists()
 
 
 def _get_sub_admin_permissions():
@@ -147,9 +159,11 @@ class SubAdminCreateSerializer(serializers.Serializer):
     def validate_phone(self, value):
         if value:
             try:
-                return validate_indian_phone(value)   # stores the cleaned 10 digits
+                value = validate_indian_phone(value)   # stores the cleaned 10 digits
             except DjangoValidationError as e:
                 raise serializers.ValidationError(e.messages[0])
+            if _phone_taken(value):
+                raise serializers.ValidationError(PHONE_IN_USE)
         return value
 
     def validate(self, attrs):
@@ -278,6 +292,16 @@ class SubAdminUpdateSerializer(serializers.Serializer):
 
     def validate_last_name(self, value):
         return _validate_name(value, 'Last name') if value else value
+
+    def validate_phone(self, value):
+        if value:
+            try:
+                value = validate_indian_phone(value)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(e.messages[0])
+            if _phone_taken(value, exclude_user_id=getattr(self.instance, 'pk', None)):
+                raise serializers.ValidationError(PHONE_IN_USE)
+        return value
 
 
 @extend_schema_view(
@@ -421,7 +445,7 @@ class SubAdminViewSet(TranslatedViewSet):
         lang = self.get_language()
         user = self.get_object()
 
-        serializer = SubAdminUpdateSerializer(data=request.data, partial=True)
+        serializer = SubAdminUpdateSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         first_name = serializer.validated_data.get('first_name')
         last_name  = serializer.validated_data.get('last_name')
@@ -438,11 +462,6 @@ class SubAdminViewSet(TranslatedViewSet):
             user.save(update_fields=user_fields)
 
         if phone is not None:
-            if phone:
-                try:
-                    phone = validate_indian_phone(phone)
-                except DjangoValidationError as e:
-                    raise serializers.ValidationError({'phone': e.messages[0]})
             profile = user.profile
             profile.phone = phone
             profile.save(update_fields=['phone'])
@@ -455,7 +474,10 @@ class SubAdminViewSet(TranslatedViewSet):
     def destroy(self, request, *args, **kwargs):
         lang = self.get_language()
         obj  = self.get_object()
+        district = self._district_of(obj)
         obj.delete()
+        if district:
+            bust_district_count_cache(district)
         return StandardResponse.success(message=t(self.destroy_message, lang))
 
     @extend_schema(
@@ -519,8 +541,21 @@ class SubAdminViewSet(TranslatedViewSet):
     def activate(self, request, pk=None):
         lang = self.get_language()
         user = self.get_object()
+        district = self._district_of(user)
+
+        # Reactivating puts the sub-admin back into their district's count,
+        # so it must respect the cap just like create/transfer do.
+        if not user.is_active and district:
+            bust_district_count_cache(district)   # cap check needs a fresh count
+            try:
+                check_cap(district)
+            except ValueError as e:
+                return StandardResponse.error(message=str(e), errors={'district': [str(e)]}, status_code=400)
+
         user.is_active = True
         user.save()
+        if district:
+            bust_district_count_cache(district)
         return StandardResponse.success(
             data=SubAdminSerializer(user).data,
             message=t('admin.sub_admin_activated', lang),
@@ -533,6 +568,9 @@ class SubAdminViewSet(TranslatedViewSet):
         user = self.get_object()
         user.is_active = False
         user.save()
+        district = self._district_of(user)
+        if district:
+            bust_district_count_cache(district)
         return StandardResponse.success(
             data=SubAdminSerializer(user).data,
             message=t('admin.sub_admin_deactivated', lang),
@@ -1018,6 +1056,9 @@ class SubAdminViewSet(TranslatedViewSet):
                 phone = validate_indian_phone(phone)   # strips spaces / +91
             except DjangoValidationError:
                 problems.append('phone must be a 10-digit Indian mobile number starting with 6, 7, 8 or 9.')
+            else:
+                if _phone_taken(phone):
+                    problems.append(PHONE_IN_USE)
 
         if not district:
             problems.append('district is required.')
@@ -1081,6 +1122,14 @@ class SubAdminViewSet(TranslatedViewSet):
         return user
 
     # ─── Permissions helper (unchanged) ─────────────────────────────────
+
+    @staticmethod
+    def _district_of(user):
+        """District code the sub-admin counts against, or '' if unassigned."""
+        assignment = SubAdminDistrictAssignment.objects.filter(
+            subadmin=user, is_deleted=False,
+        ).only('district').first()
+        return assignment.district if assignment else ''
 
     def _assign_permissions(self, user, codenames, action='replace'):
         """Add, remove, or replace sub-admin permissions."""
