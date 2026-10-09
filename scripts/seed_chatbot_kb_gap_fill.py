@@ -29,6 +29,7 @@ FPO = ['fpo_manager']
 ADMIN = ['super_admin', 'sub_admin']
 GOV = ['government']
 CBBO = ['cbbo']
+EXPERT_ROLE = ['expert']
 
 ENTRIES = [
     # ── Landing page / public ───────────────────────────────────────────
@@ -404,11 +405,89 @@ ENTRIES = [
         ),
     ),
 
+
+    # ── Expert portal (Pass-2 refusals, 2026-10-09) ─────────────────────
+    dict(
+        topic='Expert portal — availability, leave dates and slot capacity',
+        audiences=EXPERT_ROLE + ADMIN,
+        keywords='set availability block dates leave absent mark date max bookings time slot capacity weekly pattern pick dates confirm save',
+        body=(
+            'On Set Availability you define when FPOs can book you: pick the '
+            'dates, the weekdays, and the time slots for each. Each slot has a '
+            '"max bookings" number — how many confirmed appointments that slot '
+            'can hold; once that many are confirmed the slot stops appearing to '
+            'FPOs. To block leave days, mark those dates as absent (or simply '
+            'give them no slots). If you mark a date absent that already has a '
+            'confirmed booking, the platform flags the conflict and the FPO is '
+            'notified so the appointment can be rearranged. Your date and slot '
+            'selections are shown for review before you confirm and save.'
+        ),
+    ),
+    dict(
+        topic='Expert portal — handling booking requests (confirm, reject, reschedule, cancel)',
+        audiences=EXPERT_ROLE + ADMIN,
+        keywords='booking statuses meaning pending confirmed rejected cancelled completed confirm reject reschedule cancel confirmed appointment reconsider rejected again fpo details on booking filter bookings by status date fpo other experts',
+        body=(
+            'A booking request arrives as Pending with the FPO\'s name, '
+            'application ID, requested date and time, topic and notes — that is '
+            'the FPO detail you see. You Confirm or Reject it (the FPO is '
+            'notified either way, with your reason on rejection). A rejected '
+            'request is closed — if you change your mind, ask the FPO to book a '
+            'fresh slot. You can propose a different slot instead (reschedule — '
+            'the FPO is notified of the new proposal), and you can cancel even '
+            'an already-confirmed appointment with a reason, which also '
+            'notifies the FPO. After the session takes place it is marked '
+            'Completed. My Bookings lists only YOUR appointments — bookings '
+            'with other experts are never visible or actionable — and the list '
+            'can be filtered by status, date and FPO.'
+        ),
+    ),
+    dict(
+        topic='Becoming an expert on the platform',
+        audiences=PUB,
+        keywords='register as expert how to become expert join directory onboard expert account',
+        body=(
+            'Experts are onboarded by the KAU administrator — there is no '
+            'self-registration form for experts. If you wish to be listed in '
+            'the expert directory, contact KAU with your designation, '
+            'organisation and areas of expertise; the admin creates your '
+            'profile and login credentials, and you are notified by email.'
+        ),
+    ),
+    dict(
+        topic='What is a Producer Company (FPC)?',
+        audiences=PUB,
+        keywords='producer company what is FPC farmer producer company definition difference society',
+        body=(
+            'A Producer Company (FPC) is a company owned entirely by primary '
+            'producers — farmers — registered under the Producer Companies '
+            'provisions of the Companies Act. Members are shareholders, voting '
+            'is one-member-one-vote regardless of shareholding, profits are '
+            'shared with members, and the board must have 5 to 15 directors. '
+            'It is one of the legal structures an FPO can take; others include '
+            'registration under a state Co-operative Societies Act. The legal '
+            'structure is chosen when the FPO is formed and entered during '
+            'platform registration.'
+        ),
+    ),
+    dict(
+        topic='Expert bookings — one pending request at a time',
+        audiences=FPO,
+        keywords='book two experts same time multiple bookings pending limit second booking enquiry message minimum length',
+        body=(
+            'An FPO can have only one PENDING expert booking request at a '
+            'time — submit a new request after the current one is confirmed, '
+            'rejected or cancelled. This keeps expert calendars fair. Separate '
+            'enquiry messages (without booking) can be sent to any expert at '
+            'any time from their profile.'
+        ),
+    ),
+
     # ── Government officials ────────────────────────────────────────────
     dict(
         topic='Government official registration — what happens after submitting',
         audiences=GOV + PUB,
-        keywords='government official register submit form what happens pending approval approved rejected credentials jurisdiction details shown',
+        keywords='government official register submit form what happens pending approval approved rejected credentials jurisdiction details shown regstr govt oficer officer',
         body=(
             'After you submit the government-official registration form, your '
             'application goes to the KAU admin for review — it appears in their '
@@ -436,7 +515,9 @@ ENTRIES = [
             'training lists as well, so prefer editing over deleting once FPOs '
             'are notified. The organisation dropdown at registration is '
             'admin-managed — if your organisation is missing, contact the KAU '
-            'admin to have it added; you cannot add one yourself.'
+            'admin to have it added; you cannot add one yourself. When you '
+            'reject an FPO\'s registration for a session, the FPO is notified '
+            'and can be registered again later once the issue is resolved.'
         ),
     ),
     dict(

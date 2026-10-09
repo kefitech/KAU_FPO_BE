@@ -17,7 +17,8 @@ import re
 
 logger = logging.getLogger(__name__)
 
-MALAYALAM_RE = re.compile(r'[ഀ-ൿ]')
+# Malayalam + Devanagari (Hindi) — both need translation for the English KB.
+MALAYALAM_RE = re.compile(r'[ഀ-ൿऀ-ॿ]')
 
 _PROMPT = (
     'Translate the following user question to English. Reply with ONLY '
