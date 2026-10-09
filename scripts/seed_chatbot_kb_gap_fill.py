@@ -149,8 +149,8 @@ ENTRIES = [
     # ── FPO portal ──────────────────────────────────────────────────────
     dict(
         topic='FPO tier system — tiers, how the tier is decided, and how to improve',
-        audiences=FPO + ADMIN,
-        keywords='tier A B C D what tiers how decided grading score assessment 28 questions domains improve upgrade reach tier history previous year Q2 Q7 Q21 question numbers suggestions',
+        audiences=PUB,
+        keywords='tier A B C D what tiers different tiers how decided grading score assessment 28 questions domains improve upgrade reach tier history previous year Q2 Q7 Q21 question numbers suggestions',
         pages=['/fpo/*'],
         body=(
             'FPOs are graded into tiers A, B, C and D. The grade comes from the '
@@ -232,7 +232,7 @@ ENTRIES = [
     dict(
         topic='Expert consultations — slots, status, rescheduling and what to expect',
         audiences=FPO,
-        keywords='consultation slot length duration online video call link appointment status rescheduled greyed out dates calendar accept declined again certificate completed expert not replying',
+        keywords='consultation slot length duration online video call link appointment status rescheduled greyed out dates calendar accept accepted declined again certificate completed expert not replying not working bok apointmnt expart book appointment',
         body=(
             'Appointment slots are defined by each expert when they set their '
             'availability — the start and end time of the slot you pick is the '
@@ -253,7 +253,7 @@ ENTRIES = [
     dict(
         topic='Interface basics — dark mode, side menu, and changing your password',
         audiences=FPO + ADMIN + GOV + CBBO,
-        keywords='dark mode theme toggle light hide side menu collapse sidebar change password how to',
+        keywords='dark mode theme toggle light hide side menu collapse sidebar change password how to chnge pasword paswrd',
         body=(
             'Use the theme toggle in the top bar to switch between light and dark '
             'mode. The side menu can be collapsed with the menu (hamburger) control '
@@ -312,7 +312,7 @@ ENTRIES = [
     dict(
         topic='Admin — platform counts and directories (FPOs, officials, buyers, feedback)',
         audiences=ADMIN,
-        keywords='how many fpos approved district count government officials cbbo officers registered buyers directory feedback unread resolve latest dashboard stats',
+        keywords='how many fpos approved district count aproved tvm government officials cbbo officers registered buyers directory organisation feedback unread resolve latest dashboard stats compare farms',
         body=(
             'Live counts are on the admin dashboard: total and district-wise '
             'approved FPOs, tier distribution and monthly trends. Directories have '
