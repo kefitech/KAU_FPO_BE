@@ -24,6 +24,10 @@ from rest_framework.views import APIView
 from apps.core.utils.responses import StandardResponse
 from apps.chatbot.services.fallback_contacts import augment_reply as augment_fallback
 from apps.chatbot.services.gemini_answer import generate_answer as gemini_generate
+from apps.chatbot.services.answer_cache import (
+    get_cached as cache_get_answer,
+    store as cache_store_answer,
+)
 from apps.chatbot.services.history import ensure_conversation, recent_turns, save_turn
 from apps.chatbot.services.qa_client import ask as qa_ask
 from apps.chatbot.services.retrieve import retrieve
@@ -262,6 +266,24 @@ class ChatMessageView(APIView):
         if not entries:
             return _reply(_fallback_reply(lang), generator='none', confidence=0.0)
 
+        # Answer cache (2026-10-09): replay a stored Gemini answer for a
+        # repeat STANDALONE question — instant, free, and still available
+        # when Gemini itself is down. Follow-ups (prior turns exist) are
+        # context-bound and never cached/replayed. The key embeds role,
+        # language and the retrieved entries' versions, so role scoping
+        # holds and any KB edit orphans old answers automatically. The
+        # per-user district contacts footer is re-applied by _reply().
+        is_standalone = not prior
+        if is_standalone:
+            cached = cache_get_answer(message, user_role, lang, entries)
+            if cached:
+                return _reply(
+                    cached['text'],
+                    generator='gemini_cached',
+                    sources=[{'topic': e.topic, 'id': e.id} for e in entries],
+                    extra={'model': cached.get('model', '')},
+                )
+
         # Primary path — Gemini via the shared LLM gateway. Returns None if
         # the service is disabled, over budget, or the call errors — in any
         # of those cases we fall through to the extractive QA fallback.
@@ -275,6 +297,11 @@ class ChatMessageView(APIView):
             user_role=user_role or 'public',
         )
         if gemini_result is not None:
+            if is_standalone:
+                cache_store_answer(
+                    message, user_role, lang, entries,
+                    text=gemini_result['text'], model=gemini_result['model'],
+                )
             return _reply(
                 gemini_result['text'],
                 generator='gemini',
