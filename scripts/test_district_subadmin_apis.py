@@ -60,7 +60,7 @@ def run_all():
         'test.sa@kau.in', 'test.sub.tsr@kau.in',
         'bulk1@kau.in', 'bulk2@kau.in', 'bulk4@kau.in', 'bulk5@kau.in', 'bad_email',
         'sub.dpr@kau.in', 'sub.nodpr@kau.in',
-        'sub.schemes@kau.in', 'sub.other@kau.in',
+        'sub.schemes@kau.in', 'sub.other@kau.in', 'sub.nodistrict@kau.in',
     ]
     User.objects.filter(email__in=_EMAILS_TO_CLEAN).delete()
     print(f'  purged {len(_EMAILS_TO_CLEAN)} potential leftover accounts')
@@ -221,6 +221,11 @@ def run_all():
     sub_scoped = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), sub_tsr).count()
     _pass('sub sees only PKD', pkd_count, sub_scoped)
 
+    # sub with no district sees nothing — there is no per-FPO fallback
+    sub_no_district = _mk('sub.nodistrict@kau.in', [sub_g])
+    nodist_scoped = scope_fpo_queryset(FPO.objects.filter(is_deleted=False), sub_no_district).count()
+    _pass('sub without district sees nothing', 0, nodist_scoped)
+
     # -----------------------------------------------------------------
     # 9. Permission gate — DPR
     # -----------------------------------------------------------------
@@ -347,7 +352,8 @@ def run_all():
 
     # Delete throwaway users + schemes
     for email in ['test.sa@kau.in', 'test.sub.tsr@kau.in', 'bulk1@kau.in', 'bulk2@kau.in',
-                  'sub.dpr@kau.in', 'sub.nodpr@kau.in', 'sub.schemes@kau.in', 'sub.other@kau.in']:
+                  'sub.dpr@kau.in', 'sub.nodpr@kau.in', 'sub.schemes@kau.in', 'sub.other@kau.in',
+                  'sub.nodistrict@kau.in']:
         User.objects.filter(email=email).delete()
     Scheme.objects.filter(pk=scheme_id).delete()
     print('  test users + schemes cleaned up')

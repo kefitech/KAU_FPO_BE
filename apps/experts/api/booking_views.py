@@ -1,17 +1,28 @@
 """
 Expert Booking API - P2-08
-FPO-side:
-  GET  /api/experts/{id}/availability/    - browse open slots for an expert
-  POST /api/experts/{id}/book/            - submit a booking request
-  POST /api/experts/bookings/{id}/cancel/ - FPO cancels a booking
 
-Expert-side:
-  POST /api/experts/me/availability/            - publish availability slots
-  GET  /api/experts/me/bookings/                - list bookings for the expert
-  POST /api/experts/me/bookings/{id}/confirm/   - confirm a pending request
-  POST /api/experts/me/bookings/{id}/reject/    - reject with a reason
-  POST /api/experts/me/bookings/{id}/reschedule/ - propose a new date/time
+Bookings belong to an individual FPO member and are first come, first served:
+booking an open slot confirms it at once, with no expert approval step. A
+member may hold at most one appointment per calendar day, with any expert.
+
+FPO member side:
+  GET  /api/experts/{id}/availability/    - browse an expert's open slots
+  POST /api/experts/{id}/book/            - book a slot (confirmed immediately)
+  GET  /api/experts/bookings/             - my bookings (?scope=fpo for the whole FPO)
+  POST /api/experts/bookings/{id}/cancel/ - cancel my booking (the FPO primary may cancel any)
+
+Expert / admin side:
+  POST     /api/experts/admin/{id}/availability/    - set slots per date
+  GET/POST /api/experts/admin/{id}/weekly-defaults/ - weekly template
+  GET      /api/experts/admin/bookings/             - bookings (an expert sees only their own)
+  POST     /api/experts/admin/bookings/{id}/cancel/ - expert cancels a confirmed booking
+  confirm / reject / reschedule remain only for legacy pending rows.
 """
+from django.conf import settings as django_settings
+from django.contrib.auth.models import User
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
@@ -75,6 +86,10 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
     fpo_district = serializers.SerializerMethodField()
     fpo_registration_number = serializers.SerializerMethodField()
     fpo_total_members = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
+    user_email = serializers.SerializerMethodField()
+    user_phone = serializers.SerializerMethodField()
+    can_cancel = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -83,6 +98,7 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
             'id', 'expert', 'expert_name', 'fpo', 'fpo_name', 'fpo_email', 'fpo_phone',
             'fpo_contact_name', 'fpo_application_id', 'fpo_location',
             'fpo_district', 'fpo_registration_number', 'fpo_total_members',
+            'user', 'user_name', 'user_email', 'user_phone', 'can_cancel',
             'requested_date', 'requested_time',
             'topic', 'notes', 'status', 'status_display', 'cancellation_reason',
             'created_at', 'updated_at',
@@ -90,6 +106,27 @@ class ExpertBookingSerializer(serializers.ModelSerializer):
 
     def get_expert_name(self, obj):
         return obj.expert.name_en
+
+    # The member who made the booking. Rows from before bookings were per user
+    # have no user; the fpo_* fields still describe the FPO's primary contact.
+    def get_user_name(self, obj):
+        if not obj.user:
+            return None
+        return obj.user.get_full_name() or obj.user.username
+
+    def get_user_email(self, obj):
+        return obj.user.email if obj.user else None
+
+    def get_user_phone(self, obj):
+        profile = getattr(obj.user, 'profile', None) if obj.user else None
+        return profile.phone if profile else None
+
+    def get_can_cancel(self, obj):
+        """Whether the requesting user may cancel this booking. Needs `request` in context."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.status in LIVE_STATUSES and _can_cancel_booking(request.user, obj)
 
     def get_fpo_name(self, obj):
         return obj.fpo.name
@@ -160,6 +197,130 @@ def _can_manage_expert(user, expert):
     return _is_admin(user) or (expert.is_active and expert.user_id and expert.user_id == user.id)
 
 
+# ---------------------------------------------------------------------------
+# Booking rules
+# ---------------------------------------------------------------------------
+# How many upcoming appointments one member may hold at a time (stops slot hoarding).
+MAX_UPCOMING_BOOKINGS_PER_USER = getattr(django_settings, 'EXPERT_MAX_UPCOMING_BOOKINGS_PER_USER', 5)
+
+# Statuses that hold a place in the calendar.
+LIVE_STATUSES = (ExpertBooking.Status.PENDING, ExpertBooking.Status.CONFIRMED)
+
+
+def _time_str(t):
+    return t.strftime('%H:%M')
+
+
+def _slot_is_past(date, start_time):
+    now = timezone.localtime()
+    return date < now.date() or (date == now.date() and start_time <= now.time())
+
+
+def _find_slot(avail, slot_id=None, start_time=None, lock=False):
+    """The slot on `avail` picked by id (preferred) or by start time, or None."""
+    qs = ExpertTimeSlot.objects.filter(availability=avail, is_deleted=False)
+    if lock:
+        qs = qs.select_for_update()
+    if slot_id:
+        return qs.filter(id=slot_id).first()
+    return qs.filter(start_time=start_time).first()
+
+
+def _user_bookings_by_date(user, dates, exclude_pk=None):
+    """The member's live bookings on `dates`, keyed by date (earliest first wins)."""
+    qs = ExpertBooking.objects.filter(
+        user=user, status__in=LIVE_STATUSES, is_deleted=False, requested_date__in=list(dates),
+    ).select_related('expert').order_by('requested_time')
+    if exclude_pk:
+        qs = qs.exclude(pk=exclude_pk)
+    by_date = {}
+    for booking in qs:
+        by_date.setdefault(booking.requested_date, booking)
+    return by_date
+
+
+def _user_conflict_error(user, slot, date, exclude_pk=None, subject='You already have'):
+    """
+    Rules that stop one person holding two places at once: no second booking of
+    the same slot, and at most one live booking (with any expert) per calendar
+    day. Returns an error message, or None when allowed.
+    """
+    live = ExpertBooking.objects.filter(user=user, status__in=LIVE_STATUSES, is_deleted=False)
+    if exclude_pk:
+        live = live.exclude(pk=exclude_pk)
+
+    if live.filter(time_slot=slot).exists():
+        return f'{subject} a booking for this exact slot.'
+
+    other = _user_bookings_by_date(user, [date], exclude_pk=exclude_pk).get(date)
+    if other:
+        return (
+            f'{subject} an appointment on {other.requested_date} with {other.expert.name_en} '
+            f'at {other.requested_time}. Only one appointment per day is allowed.'
+        )
+    return None
+
+
+def _can_cancel_booking(user, booking):
+    """
+    The member who made the booking may cancel it, and so may the FPO's primary
+    user. Legacy rows with no booker fall back to the FPO-wide permission.
+    """
+    if booking.user_id:
+        return user.id in (booking.user_id, booking.fpo.primary_user_id)
+    return has_fpo_permission(user, booking.fpo, 'can_book_experts')
+
+
+def _booking_recipient(booking):
+    """Who hears about changes to a booking: the member who made it, else the FPO's primary user."""
+    return booking.user or booking.fpo.primary_user
+
+
+def _remove_slot(slot, user, cancelled, rejected):
+    """
+    Soft-delete `slot`. Confirmed bookings on it are cancelled and pending
+    requests rejected, so no FPO is left holding a booking on a slot that no
+    longer exists. Affected bookings are appended to `cancelled` / `rejected`
+    for the caller to notify.
+    """
+    live = ExpertBooking.objects.filter(
+        time_slot=slot, status__in=LIVE_STATUSES, is_deleted=False,
+    ).select_related('fpo', 'fpo__primary_user', 'user')
+    for booking in live:
+        if booking.status == ExpertBooking.Status.CONFIRMED:
+            booking.status = ExpertBooking.Status.CANCELLED
+            booking.cancellation_reason = 'Expert marked this date as unavailable.'
+            cancelled.append(booking)
+        else:
+            booking.status = ExpertBooking.Status.REJECTED
+            booking.cancellation_reason = 'Expert removed this time slot.'
+            rejected.append(booking)
+        booking.save(update_fields=['status', 'cancellation_reason'])
+    slot.soft_delete(user=user)
+
+
+def _notify_expert_in_app(expert, code, context):
+    """In-app notification to the expert's own login, when they have one; failures are swallowed."""
+    if not expert.user_id:
+        return
+    try:
+        send_notification(user=expert.user, code=code, channel='in_app', context=context)
+    except Exception:
+        pass
+
+
+def _notify_booker(booking, code, context):
+    """Email + in-app notification to the booking's member; failures are swallowed."""
+    recipient = _booking_recipient(booking)
+    if not recipient:
+        return
+    for channel in ('email', 'in_app'):
+        try:
+            send_notification(user=recipient, code=code, channel=channel, context=context)
+        except Exception:
+            pass
+
+
 
 class ExpertAvailabilityView(APIView):
     permission_classes = [IsAuthenticated]
@@ -202,6 +363,10 @@ class ExpertAvailabilityView(APIView):
             .values_list('time_slot_id', 'n')
         )
 
+        # One appointment per day: dates the caller already holds a booking on
+        # (with any expert) are reported so the calendar can mark them unavailable.
+        my_bookings = _user_bookings_by_date(request.user, [a.date for a in avails])
+
         data = []
         for a in avails:
             slots = []
@@ -215,14 +380,20 @@ class ExpertAvailabilityView(APIView):
                     'confirmed_count': count,
                     'is_booked': count >= s.max_bookings,
                 })
-            data.append({'id': a.id, 'date': str(a.date), 'time_slots': slots})
+            mine = my_bookings.get(a.date)
+            data.append({
+                'id': a.id,
+                'date': str(a.date),
+                'time_slots': slots,
+                'my_booking': {'expert_name': mine.expert.name_en, 'time': mine.requested_time} if mine else None,
+            })
 
         return StandardResponse.success(data=data)
 
 class CreateBookingView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=['Expert Booking'], summary='Request a booking', request=CreateBookingSerializer)
+    @extend_schema(tags=['Expert Booking'], summary='Book a slot (first come, first served)', request=CreateBookingSerializer)
     def post(self, request, pk):
         if not request.user.groups.filter(name=UserRole.FPO_MANAGER).exists():
             return StandardResponse.error('Only FPO members can book experts.', status_code=status.HTTP_403_FORBIDDEN)
@@ -232,12 +403,6 @@ class CreateBookingView(APIView):
             return StandardResponse.error('Your FPO must be approved to book experts.', status_code=status.HTTP_403_FORBIDDEN)
         if not has_fpo_permission(request.user, fpo, 'can_book_experts'):
             return StandardResponse.error('You do not have permission to book experts.', status_code=status.HTTP_403_FORBIDDEN)
-
-        if ExpertBooking.objects.filter(fpo=fpo, status=ExpertBooking.Status.PENDING, is_deleted=False).exists():
-            return StandardResponse.error(
-                'You already have a pending booking request. Please wait for it to be confirmed or rejected before requesting another.',
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
 
         try:
             expert = Expert.objects.get(pk=pk, is_deleted=False, is_active=True)
@@ -254,37 +419,62 @@ class CreateBookingView(APIView):
         if not avail:
             return StandardResponse.error('No availability found for that date.', status_code=status.HTTP_400_BAD_REQUEST)
 
-        if data.get('time_slot_id'):
-            slot = ExpertTimeSlot.objects.filter(
-                id=data['time_slot_id'], availability=avail, is_deleted=False
-            ).first()
-        else:
-            slot = ExpertTimeSlot.objects.filter(
-                availability=avail, start_time=data['requested_time'], is_deleted=False
-            ).first()
-        if not slot:
-            return StandardResponse.error('That time slot does not exist.', status_code=status.HTTP_400_BAD_REQUEST)
-        if slot.is_full:
-            return StandardResponse.error('That slot is already fully booked.', status_code=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            # Lock the slot row so two people cannot both take its last place, and
+            # the member's own row so a double submit cannot pass the per-user
+            # rules twice.
+            User.objects.select_for_update().get(pk=request.user.pk)
+            slot = _find_slot(avail, slot_id=data.get('time_slot_id'), start_time=data['requested_time'], lock=True)
+            if not slot:
+                return StandardResponse.error('That time slot does not exist.', status_code=status.HTTP_400_BAD_REQUEST)
+            if _slot_is_past(avail.date, slot.start_time):
+                return StandardResponse.error('That time slot has already passed.', status_code=status.HTTP_400_BAD_REQUEST)
+            if slot.is_full:
+                return StandardResponse.error('That slot is already fully booked.', status_code=status.HTTP_400_BAD_REQUEST)
 
-        booking = ExpertBooking.objects.create(
-            expert=expert, fpo=fpo, time_slot=slot,
-            requested_date=data['requested_date'], requested_time=data['requested_time'],
-            topic=data['topic'], notes=data.get('notes', ''),
-        )
+            upcoming = ExpertBooking.objects.filter(
+                user=request.user, status=ExpertBooking.Status.CONFIRMED, is_deleted=False,
+                requested_date__gte=timezone.localdate(),
+            ).count()
+            if upcoming >= MAX_UPCOMING_BOOKINGS_PER_USER:
+                return StandardResponse.error(
+                    f'You already have {upcoming} upcoming appointments. Cancel one before booking another.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
+            error = _user_conflict_error(request.user, slot, avail.date)
+            if error:
+                return StandardResponse.error(error, status_code=status.HTTP_400_BAD_REQUEST)
+
+            # First come, first served: the slot is confirmed the moment it is booked.
+            booking = ExpertBooking.objects.create(
+                expert=expert, fpo=fpo, user=request.user, time_slot=slot,
+                requested_date=avail.date, requested_time=_time_str(slot.start_time),
+                topic=data['topic'], notes=data.get('notes', ''),
+                status=ExpertBooking.Status.CONFIRMED,
+                created_by=request.user,
+            )
+
+        user_name = request.user.get_full_name() or request.user.username
+        expert_context = {
+            'expert_name': expert.name_en, 'fpo_name': fpo.name, 'user_name': user_name,
+            'date': str(booking.requested_date), 'time': booking.requested_time, 'topic': booking.topic,
+        }
         try:
             send_notification(
-                user=request.user, code='expert_booking_requested', channel='email',
-                context={'expert_name': expert.name_en, 'fpo_name': fpo.name, 'date': str(data['requested_date']), 'time': data['requested_time']},
-                override_recipient=expert.email,
+                user=expert.user or request.user, code='expert_booking_new', channel='email',
+                context=expert_context, override_recipient=expert.email,
             )
         except Exception:
             pass
+        _notify_expert_in_app(expert, 'expert_booking_new', expert_context)
+        _notify_booker(booking, 'expert_booking_receipt', {
+            'expert_name': expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time,
+        })
 
         return StandardResponse.success(
-            data=ExpertBookingSerializer(booking).data,
-            message='Booking request submitted. The expert will confirm shortly.',
+            data=ExpertBookingSerializer(booking, context={'request': request}).data,
+            message='Appointment booked.',
             status_code=status.HTTP_201_CREATED,
         )
 
@@ -292,16 +482,20 @@ class CreateBookingView(APIView):
 class CancelBookingView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=['Expert Booking'], summary='FPO cancels a booking')
+    @extend_schema(tags=['Expert Booking'], summary="Cancel my booking (the FPO primary may cancel any member's)")
     def post(self, request, pk):
         fpo = _get_fpo(request.user)
-        booking = ExpertBooking.objects.filter(pk=pk, fpo=fpo, is_deleted=False).first()
+        booking = (
+            ExpertBooking.objects.filter(pk=pk, fpo=fpo, is_deleted=False)
+            .select_related('expert', 'expert__user', 'fpo', 'user')
+            .first()
+        )
         if not booking:
             return StandardResponse.error('Booking not found.', status_code=status.HTTP_404_NOT_FOUND)
-        if not has_fpo_permission(request.user, fpo, 'can_book_experts'):
-            return StandardResponse.error('You do not have permission to cancel bookings.', status_code=status.HTTP_403_FORBIDDEN)
+        if not _can_cancel_booking(request.user, booking):
+            return StandardResponse.error('You can only cancel your own bookings.', status_code=status.HTTP_403_FORBIDDEN)
 
-        if booking.status not in (ExpertBooking.Status.PENDING, ExpertBooking.Status.CONFIRMED):
+        if booking.status not in LIVE_STATUSES:
             return StandardResponse.error('This booking cannot be cancelled.', status_code=status.HTTP_400_BAD_REQUEST)
 
         reason = request.data.get('reason', '')
@@ -309,16 +503,24 @@ class CancelBookingView(APIView):
         booking.cancellation_reason = reason
         booking.save(update_fields=['status', 'cancellation_reason'])
 
+        booker = booking.user or request.user
+        expert_context = {
+            'fpo_name': fpo.name, 'user_name': booker.get_full_name() or booker.username,
+            'date': str(booking.requested_date), 'time': booking.requested_time, 'reason': reason,
+        }
         try:
             send_notification(
-                user=request.user, code='expert_booking_cancelled', channel='email',
-                context={'fpo_name': fpo.name, 'date': str(booking.requested_date), 'time': booking.requested_time, 'reason': reason},
-                override_recipient=booking.expert.email,
+                user=booking.expert.user or request.user, code='expert_booking_cancelled', channel='email',
+                context=expert_context, override_recipient=booking.expert.email,
             )
         except Exception:
             pass
+        _notify_expert_in_app(booking.expert, 'expert_booking_cancelled', expert_context)
 
-        return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking cancelled.')
+        return StandardResponse.success(
+            data=ExpertBookingSerializer(booking, context={'request': request}).data,
+            message='Booking cancelled.',
+        )
 
 class AdminSetAvailabilityView(APIView):
     permission_classes = [IsAuthenticated]
@@ -339,6 +541,7 @@ class AdminSetAvailabilityView(APIView):
         results = []
         cancelled_dates = []
         affected_bookings = []
+        rejected_bookings = []
         for slot_group in serializer.validated_data['slots']:
             avail, _ = ExpertAvailability.objects.get_or_create(
                 expert=expert, date=slot_group['date'],
@@ -348,28 +551,18 @@ class AdminSetAvailabilityView(APIView):
                 avail.save(update_fields=['is_custom'])
             submitted = {(s['start'], s['end']) for s in slot_group['time_slots']}
 
-            # Slots the expert has un-chosen are removed. If a slot still has a
-            # confirmed booking on it, the booking is auto-cancelled first (so the
-            # FPO isn't left holding a "confirmed" appointment the expert has
-            # already blocked off), then the slot is removed as normal.
+            # Slots the expert has un-chosen are removed. Confirmed bookings on
+            # them are auto-cancelled and pending requests auto-rejected, so no
+            # FPO is left holding a booking on a slot that no longer exists.
             candidates = avail.time_slots.filter(is_deleted=False)
             date_has_cancelled_booking = False
             for old_slot in candidates:
                 key = (old_slot.start_time.strftime('%H:%M'), old_slot.end_time.strftime('%H:%M'))
                 if key not in submitted:
-                    if old_slot.confirmed_count > 0:
-                        confirmed_bookings = ExpertBooking.objects.filter(
-                            time_slot=old_slot,
-                            status=ExpertBooking.Status.CONFIRMED,
-                            is_deleted=False,
-                        )
-                        for booking in confirmed_bookings:
-                            booking.status = ExpertBooking.Status.CANCELLED
-                            booking.cancellation_reason = 'Expert marked this date as unavailable.'
-                            booking.save(update_fields=['status', 'cancellation_reason'])
-                            affected_bookings.append(booking)
+                    cancelled_before = len(affected_bookings)
+                    _remove_slot(old_slot, request.user, affected_bookings, rejected_bookings)
+                    if len(affected_bookings) > cancelled_before:
                         date_has_cancelled_booking = True
-                    old_slot.soft_delete(user=request.user)
             if date_has_cancelled_booking:
                 cancelled_dates.append(str(slot_group['date']))
 
@@ -383,42 +576,35 @@ class AdminSetAvailabilityView(APIView):
                     },
                 )
             results.append(avail)
-        # Notify FPOs exactly once per call, after all slot_groups are processed.
+        # Notify members exactly once per call, after all slot_groups are processed.
         for booking in affected_bookings:
-            if booking.fpo.primary_user:
-                notify_context = {
-                    'expert_name': expert.name_en,
-                    'fpo_name': booking.fpo.name,
-                    'date': str(booking.requested_date),
-                    'time': booking.requested_time,
-                    'reason': booking.cancellation_reason,
-                }
-                try:
-                    send_notification(
-                        user=booking.fpo.primary_user,
-                        code='expert_cancelled_confirmed_booking',
-                        channel='email',
-                        context=notify_context,
-                    )
-                except Exception:
-                    pass
-                try:
-                    send_notification(
-                        user=booking.fpo.primary_user,
-                        code='expert_cancelled_confirmed_booking',
-                        channel='in_app',
-                        context=notify_context,
-                    )
-                except Exception:
-                    pass
+            _notify_booker(booking, 'expert_cancelled_confirmed_booking', {
+                'expert_name': expert.name_en,
+                'fpo_name': booking.fpo.name,
+                'date': str(booking.requested_date),
+                'time': booking.requested_time,
+                'reason': booking.cancellation_reason,
+            })
 
-        message = 'Availability updated.'
+        for booking in rejected_bookings:
+            _notify_booker(booking, 'expert_booking_rejected', {
+                'expert_name': expert.name_en,
+                'date': str(booking.requested_date),
+                'time': booking.requested_time,
+                'reason': booking.cancellation_reason,
+            })
+
+        notes = []
         if cancelled_dates:
-            message = (
-                'Availability updated. Confirmed bookings on '
-                f"{', '.join(cancelled_dates)} were automatically cancelled because the "
-                'expert marked those dates unavailable. Affected FPOs have been notified.'
+            notes.append(
+                f"Confirmed bookings on {', '.join(cancelled_dates)} were automatically cancelled "
+                'because the expert marked those dates unavailable.'
             )
+        if rejected_bookings:
+            notes.append(f'{len(rejected_bookings)} pending request(s) on removed slots were declined.')
+        message = 'Availability updated.'
+        if notes:
+            message = f"Availability updated. {' '.join(notes)} Affected FPOs have been notified."
 
         return StandardResponse.success(
             data=ExpertAvailabilitySerializer(results, many=True).data,
@@ -518,6 +704,7 @@ class ExpertWeeklyDefaultsView(APIView):
         from datetime import date as date_cls
         affected_weekdays = {s['weekday'] for s in submitted}
         blocked_dates = []
+        rejected_bookings = []
         for weekday in affected_weekdays:
             weekday_slot_specs = [s for s in submitted if s['weekday'] == weekday]
             weekday_submitted_keys = {
@@ -544,7 +731,8 @@ class ExpertWeeklyDefaultsView(APIView):
                     key = (old_slot.start_time.strftime('%H:%M'), old_slot.end_time.strftime('%H:%M'))
                     if key not in weekday_submitted_keys:
                         if old_slot.confirmed_count == 0:
-                            old_slot.soft_delete(user=request.user)
+                            # Only pending requests can be on it; they are rejected.
+                            _remove_slot(old_slot, request.user, [], rejected_bookings)
                         else:
                             date_has_blocked_slot = True
                 for s in weekday_slot_specs:
@@ -560,13 +748,28 @@ class ExpertWeeklyDefaultsView(APIView):
                 if date_has_blocked_slot:
                     blocked_dates.append(str(avail.date))
 
-        message = 'Weekly schedule updated.'
+        for booking in rejected_bookings:
+            _notify_booker(booking, 'expert_booking_rejected', {
+                'expert_name': expert.name_en,
+                'date': str(booking.requested_date),
+                'time': booking.requested_time,
+                'reason': booking.cancellation_reason,
+            })
+
+        notes = []
         if blocked_dates:
-            message = (
-                'Weekly schedule updated, and applied to matching upcoming dates. '
-                f"Some slots on {', '.join(sorted(set(blocked_dates)))} could not be "
-                'removed because they already have confirmed bookings.'
+            notes.append(
+                f"Some slots on {', '.join(sorted(set(blocked_dates)))} could not be removed "
+                'because they already have confirmed bookings.'
             )
+        if rejected_bookings:
+            notes.append(
+                f'{len(rejected_bookings)} pending request(s) on removed slots were declined '
+                'and the FPOs notified.'
+            )
+        message = 'Weekly schedule updated.'
+        if notes:
+            message = f"Weekly schedule updated, and applied to matching upcoming dates. {' '.join(notes)}"
 
         return StandardResponse.success(message=message)
 
@@ -594,7 +797,8 @@ class AdminBookingListView(APIView):
         if status_filter:
             qs = qs.filter(status=status_filter)
 
-        return StandardResponse.success(data=ExpertBookingSerializer(qs, many=True).data)
+        qs = qs.select_related('expert', 'fpo', 'fpo__primary_user', 'user')
+        return StandardResponse.success(data=ExpertBookingSerializer(qs, many=True, context={'request': request}).data)
 
 
 
@@ -613,20 +817,27 @@ class AdminConfirmBookingView(APIView):
         if booking.status != ExpertBooking.Status.PENDING:
             return StandardResponse.error('Only pending bookings can be confirmed.', status_code=status.HTTP_400_BAD_REQUEST)
 
-        # No manual slot update needed — is_full is computed from confirmed bookings,
-        # and this booking's time_slot was already set when the FPO requested it.
-        booking.status = ExpertBooking.Status.CONFIRMED
-        booking.save(update_fields=['status'])
-        notify_context = {'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time}
-        if booking.fpo.primary_user:
-            try:
-                send_notification(user=booking.fpo.primary_user, code='expert_booking_confirmed', channel='email', context=notify_context)
-            except Exception:
-                pass
-            try:
-                send_notification(user=booking.fpo.primary_user, code='expert_booking_confirmed', channel='in_app', context=notify_context)
-            except Exception:
-                pass
+        with transaction.atomic():
+            # Pending requests do not consume capacity, so several FPOs may be
+            # waiting on the same slot. Lock it and re-check before confirming.
+            slot = ExpertTimeSlot.objects.select_for_update().filter(
+                pk=booking.time_slot_id, is_deleted=False,
+            ).first()
+            if not slot:
+                return StandardResponse.error(
+                    'The requested time slot no longer exists. Reject or reschedule this request instead.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            if slot.is_full:
+                return StandardResponse.error(
+                    'This slot has already reached its booking limit. Reject or reschedule this request instead.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            booking.status = ExpertBooking.Status.CONFIRMED
+            booking.save(update_fields=['status'])
+        _notify_booker(booking, 'expert_booking_confirmed', {
+            'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time,
+        })
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking confirmed.')
 
 
@@ -650,23 +861,23 @@ class AdminRejectBookingView(APIView):
         booking.status = ExpertBooking.Status.REJECTED
         booking.cancellation_reason = reason
         booking.save(update_fields=['status', 'cancellation_reason'])
-        notify_context = {'expert_name': booking.expert.name_en, 'date': str(booking.requested_date), 'time': booking.requested_time, 'reason': reason}
-        if booking.fpo.primary_user:
-            try:
-                send_notification(user=booking.fpo.primary_user, code='expert_booking_rejected', channel='email', context=notify_context)
-            except Exception:
-                pass
-            try:
-                send_notification(user=booking.fpo.primary_user, code='expert_booking_rejected', channel='in_app', context=notify_context)
-            except Exception:
-                pass
+        _notify_booker(booking, 'expert_booking_rejected', {
+            'expert_name': booking.expert.name_en, 'date': str(booking.requested_date),
+            'time': booking.requested_time, 'reason': reason,
+        })
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking rejected.')
 
 class RescheduleSerializer(serializers.Serializer):
     new_date = serializers.DateField()
-    new_time = serializers.CharField(max_length=10)
+    new_time = serializers.TimeField(required=False)
+    time_slot_id = serializers.IntegerField(required=False)
     reason = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate(self, attrs):
+        if not attrs.get('new_time') and not attrs.get('time_slot_id'):
+            raise serializers.ValidationError('Provide new_time or time_slot_id.')
+        return attrs
 
 
 
@@ -690,23 +901,43 @@ class AdminRescheduleBookingView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        booking.requested_date = data['new_date']
-        booking.requested_time = data['new_time']
-        booking.cancellation_reason = data.get('reason', '')
-        booking.save(update_fields=['requested_date', 'requested_time', 'cancellation_reason'])
-        notify_context = {
-            'expert_name': booking.expert.name_en, 'date': str(data['new_date']),
-            'time': data['new_time'], 'reason': data.get('reason', ''),
-        }
-        if booking.fpo.primary_user:
-            try:
-                send_notification(user=booking.fpo.primary_user, code='expert_booking_rescheduled', channel='email', context=notify_context)
-            except Exception:
-                pass
-            try:
-                send_notification(user=booking.fpo.primary_user, code='expert_booking_rescheduled', channel='in_app', context=notify_context)
-            except Exception:
-                pass
+        avail = ExpertAvailability.objects.filter(
+            expert=booking.expert, date=data['new_date'], is_deleted=False,
+        ).first()
+        if not avail:
+            return StandardResponse.error(
+                'No availability found for that date. Add a slot for it first.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            slot = _find_slot(avail, slot_id=data.get('time_slot_id'), start_time=data.get('new_time'), lock=True)
+            if not slot:
+                return StandardResponse.error('That time slot does not exist on the new date.', status_code=status.HTTP_400_BAD_REQUEST)
+            if _slot_is_past(avail.date, slot.start_time):
+                return StandardResponse.error('That time slot has already passed.', status_code=status.HTTP_400_BAD_REQUEST)
+            if slot.is_full:
+                return StandardResponse.error('That slot is already fully booked.', status_code=status.HTTP_400_BAD_REQUEST)
+
+            if booking.user:
+                error = _user_conflict_error(
+                    booking.user, slot, avail.date, exclude_pk=booking.pk, subject='This member already has',
+                )
+                if error:
+                    return StandardResponse.error(error, status_code=status.HTTP_400_BAD_REQUEST)
+
+            # Keep the slot pointer in step with the new date/time, otherwise the
+            # booking keeps consuming capacity on the old slot once confirmed.
+            booking.time_slot = slot
+            booking.requested_date = avail.date
+            booking.requested_time = _time_str(slot.start_time)
+            booking.cancellation_reason = data.get('reason', '')
+            booking.save(update_fields=['time_slot', 'requested_date', 'requested_time', 'cancellation_reason'])
+
+        _notify_booker(booking, 'expert_booking_rescheduled', {
+            'expert_name': booking.expert.name_en, 'date': str(booking.requested_date),
+            'time': booking.requested_time, 'reason': data.get('reason', ''),
+        })
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking rescheduled. Awaiting FPO confirmation.')
 
@@ -734,27 +965,12 @@ class AdminCancelBookingView(APIView):
         booking.cancellation_reason = reason
         booking.save(update_fields=['status', 'cancellation_reason'])
 
-        notify_context = {
+        _notify_booker(booking, 'expert_cancelled_confirmed_booking', {
             'expert_name': booking.expert.name_en,
             'date': str(booking.requested_date),
             'time': booking.requested_time,
             'reason': reason,
-        }
-        if booking.fpo.primary_user:
-            try:
-                send_notification(
-                    user=booking.fpo.primary_user, code='expert_cancelled_confirmed_booking',
-                    channel='email', context=notify_context,
-                )
-            except Exception:
-                pass
-            try:
-                send_notification(
-                    user=booking.fpo.primary_user, code='expert_cancelled_confirmed_booking',
-                    channel='in_app', context=notify_context,
-                )
-            except Exception:
-                pass
+        })
 
         return StandardResponse.success(data=ExpertBookingSerializer(booking).data, message='Booking cancelled.')
 
@@ -762,7 +978,10 @@ class AdminCancelBookingView(APIView):
 class FpoBookingListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=['Expert Booking'], summary="List the FPO's own bookings")
+    @extend_schema(
+        tags=['Expert Booking'],
+        summary="List my bookings (?scope=fpo for every member's bookings in my FPO)",
+    )
     def get(self, request):
         fpo = _get_fpo(request.user)
         if not fpo:
@@ -771,11 +990,17 @@ class FpoBookingListView(APIView):
             )
 
         bookings = ExpertBooking.objects.filter(fpo=fpo, is_deleted=False)
-        expert_id = request.query_params.get('expert_id')
+        if request.query_params.get('scope') != 'fpo':
+            mine = Q(user=request.user)
+            if fpo.primary_user_id == request.user.id:
+                # Rows from before bookings were per user belong to the FPO's owner.
+                mine |= Q(user__isnull=True)
+            bookings = bookings.filter(mine)
+        expert_id = request.query_params.get('expert_id') or request.query_params.get('expert')
         if expert_id:
             bookings = bookings.filter(expert_id=expert_id)
 
-        bookings = bookings.order_by('-requested_date')
+        bookings = bookings.select_related('expert', 'fpo', 'fpo__primary_user', 'user').order_by('-requested_date')
         return StandardResponse.success(
-            data=ExpertBookingSerializer(bookings, many=True).data,
+            data=ExpertBookingSerializer(bookings, many=True, context={'request': request}).data,
         )

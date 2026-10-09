@@ -61,6 +61,9 @@ class ExpertTimeSlot(BaseModel):
 class ExpertBooking(BaseModel):
 
     class Status(models.TextChoices):
+        # Legacy: bookings used to wait for the expert's approval. New bookings
+        # are created CONFIRMED (first come, first served); PENDING survives only
+        # on rows created before that change.
         PENDING = 'pending', 'Pending'
         CONFIRMED = 'confirmed', 'Confirmed'
         REJECTED = 'rejected', 'Rejected'
@@ -72,6 +75,11 @@ class ExpertBooking(BaseModel):
     )
     fpo = models.ForeignKey(
         'database.FPO', on_delete=models.CASCADE, related_name='expert_bookings'
+    )
+    user = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='expert_bookings',
+        help_text='The FPO member who made this booking. Bookings belong to a person, not the FPO.',
     )
     time_slot = models.ForeignKey(
         ExpertTimeSlot, on_delete=models.SET_NULL, null=True, blank=True,

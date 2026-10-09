@@ -224,7 +224,7 @@ _ROUTE_TITLE_OVERRIDES = {
     '/cbbo/verifications/[id]':          'FPO Verification Detail',
     # Expert — dashboard picks a filter, profile picks OTP text.
     '/expert/dashboard':                 'Expert Dashboard',
-    '/expert/dashboard/fpo/[fpoId]':     'FPO Booking History',
+    '/expert/booking/fpo/[fpoId]':       'FPO Booking History',
     '/expert/profile':                   'Expert Profile',
     # Government — routes at root + several detail / edit / list pages need
     # cleaner titles. `/government` (root) is the officials directory.
