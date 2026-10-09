@@ -29,6 +29,8 @@ from apps.chatbot.services.answer_cache import (
     store as cache_store_answer,
 )
 from apps.chatbot.services.history import ensure_conversation, recent_turns, save_turn
+from apps.chatbot.services.translate import has_malayalam, translate_query_to_english
+from apps.chatbot.services.user_context import build_user_context, is_personal_question
 from apps.chatbot.services.qa_client import ask as qa_ask
 from apps.chatbot.services.retrieve import retrieve
 from apps.chatbot.services.small_talk import handle_small_talk
@@ -241,6 +243,13 @@ class ChatMessageView(APIView):
         # follow-up (short + contains a pronoun / connector) AND we have a
         # prior user turn to anchor on.
         search_query = message
+        # Malayalam support (2026-10-09): the KB is English — translate the
+        # question for RETRIEVAL only. Gemini still sees the original and
+        # replies in the user's language. Fail-open on any error.
+        if has_malayalam(message):
+            translated = translate_query_to_english(message, user=request.user)
+            if translated:
+                search_query = translated
         follow_up_markers = (
             'that', 'this', 'it', 'those', 'these', 'the same',
             'and ', 'also', 'what about',
@@ -273,7 +282,14 @@ class ChatMessageView(APIView):
         # language and the retrieved entries' versions, so role scoping
         # holds and any KB edit orphans old answers automatically. The
         # per-user district contacts footer is re-applied by _reply().
-        is_standalone = not prior
+        # Own-data feature (2026-10-09): personal questions from logged-in
+        # users get a private context block — and are NEVER cached or
+        # replayed (the cache is shared across users of the same role).
+        user_context = ''
+        if is_personal_question(message) and request.user and request.user.is_authenticated:
+            user_context = build_user_context(request.user)
+
+        is_standalone = not prior and not user_context
         if is_standalone:
             cached = cache_get_answer(message, user_role, lang, entries)
             if cached:
@@ -295,6 +311,7 @@ class ChatMessageView(APIView):
             lang=lang,
             prior_turns=prior,
             user_role=user_role or 'public',
+            user_context=user_context,
         )
         if gemini_result is not None:
             if is_standalone:

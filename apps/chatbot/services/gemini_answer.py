@@ -199,6 +199,7 @@ def _build_prompt(
     current_path: str,
     prior_turns: list | None = None,
     user_role: str | None = None,
+    user_context: str = '',
 ) -> str:
     """Assemble the user prompt with retrieved KB context.
 
@@ -229,9 +230,20 @@ def _build_prompt(
             history_lines.append(f'{speaker}: {turn["content"]}')
         history_block = 'PREVIOUS CONVERSATION:\n' + '\n'.join(history_lines) + '\n\n'
 
+    # Own-data feature (2026-10-09): private block for personal questions.
+    user_block = ''
+    if user_context:
+        user_block = (
+            "USER'S OWN ACCOUNT DATA (private to THIS user only — use it "
+            "ONLY to answer questions about their own account, records or "
+            "status; never present it as general platform information):\n"
+            f'{user_context}\n\n'
+        )
+
     return (
         f'{role_line}'
         f'{page_hint}'
+        f'{user_block}'
         f'{history_block}'
         f'USER QUESTION: {question}\n\n'
         f'CONTEXT:\n{context}\n\n'
@@ -251,6 +263,7 @@ def generate_answer(
     lang: str = 'en',
     prior_turns: list | None = None,
     user_role: str | None = None,
+    user_context: str = '',
 ) -> Optional[dict]:
     """Try to answer via Gemini using the retrieved KB context.
 
@@ -275,7 +288,7 @@ def generate_answer(
         return None
 
     system = _SYSTEM_PROMPT_ML if lang == 'ml' else _SYSTEM_PROMPT_EN
-    prompt = _build_prompt(question, entries, current_path, prior_turns, user_role)
+    prompt = _build_prompt(question, entries, current_path, prior_turns, user_role, user_context)
 
     try:
         # 500 tokens is plenty for a 2-4 sentence chatbot reply and keeps

@@ -149,6 +149,39 @@ def build_fpo_entry(fpo) -> dict | None:
     }
 
 
+ADMIN_AUDIENCES = ['super_admin', 'sub_admin']
+
+
+def build_admin_draft_entry(fpo) -> dict | None:
+    """Admin-audience-only entry for a NON-approved FPO (2026-10-09).
+
+    Super admins asked the chatbot about draft/suspended FPOs and got
+    nothing, because only APPROVED FPOs are mirrored. These entries are
+    hard-scoped to the admin audiences — regular users can never retrieve
+    them (audience is a hard filter in retrieve())."""
+    from apps.core.utils.constants import FPOStatus
+    if fpo.is_deleted or not fpo.name or fpo.status == FPOStatus.APPROVED:
+        return None
+    district_en = get_district_name(fpo.district, language='en') if fpo.district else 'district not set'
+    status = str(fpo.status).replace('_', ' ')
+    commodities = _commodity_labels_for(fpo)
+    body = (
+        f"{fpo.name} is a NON-approved FPO record (status: {status}) in "
+        f"{district_en} district"
+        + (f", registered under {fpo.legal_structure.replace('_', ' ')}" if fpo.legal_structure else '')
+        + (f", promoted by {fpo.promoting_agency.replace('_', ' ')}" if getattr(fpo, 'promoting_agency', '') else '')
+        + (f". Commodities: {', '.join(commodities)}" if commodities else '')
+        + f". Declared members: {fpo.total_members or 'not entered'}. "
+        f"Full profile, documents, status history and any ownership claims "
+        f"are under Admin \u2192 FPO Applications."
+    )
+    return {
+        'topic': f'FPO (not approved): {fpo.name} \u2014 {status}',
+        'body_en': body,
+        'keywords': f'{fpo.name} draft unsubmitted suspended rejected fpo status {district_en}',
+    }
+
+
 def upsert_fpo_entry(fpo) -> tuple[bool, bool]:
     """Sync one FPO's chatbot entry. Returns (created, deleted).
     Deletes the entry when the FPO no longer qualifies (not APPROVED / soft-deleted)."""
@@ -156,12 +189,34 @@ def upsert_fpo_entry(fpo) -> tuple[bool, bool]:
 
     entry = build_fpo_entry(fpo)
     topic_prefix = f'FPO: {fpo.name} — '
+    admin_prefix = f'FPO (not approved): {fpo.name} — '
 
     if not entry:
         deleted = ChatKnowledgeEntry.objects.filter(
             topic__startswith=topic_prefix,
         ).delete()[0]
+        # 2026-10-09: keep an admin-only entry for the non-approved FPO
+        # (or drop it too when the FPO is hard-deleted / nameless).
+        admin_entry = build_admin_draft_entry(fpo)
+        ChatKnowledgeEntry.objects.filter(
+            topic__startswith=admin_prefix,
+        ).exclude(topic=(admin_entry or {}).get('topic', '')).delete()
+        if admin_entry:
+            ChatKnowledgeEntry.objects.update_or_create(
+                topic=admin_entry['topic'],
+                defaults={
+                    'body_en':       admin_entry['body_en'],
+                    'keywords':      admin_entry['keywords'],
+                    'audiences':     ADMIN_AUDIENCES,
+                    'pages':         [],
+                    'is_active':     True,
+                    'display_order': DEFAULT_DISPLAY_ORDER,
+                },
+            )
         return (False, bool(deleted))
+
+    # Approved — make sure any stale admin-draft entry is gone.
+    ChatKnowledgeEntry.objects.filter(topic__startswith=admin_prefix).delete()
 
     _obj, was_new = ChatKnowledgeEntry.objects.update_or_create(
         topic=entry['topic'],
@@ -205,3 +260,15 @@ def sync_all_approved_fpos() -> dict:
         'skipped':  skipped,
         'total_fpos_processed': fpos.count(),
     }
+
+
+def sync_all_draft_fpos() -> dict:
+    """Backfill admin-only entries for every existing non-approved FPO
+    (2026-10-09). Signals keep them current afterwards."""
+    from apps.core.utils.constants import FPOStatus
+    from apps.database.models.fpo import FPO
+    processed = 0
+    for fpo in FPO.objects.filter(is_deleted=False).exclude(status=FPOStatus.APPROVED):
+        upsert_fpo_entry(fpo)
+        processed += 1
+    return {'drafts_processed': processed}
