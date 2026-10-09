@@ -624,7 +624,7 @@ class PublicHeaderLogoListView(APIView):
                     'name':        obj.name,
                     'logo_url':    request.build_absolute_uri(obj.logo.url) if obj.logo else None,
                     'is_platform': obj.is_platform,
-                    'order':       obj.order,   # 0-2 = header positions, 3 = mobile menu logo
+                    'order':       obj.order,   # 0-3 = header positions, 4 = mobile menu logo, 5 = footer logo
                 }
                 for obj in HeaderLogo.objects.filter(is_active=True)
             ]

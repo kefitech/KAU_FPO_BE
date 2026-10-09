@@ -1083,15 +1083,15 @@ class PartnerDeactivateView(APIView):
 # =============================================================================
 
 _HEADER_LOGOS_CACHE_KEY = 'public:header_logos'
-_HEADER_LOGOS_MAX       = 3     # admin can add at most 3 header logos
-_HEADER_MOBILE_ORDER    = 3     # order 3 = separate logo for the mobile menu (not one of the 3)
-_HEADER_FOOTER_ORDER    = 4     # order 4 = logo in the website footer
+_HEADER_LOGOS_MAX       = 4     # admin can add at most 4 header logos
+_HEADER_MOBILE_ORDER    = 4     # order 4 = separate logo for the mobile menu (not one of the 4)
+_HEADER_FOOTER_ORDER    = 5     # order 5 = logo in the website footer
 _HEADER_LOGO_HEIGHT     = 160   # stored height (2x the ~64-80px display height → sharp on HiDPI)
 _HEADER_LOGO_MAX_WIDTH  = 960   # wide banners (e.g. Directorate of Extension) shrink to fit
 _HEADER_LOGO_TRIM_PAD   = 4     # px of breathing room kept after trimming
 
-# Exact pixel size for each header position (1st, 2nd, 3rd logo)
-_HEADER_SLOT_SIZES      = [(2048, 285), (1594, 1038), (1594, 1038)]
+# Exact pixel size for each header position (1st, 2nd, 3rd, 4th logo)
+_HEADER_SLOT_SIZES      = [(2048, 285), (1594, 1038), (1594, 1038), (1594, 1038)]
 
 
 def _header_slot_index(instance, is_platform, order):
@@ -1179,12 +1179,12 @@ class HeaderLogoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = HeaderLogo
-        fields = ['id', 'name', 'logo', 'logo_url', 'is_platform', 'order', 'is_active', 'created_at']
+        fields = ['id', 'name', 'name_ml', 'logo', 'logo_url', 'is_platform', 'order', 'is_active', 'created_at']
         read_only_fields = ['is_platform']
         extra_kwargs = {
             'logo':      {'write_only': True, 'required': True},
             'is_active': {'default': True},
-            'order':     {'required': False},   # 0-2 = header positions, 3 = mobile logo, 4 = footer logo
+            'order':     {'required': False},   # 0-3 = header positions, 4 = mobile logo, 5 = footer logo
         }
 
     def get_logo_url(self, obj):
@@ -1201,7 +1201,7 @@ class HeaderLogoSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         order = attrs.get('order', self.instance.order if self.instance else None)
         if order is None:
-            raise serializers.ValidationError({'order': 'Choose a position (1, 2, 3, mobile or footer).'})
+            raise serializers.ValidationError({'order': 'Choose a position (1, 2, 3, 4, mobile or footer).'})
         if not 0 <= order <= _HEADER_FOOTER_ORDER:
             raise serializers.ValidationError({'order': f'Position must be 0 to {_HEADER_FOOTER_ORDER}.'})
 
@@ -1247,9 +1247,10 @@ class HeaderLogoListView(APIView):
         tags=['Admin - CMS'],
         summary='Create a header logo',
         description=(
-            'Multipart form: `name`, `logo` (image file), `order` (position), `is_active` (optional).\n\n'
+            'Multipart form: `name`, `name_ml` (optional Malayalam name), `logo` (image file), '
+            '`order` (position), `is_active` (optional).\n\n'
             '`order`: 0 = Position 1 (main logo, 2048×285), 1 = Position 2 (1594×1038), '
-            '2 = Position 3 (1594×1038), 3 = Mobile menu logo, 4 = Footer logo.\n\n'
+            '2 = Position 3 (1594×1038), 3 = Position 4 (1594×1038), 4 = Mobile menu logo, 5 = Footer logo.\n\n'
             'Each position can hold only one logo. Any image size is accepted — it is trimmed and '
             'fitted to the chosen position (no stretching or cropping) and stored as WebP. SVGs are stored as-is.'
         ),
@@ -1260,7 +1261,7 @@ class HeaderLogoListView(APIView):
         if not _is_admin(request.user):
             return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
 
-        if HeaderLogo.objects.count() >= _HEADER_FOOTER_ORDER + 1:   # 3 header + 1 mobile + 1 footer
+        if HeaderLogo.objects.count() >= _HEADER_FOOTER_ORDER + 1:   # 4 header + 1 mobile + 1 footer
             return StandardResponse.error(
                 f'Only {_HEADER_LOGOS_MAX} header logos, 1 mobile logo and 1 footer logo are allowed. '
                 'Delete or replace an existing logo first.',

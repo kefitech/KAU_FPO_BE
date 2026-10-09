@@ -207,6 +207,8 @@ def _header_logo_path(instance, filename):
 
 class HeaderLogo(BaseModel):
     name        = models.CharField(max_length=200, help_text='Shown as alt text — e.g. "GOK Logo"')
+    name_ml     = models.CharField(max_length=200, blank=True, default='',
+                                   help_text='Malayalam name — shown in the Malayalam admin panel; blank falls back to name')
     logo        = models.FileField(upload_to=_header_logo_path,
                                    help_text='FileField (not ImageField) so SVG logos are allowed')
     is_platform = models.BooleanField(default=False,
