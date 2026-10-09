@@ -532,6 +532,78 @@ ENTRIES = [
             'sellable stock.'
         ),
     ),
+
+    # ── Pass-2 retest micro-gaps (2026-10-09, final batch) ──────────────
+    dict(
+        topic='Expert consultations are free — no payment on the platform',
+        audiences=FPO + PUB,
+        keywords='fee cost pay payment UPI charge expert consultation booking free paid',
+        body=(
+            'Booking an expert consultation through the platform is free — '
+            'there is no booking fee and no payment feature (no UPI or card '
+            'payments) on the portal. If any session involves costs, that is '
+            'arranged directly between the FPO and the expert outside the '
+            'platform. An enquiry message to an expert needs at least 20 '
+            'characters so the expert gets a meaningful question.'
+        ),
+    ),
+    dict(
+        topic='Registration prerequisites — what to have ready before applying',
+        audiences=PUB,
+        keywords='before applying complete prerequisites checklist what needed ready documents start',
+        body=(
+            'Have these ready before starting FPO registration: the FPO\'s '
+            'legal registration details (CIN for a producer company, or the '
+            'registration number under the applicable act), PAN, the office '
+            'email and phone (both are OTP-verified), bank account details, '
+            'at least 10 members with the member breakdown, the office '
+            'address with GPS location, and scanned copies of the three '
+            'required documents — registration certificate, bank details '
+            'proof and PAN card (PDF/JPG/PNG, up to 5 MB each).'
+        ),
+    ),
+    dict(
+        topic='Landing page menus — Pages and the Access quick-link tools',
+        audiences=PUB,
+        keywords='pages menu what under access quick links seed rate spacing fertulator agri almanac farm machinery tools',
+        body=(
+            'The Pages menu on the public website leads to the programme\'s '
+            'content pages — About, Team, Gallery, Documents, News, FAQs and '
+            'Contact/Feedback. The Access section holds quick links to '
+            'external KAU farming tools such as Seed Rate & Spacing '
+            'calculators, Fertulator (fertiliser calculator), the Agri '
+            'Almanac, and Farm Machinery references — each opens the '
+            'respective KAU tool in a new tab.'
+        ),
+    ),
+    dict(
+        topic='Team invitations — duplicate emails, and account basics',
+        audiences=FPO + GOV + CBBO + ADMIN,
+        keywords='invite same email twice duplicate already registered change phone number update profile login email change',
+        body=(
+            'An email address can hold only one account — inviting an email '
+            'that is already registered (or inviting the same address twice) '
+            'is rejected with a clear error; use a different address or ask '
+            'the person to log in with their existing account. Your own '
+            'name, phone number and preferred language can be updated from '
+            'Settings → Profile. The login email cannot be changed from the '
+            'portal — contact the KAU admin if an email must be corrected.'
+        ),
+    ),
+    dict(
+        topic='Troubleshooting — "my form data disappeared"',
+        audiences=FPO + PUB,
+        keywords='form data disappeared lost not saved application wizard resume draft missing',
+        body=(
+            'The registration and DPR wizards save each step when you '
+            'complete it, and your application resumes at the step you '
+            'reached when you log back in. If a page was closed mid-step, '
+            'only the unsaved fields of that step are lost — log in again '
+            'and the wizard reopens where you left off. If saved data is '
+            'genuinely missing, report it through the Feedback form with '
+            'your application ID.'
+        ),
+    ),
 ]
 
 
