@@ -106,22 +106,26 @@ class AdminDashboardStatsView(APIView):
         # district with the rest of Kerala. It only shows a count per district (the block
         # drill-down is AdminDashboardDistrictBlocksView, which applies the sub-admin's
         # read scope); every other figure here stays scoped to the caller's FPOs.
-        district_counts = (
+        # Every district is listed, zero-FPO ones included, so the map can label all
+        # of them in the caller's language.
+        district_counts = dict(
             FPO.objects.filter(is_deleted=False).exclude(district='')
             .values('district')
             .annotate(count=Count('id'))
-            .order_by('-count')
+            .values_list('district', 'count')
         )
-        district_distribution = []
-        for row in district_counts:
-            code  = row['district']
-            names = DISTRICTS_BILINGUAL.get(code, (code, code))
-            district_distribution.append({
-                'code':    code,
-                'name':    names[0],
-                'name_ml': names[1],
-                'count':   row['count'],
-            })
+        district_distribution = sorted(
+            (
+                {
+                    'code':    code,
+                    'name':    names[0],
+                    'name_ml': names[1],
+                    'count':   district_counts.get(code, 0),
+                }
+                for code, names in DISTRICTS_BILINGUAL.items()
+            ),
+            key=lambda d: -d['count'],
+        )
 
         # ── Monthly Registration Trend (last 12 months) ───────────────────────
         twelve_months_ago = date.today().replace(day=1) - relativedelta(months=11)
