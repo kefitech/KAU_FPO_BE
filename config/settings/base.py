@@ -495,6 +495,11 @@ SERVER_EMAIL = config('SERVER_EMAIL', default='server@kau-fpo.in')
 EMAIL_PROVIDER = config('EMAIL_PROVIDER', default='smtp')  # 'smtp' or 'ses'
 
 # Email template branding
+# Chatbot refusal contact — leave empty to point users at the website's
+# Feedback form instead of an email address (2026-10-09; the old
+# hardcoded 'de@kau.in' was a dev placeholder).
+CHATBOT_SUPPORT_EMAIL = config('CHATBOT_SUPPORT_EMAIL', default='')
+
 EMAIL_COMPANY_NAME    = config('EMAIL_COMPANY_NAME',    default='KAU-FPO Platform')
 EMAIL_COMPANY_ADDRESS = config('EMAIL_COMPANY_ADDRESS', default='Kerala Agricultural University, Thrissur - 680656, Kerala')
 EMAIL_PRIMARY_COLOR   = config('EMAIL_PRIMARY_COLOR',   default='#2e7d32')

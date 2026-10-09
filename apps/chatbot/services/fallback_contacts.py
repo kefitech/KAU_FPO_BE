@@ -22,22 +22,39 @@ from apps.core.utils.constants import get_district_name
 # Single canonical refusal — used by _fallback_reply(), the Gemini prompt
 # (case C), and anywhere else the chatbot has to say "I don't know". Three
 # different wordings pre-fix (BUG-12) made the UX feel inconsistent.
-SUPPORT_EMAIL = 'de@kau.in'
+# 2026-10-09 (owner report): 'de@kau.in' was a hardcoded dev placeholder
+# shown to every refused user. The address now comes from settings
+# (CHATBOT_SUPPORT_EMAIL env var); when none is configured the refusal
+# points at the website's real Feedback form instead of a fake inbox.
+from django.conf import settings
 
-GENERIC_REFUSAL_EN = (
-    "Sorry, I couldn't answer that from what I know. "
-    "Please rephrase your question, or contact KAU support at "
-    f"{SUPPORT_EMAIL} for help."
-)
-GENERIC_REFUSAL_ML = (
-    "ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. "
-    "ദയവായി മറ്റൊരു രീതിയിൽ ചോദിക്കുക, അല്ലെങ്കിൽ "
-    f"{SUPPORT_EMAIL}-ൽ KAU സപ്പോർട്ടിനെ ബന്ധപ്പെടുക."
-)
+SUPPORT_EMAIL = getattr(settings, 'CHATBOT_SUPPORT_EMAIL', '') or ''
 
 
 def generic_refusal(lang: str = 'en') -> str:
-    return GENERIC_REFUSAL_ML if lang == 'ml' else GENERIC_REFUSAL_EN
+    if lang == 'ml':
+        if SUPPORT_EMAIL:
+            return (
+                'ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. '
+                'ദയവായി മറ്റൊരു രീതിയിൽ ചോദിക്കുക, അല്ലെങ്കിൽ '
+                f'{SUPPORT_EMAIL}-ൽ KAU സപ്പോർട്ടിനെ ബന്ധപ്പെടുക.'
+            )
+        return (
+            'ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. '
+            'ദയവായി മറ്റൊരു രീതിയിൽ ചോദിക്കുക, അല്ലെങ്കിൽ വെബ്സൈറ്റിലെ '
+            'ഫീഡ്ബാക്ക് ഫോം വഴി KAU-വിനെ ബന്ധപ്പെടുക.'
+        )
+    if SUPPORT_EMAIL:
+        return (
+            "Sorry, I couldn't answer that from what I know. "
+            'Please rephrase your question, or contact KAU support at '
+            f'{SUPPORT_EMAIL} for help.'
+        )
+    return (
+        "Sorry, I couldn't answer that from what I know. "
+        'Please rephrase your question, or reach KAU through the '
+        'Feedback form on the website.'
+    )
 
 
 # Text that we consider a "refusal / can't help" reply. We match on any of
@@ -48,7 +65,8 @@ _REFUSAL_MARKERS = (
     "i couldn't find an answer",
     "i couldn't answer that",
     "please rephrase",
-    SUPPORT_EMAIL,
+    "feedback form on the website",
+    *( [SUPPORT_EMAIL] if SUPPORT_EMAIL else [] ),
     'kau സപ്പോർട്ട്',
     'സഹായിക്കാൻ കഴിയാത്ത',
     'ഉത്തരം തരാൻ കഴിഞ്ഞില്ല',

@@ -604,6 +604,25 @@ ENTRIES = [
             'your application ID.'
         ),
     ),
+
+    dict(
+        topic='How to register as a CBBO / NGO partner officer',
+        audiences=PUB,
+        keywords='register cbbo ngo partner officer registration how to become organisation level district state approval official register',
+        body=(
+            'CBBO and NGO partner officers register from the Official '
+            'Registration page (choose the CBBO/NGO option): enter your name, '
+            'email, phone and designation, pick your organisation from the '
+            'list (organisations are added by the KAU admin — contact KAU if '
+            'yours is missing), and choose your working level — specific '
+            'districts or state-wide. The application then goes to the KAU '
+            'admin for approval; you are notified by email when approved and '
+            'can log in (changing any temporary password at first login). If '
+            'rejected, you are notified with the reason and may reapply. '
+            'Government officials register from the same page using the '
+            'Government option.'
+        ),
+    ),
 ]
 
 
