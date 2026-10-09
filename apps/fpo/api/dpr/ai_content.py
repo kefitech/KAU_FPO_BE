@@ -201,8 +201,16 @@ class AIContentGenerateView(APIView):
             return err
         if chapter not in dict(DPRAIContent.Chapter.choices):
             return StandardResponse.error(f'Unknown chapter: {chapter}', status_code=400)
+        force = str(request.query_params.get('force', '')).lower() in ('1', 'true')
         try:
-            row = narrative.generate_chapter(project, chapter, requested_by=request.user)
+            row = narrative.generate_chapter(
+                project, chapter, requested_by=request.user, force=force)
+        except narrative.NarrativeUnchanged as e:
+            # Hash-guard: inputs identical to the current text — no LLM
+            # call made, no cost incurred. ?force=1 bypasses.
+            data = AIContentSerializer(e.row).data
+            data['unchanged'] = True
+            return StandardResponse.success(data, str(e))
         except narrative.NarrativeError as e:
             return StandardResponse.error(str(e), status_code=503)
         _audit(request.user, project, row, 'generate', extra={

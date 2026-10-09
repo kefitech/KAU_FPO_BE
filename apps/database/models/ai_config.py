@@ -154,12 +154,67 @@ class AIServiceConfig(BaseModel):
         fields = ['current_month_cost_inr', 'current_month_tokens', 'current_month_calls']
 
         # Auto-disable if cap exceeded
+        auto_disabled_now = False
         if self.monthly_cap_inr and self.current_month_cost_inr >= self.monthly_cap_inr:
+            if self.is_enabled:
+                auto_disabled_now = True
             self.is_enabled       = False
             self.auto_disabled_at = timezone.now()
             fields += ['is_enabled', 'auto_disabled_at']
 
+        # Wave B (2026-10-09): the alert threshold existed but nothing ever
+        # fired. Notify super admins once per month at alert_at_pct, and
+        # again (regardless of alert_sent) the moment auto-disable trips.
+        alert_now = False
+        _pct = self.budget_usage_pct
+        if (self.monthly_cap_inr and not self.alert_sent and _pct is not None
+                and _pct >= (self.alert_at_pct or 80)):
+            alert_now = True
+            self.alert_sent = True
+            fields += ['alert_sent']
+
         self.save(update_fields=fields)
+
+        if alert_now or auto_disabled_now:
+            self._send_budget_alert(disabled=auto_disabled_now)
+
+    def _send_budget_alert(self, disabled: bool) -> None:
+        """Email + in-app alert to every active super admin. Best-effort —
+        a notification failure must never break the LLM call path."""
+        try:
+            from django.contrib.auth.models import User
+            from apps.notifications.services import send_notification
+            status_line = (
+                'The service has been AUTOMATICALLY DISABLED for the rest of '
+                'the month (it re-enables on the monthly reset).'
+                if disabled else
+                'The service remains enabled; it will auto-disable if the '
+                'cap is reached.'
+            )
+            context_base = {
+                'service_label': self.get_service_display(),
+                'usage_pct':     f'{self.budget_usage_pct}',
+                'spend_inr':     f'{self.current_month_cost_inr:,.0f}',
+                'cap_inr':       f'{self.monthly_cap_inr:,.0f}',
+                'status_line':   status_line,
+            }
+            admins = User.objects.filter(
+                groups__name='super_admin', is_active=True,
+            ).distinct()
+            for admin in admins:
+                for channel in ('email', 'in_app'):
+                    try:
+                        send_notification(
+                            user=admin,
+                            code='ai_budget_alert',
+                            channel=channel,
+                            context={**context_base, 'user_name': admin.get_full_name() or admin.username},
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception('AI budget alert dispatch failed')
 
     def reset_monthly_totals(self):
         """Called by Celery beat on 1st of each month."""

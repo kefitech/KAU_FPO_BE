@@ -221,6 +221,15 @@ class DPRAIContent(TimeStampedModel, AuditModel):
     # Each entry: {"metric": "IRR", "expected": "19.40", "found": "19",
     # "kind": "drift" | "mismatch", "excerpt": "…IRR of roughly 19%…"}.
     # Cleared on the next zero-warning regeneration of this chapter.
+    # Regenerate hash-guard (2026-10-09, approved 2026-10-08): SHA-256 of
+    # the full generation prompt at the time the ACTIVE text was produced.
+    # Empty for rows generated before this field shipped (treated as
+    # unknown — regeneration always allowed). Compared on Regenerate: an
+    # identical fingerprint means nothing upstream changed, so the call
+    # is skipped; a differing one (data edit OR platform prompt change)
+    # regenerates as usual.
+    prompt_fingerprint = models.CharField(max_length=64, blank=True, default='')
+
     consistency_warnings = models.JSONField(
         default=list, blank=True,
         help_text='Mismatches between narrative numbers and the calc-engine '

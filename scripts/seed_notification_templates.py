@@ -69,6 +69,10 @@ TEMPLATE_CODES = [
     # DPR Generation (P2-07)
     ('dpr_generated',               'email',  'Email to FPO when DPR PDF is ready to download',                       ['user_name', 'project_title', 'financial_year', 'button_link', 'button_text']),
     ('dpr_generated',               'in_app', 'In-app notification when DPR PDF is ready',                            ['user_name', 'project_title', 'financial_year']),
+    # AI budget alert (Wave B, 2026-10-09) — fires at alert_at_pct of the
+    # monthly cap and again on auto-disable; sent to super admins.
+    ('ai_budget_alert',             'email',  'Alert super admins when an AI service nears/hits its monthly budget cap', ['user_name', 'service_label', 'usage_pct', 'spend_inr', 'cap_inr', 'status_line']),
+    ('ai_budget_alert',             'in_app', 'In-app AI budget alert for super admins',                                 ['service_label', 'usage_pct', 'spend_inr', 'cap_inr', 'status_line']),
     # DPR Submitted — FPO clicked Finish on the wizard (P2-07)
     ('dpr_submitted_fpo',           'email',  'Email to FPO confirming their DPR has been submitted',                  ['user_name', 'fpo_name', 'project_title', 'submitted_at']),
     ('dpr_submitted_fpo',           'in_app', 'In-app confirmation to FPO after Finish click',                          ['user_name', 'fpo_name', 'project_title', 'submitted_at']),
@@ -773,6 +777,21 @@ TEMPLATES = [
         'dpr_generated', 'in_app', 'ml',
         'DPR തയ്യാർ — {{project_title}}',
         '<strong>{{project_title}}</strong> (FY {{financial_year}}) DPR തയ്യാറായി. ഡൗൺലോഡ് ചെയ്യാൻ ക്ലിക്ക് ചെയ്യുക.',
+    ),
+
+    # ── AI budget alert (Wave B 2026-10-09) ──────────────────────────────
+    (
+        'ai_budget_alert', 'email', 'en',
+        'AI budget alert — {{service_label}} at {{usage_pct}}% of monthly cap',
+        """<p>Dear <strong>{{user_name}}</strong>,</p>
+<p>The <strong>{{service_label}}</strong> AI service has used <strong>\u20b9{{spend_inr}}</strong> of its <strong>\u20b9{{cap_inr}}</strong> monthly budget (<strong>{{usage_pct}}%</strong>).</p>
+<p>{{status_line}}</p>
+<p style="margin-top:14px;color:#555;">You can raise the cap, disable the service, or review usage under Admin \u2192 AI Services.</p>""",
+    ),
+    (
+        'ai_budget_alert', 'in_app', 'en',
+        'AI budget — {{service_label}} at {{usage_pct}}%',
+        '<strong>{{service_label}}</strong> has used \u20b9{{spend_inr}} of its \u20b9{{cap_inr}} monthly cap ({{usage_pct}}%). {{status_line}}',
     ),
 
     # ── DPR Submitted — FPO Finish click (P2-07) ──────────────────────────

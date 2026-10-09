@@ -58,6 +58,18 @@ from .knowledge_retrieval import (
 from .llm_gateway import LLMError, LLMResponse, call_llm
 
 
+class NarrativeUnchanged(Exception):
+    """Regenerate hash-guard (2026-10-09): raised instead of calling the
+    LLM when the freshly built prompt is byte-identical to the one that
+    produced the chapter's current text — nothing upstream changed, so a
+    regeneration would only burn cost and churn wording. Carries the
+    existing row so the API can return it."""
+    def __init__(self, row):
+        self.row = row
+        super().__init__('Nothing has changed since the last generation — '
+                         'the current text is already up to date.')
+
+
 class NarrativeError(Exception):
     """Raised when generation cannot proceed (service disabled, cap hit, etc.)."""
 
@@ -1585,6 +1597,7 @@ def generate_chapter(
     requested_by=None,
     calc_facts: Optional[str] = None,
     calc_result: Optional[CalculationResult] = None,
+    force: bool = False,
 ) -> DPRAIContent:
     """Generate a fresh narrative candidate for one chapter.
 
@@ -1641,6 +1654,19 @@ def generate_chapter(
     # Anthropic / OpenAI / Google / mock based on `cfg.provider`, so
     # switching vendors is admin config only.
     prompt = build_prompt(project, chapter, kb_entries, calc_facts=calc_facts)
+
+    # Regenerate hash-guard (2026-10-09): identical prompt → identical
+    # inputs → skip the LLM entirely. Platform prompt/FACTS changes alter
+    # the hash automatically, so chapters generated before a deploy
+    # regenerate normally. `force=True` bypasses (explicit admin retry).
+    import hashlib as _hashlib
+    prompt_fp = _hashlib.sha256(prompt.encode('utf-8')).hexdigest()
+    if not force:
+        _existing = DPRAIContent.objects.filter(
+            project=project, chapter=chapter).first()
+        if (_existing is not None and _existing.has_original
+                and _existing.prompt_fingerprint == prompt_fp):
+            raise NarrativeUnchanged(_existing)
 
     # BUG-26 (KAU §6 retest r3): Gemini still emits broken Indian comma
     # groupings (`13,00,00,00` for 13,00,000) in roughly half of chapters
@@ -1783,6 +1809,7 @@ def generate_chapter(
         row.is_stale = False
         row.stale_reason = ''
 
+    row.prompt_fingerprint = prompt_fp
     row.updated_by = requested_by
     row.save()
     return row
@@ -2425,6 +2452,9 @@ def generate_all_narratives(
                 calc_result=calc_result,
             )
             generated.append(chapter)
+        except NarrativeUnchanged:
+            # Hash-guard: inputs identical to this chapter's current text.
+            skipped.append(chapter)
         except Exception as e:  # noqa: BLE001 — chapter failure never blocks the loop
             failed.append((chapter, str(e)[:200]))
 
