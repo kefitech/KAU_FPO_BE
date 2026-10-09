@@ -1,8 +1,8 @@
 """
 Expert Booking - Scheduled Tasks
 ==================================
-- send_booking_reminders: runs hourly, emails/notifies FPO + expert 24h before
-  a confirmed appointment.
+- send_booking_reminders: runs hourly, emails and in-app-notifies the member who
+  booked and the expert 24h before a confirmed appointment.
 - mark_completed_bookings: runs hourly, flips confirmed bookings whose date/time
   has passed to 'completed'.
 """
@@ -28,7 +28,7 @@ def send_booking_reminders():
         status=ExpertBooking.Status.CONFIRMED,
         reminder_sent=False,
         is_deleted=False,
-    ).select_related('expert', 'fpo', 'fpo__primary_user')
+    ).select_related('expert', 'expert__user', 'fpo', 'fpo__primary_user', 'user')
 
     count = 0
     for booking in candidates:
@@ -44,39 +44,36 @@ def send_booking_reminders():
         if not (window_start <= appointment_dt <= window_end):
             continue
 
-        fpo_email = booking.fpo.primary_user.email if booking.fpo.primary_user else None
-        if fpo_email:
-            try:
-                send_notification(
-                    user=booking.fpo.primary_user,
-                    code='expert_booking_reminder',
-                    channel='email',
-                    context={
-                        'expert_name': booking.expert.name_en,
-                        'fpo_name': booking.fpo.name,
-                        'date': str(booking.requested_date),
-                        'time': booking.requested_time,
-                    },
-                )
-            except Exception:
-                logger.exception(f"Failed to send FPO reminder for booking {booking.id}")
+        # The member who booked; legacy rows fall back to the FPO's primary user.
+        recipient = booking.user or booking.fpo.primary_user
+        context = {
+            'expert_name': booking.expert.name_en,
+            'fpo_name': booking.fpo.name,
+            'date': str(booking.requested_date),
+            'time': booking.requested_time,
+        }
+        if recipient:
+            for channel in ('email', 'in_app'):
+                if channel == 'email' and not recipient.email:
+                    continue
+                try:
+                    send_notification(user=recipient, code='expert_booking_reminder', channel=channel, context=context)
+                except Exception:
+                    logger.exception(f"Failed to send {channel} reminder to the member for booking {booking.id}")
 
         if booking.expert.email:
             try:
                 send_notification(
-                    user=booking.fpo.primary_user,
-                    code='expert_booking_reminder',
-                    channel='email',
-                    context={
-                        'expert_name': booking.expert.name_en,
-                        'fpo_name': booking.fpo.name,
-                        'date': str(booking.requested_date),
-                        'time': booking.requested_time,
-                    },
-                    override_recipient=booking.expert.email,
+                    user=booking.expert.user or recipient, code='expert_booking_reminder', channel='email',
+                    context=context, override_recipient=booking.expert.email,
                 )
             except Exception:
-                logger.exception(f"Failed to send expert reminder for booking {booking.id}")
+                logger.exception(f"Failed to send expert email reminder for booking {booking.id}")
+        if booking.expert.user_id:
+            try:
+                send_notification(user=booking.expert.user, code='expert_booking_reminder', channel='in_app', context=context)
+            except Exception:
+                logger.exception(f"Failed to send expert in-app reminder for booking {booking.id}")
 
         booking.reminder_sent = True
         booking.save(update_fields=['reminder_sent'])

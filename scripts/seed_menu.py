@@ -544,13 +544,28 @@ def seed_menu():
         order     = 3,
     )
     # Jobin follow-up (KAU 2026-09-21) — booking overview sidebar link for
-    # /expert/stats page (page existed but was unreachable from the sidebar).
+    # /expert/booking page (page existed but was unreachable from the sidebar).
     seed_item(
         label_key = 'menu.expert_stats',
-        path      = '/expert/stats',
+        path      = '/expert/booking',
         icon      = 'bar-chart-3',
         roles     = [expert_group],
         order     = 4,
+    )
+    # Read-only — the same schemes directory FPOs browse.
+    seed_item(
+        label_key = 'menu.expert_schemes',
+        path      = '/expert/schemes',
+        icon      = 'book-open',
+        roles     = [expert_group],
+        order     = 5,
+    )
+    seed_item(
+        label_key = 'menu.expert_inbox',
+        path      = '/expert/inbox',
+        icon      = 'inbox',
+        roles     = [expert_group],
+        order     = 6,
     )
 
     # ── Aravind merge follow-ups (KAU 2026-09-21) ──────────────────────────

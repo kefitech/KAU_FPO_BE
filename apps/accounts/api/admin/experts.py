@@ -5,7 +5,10 @@ GET/POST  /api/admin/experts/
 GET/PATCH/DELETE  /api/admin/experts/{id}/
 POST  /api/admin/experts/{id}/activate/
 POST  /api/admin/experts/{id}/deactivate/
-GET   /api/admin/experts/{id}/enquiries/
+GET   /api/admin/experts/{id}/bookings/
+
+Enquiries ("Contact Expert" messages) go straight to the expert by email and
+have no admin listing.
 """
 
 from drf_spectacular.utils import extend_schema
@@ -18,7 +21,7 @@ from apps.core.permissions.fpo_scope import get_sub_admin_district, is_super_adm
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
-from apps.database.models.schemes import Expert, ExpertCategory, ExpertEnquiry
+from apps.database.models.schemes import Expert, ExpertCategory
 import secrets
 from django.contrib.auth.models import User, Group
 from django.conf import settings as django_settings
@@ -85,27 +88,6 @@ class ExpertWriteSerializer(serializers.ModelSerializer):
         if value not in valid:
             raise serializers.ValidationError(f'Must be one of: {", ".join(valid)}')
         return value
-
-
-class EnquiryAdminSerializer(serializers.ModelSerializer):
-    fpo_name    = serializers.SerializerMethodField()
-    user_name   = serializers.SerializerMethodField()
-    user_email  = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ExpertEnquiry
-        fields = ['id', 'fpo_name', 'user_name', 'user_email', 'message', 'submitted_at', 'email_sent']
-
-    def get_fpo_name(self, obj):
-        return obj.fpo.fpo_name if obj.fpo else None
-
-    def get_user_name(self, obj):
-        if obj.fpo_user:
-            return f'{obj.fpo_user.first_name} {obj.fpo_user.last_name}'.strip()
-        return None
-
-    def get_user_email(self, obj):
-        return obj.fpo_user.email if obj.fpo_user else None
 
 
 class ExpertListView(APIView):
@@ -302,39 +284,21 @@ class ExpertDeactivateView(APIView):
         return StandardResponse.success(message='Expert deactivated.')
 
 
-class ExpertEnquiriesView(APIView):
+class ExpertBookingsView(APIView):
+    """GET /api/admin/experts/{id}/bookings/ — every booking for an expert (admin only)."""
     permission_classes = [IsAuthenticated]
-
-    @extend_schema(tags=['Admin - Experts'], summary='List enquiries for an expert')
-    def get(self, request, pk):
-        if not _is_admin(request.user):
-            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
-
-        try:
-            expert = Expert.objects.get(pk=pk, is_deleted=False)
-        except Expert.DoesNotExist:
-            return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
-
-        # KAU suggestion #1 — district sub-admins see only inquiries from FPOs
-        # in their district. Super admin sees everything.
-        from apps.core.permissions.fpo_scope import scope_fpo_queryset
-        qs = expert.enquiries.select_related('fpo', 'fpo_user').order_by('-submitted_at')
-        qs = scope_fpo_queryset(qs, request.user, fpo_field='fpo')
-
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(qs, request)
-        serializer = EnquiryAdminSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
-
-class ExpertBookingsView(ExpertEnquiriesView):
-    """GET /api/admin/experts/{id}/bookings/ — all bookings for an expert (admin)."""
 
     @extend_schema(tags=['Admin - Experts'], summary='List bookings for an expert')
     def get(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        if not Expert.objects.filter(pk=pk, is_deleted=False).exists():
+            return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
+
         qs = (
             ExpertBooking.objects
-            .filter(expert_id=pk)
-            .select_related('fpo')
+            .filter(expert_id=pk, is_deleted=False)
+            .select_related('expert', 'fpo', 'fpo__primary_user', 'user')
             .order_by('-created_at')
         )
         serializer = ExpertBookingSerializer(qs, many=True, context={'request': request})
