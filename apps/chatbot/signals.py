@@ -179,3 +179,33 @@ def _remove_stock_from_chatbot_kb(sender, instance, **kwargs):
         upsert_fpo_entry(instance.product.fpo)
     except Exception:
         logger.exception(f'Stock delete sync failed for stock {instance.id}')
+
+
+@receiver(post_save, sender='database.Expert')
+def _sync_expert_to_chatbot_kb(sender, instance, **kwargs):
+    """2026-10-09: tester run showed every expert question refused — the
+    directory was never mirrored into the KB (unlike FPOs/products).
+    Phone/email are deliberately NEVER written to the KB entries."""
+    from apps.chatbot.services.expert_sync import upsert_expert_entry
+    try:
+        created, deleted = upsert_expert_entry(instance)
+        if created or deleted:
+            logger.info(
+                f'Expert sync: {instance.name_en!r} → chatbot KB '
+                f'(created={created}, deleted={deleted})'
+            )
+    except Exception:
+        logger.exception(f'Expert sync failed for {getattr(instance, "name_en", "?")}')
+
+
+@receiver(post_delete, sender='database.Expert')
+def _remove_expert_from_chatbot_kb(sender, instance, **kwargs):
+    from apps.chatbot.services.expert_sync import delete_expert_entries
+    try:
+        removed = delete_expert_entries(instance.name_en)
+        if removed:
+            logger.info(
+                f'Expert sync: removed {removed} chatbot entries for deleted expert {instance.name_en!r}'
+            )
+    except Exception:
+        logger.exception(f'Expert delete sync failed for {getattr(instance, "name_en", "?")}')
