@@ -95,6 +95,10 @@ PRICING_USD_PER_MTOKEN: dict[tuple[str, str], tuple[Decimal, Decimal]] = {
     ('google', 'gemini-2.5-pro'):   (Decimal('1.25'), Decimal('10')),
     ('google', 'gemini-2.5-flash'): (Decimal('0.30'), Decimal('2.50')),
     ('google', 'gemini-3.6-flash'): (Decimal('0.30'), Decimal('2.50')),
+    # 2026-10-09: the chatbot was switched to 3.8-flash without a price
+    # row, so 2,185 calls recorded ₹0 and the budget cap never saw the
+    # spend. Introductory rates per Google (flagged to rise at year-end).
+    ('google', 'gemini-3.8-flash'): (Decimal('0.75'), Decimal('3.75')),
     # Mock is free
     ('mock', 'mock-narrative-v1'): (Decimal('0'), Decimal('0')),
 }
@@ -108,10 +112,33 @@ def _resolve_model(provider: str, requested: str) -> str:
 
 
 def _compute_cost(provider: str, model: str, input_tokens: int, output_tokens: int) -> Decimal:
-    """Compute USD cost. Unknown (provider, model) → 0 (logged but not billed)."""
+    """Compute USD cost.
+
+    2026-10-09 hardening: an unknown (provider, model) used to price as 0
+    SILENTLY — a model rename in admin config made the whole service
+    invisible to the budget cap (exactly what happened to the chatbot on
+    gemini-3.8-flash). Unknown models now fall back to the provider's
+    DEFAULT model's rates as a best-estimate, with a loud log so the
+    price table gets updated — never a silent zero.
+    """
     rates = PRICING_USD_PER_MTOKEN.get((provider, model))
     if not rates:
-        return Decimal('0')
+        default_model = DEFAULT_MODELS.get(provider, '')
+        rates = PRICING_USD_PER_MTOKEN.get((provider, default_model))
+        if rates:
+            logger.warning(
+                'No price row for (%s, %s) — estimating cost with the '
+                'provider default model %s rates. Add the real rates to '
+                'PRICING_USD_PER_MTOKEN in llm_gateway.py.',
+                provider, model, default_model,
+            )
+        else:
+            logger.error(
+                'No price row for (%s, %s) and no default-model rates — '
+                'cost recorded as 0; budget caps are BLIND to this spend.',
+                provider, model,
+            )
+            return Decimal('0')
     in_rate, out_rate = rates
     return (
         Decimal(input_tokens) / Decimal('1000000') * in_rate

@@ -282,18 +282,28 @@ class ChatMessageView(APIView):
                 extra={'model': gemini_result['model']},
             )
 
-        # Fallback — extractive QA against the retrieved context. Same
-        # behaviour as before Phase 2 — zero-hallucination literal span quote.
+        # Fallback — extractive QA against the retrieved context.
+        # Zero-hallucination literal quote, but readable (2026-10-09):
+        # the raw model span can start mid-sentence ("required documents —
+        # fpo_reg_cert, bank") and the old low-confidence path dumped the
+        # entire KB body — both read as broken replies whenever Gemini was
+        # down. The span is now snapped outward to full sentence
+        # boundaries, and the low-confidence path quotes only the leading
+        # sentences of the top entry. Still always a literal substring of
+        # the retrieved KB.
         context = '\n\n'.join(f'{e.topic}. {e.body_en}' for e in entries)
         qa = qa_ask(question=message, context=context)
 
         if qa['confident']:
-            reply = qa['answer']
+            reply = (
+                _snap_to_sentences(context, qa['start'], qa['end'])
+                or qa['answer']
+            )
         else:
-            # Low-confidence: fall back to the top-ranked entry's body_en
-            # verbatim. Still grounded in retrieved KB (no hallucination)
-            # and usually more useful than a bland fallback.
-            reply = entries[0].body_en if entries else _fallback_reply(lang)
+            reply = (
+                _leading_sentences(entries[0].body_en)
+                if entries else _fallback_reply(lang)
+            )
 
         return _reply(
             reply,
@@ -301,6 +311,50 @@ class ChatMessageView(APIView):
             sources=[{'topic': e.topic, 'id': e.id} for e in entries],
             confidence=qa['score'],
         )
+
+
+_SENTENCE_ENDS = ('.', '!', '?', '\n')
+
+
+def _snap_to_sentences(context: str, start: int, end: int,
+                       max_chars: int = 480) -> str:
+    """Expand a model span outward to whole sentence boundaries.
+
+    The extractive model points at the minimal answering span; quoting it
+    alone reads like a fragment. Expanding to the enclosing sentence(s)
+    keeps the zero-hallucination property (still a literal substring of
+    the retrieved KB) while reading like an actual reply. Returns '' on
+    any inconsistency so the caller falls back to the raw span.
+    """
+    try:
+        if not context or not (0 <= start < end <= len(context)):
+            return ''
+        # Walk left to the previous sentence terminator (or text start).
+        left = start
+        while left > 0 and context[left - 1] not in _SENTENCE_ENDS:
+            left -= 1
+        # Walk right to the next terminator (or text end), keeping it.
+        right = end
+        while right < len(context) and context[right - 1] not in _SENTENCE_ENDS:
+            right += 1
+        snippet = context[left:right].strip()
+        if len(snippet) > max_chars:
+            # Over budget — trim trailing sentences past the span's own end.
+            cut = snippet.rfind('.', 0, max_chars)
+            snippet = snippet[:cut + 1] if cut > (end - left) else snippet[:max_chars]
+        return snippet.strip()
+    except Exception:  # noqa: BLE001 — cosmetic helper must never break the reply
+        return ''
+
+
+def _leading_sentences(text: str, max_chars: int = 480) -> str:
+    """First few sentences of a KB body — replaces the old full-body dump
+    on low-confidence answers."""
+    t = (text or '').strip()
+    if len(t) <= max_chars:
+        return t
+    cut = t.rfind('.', 0, max_chars)
+    return (t[:cut + 1] if cut > 80 else t[:max_chars]).strip()
 
 
 def _fallback_reply(lang: str = 'en') -> str:
