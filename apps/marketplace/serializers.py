@@ -1,6 +1,8 @@
 #Arunima S
 
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.core.services.lookup import LookupService
@@ -65,6 +67,32 @@ def _compress_product_image(file):
     )
 
 
+# Stock quantity bounds — shared by the nested /stocks/ serializer (create +
+# PATCH) and the flat first-batch fields on ProductSerializer (create). The
+# values live on the model next to the column they mirror; the frontend keeps
+# a copy in src/lib/validations/stock-quantity.ts.
+_STOCK_QUANTITY_FIELD_KWARGS = {
+    'min_value': ProductStock.MIN_QUANTITY,
+    'max_value': ProductStock.MAX_QUANTITY,
+    'error_messages': {
+        'min_value': 'Quantity must be greater than 0.',
+        'max_value': f'Quantity cannot exceed {ProductStock.MAX_QUANTITY:,}.',
+    },
+}
+
+
+def _validate_whole_number_for_count_unit(quantity, unit):
+    """Count units (pieces) can't have fractional quantities — same rule the
+    frontend applies in stock-quantity.ts."""
+    if unit != ProductStock.Unit.PIECE or quantity is None:
+        return
+    quantity = Decimal(quantity)
+    if quantity != quantity.to_integral_value():
+        raise serializers.ValidationError(
+            {'quantity': 'Quantity must be a whole number when the unit is Piece.'}
+        )
+
+
 class ProductStockSerializer(serializers.ModelSerializer):
     """
     One stock/listing batch under a Product. Managed via the nested
@@ -92,6 +120,18 @@ class ProductStockSerializer(serializers.ModelSerializer):
             'id', 'product', 'is_ondc_listed', 'ondc_product_id',
             'created_at', 'updated_at',
         ]
+        # min/max apply on create and on PATCH alike (DRF validates every
+        # field present in a partial update).
+        extra_kwargs = {'quantity': _STOCK_QUANTITY_FIELD_KWARGS}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # On PATCH, fall back to the stored values so a quantity-only edit of
+        # a Piece batch (or a unit-only switch to Piece) is still checked.
+        unit = attrs.get('unit', getattr(self.instance, 'unit', None))
+        quantity = attrs.get('quantity', getattr(self.instance, 'quantity', None))
+        _validate_whole_number_for_count_unit(quantity, unit)
+        return attrs
 
     def validate_status(self, value):
         # Sold/expired are set via dedicated actions (publish/mark-sold) or
@@ -137,6 +177,7 @@ class ProductSerializer(serializers.ModelSerializer):
     quantity = serializers.DecimalField(
         max_digits=12, decimal_places=2,
         required=False, allow_null=True, write_only=True,
+        **_STOCK_QUANTITY_FIELD_KWARGS,
     )
     unit = serializers.ChoiceField(
         choices=ProductStock.Unit.choices,
@@ -214,6 +255,13 @@ class ProductSerializer(serializers.ModelSerializer):
         if value is None:
             return value
         return _compress_product_image(value)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Create only — the flat stock fields are dropped on update anyway.
+        if self.instance is None:
+            _validate_whole_number_for_count_unit(attrs.get('quantity'), attrs.get('unit'))
+        return attrs
 
     def _pop_initial_stock_fields(self, validated_data):
         """Pop the write-only flat stock fields out of validated_data so

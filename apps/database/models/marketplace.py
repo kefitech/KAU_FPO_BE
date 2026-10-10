@@ -9,6 +9,7 @@ Inquiry         : buyer-initiated purchase inquiries on a product
 """
 import os
 import uuid
+from decimal import Decimal
 
 from django.db import models
 from apps.core.models.base import BaseModel
@@ -88,6 +89,13 @@ class ProductStock(BaseModel):
     The Product (master) carries the identity: name, commodity, image,
     description. Stocks are the sellable units.
     """
+
+    # Quantity bounds enforced by the API on create AND edit. Derived from
+    # the `quantity` column below (max_digits=12, decimal_places=2 → 10
+    # integer digits + 2 decimals). The frontend mirrors these in
+    # KAU_FPO_FE/src/lib/validations/stock-quantity.ts — keep them in sync.
+    MIN_QUANTITY = Decimal('0.01')
+    MAX_QUANTITY = Decimal('9999999999.99')
 
     class Unit(models.TextChoices):
         KG = 'kg', 'Kilogram'
