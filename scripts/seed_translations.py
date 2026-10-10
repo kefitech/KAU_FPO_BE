@@ -1073,8 +1073,9 @@ def seed_ui_translations(languages):
         ('cbbo_dashboard.notifications_empty_hint', 'KAU comments on your training sessions will appear here', 'നിങ്ങളുടെ പരിശീലന സെഷനുകളിലെ KAU അഭിപ്രായങ്ങൾ ഇവിടെ കാണാം'),
         # Expert directory, read-only (CBBO + government portals)
         ('fpo_experts.page_description_readonly', 'Browse agricultural experts and KAU specialists', 'കാർഷിക വിദഗ്ധരെയും KAU സ്പെഷ്യലിസ്റ്റുകളെയും കാണുക'),
-        # Expert directory, FPO portal — toggle that lists experts this FPO has booked first
-        ('fpo_experts.btn_booked_first',   'Booked experts first',                     'ബുക്ക് ചെയ്ത വിദഗ്ധർ ആദ്യം'),
+        # Expert directory, FPO portal — toggle that shows only the experts this member has booked
+        ('fpo_experts.btn_view_bookings',  'View bookings',                            'ബുക്കിംഗുകൾ കാണുക'),
+        ('fpo_experts.empty_bookings',     'You have not booked any experts yet.',     'നിങ്ങൾ ഇതുവരെ വിദഗ്ധരെ ആരെയും ബുക്ക് ചെയ്തിട്ടില്ല.'),
         # Government dashboard — training trend chart + recent notifications
         ('government_dashboard.chart_training_trend', 'Training Sessions',                  'പരിശീലന സെഷനുകൾ'),
         ('government_dashboard.chart_training_trend_subtitle', 'Sessions held for FPOs in your jurisdiction per month — last 12 months', 'നിങ്ങളുടെ അധികാരപരിധിയിലെ എഫ്പിഒകൾക്കായി നടത്തിയ പ്രതിമാസ സെഷനുകൾ — കഴിഞ്ഞ 12 മാസം'),
