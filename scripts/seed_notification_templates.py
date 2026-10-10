@@ -76,6 +76,9 @@ TEMPLATE_CODES = [
     # Crop recommendations (P2-06)
     ('recommendation_ready',        'email',  'Notify FPO that their crop recommendation is ready',                    ['user_name', 'top_crop', 'financial_year']),
     ('recommendation_ready',        'in_app', 'In-app notification when crop recommendation is ready',                 ['user_name', 'top_crop', 'financial_year']),
+    # AI business plan — sent to the FPO primary user and the member who generated it
+    ('business_plan_ready',         'email',  'Notify FPO that their AI business plan is ready',                       ['user_name', 'fpo_name', 'financial_year', 'generated_by']),
+    ('business_plan_ready',         'in_app', 'In-app notification when the AI business plan is ready',                ['user_name', 'fpo_name', 'financial_year', 'generated_by']),
     # ML model retraining (P2-06)
     ('model_retrain_ready',         'in_app', 'Notify admin inbox when async model retraining finishes successfully', ['version_code', 'accuracy']),
     ('model_retrain_failed',        'in_app', 'Notify admin inbox when async model retraining fails',                 ['version_code', 'reason']),
@@ -101,7 +104,11 @@ TEMPLATE_CODES = [
     ('expert_booking_reminder',             'in_app', 'In-app reminder 24h before a confirmed appointment',                                     ['expert_name', 'fpo_name', 'date', 'time']),
     # FPO Training Sessions (Jobin — P2-08)
     ('fpo_training_scheduled',              'email',  'Notify FPO when a government official schedules a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
-    ('fpo_training_scheduled',              'in_app', 'In-app: training session scheduled for FPO',                          ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue']),
+    ('fpo_training_scheduled',              'in_app', 'In-app: training session scheduled for FPO (link opens /fpo/trainings)', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue', 'link']),
+    ('fpo_training_reminder',               'email',  'Remind the organiser, the FPO and its team within 24h of a training session', ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue', 'link']),
+    ('fpo_training_reminder',               'in_app', 'In-app reminder within 24h of a training session',                           ['fpo_name', 'topic', 'trainer_name', 'date', 'time', 'venue', 'link']),
+    ('fpo_training_cancelled',              'email',  'Tell the FPO primary user the official cancelled a training session',        ['fpo_name', 'topic', 'date', 'time', 'venue', 'reason', 'cancelled_by', 'link']),
+    ('fpo_training_cancelled',              'in_app', 'In-app: a scheduled training session was cancelled by the official',        ['fpo_name', 'topic', 'date', 'time', 'venue', 'reason', 'cancelled_by', 'link']),
     # KAU admin / sub-admin commented on a session → the CBBO officer or government official
     # who recorded it (link opens the session on /cbbo/training or /government/training)
     ('training_comment_added', 'in_app', 'In-app: a KAU admin or sub-admin commented on a training session you recorded', ['author_name', 'author_designation', 'topic', 'fpo_name', 'date', 'comment', 'link', 'session_id']),
@@ -114,6 +121,9 @@ TEMPLATE_CODES = [
     # Marketplace inquiries → FPO inbox (link opens the matching tab on /fpo/products)
     ('inquiry_received', 'in_app', "In-app: a verified buyer sent an inquiry on one of the FPO's products", ['buyer_name', 'product_name', 'quantity', 'unit', 'link']),
     ('inquiry_received_public', 'in_app', 'In-app: a visitor sent an inquiry from the public Market Hub', ['buyer_name', 'product_name', 'link']),
+    # Inquiry status updates → the buyer's inbox (contact account + the member who submitted it)
+    ('inquiry_contacted', 'in_app', "In-app: the selling FPO marked the buyer's inquiry as contacted", ['product_name', 'fpo_name']),
+    ('inquiry_resolved',  'in_app', "In-app: the selling FPO marked the buyer's inquiry as resolved",  ['product_name', 'fpo_name']),
     # External buyer self-registration → district sub-admins (link opens pending buyers on /admin/buyers;
     # buyer_id drives the unread dot on that row)
     ('buyer_registration_pending', 'in_app', 'In-app: an external buyer registered in the sub-admin\'s district and awaits verification', ['buyer_name', 'district', 'district_ml', 'link', 'buyer_id']),
@@ -852,6 +862,38 @@ TEMPLATES = [
         'പ്രിയ {{user_name}}, {{financial_year}}-നുള്ള നിങ്ങളുടെ വിള ശുപാർശ തയ്യാറാണ്. മുൻനിര നിർദ്ദേശം: {{top_crop}}.',
     ),
 
+    # ── AI Business Plan Ready ────────────────────────────────────────────
+    (
+        'business_plan_ready', 'email', 'en',
+        'Your Business Plan is Ready',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>The AI business plan for <strong>{{fpo_name}}</strong> ({{financial_year}}) is ready. '
+            'It was generated by <strong>{{generated_by}}</strong>.</p>'
+            '<p>Log in to the KAU-FPO Platform to read it and download it as PDF or Word.</p>'
+        ),
+    ),
+    (
+        'business_plan_ready', 'email', 'ml',
+        'നിങ്ങളുടെ ബിസിനസ് പ്ലാൻ തയ്യാറാണ്',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{fpo_name}}</strong>-ന്റെ ({{financial_year}}) AI ബിസിനസ് പ്ലാൻ തയ്യാറാണ്. '
+            '<strong>{{generated_by}}</strong> ആണ് ഇത് തയ്യാറാക്കിയത്.</p>'
+            '<p>വായിക്കാനും PDF അല്ലെങ്കിൽ Word ആയി ഡൗൺലോഡ് ചെയ്യാനും KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ ലോഗിൻ ചെയ്യുക.</p>'
+        ),
+    ),
+    (
+        'business_plan_ready', 'in_app', 'en',
+        'Your Business Plan is Ready',
+        'Dear {{user_name}}, the business plan for {{fpo_name}} ({{financial_year}}) is ready. Generated by {{generated_by}}.',
+    ),
+    (
+        'business_plan_ready', 'in_app', 'ml',
+        'നിങ്ങളുടെ ബിസിനസ് പ്ലാൻ തയ്യാറാണ്',
+        'പ്രിയ {{user_name}}, {{fpo_name}}-ന്റെ ({{financial_year}}) ബിസിനസ് പ്ലാൻ തയ്യാറാണ്. {{generated_by}} ആണ് തയ്യാറാക്കിയത്.',
+    ),
+
     # ── Model Retraining (P2-06) ──────────────────────────────────────────
     (
         'model_retrain_ready', 'in_app', 'en',
@@ -1024,6 +1066,78 @@ TEMPLATES = [
         'Training Session Scheduled',
         'A training on "{{topic}}" has been scheduled for {{date}} at {{time}}, venue: {{venue}}, conducted by {{trainer_name}}.',
     ),
+    # Training reminder (email + in-app → organiser, FPO primary user, team)
+    (
+        'fpo_training_reminder', 'email', 'en',
+        'Reminder: Training session coming up — {{topic}}',
+        '<p>This is a reminder that the training session <strong>{{topic}}</strong> for '
+        '<strong>{{fpo_name}}</strong> is coming up.</p>'
+        '<table style="margin:12px 0;border-collapse:collapse;">'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Date</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{date}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Time</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Venue</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Trainer</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{trainer_name}}</td></tr>'
+        '</table>'
+        '<p>Please make sure you are available at the scheduled time.</p>',
+    ),
+    (
+        'fpo_training_reminder', 'email', 'ml',
+        'ഓർമ്മപ്പെടുത്തൽ: പരിശീലന സെഷൻ ഉടൻ — {{topic}}',
+        '<p><strong>{{fpo_name}}</strong>-നായുള്ള <strong>{{topic}}</strong> പരിശീലന സെഷൻ ഉടൻ നടക്കുമെന്ന ഓർമ്മപ്പെടുത്തലാണിത്.</p>'
+        '<table style="margin:12px 0;border-collapse:collapse;">'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">തീയതി</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{date}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">സമയം</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">വേദി</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">പരിശീലകൻ</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{trainer_name}}</td></tr>'
+        '</table>'
+        '<p>നിശ്ചിത സമയത്ത് ലഭ്യമാണെന്ന് ദയവായി ഉറപ്പാക്കുക.</p>',
+    ),
+    (
+        'fpo_training_reminder', 'in_app', 'en',
+        'Upcoming Training Reminder',
+        'Reminder: the training on "{{topic}}" for {{fpo_name}} is on {{date}} at {{time}}, venue: {{venue}}.',
+    ),
+    (
+        'fpo_training_reminder', 'in_app', 'ml',
+        'വരാനിരിക്കുന്ന പരിശീലന ഓർമ്മപ്പെടുത്തൽ',
+        'ഓർമ്മപ്പെടുത്തൽ: {{fpo_name}}-നായുള്ള "{{topic}}" പരിശീലനം {{date}}-ന് {{time}}-ന് {{venue}} എന്ന വേദിയിൽ നടക്കും.',
+    ),
+    # Training cancelled (email → FPO primary, in-app → FPO primary + team)
+    (
+        'fpo_training_cancelled', 'email', 'en',
+        'Training session cancelled — {{topic}}',
+        '<p>The training session <strong>{{topic}}</strong> scheduled for <strong>{{fpo_name}}</strong> on '
+        '<strong>{{date}}</strong> at <strong>{{time}}</strong> ({{venue}}) has been cancelled by '
+        '<strong>{{cancelled_by}}</strong>.</p>'
+        '<p>Reason: {{reason}}</p>'
+        '<p>Any new date will be announced separately.</p>',
+    ),
+    (
+        'fpo_training_cancelled', 'email', 'ml',
+        'പരിശീലന സെഷൻ റദ്ദാക്കി — {{topic}}',
+        '<p><strong>{{fpo_name}}</strong>-നായി <strong>{{date}}</strong>-ന് <strong>{{time}}</strong>-ന് ({{venue}}) '
+        'നിശ്ചയിച്ചിരുന്ന <strong>{{topic}}</strong> പരിശീലന സെഷൻ <strong>{{cancelled_by}}</strong> റദ്ദാക്കി.</p>'
+        '<p>കാരണം: {{reason}}</p>'
+        '<p>പുതിയ തീയതി ഉണ്ടെങ്കിൽ പ്രത്യേകം അറിയിക്കും.</p>',
+    ),
+    (
+        'fpo_training_cancelled', 'in_app', 'en',
+        'Training session cancelled',
+        'The training on "{{topic}}" scheduled for {{date}} at {{time}} has been cancelled by {{cancelled_by}}. Reason: {{reason}}',
+    ),
+    (
+        'fpo_training_cancelled', 'in_app', 'ml',
+        'പരിശീലന സെഷൻ റദ്ദാക്കി',
+        '{{date}}-ന് {{time}}-ന് നിശ്ചയിച്ചിരുന്ന "{{topic}}" പരിശീലനം {{cancelled_by}} റദ്ദാക്കി. കാരണം: {{reason}}',
+    ),
     # Training-session comment (in-app → session recorder)
     (
         'training_comment_added', 'in_app', 'en',
@@ -1111,6 +1225,27 @@ TEMPLATES = [
         'inquiry_received_public', 'in_app', 'ml',
         'പുതിയ മാർക്കറ്റ് ഹബ് അന്വേഷണം — {{product_name}}',
         '<strong>{{buyer_name}}</strong> പൊതു മാർക്കറ്റ് ഹബ്ബിൽ നിന്ന് <strong>{{product_name}}</strong> സംബന്ധിച്ച് അന്വേഷണം അയച്ചു. കാണാനും മറുപടി നൽകാനും മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ തുറക്കുക.',
+    ),
+    # Marketplace inquiry status updates (in-app → buyer)
+    (
+        'inquiry_contacted', 'in_app', 'en',
+        'Inquiry update — {{product_name}}',
+        '<strong>{{fpo_name}}</strong> has marked your inquiry about <strong>{{product_name}}</strong> as contacted. They should be in touch with you shortly.',
+    ),
+    (
+        'inquiry_contacted', 'in_app', 'ml',
+        'അന്വേഷണ അപ്ഡേറ്റ് — {{product_name}}',
+        '<strong>{{fpo_name}}</strong> <strong>{{product_name}}</strong> സംബന്ധിച്ച നിങ്ങളുടെ അന്വേഷണം ബന്ധപ്പെട്ടതായി അടയാളപ്പെടുത്തി. അവർ ഉടൻ നിങ്ങളുമായി ബന്ധപ്പെടും.',
+    ),
+    (
+        'inquiry_resolved', 'in_app', 'en',
+        'Inquiry resolved — {{product_name}}',
+        '<strong>{{fpo_name}}</strong> has marked your inquiry about <strong>{{product_name}}</strong> as resolved.',
+    ),
+    (
+        'inquiry_resolved', 'in_app', 'ml',
+        'അന്വേഷണം പൂർത്തിയായി — {{product_name}}',
+        '<strong>{{fpo_name}}</strong> <strong>{{product_name}}</strong> സംബന്ധിച്ച നിങ്ങളുടെ അന്വേഷണം പൂർത്തിയായതായി അടയാളപ്പെടുത്തി.',
     ),
     # External buyer registration (in-app → district sub-admins)
     (

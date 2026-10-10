@@ -1,7 +1,7 @@
 """
 Expert Directory — FPO-facing Browse & Contact Enquiry
 ========================================================
-GET   /api/experts/            — browse active experts (filter: category, district, search)
+GET   /api/experts/            — browse active experts (filter: category, district, search; sort=booked)
 GET   /api/experts/{id}/       — expert detail
 POST  /api/experts/{id}/enquiry/ — submit contact enquiry (sends email to expert)
 """
@@ -14,9 +14,11 @@ from rest_framework.views import APIView
 from apps.core.utils.constants import UserRole
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
+from apps.database.models.expert_booking import ExpertBooking
 from apps.database.models.schemes import Expert, ExpertEnquiry
 from apps.database.models.fpo import FPO, FPOUserMembership
-from django.db.models import Case, When, IntegerField
+from django.db.models import Case, Exists, F, IntegerField, OuterRef, Q, Subquery, When
+from django.utils import timezone
 from apps.core.utils.constants import DISTRICT_ZONE
 from apps.notifications.services import send_notification
 
@@ -62,6 +64,10 @@ class ExpertListView(APIView):
             '- `category` — scientist / trainer / banker / facilitator\n'
             '- `district` — Kerala district code (e.g. TRS, TVM)\n'
             '- `search` — keyword search in name and expertise\n\n'
+            '**Sort:** `sort=booked` lists the experts you have booked before the rest, '
+            'soonest upcoming appointment first; booked experts with no upcoming appointment '
+            'follow, then everyone else in the usual district/zone order. '
+            'Ignored for callers without an FPO.\n\n'
             '**Language:** Send `X-Language: ml` header for Malayalam names.'
         ),
     )
@@ -78,7 +84,6 @@ class ExpertListView(APIView):
 
         search = request.query_params.get('search')
         if search:
-            from django.db.models import Q
             qs = qs.filter(
                 Q(name_en__icontains=search) |
                 Q(primary_expertise__icontains=search) |
@@ -86,11 +91,44 @@ class ExpertListView(APIView):
                 Q(organisation__icontains=search)
             )
 
-        fpo_district = None
+        fpo = None
         if request.user.is_authenticated:
-            membership = FPOUserMembership.objects.filter(user=request.user, is_active=True).first()
-            if membership and membership.fpo:
-                fpo_district = membership.fpo.district
+            membership = (
+                FPOUserMembership.objects.filter(user=request.user, is_active=True)
+                .select_related('fpo').first()
+            )
+            fpo = membership.fpo if membership else None
+            if fpo is None:
+                fpo = FPO.objects.filter(primary_user=request.user, is_deleted=False).first()
+        fpo_district = fpo.district if fpo else None
+
+        ordering = []
+        if fpo and request.query_params.get('sort') == 'booked':
+            # Experts the caller has a booking with (any status — matches the
+            # bookings badge on the directory card) come first, ordered by their
+            # soonest upcoming appointment. Booked experts with nothing upcoming
+            # follow, then everyone else. Same ownership rule as the bookings
+            # list: the primary user also owns legacy rows with no booker.
+            mine = Q(user=request.user)
+            if fpo.primary_user_id == request.user.id:
+                mine |= Q(user__isnull=True)
+            my_bookings = ExpertBooking.objects.filter(
+                mine, expert=OuterRef('pk'), fpo=fpo, is_deleted=False,
+            )
+            next_upcoming = my_bookings.filter(
+                status__in=[ExpertBooking.Status.PENDING, ExpertBooking.Status.CONFIRMED],
+                requested_date__gte=timezone.localdate(),
+            ).order_by('requested_date', 'requested_time')
+            qs = qs.annotate(
+                _booked=Exists(my_bookings),
+                _next_date=Subquery(next_upcoming.values('requested_date')[:1]),
+                _next_time=Subquery(next_upcoming.values('requested_time')[:1]),
+            )
+            ordering += [
+                '-_booked',
+                F('_next_date').asc(nulls_last=True),
+                F('_next_time').asc(nulls_last=True),
+            ]
 
         if fpo_district:
             fpo_zone = DISTRICT_ZONE.get(fpo_district)
@@ -102,9 +140,9 @@ class ExpertListView(APIView):
                     default=2,
                     output_field=IntegerField(),
                 )
-            ).order_by('_priority', 'order', 'name_en')
-        else:
-            qs = qs.order_by('order', 'name_en')
+            )
+            ordering.append('_priority')
+        qs = qs.order_by(*ordering, 'order', 'name_en')
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)

@@ -8,7 +8,7 @@ member may hold at most one appointment per calendar day, with any expert.
 FPO member side:
   GET  /api/experts/{id}/availability/    - browse an expert's open slots
   POST /api/experts/{id}/book/            - book a slot (confirmed immediately)
-  GET  /api/experts/bookings/             - my bookings (?scope=fpo for the whole FPO)
+  GET  /api/experts/bookings/             - my bookings
   POST /api/experts/bookings/{id}/cancel/ - cancel my booking (the FPO primary may cancel any)
 
 Expert / admin side:
@@ -178,7 +178,12 @@ class CreateBookingSerializer(serializers.Serializer):
             'required': 'Please enter a topic for this appointment.',
         },
     )
-    notes = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=1000,
+        error_messages={'max_length': 'Notes must be 1000 characters or fewer.'},
+    )
 def _get_fpo(user):
     membership = FPOUserMembership.objects.filter(user=user, is_active=True).first()
     if membership:
@@ -200,6 +205,8 @@ def _can_manage_expert(user, expert):
 # ---------------------------------------------------------------------------
 # Booking rules
 # ---------------------------------------------------------------------------
+# Longest cancellation reason an FPO member may give (the frontend shows the same limit).
+CANCEL_REASON_MAX_CHARS = 300
 # How many upcoming appointments one member may hold at a time (stops slot hoarding).
 MAX_UPCOMING_BOOKINGS_PER_USER = getattr(django_settings, 'EXPERT_MAX_UPCOMING_BOOKINGS_PER_USER', 5)
 
@@ -263,12 +270,12 @@ def _user_conflict_error(user, slot, date, exclude_pk=None, subject='You already
 
 def _can_cancel_booking(user, booking):
     """
-    The member who made the booking may cancel it, and so may the FPO's primary
-    user. Legacy rows with no booker fall back to the FPO-wide permission.
+    Only the member who made the booking may cancel it. Legacy rows with no
+    booker belong to the FPO's primary user, as in the bookings list.
     """
     if booking.user_id:
-        return user.id in (booking.user_id, booking.fpo.primary_user_id)
-    return has_fpo_permission(user, booking.fpo, 'can_book_experts')
+        return user.id == booking.user_id
+    return user.id == booking.fpo.primary_user_id
 
 
 def _booking_recipient(booking):
@@ -482,7 +489,7 @@ class CreateBookingView(APIView):
 class CancelBookingView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=['Expert Booking'], summary="Cancel my booking (the FPO primary may cancel any member's)")
+    @extend_schema(tags=['Expert Booking'], summary='Cancel my booking')
     def post(self, request, pk):
         fpo = _get_fpo(request.user)
         booking = (
@@ -498,7 +505,12 @@ class CancelBookingView(APIView):
         if booking.status not in LIVE_STATUSES:
             return StandardResponse.error('This booking cannot be cancelled.', status_code=status.HTTP_400_BAD_REQUEST)
 
-        reason = request.data.get('reason', '')
+        reason = (request.data.get('reason') or '').strip()
+        if len(reason) > CANCEL_REASON_MAX_CHARS:
+            return StandardResponse.error(
+                f'Reason must be {CANCEL_REASON_MAX_CHARS} characters or fewer.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         booking.status = ExpertBooking.Status.CANCELLED
         booking.cancellation_reason = reason
         booking.save(update_fields=['status', 'cancellation_reason'])
@@ -980,7 +992,7 @@ class FpoBookingListView(APIView):
 
     @extend_schema(
         tags=['Expert Booking'],
-        summary="List my bookings (?scope=fpo for every member's bookings in my FPO)",
+        summary='List my bookings',
     )
     def get(self, request):
         fpo = _get_fpo(request.user)
@@ -989,13 +1001,12 @@ class FpoBookingListView(APIView):
                 'FPO not found.', status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        bookings = ExpertBooking.objects.filter(fpo=fpo, is_deleted=False)
-        if request.query_params.get('scope') != 'fpo':
-            mine = Q(user=request.user)
-            if fpo.primary_user_id == request.user.id:
-                # Rows from before bookings were per user belong to the FPO's owner.
-                mine |= Q(user__isnull=True)
-            bookings = bookings.filter(mine)
+        # Bookings belong to the member who made them; nobody sees another
+        # member's. Rows from before bookings were per user belong to the owner.
+        mine = Q(user=request.user)
+        if fpo.primary_user_id == request.user.id:
+            mine |= Q(user__isnull=True)
+        bookings = ExpertBooking.objects.filter(mine, fpo=fpo, is_deleted=False)
         expert_id = request.query_params.get('expert_id') or request.query_params.get('expert')
         if expert_id:
             bookings = bookings.filter(expert_id=expert_id)

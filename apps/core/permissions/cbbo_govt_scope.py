@@ -9,6 +9,8 @@ Government admin pages:
     sub_admin                                → sees records in their district + state-wide ones
     sub_admin changing anything              → only records in their own district; anything
                                                else they can see is read-only
+    sub_admin reactivating / deleting        → not an account a super admin deactivated
+                                               (their own deactivations stay reversible)
 
 "In their district" means: a CBBO with an active assignment for the district, or an
 official whose districts include it. A record outside the caller's scope is a
@@ -16,13 +18,18 @@ official whose districts include it. A record outside the caller's scope is a
 
 Usage:
     qs = scope_cbbo_queryset(qs, request.user, manage=request.method not in SAFE_METHODS)
+    error = super_admin_lock_error(request.user, account, lang)   # before activate / destroy
 """
 
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
+from apps.core.models.generic import AuditLog
 from apps.core.permissions.fpo_scope import get_sub_admin_district, is_sub_admin, is_super_admin
-from apps.core.utils.constants import District
+from apps.core.services.audit import AuditService
+from apps.core.utils.constants import District, UserRole
+from apps.core.utils.messages import AdminMessages, msg
 from apps.database.models.cbbo import CBBOAssignment
 
 VIEW_ALL_PERM = 'accounts.can_view_all_cbbo_govt'
@@ -135,3 +142,76 @@ def own_district_error(user, *, state_wide=False, districts=()):
     if any(d != own for d in districts):
         return f'You can only assign your own district ({own}).'
     return None
+
+
+# ── Super-admin deactivation lock ────────────────────────────────────────────
+# Same rule FPO primary users get for team members (apps/fpo/api/team.py,
+# _last_deactivated_by_admin): who switched a login off is read back from the
+# audit log, and a sub-admin may not reactivate or delete an account a super
+# admin deactivated. A sub-admin's own deactivation stays reversible by sub-admins.
+
+ACCOUNT_STATUS_ACTIONS = (AuditLog.Action.USER_ACTIVATE, AuditLog.Action.USER_DEACTIVATE)
+
+
+def log_account_status(request, account, active):
+    """Audit row for an admin switching `account`'s login on or off."""
+    AuditService.log(
+        user=request.user,
+        action=AuditLog.Action.USER_ACTIVATE if active else AuditLog.Action.USER_DEACTIVATE,
+        instance=account,
+        request=request,
+        changes={'activated_user' if active else 'deactivated_user': account.email},
+    )
+
+
+def super_admin_deactivated_ids(user_ids=None):
+    """
+    Ids of accounts whose most recent activate/deactivate audit row is a deactivation
+    by a super admin. `user_ids` limits the lookup; None covers every account ever toggled.
+    """
+    rows = AuditLog.objects.filter(
+        content_type=ContentType.objects.get_for_model(User), action__in=ACCOUNT_STATUS_ACTIONS,
+    )
+    if user_ids is not None:
+        rows = rows.filter(object_id__in=[str(pk) for pk in user_ids])
+    latest = (
+        rows.order_by('object_id', '-created_at', '-pk').distinct('object_id')
+            .values_list('object_id', 'action', 'user_id')
+    )
+    actor_by_account = {
+        object_id: actor_id for object_id, action, actor_id in latest
+        if action == AuditLog.Action.USER_DEACTIVATE and actor_id
+    }
+    if not actor_by_account:
+        return set()
+    super_admins = set(
+        User.objects.filter(pk__in=set(actor_by_account.values()), groups__name=UserRole.SUPER_ADMIN)
+            .values_list('pk', flat=True)
+    )
+    return {int(object_id) for object_id, actor_id in actor_by_account.items() if actor_id in super_admins}
+
+
+def locked_by_super_admin(account):
+    """Whether `account` is currently deactivated and a super admin was the one who did it."""
+    return not account.is_active and account.pk in super_admin_deactivated_ids([account.pk])
+
+
+def super_admin_lock_error(user, account, lang='en', *, deleting=False):
+    """
+    For reactivating or deleting an account: a sub-admin may not undo a super admin's
+    deactivation. Returns the error message, or None when allowed.
+    """
+    if is_super_admin(user) or not locked_by_super_admin(account):
+        return None
+    text = AdminMessages.SUPER_ADMIN_DEACTIVATED_DELETE if deleting else AdminMessages.SUPER_ADMIN_DEACTIVATED_REACTIVATE
+    return msg(text, lang)
+
+
+def deactivated_by_super_admin(context, obj):
+    """
+    Serializer flag so the UI can hide activate/delete for sub-admins. Cached on the
+    serializer context, so a list costs one lookup.
+    """
+    if '_super_admin_deactivated' not in context:
+        context['_super_admin_deactivated'] = super_admin_deactivated_ids()
+    return not obj.is_active and obj.pk in context['_super_admin_deactivated']

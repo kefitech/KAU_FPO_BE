@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
     default_retry_delay=30,
     name='recommendations.generate',
 )
-def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year, season_override=None, ph_override=None):
+def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_year, season_override=None, ph_override=None, requested_by_id=None):
     """
     Args:
         fpo_id            : FPO.pk
@@ -42,6 +42,10 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
                              (their actual measured value). None means fall
                              back to the resolved soil type's estimated
                              pH range, same as before this param existed.
+        requested_by_id    : User.pk of the member who asked for this run, so
+                             they are notified alongside the FPO's primary
+                             user. None (older queued tasks) notifies the
+                             primary user only.
 
     Looks up the FPO and model, calls FastAPI (via the existing
     get_crop_recommendation), saves the result, and — on success —
@@ -157,40 +161,21 @@ def generate_crop_recommendation_task(self, fpo_id, model_version_id, financial_
     )
 
     if new_status == CropRecommendation.Status.COMPLETED:
-        _notify_recommendation_ready(fpo, recommendations_list, financial_year)
+        _notify_recommendation_ready(fpo, recommendations_list, financial_year, requested_by_id)
 
     return rec.id
 
 
-def _notify_recommendation_ready(fpo, recommendations_list, financial_year):
+def _notify_recommendation_ready(fpo, recommendations_list, financial_year, requested_by_id=None):
     """
-    Sends both email and in-app notifications via the project's shared
-    dispatcher (apps.notifications.services.send_notification). Fails
-    silently per-channel if a template/channel isn't configured yet —
-    send_notification() already logs a warning in that case; we don't
-    want a missing notification template to break the recommendation
-    itself, which already succeeded.
+    Email + in-app to the FPO's primary user and, when a different member
+    requested the run, to that member too (apps.recommendations.notifications).
     """
-    from apps.notifications.services import send_notification
+    from django.contrib.auth.models import User
+    from apps.recommendations.notifications import notify_recommendation_ready
 
-    user = fpo.primary_user
-    if not user:
-        logger.warning(f"FPO {fpo.pk} has no primary_user — skipping notification")
-        return
-
-    top_crop = recommendations_list[0].get('crop', '') if recommendations_list else ''
-    context = {
-        'user_name': getattr(user, 'first_name', '') or getattr(user, 'username', ''),
-        'top_crop': top_crop,
-        'financial_year': financial_year,
-    }
-
-    # TODO: pull the user's actual language preference once that's
-    # readily available on the user/profile model — defaulting to 'en'.
-    lang = 'en'
-
-    send_notification(user=user, code='recommendation_ready', channel='email', context=context, lang=lang)
-    send_notification(user=user, code='recommendation_ready', channel='in_app', context=context, lang=lang)
+    requested_by = User.objects.filter(pk=requested_by_id).first() if requested_by_id else None
+    notify_recommendation_ready(fpo, recommendations_list, financial_year, requested_by)
 
 
 # ---------------------------------------------------------------------------

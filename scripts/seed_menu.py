@@ -380,12 +380,13 @@ def seed_menu():
         order     = 13,
     )
     # Jobin follow-up (KAU 2026-09-21) — read-only trainings list for FPO
-    # users (sessions scheduled for their FPO by CBBO/gov officials).
+    # users (sessions scheduled for their FPO by CBBO/gov officials). Team
+    # members get the scheduling notification too, so they see the page.
     seed_item(
         label_key = 'menu.fpo_trainings',
         path      = '/fpo/trainings',
         icon      = 'graduation-cap',
-        roles     = fpo_roles,
+        roles     = fpo_roles_with_secondary,
         order     = 14,
     )
 

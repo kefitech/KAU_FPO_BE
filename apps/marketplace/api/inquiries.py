@@ -27,6 +27,7 @@ from apps.core.services.fpo_permission import get_member_fpo
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BuyerSellerMatch, Inquiry, Product, ProductStock
+from apps.core.services.fpo_permission import fpo_notification_recipients
 from apps.marketplace.api.buyers import _resolve_buyer_user
 from apps.marketplace.permissions import CanManageProducts
 from apps.marketplace.serializers import InquiryCreateSerializer, InquirySerializer, MarketHubInquirySerializer
@@ -78,6 +79,7 @@ class InquiryCreateView(APIView):
             product=product,
             buyer=buyer,
             contact_user=contact_user,
+            submitted_by=request.user,
             quantity_requested=serializer.validated_data['quantity_requested'],
             message=serializer.validated_data.get('message', ''),
         )
@@ -100,28 +102,29 @@ class InquiryCreateView(APIView):
             except Exception:
                 pass  # Inquiry already saved — don't fail the request if notification dispatch fails
 
-            # In-app (FPO inbox + dashboard). `link` makes the dashboard
-            # notification open the Inquiries tab on /fpo/products.
-            # Names are HTML-escaped: in-app bodies are rendered as HTML and the
-            # template engine substitutes values verbatim.
-            try:
-                from django.utils.html import escape
+            # In-app (FPO inbox + dashboard) to everyone on the selling FPO who
+            # can act on inquiries: the primary user and members with
+            # can_manage_products. `link` makes the dashboard notification open
+            # the Inquiries tab on /fpo/products. Names are HTML-escaped: in-app
+            # bodies are rendered as HTML and the template engine substitutes
+            # values verbatim.
+            from django.utils.html import escape
 
-                quantity = inquiry.quantity_requested
-                send_notification(
-                    user=seller_user,
-                    code='inquiry_received',
-                    channel='in_app',
-                    context={
-                        'buyer_name': escape(buyer.name),
-                        'product_name': escape(product.name.get('en', '') if product.name else ''),
-                        'quantity': f'{quantity.normalize():f}' if quantity is not None else '',
-                        'unit': stock.unit,
-                        'link': '/fpo/products?view=inquiries',
-                    },
-                )
-            except Exception:
-                pass  # Inquiry already saved — don't fail the request if notification dispatch fails
+            quantity = inquiry.quantity_requested
+            in_app_context = {
+                'buyer_name': escape(buyer.name),
+                'product_name': escape(product.name.get('en', '') if product.name else ''),
+                'quantity': f'{quantity.normalize():f}' if quantity is not None else '',
+                'unit': stock.unit,
+                'link': '/fpo/products?view=inquiries',
+            }
+            for recipient in fpo_notification_recipients(product.fpo, 'can_manage_products'):
+                try:
+                    send_notification(
+                        user=recipient, code='inquiry_received', channel='in_app', context=in_app_context,
+                    )
+                except Exception:
+                    pass  # Inquiry already saved — don't fail the request if notification dispatch fails
 
         return StandardResponse.success(
             data={'inquiry_id': inquiry.id},
@@ -196,24 +199,29 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return StandardResponse.success(message='Inquiry marked as resolved')
 
     def _notify_buyer(self, inquiry, code):
-        """Notify the buyer's inbox (in_app) when the FPO changes an inquiry's status."""
-        if not inquiry.contact_user:
-            return
+        """
+        Notify the buyer's inbox (in_app) when the FPO changes an inquiry's
+        status: the contact account and, when a different FPO team member
+        submitted the inquiry on the FPO's behalf, that member too.
+        """
+        from django.utils.html import escape
         from apps.notifications.services import send_notification
-        lang = getattr(getattr(inquiry.contact_user, 'profile', None), 'preferred_language', 'en')
-        try:
-            send_notification(
-                user=inquiry.contact_user,
-                code=code,
-                channel='in_app',
-                context={
-                    'product_name': inquiry.product.name.get('en', '') if inquiry.product.name else '',
-                    'fpo_name': inquiry.product.fpo.name,
-                },
-                lang=lang or 'en',
-            )
-        except Exception:
-            pass  # Status already saved — don't fail the request if notification dispatch fails
+
+        recipients, seen = [], set()
+        for user in (inquiry.contact_user, inquiry.submitted_by):
+            if user and user.pk not in seen:
+                seen.add(user.pk)
+                recipients.append(user)
+        context = {
+            'product_name': escape(inquiry.product.name.get('en', '') if inquiry.product.name else ''),
+            'fpo_name': escape(inquiry.product.fpo.name),
+        }
+        for user in recipients:
+            lang = getattr(getattr(user, 'profile', None), 'preferred_language', 'en')
+            try:
+                send_notification(user=user, code=code, channel='in_app', context=context, lang=lang or 'en')
+            except Exception:
+                pass  # Status already saved — don't fail the request if notification dispatch fails
 
 class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """

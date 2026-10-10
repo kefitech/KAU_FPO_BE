@@ -18,6 +18,7 @@ from apps.core.services.translation import t
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BusinessPlan
 from apps.recommendations.api.recommendations import _get_fpo_or_404, _require_fpo_action
+from apps.recommendations.notifications import notify_business_plan_ready
 from apps.recommendations.business_plan import (
     BusinessPlanError,
     build_profile,
@@ -102,6 +103,10 @@ class GenerateBusinessPlanView(APIView):
         except BusinessPlanError as e:
             key, status_code = _ERROR_RESPONSES[e.code]
             return StandardResponse.error(t(key, lang), status_code=status_code)
+
+        # The plan belongs to the FPO: tell the primary user and, if a
+        # different member generated it, that member too.
+        notify_business_plan_ready(fpo, plan, request.user)
 
         return StandardResponse.success(
             data=_payload(fpo, plan, lang),

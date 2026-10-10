@@ -16,6 +16,42 @@ from apps.cbbo.training_comments import (
 )
 
 from apps.government.api.scoping import is_government_user, scope_fpo_qs, get_fpo_scoped
+from apps.cbbo.training_cancel import CancelSessionSerializer, cancel_training_session
+
+
+
+def _notify_fpo(fpo, session):
+    """
+    Session scheduled: in-app to the FPO's primary user and every active team
+    member, email to the primary user. Mirrors apps.cbbo.api.training._notify_fpo.
+    """
+    from apps.core.services.fpo_permission import fpo_notification_recipients
+    from apps.notifications.services import send_notification
+    context = {
+        'fpo_name': fpo.name,
+        'topic': session.topic,
+        'trainer_name': session.trainer_name or 'TBD',
+        'date': str(session.date),
+        'time': session.time or 'TBD',
+        'venue': session.venue or 'TBD',
+        'link': '/fpo/trainings',
+    }
+    for member in fpo_notification_recipients(fpo):
+        try:
+            send_notification(user=member, code='fpo_training_scheduled', channel='in_app', context=context)
+        except Exception:
+            pass
+    if fpo.primary_user:
+        try:
+            send_notification(
+                user=fpo.primary_user, code='fpo_training_scheduled', channel='email', context=context,
+            )
+        except Exception:
+            pass
+
+
+# Same cap as the create/edit forms; the column allows 300 but the UI stops at 200.
+TOPIC_MAX_CHARS = 200
 
 
 class _SessionListSerializer(serializers.ModelSerializer):
@@ -86,7 +122,7 @@ class _SessionCreateSerializer(serializers.Serializer):
     fpo_application_ids = serializers.ListField(
         child=serializers.CharField(max_length=50), min_length=1
     )
-    topic = serializers.CharField(max_length=300)
+    topic = serializers.CharField(max_length=TOPIC_MAX_CHARS)
     trainer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     date = serializers.DateField()
     time = serializers.CharField(max_length=10, required=False, allow_blank=True)
@@ -217,31 +253,7 @@ class GovernmentTrainingSessionListView(APIView):
                 venue=data.get('venue', ''),
             )
             created_ids.append(session.id)
-
-            if fpo.primary_user:
-                from apps.notifications.services import send_notification
-                notify_context = {
-                    'fpo_name': fpo.name,
-                    'topic': session.topic,
-                    'trainer_name': session.trainer_name or 'TBD',
-                    'date': str(session.date),
-                    'time': session.time or 'TBD',
-                    'venue': session.venue or 'TBD',
-                }
-                try:
-                    send_notification(
-                        user=fpo.primary_user, code='fpo_training_scheduled', channel='in_app',
-                        context=notify_context,
-                    )
-                except Exception:
-                    pass
-                try:
-                    send_notification(
-                        user=fpo.primary_user, code='fpo_training_scheduled', channel='email',
-                        context=notify_context,
-                    )
-                except Exception:
-                    pass
+            _notify_fpo(fpo, session)
 
         if not created_ids:
             return StandardResponse.error(
@@ -263,7 +275,7 @@ class GovernmentTrainingSessionListView(APIView):
 
 
 class _SessionUpdateSerializer(serializers.Serializer):
-    topic = serializers.CharField(max_length=300, required=False)
+    topic = serializers.CharField(max_length=TOPIC_MAX_CHARS, required=False)
     trainer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     date = serializers.DateField(required=False)
     time = serializers.CharField(max_length=10, required=False, allow_blank=True)
@@ -398,3 +410,22 @@ class GovernmentTrainingAttendanceSetView(APIView):
             data={'session_id': session.id, 'attendance_count': len(rows)},
             message='Attendance recorded.',
         )
+
+class GovernmentTrainingSessionCancelView(APIView):
+    """POST — cancel my own session with an optional reason; the FPO and its team are notified."""
+
+    def post(self, request, session_id):
+        if not is_government_user(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+        # Same boundary as edit and delete: only the creator.
+        session = TrainingSession.objects.filter(id=session_id, cbbo=request.user, is_deleted=False).first()
+        if not session:
+            return StandardResponse.error(
+                'Session not found, or you do not have permission to cancel it.',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        ser = CancelSessionSerializer(data=request.data)
+        if not ser.is_valid():
+            return StandardResponse.error(ser.errors, status_code=status.HTTP_400_BAD_REQUEST)
+        cancel_training_session(session, request.user, ser.validated_data.get('reason', ''))
+        return StandardResponse.success(message='Training session cancelled. The FPO has been notified.')

@@ -608,6 +608,18 @@ class RoleMessages:
     )
 
 
+class AdminMessages:
+    """Admin portal — CBBO / Government official account management"""
+    SUPER_ADMIN_DEACTIVATED_REACTIVATE: Tuple[str, str] = (
+        "This account was deactivated by the super admin. Only the super admin can reactivate it.",
+        "ഈ അക്കൗണ്ട് സൂപ്പർ അഡ്മിൻ നിഷ്ക്രിയമാക്കിയതാണ്. സൂപ്പർ അഡ്മിന് മാത്രമേ ഇത് വീണ്ടും സജീവമാക്കാൻ കഴിയൂ."
+    )
+    SUPER_ADMIN_DEACTIVATED_DELETE: Tuple[str, str] = (
+        "This account was deactivated by the super admin. Only the super admin can delete it.",
+        "ഈ അക്കൗണ്ട് സൂപ്പർ അഡ്മിൻ നിഷ്ക്രിയമാക്കിയതാണ്. സൂപ്പർ അഡ്മിന് മാത്രമേ ഇത് ഇല്ലാതാക്കാൻ കഴിയൂ."
+    )
+
+
 # =============================================================================
 # MESSAGE HELPER FUNCTIONS
 # =============================================================================

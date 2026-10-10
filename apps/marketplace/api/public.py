@@ -325,24 +325,25 @@ class PublicProductInquireView(APIView):
             except Exception:
                 pass  # Inquiry already saved — don't fail the request if notification dispatch fails
 
-            # In-app (FPO inbox + dashboard). `link` opens the Market Hub
-            # Inquiries tab on /fpo/products. Names are HTML-escaped — in-app
-            # bodies are rendered as HTML and substituted verbatim.
-            try:
-                from django.utils.html import escape
+            # In-app (FPO inbox + dashboard) to the primary user and every member
+            # with can_manage_products. `link` opens the Market Hub Inquiries tab
+            # on /fpo/products. Names are HTML-escaped — in-app bodies are
+            # rendered as HTML and substituted verbatim.
+            from django.utils.html import escape
+            from apps.core.services.fpo_permission import fpo_notification_recipients
 
-                send_notification(
-                    user=primary_user,
-                    code='inquiry_received_public',
-                    channel='in_app',
-                    context={
-                        'buyer_name': escape(data['name']),
-                        'product_name': escape(product.name.get('en', '')),
-                        'link': '/fpo/products?view=market-hub-inquiries',
-                    },
-                )
-            except Exception:
-                pass  # Inquiry already saved — don't fail the request if notification dispatch fails
+            in_app_context = {
+                'buyer_name': escape(data['name']),
+                'product_name': escape(product.name.get('en', '')),
+                'link': '/fpo/products?view=market-hub-inquiries',
+            }
+            for recipient in fpo_notification_recipients(product.fpo, 'can_manage_products'):
+                try:
+                    send_notification(
+                        user=recipient, code='inquiry_received_public', channel='in_app', context=in_app_context,
+                    )
+                except Exception:
+                    pass  # Inquiry already saved — don't fail the request if notification dispatch fails
 
         return StandardResponse.success(
             data={'inquiry_id': match.id},

@@ -134,6 +134,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute=0),  # Every hour
     },
 
+    # FPO Training: within 24h of a session, remind the official who recorded
+    # it, the FPO's primary user and the team (email + in-app, once).
+    'fpo-training-reminders': {
+        'task': 'apps.cbbo.tasks.send_training_reminders',
+        'schedule': crontab(minute=15),  # Every hour
+    },
+
     # Expert Booking: mark confirmed bookings completed after appointment time
     'expert-booking-mark-completed': {
         'task': 'apps.experts.tasks.mark_completed_bookings',

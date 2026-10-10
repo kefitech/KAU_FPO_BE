@@ -19,7 +19,7 @@ CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
     ('application',     ('application_', 'info_')),
     ('claims',          ('claim_',)),
     ('dpr',             ('dpr_',)),
-    ('recommendations', ('recommendation_', 'model_')),
+    ('recommendations', ('recommendation_', 'model_', 'business_plan_')),
     ('expert',          ('expert_',)),
     ('training',        ('fpo_training_', 'training_')),
     ('marketplace',     ('inquiry_', 'buyer_')),

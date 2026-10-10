@@ -18,7 +18,8 @@ from rest_framework.permissions import SAFE_METHODS
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, extend_schema_field
 
 from apps.core.permissions.cbbo_govt_scope import (
-    assignable_districts, can_manage, filter_govt_by_district, own_district_error, scope_govt_queryset,
+    assignable_districts, can_manage, deactivated_by_super_admin, filter_govt_by_district,
+    log_account_status, own_district_error, scope_govt_queryset, super_admin_lock_error,
 )
 from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
 from apps.core.utils.constants import UserRole, District, get_district_name
@@ -90,6 +91,7 @@ class GovernmentSerializer(serializers.ModelSerializer):
     user_category               = serializers.SerializerMethodField()
     id_number                   = serializers.SerializerMethodField()
     can_manage                  = serializers.SerializerMethodField()
+    deactivated_by_super_admin  = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
@@ -98,6 +100,7 @@ class GovernmentSerializer(serializers.ModelSerializer):
             'designation', 'department', 'jurisdiction_type',
             'assigned_districts', 'assigned_districts_display',
             'registration_status', 'user_category', 'id_number', 'can_manage',
+            'deactivated_by_super_admin',
         ]
         read_only_fields = fields
 
@@ -105,6 +108,11 @@ class GovernmentSerializer(serializers.ModelSerializer):
     def get_can_manage(self, obj):
         # False for rows a sub-admin can only view (state-level, or another district)
         return can_manage(self.context, obj, scope_govt_queryset)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_deactivated_by_super_admin(self, obj):
+        # True when a super admin switched this login off — sub-admins cannot reactivate or delete it
+        return deactivated_by_super_admin(self.context, obj)
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
@@ -380,6 +388,9 @@ class GovernmentViewSet(TranslatedViewSet):
     def destroy(self, request, *args, **kwargs):
         lang = self.get_language()
         obj  = self.get_object()
+        error = super_admin_lock_error(request.user, obj, lang, deleting=True)
+        if error:
+            return StandardResponse.error(error, status_code=403)
         obj.delete()
         return StandardResponse.success(message=t(self.destroy_message, lang))
 
@@ -450,13 +461,24 @@ class GovernmentViewSet(TranslatedViewSet):
         data = [{'code': code, 'name': get_district_name(code, language=lang)} for code in codes]
         return StandardResponse.success(data=data, message=t('admin.districts_retrieved', lang))
 
+    # ── ACTIVATE / DEACTIVATE ────────────────────────────────────────────────
+    # Each real change writes a USER_ACTIVATE / USER_DEACTIVATE audit row. A
+    # sub-admin cannot reactivate (or delete) an official a super admin
+    # deactivated — see super_admin_lock_error(). Repeating the current state
+    # is a no-op and is not logged, so a sub-admin cannot re-deactivate to
+    # become the last actor on the trail.
     @extend_schema(tags=['Admin - Government'])
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
         lang = self.get_language()
         user = self.get_object()
-        user.is_active = True
-        user.save()
+        error = super_admin_lock_error(request.user, user, lang)
+        if error:
+            return StandardResponse.error(error, status_code=403)
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+            log_account_status(request, user, active=True)
         return StandardResponse.success(
             data=GovernmentSerializer(user, context={"request": request}).data,
             message=t('admin.government_activated', lang),
@@ -467,8 +489,10 @@ class GovernmentViewSet(TranslatedViewSet):
     def deactivate(self, request, pk=None):
         lang = self.get_language()
         user = self.get_object()
-        user.is_active = False
-        user.save()
+        if user.is_active:
+            user.is_active = False
+            user.save()
+            log_account_status(request, user, active=False)
         return StandardResponse.success(
             data=GovernmentSerializer(user, context={"request": request}).data,
             message=t('admin.government_deactivated', lang),

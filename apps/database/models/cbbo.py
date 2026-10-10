@@ -120,6 +120,14 @@ class TrainingSession(BaseModel):
         default=True,
         help_text='Auto-hidden by Celery task N days after date (training_expiry_days).',
     )
+    reminder_sent = models.BooleanField(
+        default=False,
+        help_text='Celery marks True after the day-before reminder went to the organiser, the FPO and its team.',
+    )
+    cancellation_reason = models.TextField(
+        blank=True,
+        help_text='Why the official cancelled it (a cancelled session is a soft-deleted one). Shown to the FPO.',
+    )
 
     class Meta:
         verbose_name = 'Training Session'

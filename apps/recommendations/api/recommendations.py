@@ -316,7 +316,9 @@ class RequestRecommendationView(APIView):
             },
         )
 
-        generate_crop_recommendation_task.delay(fpo.pk, active_model.pk, fy, season_override, ph_override)
+        generate_crop_recommendation_task.delay(
+            fpo.pk, active_model.pk, fy, season_override, ph_override, request.user.pk,
+        )
 
         serializer = CropRecommendationSerializer(rec)
         return StandardResponse.success(
