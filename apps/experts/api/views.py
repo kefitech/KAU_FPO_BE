@@ -1,7 +1,7 @@
 """
 Expert Directory — FPO-facing Browse & Contact Enquiry
 ========================================================
-GET   /api/experts/            — browse active experts (filter: category, district, search; sort=booked)
+GET   /api/experts/            — browse active experts (filter: category, district, search, booked=1; sort=booked)
 GET   /api/experts/{id}/       — expert detail
 POST  /api/experts/{id}/enquiry/ — submit contact enquiry (sends email to expert)
 """
@@ -68,6 +68,8 @@ class ExpertListView(APIView):
             'soonest upcoming appointment first; booked experts with no upcoming appointment '
             'follow, then everyone else in the usual district/zone order. '
             'Ignored for callers without an FPO.\n\n'
+            '**Booked only:** `booked=1` returns just the experts you have booked, in that same order. '
+            'Empty for callers without an FPO.\n\n'
             '**Language:** Send `X-Language: ml` header for Malayalam names.'
         ),
     )
@@ -103,7 +105,11 @@ class ExpertListView(APIView):
         fpo_district = fpo.district if fpo else None
 
         ordering = []
-        if fpo and request.query_params.get('sort') == 'booked':
+        sort_booked = request.query_params.get('sort') == 'booked'
+        booked_only = request.query_params.get('booked', '').lower() in ('1', 'true')
+        if booked_only and not fpo:
+            qs = qs.none()
+        if fpo and (sort_booked or booked_only):
             # Experts the caller has a booking with (any status — matches the
             # bookings badge on the directory card) come first, ordered by their
             # soonest upcoming appointment. Booked experts with nothing upcoming
@@ -124,6 +130,8 @@ class ExpertListView(APIView):
                 _next_date=Subquery(next_upcoming.values('requested_date')[:1]),
                 _next_time=Subquery(next_upcoming.values('requested_time')[:1]),
             )
+            if booked_only:
+                qs = qs.filter(_booked=True)
             ordering += [
                 '-_booked',
                 F('_next_date').asc(nulls_last=True),
