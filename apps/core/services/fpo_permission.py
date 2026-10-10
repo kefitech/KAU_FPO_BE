@@ -216,6 +216,33 @@ def set_member_permissions(membership, codes, mode='replace'):
         )
 
 
+def fpo_notification_recipients(fpo, action_code=None):
+    """
+    Who to tell about something that happened to the FPO: the primary user
+    plus every active team member — or, with `action_code`, only the members
+    allowed that action (the primary always is). Distinct, primary first.
+    """
+    from apps.database.models.fpo import FPOUserMembership
+
+    recipients, seen = [], set()
+
+    def add(user):
+        if user and user.pk not in seen:
+            seen.add(user.pk)
+            recipients.append(user)
+
+    add(fpo.primary_user)
+    memberships = (
+        FPOUserMembership.objects
+        .filter(fpo=fpo, is_active=True, is_deleted=False)
+        .select_related('user', 'role')
+    )
+    for membership in memberships:
+        if action_code is None or has_fpo_permission(membership.user, fpo, action_code):
+            add(membership.user)
+    return recipients
+
+
 def require_fpo_permission(user, action_code):
     """
     The user's FPO if they may perform `action_code` in it, else None.

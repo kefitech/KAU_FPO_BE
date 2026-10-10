@@ -185,6 +185,11 @@ class AuditLog(TimeStampedModel):
         FPO_USER_INVITE    = 'fpo_user_invite',    'FPO User Invited'
         FPO_USER_ACTIVATE  = 'fpo_user_activate',  'FPO User Activated'
         FPO_USER_DEACTIVATE = 'fpo_user_deactivate', 'FPO User Deactivated'
+        # Admin switching a managed account's login on/off (CBBO, Government
+        # official). Read back by cbbo_govt_scope.super_admin_deactivated_ids()
+        # so a sub-admin cannot undo a super admin's deactivation.
+        USER_ACTIVATE      = 'user_activate',      'User Activated'
+        USER_DEACTIVATE    = 'user_deactivate',    'User Deactivated'
         # DPR config events (per KAU RCD reply B.6 — every mutation to a
         # centrally-controlled DPR parameter is auditable)
         DPR_CONFIG_CHANGE  = 'dpr_config_change',  'DPR Config Changed'

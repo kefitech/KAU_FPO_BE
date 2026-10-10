@@ -30,7 +30,8 @@ from rest_framework.permissions import SAFE_METHODS
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, extend_schema_field
 
 from apps.core.permissions.cbbo_govt_scope import (
-    assignable_districts, can_manage, filter_cbbo_by_district, own_district_error, scope_cbbo_queryset,
+    assignable_districts, can_manage, deactivated_by_super_admin, filter_cbbo_by_district,
+    log_account_status, own_district_error, scope_cbbo_queryset, super_admin_lock_error,
 )
 from apps.core.permissions.fpo_scope import get_sub_admin_district, is_sub_admin, is_super_admin
 from apps.core.permissions.rbac import IsSubAdminOrSuperAdmin
@@ -129,10 +130,11 @@ class CBBOSerializer(serializers.ModelSerializer):
     organisation_name = serializers.SerializerMethodField()
     registration_status = serializers.SerializerMethodField()
     can_manage  = serializers.SerializerMethodField()
+    deactivated_by_super_admin = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name', 'registration_status', 'can_manage']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'is_active', 'date_joined', 'scope', 'assignments', 'organisation_id', 'organisation_name', 'registration_status', 'can_manage', 'deactivated_by_super_admin']
         read_only_fields = fields
 
     def get_registration_status(self, obj):
@@ -142,6 +144,11 @@ class CBBOSerializer(serializers.ModelSerializer):
     def get_can_manage(self, obj):
         # False for rows a sub-admin can only view (state-wide, or another district)
         return can_manage(self.context, obj, scope_cbbo_queryset)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_deactivated_by_super_admin(self, obj):
+        # True when a super admin switched this login off — sub-admins cannot reactivate or delete it
+        return deactivated_by_super_admin(self.context, obj)
 
     @extend_schema_field(serializers.CharField())
     def get_phone(self, obj):
@@ -406,6 +413,9 @@ class CBBOViewSet(TranslatedViewSet):
     def destroy(self, request, *args, **kwargs):
         lang = self.get_language()
         obj  = self.get_object()
+        error = super_admin_lock_error(request.user, obj, lang, deleting=True)
+        if error:
+            return StandardResponse.error(error, status_code=403)
         obj.delete()
         return StandardResponse.success(message=t(self.destroy_message, lang))
 
@@ -501,16 +511,25 @@ class CBBOViewSet(TranslatedViewSet):
     # ── ACTIVATE / DEACTIVATE ────────────────────────────────────────────────
     # Two explicit actions rather than a single PATCH-status endpoint — kept
     # separate from partial_update() so login-access changes get their own
-    # clear audit trail via distinct success messages. Deactivating does NOT
-    # touch district assignments, so reactivating restores exactly the same
-    # jurisdiction the CBBO had before.
+    # audit trail (a USER_ACTIVATE / USER_DEACTIVATE row per real change).
+    # Deactivating does NOT touch district assignments, so reactivating
+    # restores exactly the same jurisdiction the CBBO had before.
+    # A sub-admin cannot reactivate (or delete) an account a super admin
+    # deactivated — see super_admin_lock_error(). Repeating the current state
+    # is a no-op and is not logged, so a sub-admin cannot re-deactivate to
+    # become the last actor on the trail.
     @extend_schema(tags=['Admin - CBBOs'])
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
         lang = self.get_language()
         user = self.get_object()
-        user.is_active = True
-        user.save()
+        error = super_admin_lock_error(request.user, user, lang)
+        if error:
+            return StandardResponse.error(error, status_code=403)
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+            log_account_status(request, user, active=True)
         return StandardResponse.success(
             data=CBBOSerializer(user, context={"request": request}).data,
             message=t('admin.cbbo_activated', lang),
@@ -521,8 +540,10 @@ class CBBOViewSet(TranslatedViewSet):
     def deactivate(self, request, pk=None):
         lang = self.get_language()
         user = self.get_object()
-        user.is_active = False
-        user.save()
+        if user.is_active:
+            user.is_active = False
+            user.save()
+            log_account_status(request, user, active=False)
         return StandardResponse.success(
             data=CBBOSerializer(user, context={"request": request}).data,
             message=t('admin.cbbo_deactivated', lang),

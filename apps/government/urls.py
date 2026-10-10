@@ -7,6 +7,7 @@ from apps.government.api.fpos import GovernmentFPOListView, GovernmentFPODetailV
 from apps.government.api.dashboard import GovernmentDashboardStatsView
 from apps.government.api.schemes import GovernmentSchemeListView, GovernmentSchemeDetailView
 from apps.government.api.training import (
+    GovernmentTrainingSessionCancelView,
     GovernmentTrainingSessionListView,
     GovernmentTrainingSessionDetailView,
     GovernmentTrainingAttendanceSetView,
@@ -28,6 +29,7 @@ urlpatterns = [
     path('training-sessions/filter-options/', GovernmentTrainingFilterOptionsView.as_view(), name='training-filter-options'),
     path('training-sessions/<int:session_id>/', GovernmentTrainingSessionDetailView.as_view(), name='training-detail'),
     path('training-sessions/<int:session_id>/attendance/', GovernmentTrainingAttendanceSetView.as_view(), name='training-attendance'),
+    path('training-sessions/<int:session_id>/cancel/', GovernmentTrainingSessionCancelView.as_view(), name='training-cancel'),
     path('training-sessions/<int:session_id>/comments/read/', GovernmentTrainingCommentsReadView.as_view(), name='training-comments-read'),
     path('register/', GovernmentRegistrationView.as_view(), name='register'),
     path('register/otp/send/', GovernmentRegistrationOTPSendView.as_view(), name='register-otp-send'),

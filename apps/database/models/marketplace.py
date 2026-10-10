@@ -252,6 +252,10 @@ class Inquiry(BaseModel):
     contact_user becomes null and the seller UI shows "Contact no longer
     available" (SET_NULL, not CASCADE — deleting a user must not delete
     the inquiry record itself).
+
+    submitted_by is the account that actually pressed "send": the same as
+    contact_user except when an FPO team member inquires on behalf of their
+    FPO. Both hear about status changes.
     """
 
     class Status(models.TextChoices):
@@ -273,6 +277,14 @@ class Inquiry(BaseModel):
                    'or buyer.user (external buyer). NOT a snapshot — contact info is '
                    'always read live from this account. Null if that account was '
                    'later deleted.'
+    )
+    submitted_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='submitted_inquiries',
+        help_text='The account that actually submitted this inquiry. Differs from '
+                  'contact_user when an FPO team member inquires on behalf of their FPO; '
+                  'both are notified of status changes. Null on rows older than this '
+                  'field or if the account was later deleted.'
     )
     quantity_requested = models.DecimalField(max_digits=12, decimal_places=2)
     message = models.TextField(blank=True)
