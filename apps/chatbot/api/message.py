@@ -170,6 +170,12 @@ class ChatMessageView(APIView):
                 prof = getattr(request.user, 'profile', None)
                 if prof and getattr(prof, 'preferred_language', None):
                     lang = prof.preferred_language
+        # The question's own script beats both (tester 2026-10-12: a
+        # Malayalam question on an English-language page got the English
+        # refusal). Someone typing Malayalam wants a Malayalam answer,
+        # whatever the site chrome is set to.
+        if has_malayalam(message):
+            lang = 'ml'
 
         # Resolve / create the ChatConversation this turn belongs to. The
         # helper handles session_id validation + auth ownership. Every turn
@@ -250,6 +256,20 @@ class ChatMessageView(APIView):
             translated = translate_query_to_english(message, user=request.user)
             if translated:
                 search_query = translated
+        # Crop-name synonyms (tester 2026-10-12): the translator rendered
+        # നെല്ല് as 'paddy' but every Package-of-Practices KB entry says
+        # 'Rice', so FTS missed all 31 rice entries and the bot refused a
+        # valid agronomy question. Append the KB's canonical crop name so
+        # the search hits regardless of which synonym the user (or the
+        # translator) used.
+        _CROP_SYNONYMS = {
+            'paddy': 'rice', 'plantain': 'banana', 'cassava': 'tapioca',
+            'brinjal': 'eggplant', 'lady finger': 'okra', "lady's finger": 'okra',
+        }
+        _sq_lower = search_query.lower()
+        for alias, canonical in _CROP_SYNONYMS.items():
+            if alias in _sq_lower and canonical not in _sq_lower:
+                search_query = f'{search_query} {canonical}'
         follow_up_markers = (
             'that', 'this', 'it', 'those', 'these', 'the same',
             'and ', 'also', 'what about',
