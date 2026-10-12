@@ -43,71 +43,75 @@ def validate_section(section) -> dict[str, Any]:
 
     for i, m in enumerate(materials):
         prefix = f'materials[{i}]'
+        # Human-readable identifier for messages. Falls back to "Material N"
+        # when the name is blank (which is also an error case caught below).
+        name = (m.name or '').strip()
+        label = f'Material "{name}"' if name else f'Material {i + 1}'
 
-        if not (m.name or '').strip():
-            errors.append(_err('name_required', f'{prefix}.name', 'Raw Material Name shall not be blank.'))
+        if not name:
+            errors.append(_err('name_required', f'{prefix}.name', f'{label}: Raw Material Name shall not be blank.'))
         if not m.unit_of_purchase_id:
-            errors.append(_err('unit_required', f'{prefix}.unit_of_purchase', 'Unit of Purchase shall be specified.'))
+            errors.append(_err('unit_required', f'{prefix}.unit_of_purchase', f'{label}: Unit of Purchase shall be specified.'))
         if m.estimated_annual_requirement is None or m.estimated_annual_requirement <= 0:
             errors.append(_err(
                 'annual_req_positive', f'{prefix}.estimated_annual_requirement',
-                'Estimated Annual Requirement shall be greater than zero.',
+                f'{label}: Estimated Annual Requirement shall be greater than zero.',
             ))
         if not m.primary_source_id:
-            errors.append(_err('source_required', f'{prefix}.primary_source', 'Primary Source of Supply shall be specified.'))
+            errors.append(_err('source_required', f'{prefix}.primary_source', f'{label}: Primary Source of Supply shall be specified.'))
         if not m.procurement_method_id:
-            errors.append(_err('method_required', f'{prefix}.procurement_method', 'Procurement Method shall be specified.'))
+            errors.append(_err('method_required', f'{prefix}.procurement_method', f'{label}: Procurement Method shall be specified.'))
         if not m.commodity_id:
             warnings.append(_warn(
                 'commodity_missing', f'{prefix}.commodity',
-                'Commodity Category is recommended for better AI content generation.',
+                f'{label}: Commodity Category is recommended for better AI content generation.',
             ))
 
         # ── Category B — Availability ─────────────────────────────────────
         if m.estimated_qty_available_annual is None or m.estimated_qty_available_annual <= 0:
             errors.append(_err(
                 'qty_available_positive', f'{prefix}.estimated_qty_available_annual',
-                'Estimated Quantity Available shall be greater than zero.',
+                f'{label}: Estimated Quantity Available shall be greater than zero.',
             ))
         if m.num_supplying_farmers is None or m.num_supplying_farmers <= 0:
             errors.append(_err(
                 'farmers_positive', f'{prefix}.num_supplying_farmers',
-                'Number of Supplying Farmers shall be greater than zero.',
+                f'{label}: Number of Supplying Farmers shall be greater than zero.',
             ))
         if not m.available_months:
             errors.append(_err(
                 'months_required', f'{prefix}.available_months',
-                'At least one month of availability shall be specified.',
+                f'{label}: at least one month of availability shall be specified.',
             ))
         if not m.available_throughout_year:
             if not (m.peak_harvest_season or '').strip():
                 errors.append(_err(
                     'peak_season_required', f'{prefix}.peak_harvest_season',
-                    'Peak Harvest Season is required when material is not available year-round.',
+                    f'{label}: Peak Harvest Season is required when material is not available year-round.',
                 ))
             if not (m.off_season_strategy or '').strip():
                 errors.append(_err(
                     'off_season_strategy_required', f'{prefix}.off_season_strategy',
-                    'Off-season Procurement Strategy is required when material is not available year-round.',
+                    f'{label}: Off-season Procurement Strategy is required when material is not available year-round.',
                 ))
 
         # ── Category D — Quality ──────────────────────────────────────────
         if m.quality_standards_applicable and not m.quality_standard_id:
             errors.append(_err(
                 'quality_standard_required', f'{prefix}.quality_standard',
-                'Quality Standard is required when quality standards are applicable.',
+                f'{label}: Quality Standard is required when quality standards are applicable.',
             ))
 
         # ── Category E — Price ────────────────────────────────────────────
         if m.current_purchase_price is None or m.current_purchase_price <= 0:
             errors.append(_err(
                 'price_positive', f'{prefix}.current_purchase_price',
-                'Purchase Price shall be greater than zero.',
+                f'{label}: Purchase Price shall be greater than zero.',
             ))
         if m.price_varies_seasonally and not m.price_variation_range:
             warnings.append(_warn(
                 'price_variation_missing', f'{prefix}.price_variation_range',
-                'Price variation range should be specified when price varies seasonally.',
+                f'{label}: price variation range should be specified when price varies seasonally.',
             ))
 
     # ── Category C — Procurement System (section-level) ───────────────────
@@ -129,27 +133,31 @@ def validate_section(section) -> dict[str, Any]:
     # rolls into Operating Cost; a blank silently drops the line.
     for i, pkg in enumerate(section.packaging_materials.all()):
         p = f'packaging_materials[{i}]'
+        name = (pkg.material_name or '').strip()
+        label = f'Packaging material "{name}"' if name else f'Packaging material {i + 1}'
         if pkg.unit_cost is None or pkg.unit_cost <= 0:
             errors.append(_err(
                 'pkg_cost_required', f'{p}.unit_cost',
-                'Unit Cost is required and shall be greater than zero.',
+                f'{label}: Unit Cost is required and shall be greater than zero.',
             ))
         if pkg.estimated_annual_requirement is None or pkg.estimated_annual_requirement <= 0:
             errors.append(_err(
                 'pkg_qty_required', f'{p}.estimated_annual_requirement',
-                'Estimated Annual Requirement is required and shall be greater than zero.',
+                f'{label}: Estimated Annual Requirement is required and shall be greater than zero.',
             ))
     for i, c in enumerate(section.consumables.all()):
         p = f'consumables[{i}]'
+        name = (c.name or '').strip()
+        label = f'Consumable "{name}"' if name else f'Consumable {i + 1}'
         if c.unit_cost is None or c.unit_cost <= 0:
             errors.append(_err(
                 'consumable_cost_required', f'{p}.unit_cost',
-                'Unit Cost is required and shall be greater than zero.',
+                f'{label}: Unit Cost is required and shall be greater than zero.',
             ))
         if c.estimated_annual_requirement is None or c.estimated_annual_requirement <= 0:
             errors.append(_err(
                 'consumable_qty_required', f'{p}.estimated_annual_requirement',
-                'Estimated Annual Requirement is required and shall be greater than zero.',
+                f'{label}: Estimated Annual Requirement is required and shall be greater than zero.',
             ))
 
     # ── Category F — Risks are optional at KAU spec level, but we advise ──
@@ -164,6 +172,8 @@ def validate_section(section) -> dict[str, Any]:
     # — same material, same unit, no external yield table needed — and
     # ask for a non-member sourcing plan when demand exceeds supply.
     for i, m in enumerate(materials):
+        name = (m.name or '').strip()
+        label = f'Material "{name}"' if name else f'Material {i + 1}'
         req = m.estimated_annual_requirement
         avail = m.estimated_qty_available_annual
         if req and avail and req > avail:
@@ -178,7 +188,7 @@ def validate_section(section) -> dict[str, Any]:
                 warnings.append(_warn(
                     'requirement_exceeds_declared_availability',
                     f'materials[{i}].estimated_annual_requirement',
-                    f'Annual requirement ({req:,.0f}) is {pct}% of the '
+                    f'{label}: annual requirement ({req:,.0f}) is {pct}% of the '
                     f'declared annual availability ({avail:,.0f}) for this '
                     f'material. A bank reviewer will ask where the balance '
                     f'comes from — either raise the declared availability '
@@ -203,6 +213,8 @@ def validate_section(section) -> dict[str, Any]:
         from apps.core.models.generic import MasterLookup
 
         for i, m in enumerate(materials):
+            name = (m.name or '').strip()
+            label = f'Material "{name}"' if name else f'Material {i + 1}'
             req = m.estimated_annual_requirement
             price = m.approx_purchase_price
             unit_code = getattr(m.unit_of_purchase, 'code', '') if m.unit_of_purchase_id else ''
@@ -216,7 +228,7 @@ def validate_section(section) -> dict[str, Any]:
                     warnings.append(_warn(
                         'requirement_vs_baseline_scaleup',
                         f'materials[{i}].estimated_annual_requirement',
-                        f'The requirement ({req:,.0f} {unit_code or "units"}) is '
+                        f'{label}: the requirement ({req:,.0f} {unit_code or "units"}) is '
                         f'~{ratio}x what the baseline turnover implies the FPO '
                         f'currently handles (₹{base_turnover:,.0f} ÷ '
                         f'₹{price:,.0f}/unit ≈ {implied_current:,.0f}). A scale-up '
@@ -244,7 +256,7 @@ def validate_section(section) -> dict[str, Any]:
                         warnings.append(_warn(
                             'requirement_vs_member_acreage',
                             f'materials[{i}].estimated_annual_requirement',
-                            f'The requirement (≈{req_kg:,.0f} kg/yr) is {pct}% of '
+                            f'{label}: the requirement (≈{req_kg:,.0f} kg/yr) is {pct}% of '
                             f'what the members\' {acreage:,.0f} acres can grow at '
                             f'an indicative yield of {yield_kg_acre:,.0f} kg/acre/yr '
                             f'(≈{member_ceiling_kg:,.0f} kg). State the share '

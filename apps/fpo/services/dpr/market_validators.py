@@ -50,24 +50,28 @@ def validate_section(section) -> dict[str, Any]:
 
     for i, p in enumerate(products):
         prefix = f'products[{i}]'
-        if not (p.name or '').strip():
-            errors.append(_err('name_required', f'{prefix}.name', 'Product Name is required.'))
+        # Human-readable identifier for messages. Falls back to "Product N"
+        # when the name is blank (which is also an error case caught below).
+        name = (p.name or '').strip()
+        label = f'Product "{name}"' if name else f'Product {i + 1}'
+        if not name:
+            errors.append(_err('name_required', f'{prefix}.name', f'{label}: Product Name is required.'))
         if not p.product_category_id:
-            errors.append(_err('category_required', f'{prefix}.product_category', 'Product Category is required.'))
+            errors.append(_err('category_required', f'{prefix}.product_category', f'{label}: Product Category is required.'))
         if not p.product_type_id:
-            errors.append(_err('type_required', f'{prefix}.product_type', 'Product Type is required.'))
+            errors.append(_err('type_required', f'{prefix}.product_type', f'{label}: Product Type is required.'))
         if not p.intended_market_id:
-            errors.append(_err('intended_market_required', f'{prefix}.intended_market', 'Intended Market is required.'))
+            errors.append(_err('intended_market_required', f'{prefix}.intended_market', f'{label}: Intended Market is required.'))
         if not (p.geographic_market or '').strip():
             errors.append(_err(
                 'geographic_market_required', f'{prefix}.geographic_market',
-                'Geographic Market shall be specified.',
+                f'{label}: Geographic Market shall be specified.',
             ))
         cust_cats = list(p.customer_categories.all())
         if not cust_cats:
             errors.append(_err(
                 'customer_category_required', f'{prefix}.customer_categories',
-                'At least one customer category shall be selected per product.',
+                f'{label}: at least one customer category shall be selected per product.',
             ))
         # "Others (Specify)" needs the companion text — same pattern as
         # demand_basis_other, pricing_basis_other elsewhere. Only fires when
@@ -76,23 +80,23 @@ def validate_section(section) -> dict[str, Any]:
             errors.append(_err(
                 'customer_categories_other_required',
                 f'{prefix}.customer_categories_other',
-                'Please specify — "Others" was selected in customer categories but no description provided.',
+                f'{label}: please specify — "Others" was selected in customer categories but no description provided.',
             ))
 
         # ── Category E + H — Price ──
         if p.proposed_selling_price is None or p.proposed_selling_price <= 0:
             errors.append(_err(
                 'price_positive', f'{prefix}.proposed_selling_price',
-                'Proposed Selling Price shall be greater than zero.',
+                f'{label}: Proposed Selling Price shall be greater than zero.',
             ))
         if not p.unit_of_sale_id:
-            errors.append(_err('unit_of_sale_required', f'{prefix}.unit_of_sale', 'Unit of Sale shall be specified.'))
+            errors.append(_err('unit_of_sale_required', f'{prefix}.unit_of_sale', f'{label}: Unit of Sale shall be specified.'))
 
         # ── Category H — Sales Projection ──
         if p.year1_qty is None or p.year1_qty <= 0:
             errors.append(_err(
                 'year1_qty_positive', f'{prefix}.year1_qty',
-                'Expected Sales Quantity - Year 1 shall be greater than zero.',
+                f'{label}: Expected Sales Quantity - Year 1 shall be greater than zero.',
             ))
 
         # Channel mix percentages should sum to ≤ 100
@@ -103,7 +107,7 @@ def validate_section(section) -> dict[str, Any]:
         if channel_mix_sum > Decimal('100'):
             errors.append(_err(
                 'channel_mix_over_100', f'{prefix}.channel_mix',
-                f'Sales channel mix (domestic + export + institutional + retail + wholesale + online) totals {channel_mix_sum}% — cannot exceed 100%.',
+                f'{label}: sales channel mix (domestic + export + institutional + retail + wholesale + online) totals {channel_mix_sum}% — cannot exceed 100%.',
             ))
 
     # ── Category B — Market Demand ─────────────────────────────────────────
@@ -126,10 +130,12 @@ def validate_section(section) -> dict[str, Any]:
                 'At least one buyer shall be specified when "Existing Buyers" is Yes.',
             ))
         for i, b in enumerate(buyers):
+            name = (b.buyer_name or '').strip()
+            label = f'Buyer "{name}"' if name else f'Buyer {i + 1}'
             if not b.buyer_category_id:
                 errors.append(_err(
                     'buyer_category_required', f'buyers[{i}].buyer_category',
-                    'Buyer Category is required for each buyer.',
+                    f'{label}: Buyer Category is required for each buyer.',
                 ))
 
     # ── Category D — Marketing Channels ────────────────────────────────────
@@ -173,10 +179,12 @@ def validate_section(section) -> dict[str, Any]:
                 'At least one competitor shall be specified when "Competitors Exist" is Yes.',
             ))
         for i, c in enumerate(competitors):
+            name = (c.name or '').strip()
+            label = f'Competitor "{name}"' if name else f'Competitor {i + 1}'
             if not (c.competitive_advantage or '').strip():
                 errors.append(_err(
                     'advantage_required', f'competitors[{i}].competitive_advantage',
-                    'Competitive Advantage is required for each listed competitor.',
+                    f'{label}: Competitive Advantage is required for each listed competitor.',
                 ))
 
     # ── Category G — Branding (advisory only per spec) ────────────────────
@@ -193,10 +201,14 @@ def validate_section(section) -> dict[str, Any]:
             'No marketing risks specified. Consider identifying at least one for a complete DPR.',
         ))
     for i, r in enumerate(risks):
+        name = (r.risk_type_other or '').strip() if r.risk_type == 'other' else ''
+        if not name and r.risk_type:
+            name = (r.get_risk_type_display() or '').strip()
+        label = f'Risk "{name}"' if name else f'Risk {i + 1}'
         if not (r.mitigation_strategy or '').strip():
             errors.append(_err(
                 'mitigation_required', f'risks[{i}].mitigation_strategy',
-                'Mitigation Strategy is required for each marketing risk.',
+                f'{label}: Mitigation Strategy is required for each marketing risk.',
             ))
 
     return {

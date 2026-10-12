@@ -28,24 +28,28 @@ def validate_section(section) -> dict[str, Any]:
 
     # Environmental impact "other" text per row
     for i, imp in enumerate(section.environmental_impacts.select_related('impact')):
+        name = ((imp.impact.label_en or '') if imp.impact else '').strip() or (imp.impact_other or '').strip()
+        label = f'Environmental impact "{name}"' if name else f'Environmental impact {i + 1}'
         if imp.impact.code == 'other' and not (imp.impact_other or '').strip():
             errors.append(_err(
                 'impact_other_required', f'environmental_impacts[{i}].impact_other',
-                'Please specify — "Others" was selected for environmental impact.',
+                f'{label}: please specify — "Others" was selected for environmental impact.',
             ))
 
     # Climate risk "other" text per row + mitigation strongly recommended
     for i, risk in enumerate(section.climate_risks.select_related('risk')):
         p = f'climate_risks[{i}]'
+        name = ((risk.risk.label_en or '') if risk.risk else '').strip() or (risk.risk_other or '').strip()
+        label = f'Climate risk "{name}"' if name else f'Climate risk {i + 1}'
         if risk.risk.code == 'other' and not (risk.risk_other or '').strip():
             errors.append(_err(
                 'risk_other_required', f'{p}.risk_other',
-                'Please specify — "Others" was selected for climate risk.',
+                f'{label}: please specify — "Others" was selected for climate risk.',
             ))
         if not (risk.proposed_mitigation_strategy or '').strip():
             warnings.append(_warn(
                 'mitigation_recommended', f'{p}.proposed_mitigation_strategy',
-                'Proposed Mitigation Strategy is recommended for each selected climate risk.',
+                f'{label}: Proposed Mitigation Strategy is recommended for each selected climate risk.',
             ))
 
     return {

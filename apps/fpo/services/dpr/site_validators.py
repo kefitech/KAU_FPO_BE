@@ -32,21 +32,23 @@ def validate_section(section) -> dict[str, Any]:
         ))
     for i, p in enumerate(parcels):
         prefix = f'parcels[{i}]'
+        name = (p.village or '').strip() or (p.survey_number or '').strip()
+        label = f'Land parcel "{name}"' if name else f'Land parcel {i + 1}'
         if p.total_land_available is None or p.total_land_available <= 0:
             errors.append(_err(
                 'land_area_positive', f'{prefix}.total_land_available',
-                'Land area shall be greater than zero.',
+                f'{label}: land area shall be greater than zero.',
             ))
         if not p.ownership_id:
             errors.append(_err(
                 'ownership_required', f'{prefix}.ownership',
-                'Land ownership status shall be specified.',
+                f'{label}: land ownership status shall be specified.',
             ))
         if p.ownership_id and (p.ownership.code == 'other' or p.ownership.code.endswith('_other')):
             if not (p.ownership_other or '').strip():
                 errors.append(_err(
                     'ownership_other_required', f'{prefix}.ownership_other',
-                    'Please specify — "Others" was selected for ownership.',
+                    f'{label}: please specify — "Others" was selected for ownership.',
                 ))
         # Per KAU RCD reply B.8 (2026-09-02): every parcel is expected to
         # declare which project component(s) will use it. Enforced here since
@@ -54,7 +56,7 @@ def validate_section(section) -> dict[str, Any]:
         if p.components.count() == 0:
             errors.append(_err(
                 'parcel_components_required', f'{prefix}.components',
-                'At least one project component shall be mapped to this parcel.',
+                f'{label}: at least one project component shall be mapped to this parcel.',
             ))
 
     # Cat B — terrain
@@ -86,29 +88,37 @@ def validate_section(section) -> dict[str, Any]:
     # Cat C — existing infrastructure: type required per row, "Others" → specify.
     for i, infra in enumerate(section.existing_infrastructure.all()):
         prefix = f'existing_infrastructure[{i}]'
+        name = (infra.infrastructure_type_other or '').strip() or (
+            (infra.get_infrastructure_type_display() or '').strip() if infra.infrastructure_type else ''
+        )
+        label = f'Infrastructure item "{name}"' if name else f'Infrastructure item {i + 1}'
         if not (infra.infrastructure_type or '').strip():
             errors.append(_err(
                 'infra_type_required', f'{prefix}.infrastructure_type',
-                'Infrastructure type is required.',
+                f'{label}: infrastructure type is required.',
             ))
         if infra.infrastructure_type == 'other' and not (infra.infrastructure_type_other or '').strip():
             errors.append(_err(
                 'infra_type_other_required', f'{prefix}.infrastructure_type_other',
-                'Please specify — "Others" was selected in infrastructure type.',
+                f'{label}: please specify — "Others" was selected in infrastructure type.',
             ))
 
     # Cat H — constraints with mitigation
     for i, c in enumerate(constraints):
         prefix = f'constraints[{i}]'
+        name = (c.constraint_type_other or '').strip() or (
+            (c.get_constraint_type_display() or '').strip() if c.constraint_type else ''
+        )
+        label = f'Site constraint "{name}"' if name else f'Site constraint {i + 1}'
         if not (c.mitigation_measure or '').strip():
             errors.append(_err(
                 'mitigation_required', f'{prefix}.mitigation_measure',
-                'Mitigation Measure is required for each site constraint.',
+                f'{label}: Mitigation Measure is required for each site constraint.',
             ))
         if c.constraint_type == 'other' and not (c.constraint_type_other or '').strip():
             errors.append(_err(
                 'constraint_other_required', f'{prefix}.constraint_type_other',
-                'Please specify — "Others" was selected in constraint type.',
+                f'{label}: please specify — "Others" was selected in constraint type.',
             ))
 
     return {

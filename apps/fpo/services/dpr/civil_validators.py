@@ -19,17 +19,25 @@ def validate_section(section) -> dict[str, Any]:
 
     for i, b in enumerate(section.existing_buildings.all()):
         p = f'existing_buildings[{i}]'
-        if not (b.building_name or '').strip():
-            errors.append(_err('name_required', f'{p}.building_name', 'Building Name shall be specified.'))
+        name = (b.building_name or '').strip()
+        label = f'Building "{name}"' if name else f'Building {i + 1}'
+        if not name:
+            errors.append(_err('name_required', f'{p}.building_name', f'{label}: building name shall be specified.'))
         if b.floor_area is None or b.floor_area <= 0:
-            errors.append(_err('floor_area_positive', f'{p}.floor_area', 'Floor Area shall be greater than zero.'))
+            errors.append(_err('floor_area_positive', f'{p}.floor_area', f'{label}: floor area shall be greater than zero.'))
 
     for i, b in enumerate(section.proposed_buildings.all()):
         p = f'proposed_buildings[{i}]'
+        name = (
+            ((b.building_type.label_en if b.building_type_id and b.building_type else '') or '').strip()
+            or (b.building_type_other or '').strip()
+            or (b.purpose or '').strip()
+        )
+        label = f'Building "{name}"' if name else f'Building {i + 1}'
         if not b.building_type_id:
-            errors.append(_err('type_required', f'{p}.building_type', 'Building Type shall be specified.'))
+            errors.append(_err('type_required', f'{p}.building_type', f'{label}: building type shall be specified.'))
         if b.floor_area is None or b.floor_area <= 0:
-            errors.append(_err('floor_area_positive', f'{p}.floor_area', 'Floor Area shall be greater than zero.'))
+            errors.append(_err('floor_area_positive', f'{p}.floor_area', f'{label}: floor area shall be greater than zero.'))
         # `estimated_construction_cost` feeds Fixed Capital Investment,
         # Means of Finance, DSCR and payback. A blank silently drops the
         # building out of the project cost (ChatGPT calc audit 2026-09-22).
@@ -37,7 +45,7 @@ def validate_section(section) -> dict[str, Any]:
         if b.estimated_construction_cost is None or b.estimated_construction_cost <= 0:
             errors.append(_err(
                 'cost_required', f'{p}.estimated_construction_cost',
-                'Estimated Construction Cost is required and shall be greater than zero.',
+                f'{label}: estimated construction cost is required and shall be greater than zero.',
             ))
 
     # Cat D — if basis is "other", basis_of_estimate_other must be filled

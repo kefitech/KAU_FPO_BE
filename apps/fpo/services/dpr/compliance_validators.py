@@ -33,14 +33,17 @@ def validate_section(section) -> dict[str, Any]:
 
     for i, item in enumerate(items):
         p = f'items[{i}]'
+        reg = item.registration
+        name = ((reg.label_en if reg else '') or item.custom_name or '').strip()
+        label = f'Registration "{name}"' if name else f'Registration {i + 1}'
         # Must have either FK or custom name
         if not item.registration_id and not (item.custom_name or '').strip():
             errors.append(_err(
                 'name_required', f'{p}.registration',
-                'Each compliance item must have either a registration or a custom name.',
+                f'{label}: each compliance item must have either a registration or a custom name.',
             ))
         if not item.status:
-            errors.append(_err('status_required', f'{p}.status', 'Status is required.'))
+            errors.append(_err('status_required', f'{p}.status', f'{label}: status is required.'))
 
     # Cat G
     if section.has_pending_legal_issues:

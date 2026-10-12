@@ -24,15 +24,19 @@ def validate_section(section) -> dict[str, Any]:
 
     for i, r in enumerate(items):
         p = f'items[{i}]'
+        # Human-readable identifier for messages. Falls back to "Risk N"
+        # when the risk code is blank.
+        name = (r.risk_code or '').strip()
+        label = f'Risk "{name}"' if name else f'Risk {i + 1}'
         if not (r.mitigation_strategy or '').strip():
             errors.append(_err(
                 'mitigation_required', f'{p}.mitigation_strategy',
-                'Every identified risk shall have at least one proposed mitigation measure.',
+                f'{label}: every identified risk shall have at least one proposed mitigation measure.',
             ))
         if r.risk_code == 'other' and not (r.risk_code_other or '').strip():
             errors.append(_err(
                 'risk_other_required', f'{p}.risk_code_other',
-                'Please specify — "Others" was selected for risk code.',
+                f'{label}: please specify — "Others" was selected for risk code.',
             ))
 
     # Advisory: recommend at least one risk per category (spec suggests categories are exhaustive)

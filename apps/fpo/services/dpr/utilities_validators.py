@@ -39,10 +39,12 @@ def validate_section(section) -> dict[str, Any]:
     # Cat F — per-waste disposal method required
     for i, w in enumerate(section.wastes.all()):
         p = f'wastes[{i}]'
+        name = ((w.waste.label_en if w.waste_id else '') or w.waste_other or '').strip()
+        label = f'Waste stream "{name}"' if name else f'Waste stream {i + 1}'
         if not (w.disposal_method or '').strip():
             errors.append(_err(
                 'disposal_method_required', f'{p}.disposal_method',
-                'Disposal method shall be specified for each waste type.',
+                f'{label}: disposal method shall be specified for each waste type.',
             ))
 
     # Cat E — Fuel rows feed the operating cost line in the P&L. A blank
@@ -50,15 +52,17 @@ def validate_section(section) -> dict[str, Any]:
     # 2026-09-22 — same pattern as machinery unit_cost / civil est. cost).
     for i, f in enumerate(section.fuels.all()):
         p = f'fuels[{i}]'
+        name = ((f.fuel.label_en if f.fuel_id else '') or f.fuel_other or '').strip()
+        label = f'Fuel "{name}"' if name else f'Fuel {i + 1}'
         if not f.fuel_id:
             errors.append(_err(
                 'fuel_required', f'{p}.fuel',
-                'Fuel type is required.',
+                f'{label}: fuel type is required.',
             ))
         if f.estimated_annual_cost is None or f.estimated_annual_cost <= 0:
             errors.append(_err(
                 'fuel_cost_required', f'{p}.estimated_annual_cost',
-                'Estimated Annual Cost is required and shall be greater than zero.',
+                f'{label}: Estimated Annual Cost is required and shall be greater than zero.',
             ))
 
     # Cat J — Renewable Initiatives rows contribute to Fixed Capital
@@ -66,15 +70,17 @@ def validate_section(section) -> dict[str, Any]:
     # must too.
     for i, r in enumerate(section.renewable_initiatives.all()):
         p = f'renewable_initiatives[{i}]'
+        name = ((r.initiative.label_en if r.initiative_id else '') or r.initiative_other or '').strip()
+        label = f'Renewable initiative "{name}"' if name else f'Renewable initiative {i + 1}'
         if not r.initiative_id:
             errors.append(_err(
                 'initiative_required', f'{p}.initiative',
-                'Initiative is required.',
+                f'{label}: initiative is required.',
             ))
         if r.estimated_cost is None or r.estimated_cost <= 0:
             errors.append(_err(
                 'renewable_cost_required', f'{p}.estimated_cost',
-                'Estimated Cost is required and shall be greater than zero.',
+                f'{label}: Estimated Cost is required and shall be greater than zero.',
             ))
 
     # H/I "other" text

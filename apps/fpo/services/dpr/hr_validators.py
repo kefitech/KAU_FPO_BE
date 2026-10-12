@@ -32,12 +32,14 @@ def validate_section(section) -> dict[str, Any]:
     # Cat B
     for i, e in enumerate(section.employee_categories.all()):
         p = f'employee_categories[{i}]'
-        if not (e.designation or '').strip():
-            errors.append(_err('designation_required', f'{p}.designation', 'Designation is required.'))
+        name = (e.designation or '').strip()
+        label = f'Position "{name}"' if name else f'Position {i + 1}'
+        if not name:
+            errors.append(_err('designation_required', f'{p}.designation', f'{label}: designation is required.'))
         if e.number_required is None or e.number_required <= 0:
             errors.append(_err(
                 'number_positive', f'{p}.number_required',
-                'Number of employees shall be greater than zero.',
+                f'{label}: number of employees shall be greater than zero.',
             ))
         # Wages feed the Salaries line of Operating Cost → EBITDA → DSCR.
         # Silent-blank pattern (ChatGPT calc audit 2026-09-22) — at least
@@ -50,15 +52,17 @@ def validate_section(section) -> dict[str, Any]:
         if not has_ms and not has_yr:
             errors.append(_err(
                 'salary_required', f'{p}.monthly_salary',
-                'Monthly salary (or Annual salary) is required and shall be greater than zero.',
+                f'{label}: monthly salary (or Annual salary) is required and shall be greater than zero.',
             ))
 
     # Cat C — "other" specify text
     for i, d in enumerate(section.departments.all()):
+        name = (d.get_department_display() or '').strip() if d.department else ''
+        label = f'Department "{name}"' if name else f'Department {i + 1}'
         if d.department == 'other' and not (d.department_other or '').strip():
             errors.append(_err(
                 'department_other_required', f'departments[{i}].department_other',
-                'Please specify — "Others" was selected for department.',
+                f'{label}: please specify — "Others" was selected for department.',
             ))
 
     # Cat D — existing employees: each subgroup (technical / admin / marketing

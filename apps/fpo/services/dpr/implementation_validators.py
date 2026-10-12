@@ -14,6 +14,10 @@ def _err(code: str, field: str, message: str) -> dict[str, Any]:
     return {'code': code, 'field': field, 'message': message}
 
 
+def _warn(code: str, field: str, message: str) -> dict[str, Any]:
+    return {'code': code, 'field': field, 'message': message}
+
+
 def validate_section(section) -> dict[str, Any]:
     errors: list[dict] = []
     warnings: list[dict] = []
@@ -21,13 +25,15 @@ def validate_section(section) -> dict[str, Any]:
     # Cat A
     for i, act in enumerate(section.activities.all()):
         p = f'activities[{i}]'
-        if not (act.activity_name or '').strip():
-            errors.append(_err('activity_name_required', f'{p}.activity_name', 'Activity name is required.'))
+        name = (act.activity_name or '').strip()
+        label = f'Activity "{name}"' if name else f'Activity {i + 1}'
+        if not name:
+            errors.append(_err('activity_name_required', f'{p}.activity_name', f'{label}: activity name is required.'))
         if act.proposed_start_date and act.proposed_completion_date:
             if act.proposed_start_date > act.proposed_completion_date:
                 errors.append(_err(
                     'start_before_completion', f'{p}.proposed_start_date',
-                    'Start Date shall precede Completion Date.',
+                    f'{label}: Start Date shall precede Completion Date.',
                 ))
 
     # Cat B
@@ -42,10 +48,11 @@ def validate_section(section) -> dict[str, Any]:
 
     # Cat D — milestone "other" text
     for i, m in enumerate(section.milestones.all()):
+        label = f'Milestone {i + 1}'
         if m.milestone_type == 'other' and not (m.milestone_type_other or '').strip():
             errors.append(_err(
                 'milestone_other_required', f'milestones[{i}].milestone_type_other',
-                'Please specify — "Others" was selected for milestone type.',
+                f'{label}: please specify — "Others" was selected for milestone type.',
             ))
 
     # Cat E
@@ -75,9 +82,11 @@ def validate_section(section) -> dict[str, Any]:
                 if not act.proposed_start_date:
                     continue
                 if _CIVIL_RE.search(act.activity_name or '') and act.proposed_start_date < latest_date:
+                    name = (act.activity_name or '').strip()
+                    label = f'Activity "{name}"' if name else f'Activity {i + 1}'
                     warnings.append(_warn(
                         'civil_before_permit', f'activities[{i}].proposed_start_date',
-                        f'"{act.activity_name}" starts {act.proposed_start_date:%d %b %Y}, '
+                        f'{label}: starts {act.proposed_start_date:%d %b %Y}, '
                         f'before the expected approval of '
                         f'{"the Building Permit" if latest_code == "building_permit" else "the Consent to Establish (CTE)"} '
                         f'({latest_date:%d %b %Y}). Construction cannot legally begin '
