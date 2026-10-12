@@ -220,7 +220,9 @@ class AuditLogListView(APIView):
         # Filter: by FPO — find all AuditLog rows related to a specific FPO
         if fpo_id:
             try:
-                fpo     = scope_fpo_queryset(FPO.objects.all(), request.user).get(id=fpo_id)
+                # Read-only lookup: a sub-admin holding can_view_all_fpos (required by
+                # _can_view) may read the audit trail of FPOs outside their district.
+                fpo     = scope_fpo_queryset(FPO.objects.all(), request.user, read_only=True).get(id=fpo_id)
                 fpo_ct  = ContentType.objects.get_for_model(FPO)
                 doc_ct  = ContentType.objects.get_for_model(FPODocument)
                 doc_ids_str = [
