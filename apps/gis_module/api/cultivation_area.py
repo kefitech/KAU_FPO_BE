@@ -20,6 +20,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from drf_spectacular.utils import extend_schema
 
 from apps.core.utils.responses import StandardResponse
+from apps.core.services.fpo_permission import has_fpo_permission
 from apps.core.services.translation import t
 
 from apps.database.models import FPOCultivationArea
@@ -146,6 +147,17 @@ def _compute_hectares(multipolygon):
     return round(square_meters / 10000, 2)  # 1 hectare = 10,000 sq meters
 
 
+def _forbid_without_recommendation_permission(user, fpo, lang):
+    """
+    The farm boundary feeds the AI crop recommendation, so drawing / deleting
+    it needs the same `can_generate_recommendations` action. Viewing stays
+    open to every FPO member. The primary user always passes.
+    """
+    if has_fpo_permission(user, fpo, 'can_generate_recommendations'):
+        return None
+    return StandardResponse.error(t('common.permission_denied', lang), status_code=status.HTTP_403_FORBIDDEN)
+
+
 # ---------------------------------------------------------------------------
 # View
 # ---------------------------------------------------------------------------
@@ -179,6 +191,9 @@ class CultivationAreaView(APIView):
         lang = request.language
 
         fpo, err = _get_fpo_or_404(request.user, lang)
+        if err:
+            return err
+        err = _forbid_without_recommendation_permission(request.user, fpo, lang)
         if err:
             return err
 
@@ -215,6 +230,9 @@ class CultivationAreaView(APIView):
         lang = request.language
 
         fpo, err = _get_fpo_or_404(request.user, lang)
+        if err:
+            return err
+        err = _forbid_without_recommendation_permission(request.user, fpo, lang)
         if err:
             return err
 
