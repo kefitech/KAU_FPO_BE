@@ -347,6 +347,7 @@ def seed_gis_translations():
         # ── FPO: cultivation area map / zone-related labels ──
         'fpo_gis': {
             'draw_prompt':              ("Draw your farm's boundary to help us give more accurate recommendations.", 'കൂടുതൽ കൃത്യമായ ശുപാർശകൾ നൽകാൻ നിങ്ങളുടെ കൃഷിയിടത്തിന്റെ അതിര് വരയ്ക്കുക.'),
+            'draw_prompt_view_only':    ('No farm boundary has been drawn yet.', 'കൃഷിയിടത്തിന്റെ അതിര് ഇതുവരെ വരച്ചിട്ടില്ല.'),
             'draw_saved':                ('This is your saved cultivation area.', 'ഇത് നിങ്ങൾ സേവ് ചെയ്ത കൃഷിസ്ഥലമാണ്.'),
             'draw_instruction':          ('Click the map to place each corner of your farm boundary.', 'നിങ്ങളുടെ കൃഷിയിടത്തിന്റെ ഓരോ കോണും അടയാളപ്പെടുത്താൻ മാപ്പിൽ ക്ലിക്ക് ചെയ്യുക.'),
             'btn_draw_boundary':         ('Draw boundary', 'അതിര് വരയ്ക്കുക'),
