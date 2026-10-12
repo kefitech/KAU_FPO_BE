@@ -14,6 +14,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from django.db import transaction
 from django.http import HttpResponse
 
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -106,7 +107,7 @@ def _parse_date(value, field_name, required=False):
         raise ValueError(f"{field_name} must be a valid date (YYYY-MM-DD), got '{value}'")
 
 
-def _create_bulk_product(fpo, row):
+def _create_bulk_product(fpo, row, commodity_cache=None):
     """
     Validate one row from the bulk-import sheet and create a Product +
     ProductStock (status=ACTIVE) from it — per the confirmed decision that
@@ -124,12 +125,17 @@ def _create_bulk_product(fpo, row):
     commodity_code = str(row.get('commodity_code') or '').strip().lower()
     if not commodity_code:
         raise ValueError('commodity_code is required')
-    try:
-        commodity = MasterLookup.objects.get(
-            category='commodity', code=commodity_code, is_active=True,
-        )
-    except MasterLookup.DoesNotExist:
-        raise ValueError(f"Unknown commodity_code '{commodity_code}' — check the Commodity Codes sheet")
+    if commodity_cache is not None and commodity_code in commodity_cache:
+        commodity = commodity_cache[commodity_code]
+    else:
+        try:
+            commodity = MasterLookup.objects.get(
+                category='commodity', code=commodity_code, is_active=True,
+            )
+        except MasterLookup.DoesNotExist:
+            raise ValueError(f"Unknown commodity_code '{commodity_code}' — check the Commodity Codes sheet")
+        if commodity_cache is not None:
+            commodity_cache[commodity_code] = commodity
 
     description_en = str(row.get('description_en') or '').strip()
     if not description_en:
@@ -476,22 +482,48 @@ class ProductViewSet(TranslatedViewSet):
                 code='empty_file',
             )
 
+        # Tester 2026-10-12: a 500-row xlsx took ~58s on the test server —
+        # past every client timeout — and the browser reported 'Upload
+        # failed' while the server quietly kept importing. Cap the batch at
+        # a size that completes comfortably within request timeouts and
+        # tell the user the limit instead of timing out.
+        MAX_BULK_IMPORT_ROWS = 100
+        if len(rows) > MAX_BULK_IMPORT_ROWS:
+            raise BusinessLogicError(
+                message=f'Too many rows: this file has {len(rows)} data '
+                        f'rows but a single import is limited to '
+                        f'{MAX_BULK_IMPORT_ROWS}. Split the file and '
+                        f'upload in parts.',
+                code='too_many_rows',
+            )
+
         success, failed, created_products = [], [], []
-        for i, row in enumerate(rows, start=2):  # row 1 is the header
-            try:
-                product = _create_bulk_product(fpo, row)
-                created_products.append(product)
-                success.append({
-                    'row': i,
-                    'product_id': product.id,
-                    'name': product.name.get('en', ''),
-                })
-            except Exception as e:
-                failed.append({
-                    'row': i,
-                    'name_en': str(row.get('name_en', '') or ''),
-                    'reason': str(e),
-                })
+        # One commodity lookup per distinct code instead of one per row.
+        commodity_cache: dict = {}
+        # Single transaction: one commit instead of per-row fsyncs (the
+        # dominant cost on the small test-server Postgres), and an
+        # unexpected crash mid-file leaves nothing half-imported. Per-row
+        # validation failures are still caught and skipped as before.
+        with transaction.atomic():
+            for i, row in enumerate(rows, start=2):  # row 1 is the header
+                try:
+                    # Per-row savepoint so a DB-level failure on one row
+                    # (e.g. IntegrityError) is skipped without poisoning
+                    # the outer transaction.
+                    with transaction.atomic():
+                        product = _create_bulk_product(fpo, row, commodity_cache)
+                    created_products.append(product)
+                    success.append({
+                        'row': i,
+                        'product_id': product.id,
+                        'name': product.name.get('en', ''),
+                    })
+                except Exception as e:
+                    failed.append({
+                        'row': i,
+                        'name_en': str(row.get('name_en', '') or ''),
+                        'reason': str(e),
+                    })
 
         if created_products:
             # Bulk-import creates exactly one ACTIVE stock per product
