@@ -3,9 +3,11 @@
 
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.core.services.lookup import LookupService
+from apps.core.services.translation import t
 from apps.core.utils.constants import get_district_name
 
 from apps.core.services.fpo_permission import get_member_fpo
@@ -93,6 +95,27 @@ def _validate_whole_number_for_count_unit(quantity, unit):
         )
 
 
+def _validate_stock_dates(available_from, available_until, lang='en'):
+    """`available_until` can't be before `available_from` or in the past — a
+    batch whose validity has already ended is hidden from the buyer catalog
+    and removed by the nightly expiry task, so it would never be live.
+    Same rules the frontend applies in batch-form.tsx / product-form.tsx."""
+    if not available_until:
+        return
+    if available_from and available_until < available_from:
+        raise serializers.ValidationError(
+            {'available_until': t('marketplace.until_before_from', lang)}
+        )
+    if available_until < timezone.localdate():
+        raise serializers.ValidationError(
+            {'available_until': t('marketplace.until_in_past', lang)}
+        )
+
+
+def _request_language(context):
+    return getattr(context.get('request'), 'language', 'en') or 'en'
+
+
 class ProductStockSerializer(serializers.ModelSerializer):
     """
     One stock/listing batch under a Product. Managed via the nested
@@ -131,6 +154,20 @@ class ProductStockSerializer(serializers.ModelSerializer):
         unit = attrs.get('unit', getattr(self.instance, 'unit', None))
         quantity = attrs.get('quantity', getattr(self.instance, 'quantity', None))
         _validate_whole_number_for_count_unit(quantity, unit)
+        # Dates are checked on create, when either date is edited, or when the
+        # batch is being made active — a PATCH that touches neither (e.g.
+        # quantity only) isn't blocked by a date that has since passed.
+        if (
+            self.instance is None
+            or 'available_from' in attrs
+            or 'available_until' in attrs
+            or attrs.get('status') == ProductStock.Status.ACTIVE
+        ):
+            _validate_stock_dates(
+                attrs.get('available_from', getattr(self.instance, 'available_from', None)),
+                attrs.get('available_until', getattr(self.instance, 'available_until', None)),
+                _request_language(self.context),
+            )
         return attrs
 
     def validate_status(self, value):
@@ -261,6 +298,9 @@ class ProductSerializer(serializers.ModelSerializer):
         # Create only — the flat stock fields are dropped on update anyway.
         if self.instance is None:
             _validate_whole_number_for_count_unit(attrs.get('quantity'), attrs.get('unit'))
+            _validate_stock_dates(
+                attrs.get('available_from'), attrs.get('available_until'), _request_language(self.context),
+            )
         return attrs
 
     def _pop_initial_stock_fields(self, validated_data):

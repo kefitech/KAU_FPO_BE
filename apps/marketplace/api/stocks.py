@@ -12,6 +12,7 @@ work for the common one-batch-per-product case, but any multi-batch
 flow must come through here.
 """
 
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
 
@@ -126,6 +127,11 @@ class ProductStockViewSet(TranslatedViewSet):
             raise BusinessLogicError(
                 message=t('marketplace.only_draft_publishable', self.get_language()),
                 code='only_draft_publishable',
+            )
+        if stock.available_until and stock.available_until < timezone.localdate():
+            raise BusinessLogicError(
+                message=t('marketplace.batch_validity_ended', self.get_language()),
+                code='batch_validity_ended',
             )
         stock.status = ProductStock.Status.ACTIVE
         stock.save()

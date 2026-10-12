@@ -5265,6 +5265,13 @@ def seed_marketplace_translations(languages):
         ('product_published',         'Product published successfully',                    'ഉൽപ്പന്നം വിജയകരമായി പ്രസിദ്ധീകരിച്ചു'),
         ('only_active_can_be_sold',   'Only active products can be marked as sold',        'സജീവ ഉൽപ്പന്നങ്ങൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
         ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
+        # Batch validity dates
+        ('until_before_from',         'Available until date must be the same as or after the Available from date',
+         'ലഭ്യമായ അവസാന തീയതി ആരംഭ തീയതിക്ക് തുല്യമോ അതിനു ശേഷമോ ആയിരിക്കണം'),
+        ('until_in_past',             'Available until date cannot be in the past',
+         'ലഭ്യമായ അവസാന തീയതി കഴിഞ്ഞുപോയ ഒരു തീയതി ആകരുത്'),
+        ('batch_validity_ended',      "This batch's Available until date has passed. Update the date before publishing.",
+         'ഈ ബാച്ചിന്റെ ലഭ്യതാ കാലാവധി കഴിഞ്ഞു. പ്രസിദ്ധീകരിക്കുന്നതിന് മുമ്പ് തീയതി പുതുക്കുക.'),
  
         # Buyers
         ('buyers_retrieved',          'Buyers retrieved successfully',                     'ക്രേതാക്കൾ വിജയകരമായി ലഭിച്ചു'),
@@ -6060,6 +6067,286 @@ def seed_fpo_products_view_translations(languages):
         Translation.objects.update_or_create(
             category=category, key=key, language=lang_ml,
             defaults={'value': ml_value, 'context': 'FPO Products page — view dropdown + statuses (/fpo/products)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+#------------------------
+
+
+def seed_fpo_products_bulk_import_translations(languages):
+    """
+    FPO Products — "Bulk Import" header button (products/page.tsx) and the
+    Bulk Import dialog (_components/bulk-import-dialog.tsx). fpo_products.*
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    bulk_import_keys = [
+        ('fpo_products.bulk_import_btn', 'Bulk Import',
+         'ബൾക്ക് ഇംപോർട്ട്'),
+        ('fpo_products.bulk_import_title', 'Bulk Import Products',
+         'ഉൽപ്പന്നങ്ങൾ ബൾക്കായി ഇംപോർട്ട് ചെയ്യുക'),
+        ('fpo_products.bulk_import_description',
+         'Upload a filled Excel/CSV to create many products at once. Each row becomes a live product with one active batch.',
+         'ഒരേസമയം നിരവധി ഉൽപ്പന്നങ്ങൾ സൃഷ്ടിക്കാൻ പൂരിപ്പിച്ച Excel/CSV ഫയൽ അപ്‌ലോഡ് ചെയ്യുക. ഓരോ വരിയും ഒരു സജീവ ബാച്ചുള്ള ലൈവ് ഉൽപ്പന്നമായി മാറും.'),
+
+        # Step 1 — template
+        ('fpo_products.step1_title', '1. Download the template',
+         '1. ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്യുക'),
+        ('fpo_products.step1_description',
+         'Three sheets inside: Products (fill in), Instructions, and the Commodity Codes reference.',
+         'ഇതിൽ മൂന്ന് ഷീറ്റുകളുണ്ട്: Products (പൂരിപ്പിക്കേണ്ടത്), Instructions, Commodity Codes റഫറൻസ്.'),
+        ('fpo_products.download_template_btn', 'Download',
+         'ഡൗൺലോഡ്'),
+        ('fpo_products.downloading', 'Downloading...',
+         'ഡൗൺലോഡ് ചെയ്യുന്നു...'),
+
+        # Step 2 — upload
+        ('fpo_products.step2_title', '2. Upload the filled file',
+         '2. പൂരിപ്പിച്ച ഫയൽ അപ്‌ലോഡ് ചെയ്യുക'),
+        ('fpo_products.step2_description', 'Supports .xlsx and .csv. Invalid rows are skipped and reported.',
+         '.xlsx, .csv ഫയലുകൾ പിന്തുണയ്ക്കുന്നു. അസാധുവായ വരികൾ ഒഴിവാക്കി റിപ്പോർട്ട് ചെയ്യും.'),
+        ('fpo_products.file_placeholder', 'No file chosen',
+         'ഫയൽ തിരഞ്ഞെടുത്തിട്ടില്ല'),
+        ('fpo_products.file_clear_btn', 'Clear file',
+         'ഫയൽ നീക്കം ചെയ്യുക'),
+        ('fpo_products.choose_file_btn', 'Choose File',
+         'ഫയൽ തിരഞ്ഞെടുക്കുക'),
+        ('fpo_products.upload_btn', 'Upload',
+         'അപ്‌ലോഡ്'),
+        ('fpo_products.uploading', 'Uploading...',
+         'അപ്‌ലോഡ് ചെയ്യുന്നു...'),
+
+        # Step 3 — summary
+        ('fpo_products.step3_title', '3. Import summary',
+         '3. ഇംപോർട്ട് സംഗ്രഹം'),
+        ('fpo_products.imported', 'imported',
+         'ഇംപോർട്ട് ചെയ്തു'),
+        ('fpo_products.failed', 'failed',
+         'പരാജയപ്പെട്ടു'),
+        ('fpo_products.failed_rows_label', 'Failed rows — fix these in your file and re-upload',
+         'പരാജയപ്പെട്ട വരികൾ — ഫയലിൽ ഇവ തിരുത്തി വീണ്ടും അപ്‌ലോഡ് ചെയ്യുക'),
+        ('fpo_products.col_row', 'Row',
+         'വരി'),
+        ('fpo_products.col_reason', 'Reason',
+         'കാരണം'),
+
+        # Toasts
+        ('fpo_products.toast_bulk_import_success', '{count} product(s) imported',
+         '{count} ഉൽപ്പന്നം(ങ്ങൾ) ഇംപോർട്ട് ചെയ്തു'),
+        ('fpo_products.err_bulk_import_all_failed', 'No products could be imported',
+         'ഒരു ഉൽപ്പന്നവും ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+        ('fpo_products.err_bulk_import_upload', 'Upload failed',
+         'അപ്‌ലോഡ് പരാജയപ്പെട്ടു'),
+        ('fpo_products.err_template_download', 'Failed to download template',
+         'ടെംപ്ലേറ്റ് ഡൗൺലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
+    ]
+
+    context = 'FPO Products — Bulk Import button + dialog (/fpo/products)'
+    count = 0
+    for key, en_value, ml_value in bulk_import_keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': context, 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': context, 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
+def seed_product_batches_translations(languages):
+    """
+    FPO Products — Manage Batches sheet, batch form and the batch-related
+    labels around them (/fpo/products, /fpo/products/{id}/edit).
+
+    ManageBatchesSheet and BatchForm take their `t` from whichever page opens
+    them: product_table.* from the products list, product_form.* from the
+    edit page. So the batch keys are seeded under both prefixes.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    # ── Shared: manage-batches-sheet.tsx + batch-form.tsx ──
+    batch_keys = [
+        ('manage_batches_title', 'Manage Batches',
+         'ബാച്ചുകൾ കൈകാര്യം ചെയ്യുക'),
+        ('manage_batches_description', 'Each batch has its own quantity, price, and validity window.',
+         'ഓരോ ബാച്ചിനും അതിന്റേതായ അളവും വിലയും സാധുതാ കാലയളവും ഉണ്ട്.'),
+        ('resize_handle_label', 'Resize panel',
+         'പാനലിന്റെ വലുപ്പം മാറ്റുക'),
+        ('batches_empty_hint', 'No batches yet. Add one to start selling.',
+         'ഇതുവരെ ബാച്ചുകളൊന്നുമില്ല. വിൽപ്പന തുടങ്ങാൻ ഒരെണ്ണം ചേർക്കുക.'),
+        ('batch_singular', 'batch',
+         'ബാച്ച്'),
+        ('batch_plural', 'batches',
+         'ബാച്ചുകൾ'),
+        ('add_batch_btn', 'Add Batch',
+         'ബാച്ച് ചേർക്കുക'),
+        ('add_batch_title', 'Add New Batch',
+         'പുതിയ ബാച്ച് ചേർക്കുക'),
+        ('add_batch_submit', 'Add Batch',
+         'ബാച്ച് ചേർക്കുക'),
+        ('edit_batch_title', 'Edit Batch',
+         'ബാച്ച് എഡിറ്റ് ചെയ്യുക'),
+        ('select_all_drafts', 'Select all draft batches',
+         'എല്ലാ ഡ്രാഫ്റ്റ് ബാച്ചുകളും തിരഞ്ഞെടുക്കുക'),
+        ('selected', 'selected',
+         'തിരഞ്ഞെടുത്തു'),
+        ('select_batch', 'Select batch',
+         'ബാച്ച് തിരഞ്ഞെടുക്കുക'),
+        ('publishing', 'Publishing...',
+         'പ്രസിദ്ധീകരിക്കുന്നു...'),
+        ('publish_selected', 'Publish Selected',
+         'തിരഞ്ഞെടുത്തവ പ്രസിദ്ധീകരിക്കുക'),
+        ('public_badge', 'Public',
+         'പൊതു'),
+        ('open_ended', 'open',
+         'അവസാന തീയതിയില്ല'),
+        ('action_publish', 'Publish',
+         'പ്രസിദ്ധീകരിക്കുക'),
+        ('action_mark_sold', 'Mark Sold',
+         'വിറ്റതായി അടയാളപ്പെടുത്തുക'),
+        ('status_draft', 'Draft',
+         'ഡ്രാഫ്റ്റ്'),
+        ('status_active', 'Active',
+         'സജീവം'),
+        ('status_sold', 'Sold',
+         'വിറ്റു'),
+        ('status_expired', 'Expired',
+         'കാലഹരണപ്പെട്ടു'),
+
+        # Toasts / errors / delete confirm
+        ('toast_batch_created', 'Batch added',
+         'ബാച്ച് ചേർത്തു'),
+        ('err_batch_create_failed', 'Failed to add batch',
+         'ബാച്ച് ചേർക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_batch_updated', 'Batch updated',
+         'ബാച്ച് അപ്‌ഡേറ്റ് ചെയ്തു'),
+        ('err_batch_update_failed', 'Only draft or active batches can be edited',
+         'ഡ്രാഫ്റ്റ് അല്ലെങ്കിൽ സജീവ ബാച്ചുകൾ മാത്രമേ എഡിറ്റ് ചെയ്യാൻ കഴിയൂ'),
+        ('toast_batch_published', 'Batch published',
+         'ബാച്ച് പ്രസിദ്ധീകരിച്ചു'),
+        ('err_batch_publish_failed', 'Only draft batches can be published',
+         'ഡ്രാഫ്റ്റ് ബാച്ചുകൾ മാത്രമേ പ്രസിദ്ധീകരിക്കാൻ കഴിയൂ'),
+        ('toast_bulk_published', '{count} batch(es) published',
+         '{count} ബാച്ച്(കൾ) പ്രസിദ്ധീകരിച്ചു'),
+        ('toast_bulk_published_partial', '{ok} published, {fail} failed',
+         '{ok} എണ്ണം പ്രസിദ്ധീകരിച്ചു, {fail} എണ്ണം പരാജയപ്പെട്ടു'),
+        ('err_bulk_publish_all_failed', 'No batches could be published',
+         'ഒരു ബാച്ചും പ്രസിദ്ധീകരിക്കാൻ കഴിഞ്ഞില്ല'),
+        ('toast_batch_sold', 'Batch marked as sold',
+         'ബാച്ച് വിറ്റതായി അടയാളപ്പെടുത്തി'),
+        ('err_batch_mark_sold_failed', 'Only active batches can be marked sold',
+         'സജീവ ബാച്ചുകൾ മാത്രമേ വിറ്റതായി അടയാളപ്പെടുത്താൻ കഴിയൂ'),
+        ('toast_batch_deleted', 'Batch deleted',
+         'ബാച്ച് ഇല്ലാതാക്കി'),
+        ('err_batch_delete_failed', 'Only draft batches can be deleted',
+         'ഡ്രാഫ്റ്റ് ബാച്ചുകൾ മാത്രമേ ഇല്ലാതാക്കാൻ കഴിയൂ'),
+        ('confirm_batch_delete_title', 'Delete Batch',
+         'ബാച്ച് ഇല്ലാതാക്കുക'),
+        ('confirm_batch_delete_description',
+         'Are you sure you want to delete this batch? This action cannot be undone.',
+         'ഈ ബാച്ച് ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ? ഈ പ്രവർത്തനം പഴയപടിയാക്കാൻ കഴിയില്ല.'),
+
+        # Batch form fields
+        ('quantity_label', 'Quantity',
+         'അളവ്'),
+        ('unit_label', 'Unit',
+         'യൂണിറ്റ്'),
+        ('unit_kg', 'Kilogram',
+         'കിലോഗ്രാം'),
+        ('unit_quintal', 'Quintal',
+         'ക്വിന്റൽ'),
+        ('unit_mt', 'Metric Tonne',
+         'മെട്രിക് ടൺ'),
+        ('unit_litre', 'Litre',
+         'ലിറ്റർ'),
+        ('unit_piece', 'Piece',
+         'എണ്ണം'),
+        ('price_label', 'Price per unit (₹)',
+         'യൂണിറ്റ് വില (₹)'),
+        ('quality_label', 'Quality certification',
+         'ഗുണനിലവാര സാക്ഷ്യപ്പെടുത്തൽ'),
+        ('quality_placeholder', 'e.g. FSSAI, NPOP Organic, ISO 22000',
+         'ഉദാ. FSSAI, NPOP ഓർഗാനിക്, ISO 22000'),
+        ('contact_phone_label', 'Seller contact phone',
+         'വിൽപ്പനക്കാരന്റെ ഫോൺ നമ്പർ'),
+        ('contact_phone_placeholder', '10-digit mobile (optional)',
+         '10 അക്ക മൊബൈൽ നമ്പർ (ഐച്ഛികം)'),
+        ('contact_phone_hint',
+         'Shown to buyers as a tap-to-call link on the product card. Leave blank to route inquiries only through the Market Hub form.',
+         'ഉൽപ്പന്ന കാർഡിൽ വാങ്ങുന്നവർക്ക് ടാപ്പ് ചെയ്ത് വിളിക്കാവുന്ന ലിങ്കായി കാണിക്കും. അന്വേഷണങ്ങൾ മാർക്കറ്റ് ഹബ് ഫോം വഴി മാത്രം ലഭിക്കാൻ ഇത് ശൂന്യമായി വിടുക.'),
+        ('available_from_label', 'Available from',
+         'ലഭ്യമായ തീയതി മുതൽ'),
+        ('available_until_label', 'Available until',
+         'ലഭ്യമായ തീയതി വരെ'),
+        ('publish_now_label', 'Publish immediately',
+         'ഉടൻ പ്രസിദ്ധീകരിക്കുക'),
+        ('publish_now_hint',
+         'Make this batch Active right away. Leave off to save as a draft and publish later.',
+         'ഈ ബാച്ച് ഉടൻ സജീവമാക്കുക. ഡ്രാഫ്റ്റായി സേവ് ചെയ്ത് പിന്നീട് പ്രസിദ്ധീകരിക്കാൻ ഇത് ഓഫ് ചെയ്യുക.'),
+        ('public_label', 'Visible on public Market Hub',
+         'പൊതു മാർക്കറ്റ് ഹബ്ബിൽ ദൃശ്യമാണ്'),
+        ('public_hint',
+         'Show this batch to anonymous visitors on the public Market Hub (requires publish).',
+         'പൊതു മാർക്കറ്റ് ഹബ്ബിലെ സന്ദർശകർക്ക് ഈ ബാച്ച് കാണിക്കുക (പ്രസിദ്ധീകരിക്കേണ്ടതുണ്ട്).'),
+    ]
+
+    keys = [(f'{prefix}.{key}', en, ml) for prefix in ('product_table', 'product_form') for key, en, ml in batch_keys]
+
+    keys += [
+        # ── product_table — row action, Batches column, Product Details view sheet ──
+        ('product_table.action_manage_batches', 'Manage Batches',
+         'ബാച്ചുകൾ കൈകാര്യം ചെയ്യുക'),
+        ('product_table.col_batches', 'Batches',
+         'ബാച്ചുകൾ'),
+        ('product_table.col_total_batches', 'Total batches',
+         'ആകെ ബാച്ചുകൾ'),
+        ('product_table.no_batches', 'No batches',
+         'ബാച്ചുകളൊന്നുമില്ല'),
+        ('product_table.no_stock', 'No stock',
+         'സ്റ്റോക്ക് ഇല്ല'),
+        ('product_table.no_stock_batches', 'No stock batches yet',
+         'ഇതുവരെ സ്റ്റോക്ക് ബാച്ചുകളൊന്നുമില്ല'),
+
+        # ── product_form — Stock Batches card + initial batch toggle ──
+        ('product_form.manage_batches_btn', 'Manage Batches',
+         'ബാച്ചുകൾ കൈകാര്യം ചെയ്യുക'),
+        ('product_form.batches_card_title', 'Stock Batches',
+         'സ്റ്റോക്ക് ബാച്ചുകൾ'),
+        ('product_form.batches_card_description',
+         'A product can have multiple stock batches live at once. Add, edit, publish, or mark batches sold from the Manage Batches panel.',
+         'ഒരു ഉൽപ്പന്നത്തിന് ഒരേസമയം ഒന്നിലധികം സ്റ്റോക്ക് ബാച്ചുകൾ സജീവമായിരിക്കാം. ബാച്ചുകൾ ചേർക്കാനും എഡിറ്റ് ചെയ്യാനും പ്രസിദ്ധീകരിക്കാനും വിറ്റതായി അടയാളപ്പെടുത്താനും "ബാച്ചുകൾ കൈകാര്യം ചെയ്യുക" പാനൽ ഉപയോഗിക്കുക.'),
+        ('product_form.no_batches', 'No batches yet',
+         'ഇതുവരെ ബാച്ചുകളൊന്നുമില്ല'),
+        ('product_form.initial_batch_toggle', 'Add an initial stock batch now',
+         'ഇപ്പോൾ തന്നെ ആദ്യ സ്റ്റോക്ക് ബാച്ച് ചേർക്കുക'),
+        ('product_form.initial_batch_hint',
+         'You can also create the product first and add batches later from Manage Batches.',
+         'ഉൽപ്പന്നം ആദ്യം സൃഷ്ടിച്ച ശേഷം "ബാച്ചുകൾ കൈകാര്യം ചെയ്യുക" വഴി പിന്നീട് ബാച്ചുകൾ ചേർക്കാനും കഴിയും.'),
+
+        # ── common — loading line in the sheet ──
+        ('common.loading', 'Loading...',
+         'ലോഡ് ചെയ്യുന്നു...'),
+    ]
+
+    context = 'FPO Products — Manage Batches sheet + batch form (/fpo/products)'
+    count = 0
+    for key, en_value, ml_value in keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': context, 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': context, 'is_verified': True}
         )
         count += 1
 
@@ -6926,6 +7213,21 @@ def seed_translations():
     products_page_count = seed_products_page_translations(languages)
     print(f"✅ Seeded {products_page_count} products-page translations")
     total_count += products_page_count
+
+    print("\nSeeding FPO products view translations...")
+    fpo_products_view_count = seed_fpo_products_view_translations(languages)
+    print(f"✅ Seeded {fpo_products_view_count} FPO products view translations")
+    total_count += fpo_products_view_count
+
+    print("\nSeeding FPO products bulk import translations...")
+    bulk_import_count = seed_fpo_products_bulk_import_translations(languages)
+    print(f"✅ Seeded {bulk_import_count} bulk import translations")
+    total_count += bulk_import_count
+
+    print("\nSeeding product batches translations...")
+    product_batches_count = seed_product_batches_translations(languages)
+    print(f"✅ Seeded {product_batches_count} product-batches translations")
+    total_count += product_batches_count
 
     print("\nSeeding market linkage translations...")
     market_linkage_count = seed_market_linkage_translations(languages)
