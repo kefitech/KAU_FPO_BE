@@ -15,6 +15,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from django.http import HttpResponse
+from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
@@ -148,6 +149,11 @@ def _create_bulk_product(fpo, row):
 
     available_from = _parse_date(row.get('available_from'), 'available_from', required=True)
     available_until = _parse_date(row.get('available_until'), 'available_until', required=False)
+    # Same rules as the Add Batch form — imported batches go live immediately.
+    if available_until and available_until < available_from:
+        raise ValueError('available_until must be the same as or after available_from')
+    if available_until and available_until < timezone.localdate():
+        raise ValueError('available_until cannot be in the past')
 
     # Optional is_public column — default True so bulk-imported batches are
     # discoverable on the public Market Hub right away (matches the default
@@ -291,6 +297,11 @@ class ProductViewSet(TranslatedViewSet):
                 code='only_draft_publishable',
             )
         stock = drafts[0]
+        if stock.available_until and stock.available_until < timezone.localdate():
+            raise BusinessLogicError(
+                message=t('marketplace.batch_validity_ended', self.get_language()),
+                code='batch_validity_ended',
+            )
         stock.status = ProductStock.Status.ACTIVE
         stock.save()
 
