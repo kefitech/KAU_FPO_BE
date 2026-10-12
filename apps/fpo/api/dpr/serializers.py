@@ -192,6 +192,69 @@ class DPRProjectDetailSerializer(serializers.ModelSerializer):
     def validate_title(self, value):
         return _validate_project_title(value)
 
+    # Tester 2026-10-12: promoter-profile fields accepted long digit runs
+    # and out-of-range numbers, failing only with raw DRF messages like
+    # 'Ensure this value is less than or equal to 32767.' Business rules
+    # now live here so every client gets clear, field-specific errors.
+    def validate_ceo_name(self, value):
+        if value is None or not value.strip():
+            return value
+        stripped = value.strip()
+        if len(stripped) > 100:
+            raise serializers.ValidationError('CEO name cannot exceed 100 characters.')
+        if not _NAME_ONLY_RE.match(stripped) or len(re.findall(r'[A-Za-zഀ-ൿ]', stripped)) < 2:
+            raise serializers.ValidationError(
+                'Please enter a valid CEO name (letters only — digits and '
+                'special characters are not allowed).'
+            )
+        return stripped
+
+    def validate_ceo_qualification(self, value):
+        if value is None or not value.strip():
+            return value
+        stripped = value.strip()
+        if len(stripped) > 200:
+            raise serializers.ValidationError('Qualification cannot exceed 200 characters.')
+        if len(re.findall(r'[A-Za-zഀ-ൿ]', stripped)) < 2:
+            raise serializers.ValidationError(
+                'Please enter a valid qualification (e.g. B.Sc Agriculture, '
+                'MBA Agri-business) — it cannot be only numbers.'
+            )
+        return stripped
+
+    def validate_ceo_experience_years(self, value):
+        if value is None:
+            return value
+        if value > 60:
+            raise serializers.ValidationError(
+                'CEO experience must be between 0 and 60 years.'
+            )
+        return value
+
+    def validate_total_area_acreage(self, value):
+        if value is None:
+            return value
+        if value <= 0:
+            raise serializers.ValidationError(
+                'Total farming area must be greater than zero.'
+            )
+        if value > 500000:
+            raise serializers.ValidationError(
+                'Total farming area cannot exceed 5,00,000 acres — please '
+                'check the value (it is the combined area of all member '
+                'farmers, in acres).'
+            )
+        return value
+
+    def validate_women_shareholding_pct(self, value):
+        if value is None:
+            return value
+        if value < 0 or value > 100:
+            raise serializers.ValidationError(
+                'Women shareholding is a percentage — enter a value between 0 and 100.'
+            )
+        return value
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # §2.3.10 Raw Material — child item serializers
