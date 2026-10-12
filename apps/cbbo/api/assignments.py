@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from apps.core.utils.responses import StandardResponse
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
-from apps.database.models.fpo import FPO, FPODocument
+from apps.database.models.fpo import FPO, FPODocument, FPOUserMembership
 from apps.database.models.cbbo import CBBOAssignment
 from apps.core.services.lookup import LookupService
  
@@ -316,3 +316,58 @@ class AssignedFPOVerifyDocumentView(APIView):
             },
             message=t('admin.document_verified', request.language),
         )
+
+
+def _team_member(user, role, is_active, joined_at):
+    profile = getattr(user, 'profile', None)
+    return {
+        'id':         user.id,
+        'first_name': user.first_name,
+        'last_name':  user.last_name,
+        'email':      user.email,
+        'phone':      profile.phone if profile else None,
+        'role':       role,
+        'is_active':  is_active,
+        'joined_at':  joined_at,
+        'last_login': user.last_login,
+    }
+
+
+class AssignedFPOTeamView(APIView):
+    """GET /api/cbbo/fpos/{fpo_id}/team/
+
+    Read-only list of the FPO's primary + secondary users. Jurisdiction-checked
+    exactly like AssignedFPODetailView (404 outside scope). Account actions
+    (activate / deactivate / reset password) stay admin-only.
+    """
+
+    def get(self, request, fpo_id):
+        if not is_cbbo_user(request.user):
+            return StandardResponse.error(
+                t('common.permission_denied', request.language),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        fpo = get_fpo_scoped(fpo_id, request.user)
+        if not fpo:
+            return StandardResponse.error(
+                t('fpo.fpo_not_found', request.language),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        members = []
+        if fpo.primary_user:
+            members.append(_team_member(fpo.primary_user, 'primary', fpo.primary_user.is_active, fpo.created_at))
+
+        memberships = (
+            FPOUserMembership.objects.filter(fpo=fpo, is_deleted=False)
+            .exclude(user_id=fpo.primary_user_id)
+            .select_related('user', 'user__profile', 'role')
+            .order_by('created_at')
+        )
+        for mem in memberships:
+            members.append(_team_member(
+                mem.user, mem.role.name if mem.role else 'secondary', mem.is_active, mem.created_at,
+            ))
+
+        return StandardResponse.success(data=members)
