@@ -221,7 +221,14 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             try:
                 send_notification(user=user, code=code, channel='in_app', context=context, lang=lang or 'en')
             except Exception:
-                pass  # Status already saved — don't fail the request if notification dispatch fails
+                # Status already saved — don't fail the request if dispatch
+                # fails, but never silently: a swallowed error here looks
+                # exactly like "buyer got no notification" to a tester.
+                import logging
+                logging.getLogger(__name__).exception(
+                    'inquiry %s: %s notification to user %s failed',
+                    inquiry.pk, code, user.pk,
+                )
 
 class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
