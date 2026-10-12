@@ -471,7 +471,8 @@ class ProductViewSet(TranslatedViewSet):
 
         if not rows:
             raise BusinessLogicError(
-                message='File is empty or has no data rows.',
+                message='No rows to import — the file contains only headers '
+                        'or empty rows.',
                 code='empty_file',
             )
 
