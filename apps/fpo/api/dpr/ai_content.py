@@ -182,6 +182,17 @@ class AIContentDetailView(APIView):
             return StandardResponse.error(
                 {'user_edited': 'Must be a string.'}, status_code=400,
             )
+        # Tester 2026-10-12: clearing the textarea and saving silently wiped
+        # the active chapter — the compare view then showed a blank
+        # "Existing (Active)" panel. An empty chapter is never a meaningful
+        # edit (Regenerate is the way to start over), so refuse it.
+        if not text.strip():
+            return StandardResponse.error(
+                {'user_edited': 'Chapter text cannot be empty. Use '
+                                'Regenerate to produce a fresh draft instead '
+                                'of clearing the chapter.'},
+                status_code=400,
+            )
         row.user_edited = text
         row.updated_by = request.user
         row.save(update_fields=['user_edited', 'updated_by', 'updated_at'])
