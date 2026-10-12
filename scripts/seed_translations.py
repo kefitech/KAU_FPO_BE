@@ -6333,6 +6333,7 @@ def seed_recommendations_translations(languages):
         ('business_plan_no_commodity',       'Add at least one primary commodity to your FPO profile to generate a business plan.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കാൻ നിങ്ങളുടെ FPO പ്രൊഫൈലിൽ കുറഞ്ഞത് ഒരു പ്രാഥമിക ഉൽപ്പന്നമെങ്കിലും ചേർക്കുക.'),
         ('business_plan_service_unavailable', 'Business plan generation is currently unavailable. Please try again later.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കൽ ഇപ്പോൾ ലഭ്യമല്ല. പിന്നീട് വീണ്ടും ശ്രമിക്കുക.'),
         ('business_plan_generation_failed',  'Could not generate the business plan. Please try again.', 'ബിസിനസ് പ്ലാൻ തയ്യാറാക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.'),
+        ('business_plan_up_to_date', 'Your business plan is already up to date — nothing it is based on has changed.', 'നിങ്ങളുടെ ബിസിനസ് പ്ലാൻ ഇതിനകം കാലികമാണ് — അത് അടിസ്ഥാനമാക്കിയ വിവരങ്ങളിൽ ഒന്നും മാറിയിട്ടില്ല.'),
     ]
 
     count = 0

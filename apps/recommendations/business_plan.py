@@ -33,11 +33,27 @@ logger = logging.getLogger(__name__)
 # ~1000-1500 words of JSON; Malayalam needs roughly 2-3x the tokens of English.
 MAX_OUTPUT_TOKENS = 6000
 
+# Stored in input_snapshot. Bump it when the prompt or output schema changes in
+# a way that should let FPOs regenerate plans whose data hasn't changed.
+PROMPT_VERSION = 1
+
+# Every fact build_prompt() sends to the LLM. A plan is outdated — and may be
+# regenerated — only when one of these differs from the FPO's current data;
+# regenerating identical input just re-spends AI budget on a reworded plan.
+PLAN_FACT_KEYS = (
+    'fpo_name',
+    'primary_commodity_codes', 'secondary_commodity_codes',
+    'district', 'block_taluk', 'village_town', 'pincode',
+    'agro_climatic_zone', 'soil',
+    'total_members', 'female_members', 'current_tier', 'annual_turnover',
+)
+
 
 class BusinessPlanError(Exception):
     """Generation failed. `code` is mapped to an HTTP status + message by the API layer."""
 
     NO_COMMODITY = 'no_commodity'
+    UP_TO_DATE = 'up_to_date'
     SERVICE_UNAVAILABLE = 'service_unavailable'
     GENERATION_FAILED = 'generation_failed'
 
@@ -120,18 +136,24 @@ def build_plan_context(fpo) -> dict:
     ctx['female_members'] = fpo.female_members
     ctx['current_tier'] = fpo.current_tier
     ctx['annual_turnover'] = str(fpo.annual_turnover) if fpo.annual_turnover is not None else None
+    ctx['prompt_version'] = PROMPT_VERSION
     return ctx
 
 
-def is_outdated(plan: BusinessPlan, fpo) -> bool:
-    """True when the FPO's commodities or location changed since the plan was generated."""
+def is_outdated(plan: BusinessPlan, fpo, ctx: dict | None = None) -> bool:
+    """
+    True when regenerating would actually use different input: any fact sent
+    to the LLM changed since the plan was generated, the prompt version moved
+    on, or the plan is a mock placeholder. `ctx` = an already-built
+    build_plan_context(fpo), to avoid recomputing it.
+    """
+    if plan.provider == 'mock':
+        return True  # placeholder — always replaceable by a real plan
     snap = plan.input_snapshot or {}
-    return (
-        snap.get('primary_commodity_codes') != list(fpo.primary_commodities or [])
-        or snap.get('secondary_commodity_codes') != list(fpo.secondary_commodities or [])
-        or snap.get('district') != fpo.district
-        or snap.get('block_taluk') != fpo.block_taluk
-    )
+    if snap.get('prompt_version', 1) != PROMPT_VERSION:
+        return True
+    current = ctx if ctx is not None else build_plan_context(fpo)
+    return any(snap.get(key) != current.get(key) for key in PLAN_FACT_KEYS)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -328,6 +350,13 @@ def generate_business_plan(fpo, user, lang: str = 'en') -> BusinessPlan:
         raise BusinessPlanError(BusinessPlanError.SERVICE_UNAVAILABLE, 'monthly budget cap reached')
 
     ctx = build_plan_context(fpo)
+
+    # Same input → same plan (just reworded). Only regenerate when something
+    # the plan is based on has changed.
+    existing = BusinessPlan.objects.filter(fpo=fpo, language=lang).first()
+    if existing and existing.content and not is_outdated(existing, fpo, ctx):
+        raise BusinessPlanError(BusinessPlanError.UP_TO_DATE)
+
     prompt = build_prompt(ctx, lang)
 
     try:

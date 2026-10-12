@@ -52,6 +52,7 @@ def _payload(fpo, plan, lang):
 
 _ERROR_RESPONSES = {
     BusinessPlanError.NO_COMMODITY: ('recommendations.business_plan_no_commodity', status.HTTP_400_BAD_REQUEST),
+    BusinessPlanError.UP_TO_DATE: ('recommendations.business_plan_up_to_date', status.HTTP_409_CONFLICT),
     BusinessPlanError.SERVICE_UNAVAILABLE: (
         'recommendations.business_plan_service_unavailable', status.HTTP_503_SERVICE_UNAVAILABLE,
     ),
