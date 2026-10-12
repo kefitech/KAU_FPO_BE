@@ -292,6 +292,42 @@ class KnowledgeDeactivateView(APIView):
 
 
 @extend_schema(tags=['Admin — DPR Knowledge Base'])
+class KnowledgeActivateView(APIView):
+    """Reactivate a soft-deactivated entry (tester 2026-10-12 — deactivate
+    was one-way). A superseded entry stays inactive: its replacement is the
+    live version, and reactivating both would duplicate content in
+    retrieval."""
+
+    permission_classes = [IsAuthenticated, IsSuperAdminOrReadOnly]
+
+    def post(self, request, pk):
+        try:
+            entry = DPRKnowledgeEntry.objects.get(pk=pk)
+        except DPRKnowledgeEntry.DoesNotExist:
+            return StandardResponse.error('KB entry not found', status_code=404)
+        if entry.superseded_by_id:
+            return StandardResponse.error(
+                f'This entry was superseded by entry #{entry.superseded_by_id} '
+                f'— reactivate is not allowed. Edit or deactivate the '
+                f'replacement instead.',
+                status_code=400,
+            )
+        if entry.is_active:
+            return StandardResponse.success(
+                KnowledgeEntryDetailSerializer(entry).data,
+                'KB entry already active',
+            )
+        entry.is_active = True
+        entry.updated_by = request.user
+        entry.save(update_fields=['is_active', 'updated_by', 'updated_at'])
+        _audit(request.user, 'activate', entry)
+        return StandardResponse.success(
+            KnowledgeEntryDetailSerializer(entry).data,
+            'KB entry reactivated',
+        )
+
+
+@extend_schema(tags=['Admin — DPR Knowledge Base'])
 class KnowledgeSupersedeView(APIView):
     """Create a new entry as a superseded version of an existing one.
 

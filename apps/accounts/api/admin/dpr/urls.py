@@ -24,6 +24,7 @@ from .projects_by_fpo import (
 from .risk_matrix import DPRRiskMatrixDetailView, DPRRiskMatrixListView
 from .tranches import DPRCapitalTrancheDetailView, DPRCapitalTrancheListView
 from .knowledge import (
+    KnowledgeActivateView,
     KnowledgeDeactivateView,
     KnowledgeDetailView,
     KnowledgeListCreateView,
@@ -142,6 +143,7 @@ urlpatterns = [
     path('knowledge/', KnowledgeListCreateView.as_view(), name='admin-dpr-knowledge-list'),
     path('knowledge/<int:pk>/', KnowledgeDetailView.as_view(), name='admin-dpr-knowledge-detail'),
     path('knowledge/<int:pk>/deactivate/', KnowledgeDeactivateView.as_view(), name='admin-dpr-knowledge-deactivate'),
+    path('knowledge/<int:pk>/activate/',   KnowledgeActivateView.as_view(),   name='admin-dpr-knowledge-activate'),
     path('knowledge/<int:pk>/supersede/', KnowledgeSupersedeView.as_view(), name='admin-dpr-knowledge-supersede'),
     # Applicability matrix (KAU RCD A.1 — dynamic questionnaire rules)
     path('applicability/matrix/', ApplicabilityMatrixView.as_view(), name='admin-dpr-applicability-matrix'),
