@@ -45,12 +45,21 @@ def _normalise(question: str) -> str:
     return q.rstrip('?!. ')
 
 
+# Bump when the system prompt's answering RULES change (not for KB edits —
+# those rotate keys via the entry signature). Old cached answers were
+# produced under the old rules and must not be replayed (2026-10-12: the
+# role-aware registration rule would otherwise be masked by cached
+# applicant-walkthrough answers for admin/fpo roles).
+PROMPT_RULES_VERSION = '2'
+
+
 def make_key(question: str, role: Optional[str], lang: str, entries) -> str:
     entry_sig = ';'.join(
         f'{e.id}:{getattr(e, "updated_at", "")}'
         for e in sorted(entries, key=lambda e: e.id)
     )
     raw = '\x1f'.join([
+        PROMPT_RULES_VERSION,
         _normalise(question),
         role or 'public',
         lang or 'en',

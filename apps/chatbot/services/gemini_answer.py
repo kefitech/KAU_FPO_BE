@@ -106,6 +106,22 @@ D1) ROLE-RESERVED ACTIONS. The user's role is given in the USER ROLE line
     the mechanic. Testers were explicit: FPO users should see the
     canonical refusal, not a grounded explanation.
 
+D0) "HOW DO I REGISTER AN FPO?" — answer by USER ROLE (tester 2026-10-12:
+    every role was getting the applicant walkthrough):
+    - USER ROLE fpo_manager / primary / secondary: they ALREADY manage a
+      registered FPO — do not walk them through /register. Say their FPO
+      is already registered on this account and point them to what they
+      can do next: the Dashboard, Applications, Team management and the
+      Tier Assessment pages. One account manages one FPO; registering a
+      different FPO needs its own account.
+    - USER ROLE super_admin / sub_admin: registration is done by the FPO
+      applicants themselves and approval is automatic on submission —
+      admins do not register FPOs. Point them to the Applications section
+      of the admin panel where they can review submitted FPOs, request
+      additional information or reject.
+    - Anonymous / public / other roles: normal CASE B registration steps
+      from the CONTEXT.
+
 D) CROP QUESTIONS — special sub-cases:
    → If the question is about GROWING / CULTIVATING the crop (varieties,
      spacing, manuring, pest control, harvesting, season) → CASE B using
@@ -166,6 +182,16 @@ D1) റോൾ-റിസർവ്ഡ് ആക്ഷനുകൾ. USER ROLE line-
     മറ്റെല്ലാ role + verb combinations — FPO users "Can I approve / suspend / \
     reject?" ഉൾപ്പെടെ — CASE C refusal ആയി route ചെയ്യുക, CONTEXT entries മെക്കാനിക് \
     പറഞ്ഞാലും. Testers explicitly: FPO users canonical refusal മാത്രം കാണണം.
+
+D0) "എഫ്.പി.ഒ എങ്ങനെ രജിസ്റ്റർ ചെയ്യാം?" — USER ROLE അനുസരിച്ച് മറുപടി:
+    - fpo_manager / primary / secondary: അവരുടെ FPO ഇതിനകം രജിസ്റ്റർ \
+      ചെയ്തിട്ടുണ്ട് — /register വഴി നടത്തരുത്. അക്കൗണ്ടിൽ FPO രജിസ്റ്റർ ആയിക്കഴിഞ്ഞു \
+      എന്ന് പറഞ്ഞ്, Dashboard, Applications, Team management, Tier Assessment \
+      എന്നിവയിലേക്ക് നയിക്കുക. ഒരു അക്കൗണ്ടിന് ഒരു FPO മാത്രം.
+    - super_admin / sub_admin: രജിസ്ട്രേഷൻ FPO അപേക്ഷകർ തന്നെ ചെയ്യുന്നതാണ്; \
+      admin-മാർ രജിസ്റ്റർ ചെയ്യുന്നില്ല. Admin panel-ലെ Applications വിഭാഗത്തിലേക്ക് \
+      നയിക്കുക — അവിടെ സമർപ്പിച്ച FPO-കൾ അവലോകനം ചെയ്യാം.
+    - Anonymous / public: CONTEXT-ൽ നിന്നുള്ള സാധാരണ CASE B രജിസ്ട്രേഷൻ ഘട്ടങ്ങൾ.
 
 D) ക്രോപ്പ് ചോദ്യങ്ങൾ — ഉപ-കേസുകൾ:
    → ക്രോപ്പ് വളർത്തുന്നതിനെക്കുറിച്ചാണെങ്കിൽ (വിത്ത്, ഇടയകലം, വളപ്രയോഗം, \
