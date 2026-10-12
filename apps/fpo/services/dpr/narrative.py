@@ -33,7 +33,7 @@ Author: Athul Gopan (Kefi Tech Solutions)
 from __future__ import annotations
 
 import re
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Optional
 
 from django.utils import timezone
@@ -98,18 +98,22 @@ def _fmt_inr(amount: Optional[Decimal]) -> str:
     zero-decimals as if they belonged to the Indian grouping and output
     `25,00,00,00` — pattern-match analysis of broken outputs showed
     EXACTLY the trailing-decimal digits had been shifted into the comma
-    grouping. Dropping the `.00` when the fractional is zero removes the
-    attack surface entirely. Non-zero fractionals (rare on money, common
-    on ratios) are rendered as before.
+    grouping.
+
+    Tester 2026-10-12 (v6 regression note): dropping only ZERO fractions
+    left non-zero paise in the prompt (`₹ 20,39,865.8`, `₹ 81,76,522.23`)
+    and the Financial Analysis chapter still needed ~3 grouping repairs
+    per generation. Paise carry no meaning in prose, so the FACTS block
+    now rounds every money figure to whole rupees (ROUND_HALF_UP) — the
+    PDF/DOCX tables keep exact decimals; this formatter feeds prompts
+    only.
 
     Returns 'Not available' for None.
     """
     if amount is None:
         return 'Not available'
-    # Split into integer + fractional
     negative = amount < 0
-    a = abs(amount).quantize(Decimal('0.01'))
-    int_part, _, dec_part = str(a).partition('.')
+    int_part = str(abs(amount).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     # Indian grouping: last 3 digits, then groups of 2.
     if len(int_part) > 3:
         head, tail = int_part[:-3], int_part[-3:]
@@ -122,14 +126,7 @@ def _fmt_inr(amount: Optional[Decimal]) -> str:
             pieces.insert(0, head)
         int_part = ','.join(pieces) + ',' + tail
     sign = '-' if negative else ''
-    # BUG-26: drop the trailing `.00` / `.000` when the fractional is zero
-    # so Gemini can't mistake trailing zeros for additional grouping digits.
-    if not dec_part or dec_part.rstrip('0') == '':
-        return f'₹ {sign}{int_part}'
-    # Non-zero fraction: strip trailing zeros but keep the decimal (e.g.
-    # `.50` → `.5`, `.25` stays `.25`).
-    dec_display = dec_part.rstrip('0') or '00'
-    return f'₹ {sign}{int_part}.{dec_display}'
+    return f'₹ {sign}{int_part}'
 
 
 def _fmt_pct(v: Optional[Decimal]) -> str:
@@ -294,7 +291,11 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     ceo_exp  = getattr(project, 'ceo_experience_years', None)
     ceo_exp_display = f'{ceo_exp} years' if ceo_exp is not None else _NOT_PROVIDED
     area_acres = getattr(project, 'total_area_acreage', None)
-    area_display = f'{area_acres} acres' if area_acres is not None else _NOT_PROVIDED
+    # `300.00 acres` → `300 acres` — trailing zero-decimals in the prompt
+    # are the BUG-26 grouping-corruption trigger (tester 2026-10-12).
+    area_display = (
+        _fmt_qty(area_acres, 'acres') if area_acres is not None else _NOT_PROVIDED
+    )
     women_pct = getattr(project, 'women_shareholding_pct', None)
     women_display = f'{women_pct}%' if women_pct is not None else _NOT_PROVIDED
     # BUG-01 retest: strip "N members" patterns from the free-text
