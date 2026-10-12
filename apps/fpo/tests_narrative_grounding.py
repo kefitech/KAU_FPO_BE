@@ -58,12 +58,35 @@ class ScrubBrokenNumbersTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0]['bug'], narrative.REPAIRED_BUG_TAG)
 
-    def test_masks_when_digits_not_a_prompt_figure(self):
-        """`2,85,00,00` = 2850000 ≠ 2,85,000 — scale corruption, still masked."""
+    def test_scale_repairs_unique_counterpart(self):
+        """`2,85,00,00` = 2850000; only ÷10 → 2,85,000 is a prompt fact —
+        unique scale-neighbour, so repaired to the fact."""
         text = 'Rice Bran output of 2,85,00,00 kg per year.'
         cleaned, hits = narrative.scrub_broken_numbers(text, allowed={285000})
+        self.assertIn('2,85,000 kg', cleaned)
+        self.assertNotIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], narrative.REPAIRED_BUG_TAG)
+
+    def test_scale_repairs_dropped_zero(self):
+        """Tara's WC margin: `11,00,00` = 110000, ×10 → ₹11,00,000 fact."""
+        text = 'a working capital margin of ₹ 11,00,00, leaving no gap.'
+        cleaned, hits = narrative.scrub_broken_numbers(text, allowed={1100000})
+        self.assertIn('₹ 11,00,000,', cleaned)
+        self.assertNotIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], narrative.REPAIRED_BUG_TAG)
+
+    def test_masks_when_scale_counterparts_ambiguous(self):
+        """Digits with TWO scale-neighbour facts stay masked — no guessing."""
+        text = 'Cost of 4,38,0 units.'  # digits 4380; ×100 and ×1000 both facts
+        cleaned, hits = narrative.scrub_broken_numbers(
+            text, allowed={438000, 4380000})
         self.assertIn('[?]', cleaned)
-        self.assertNotIn('2,85,00,00', cleaned)
+        self.assertEqual(hits[0]['bug'], 'BUG-26-broken-grouping')
+
+    def test_masks_when_no_counterpart_at_all(self):
+        text = 'Cost of 4,38,00,0 litres.'  # digits 438000, nothing related
+        cleaned, hits = narrative.scrub_broken_numbers(text, allowed={150000})
+        self.assertIn('[?]', cleaned)
         self.assertEqual(hits[0]['bug'], 'BUG-26-broken-grouping')
 
     def test_masks_everything_without_allowed_set(self):
@@ -79,7 +102,7 @@ class ScrubBrokenNumbersTests(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_mixed_repair_and_mask_in_one_text(self):
-        text = 'Flour 1,50,00,0 kg and bran 2,85,00,00 kg.'
+        text = 'Flour 1,50,00,0 kg and other 9,87,65,4 units.'
         cleaned, hits = narrative.scrub_broken_numbers(
             text, allowed={150000, 285000})
         self.assertIn('1,50,000 kg', cleaned)

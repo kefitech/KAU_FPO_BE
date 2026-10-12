@@ -1133,9 +1133,15 @@ def scrub_broken_numbers(
     and the final stays blocked. Commas are decoration — the digit run IS
     the value — so when the digits of a malformed token exactly match a
     figure the prompt showed the model (`allowed`), we re-group it
-    correctly instead of masking. Anything whose digits are NOT a prompt
-    figure (true scale corruptions such as `2,85,00,00` = 2850000 for
-    2,85,000) is still masked `[?]` exactly as before.
+    correctly instead of masking.
+
+    Second repair tier (same tester session): the model also drops/adds a
+    zero while fumbling the grouping (`11,00,00` = 110000 for the
+    ₹11,00,000 WC-margin fact). The token is already malformed — proof of
+    a mechanical slip — and grounding rule 7 means it can only have meant
+    a prompt figure, so when EXACTLY ONE ×/÷10^k scale-neighbour of the
+    digits is in `allowed`, rewrite to that fact. Two or more candidates
+    (ambiguous) or none → masked `[?]` exactly as before.
     """
     hits_by_raw: dict[str, dict] = {}
 
@@ -1150,6 +1156,22 @@ def scrub_broken_numbers(
                                              'detail': f'regrouped to {fixed}'})
             h['count'] += 1
             return fixed
+        if allowed is not None and v > 0:
+            candidates = set()
+            for k in _SCALE_FACTORS:
+                if (v * k) in allowed and (v * k) >= 1000:
+                    candidates.add(v * k)
+                if v % k == 0 and (v // k) in allowed and (v // k) >= 1000:
+                    candidates.add(v // k)
+            if len(candidates) == 1:
+                target = candidates.pop()
+                fixed = _indian_group_int(target)
+                h = hits_by_raw.setdefault(
+                    raw, {'count': 0, 'bug': REPAIRED_BUG_TAG,
+                          'detail': f'scale-repaired to {fixed} '
+                                    f'(digits {v} matched unique prompt fact)'})
+                h['count'] += 1
+                return fixed
         h = hits_by_raw.setdefault(raw, {'count': 0, 'bug': 'BUG-26-broken-grouping'})
         h['count'] += 1
         return '[?]'
