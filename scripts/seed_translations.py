@@ -1566,6 +1566,31 @@ def seed_ui_translations(languages):
         ('applications_table.training_comment_update_failed', 'Could not update comment', 'അഭിപ്രായം അപ്ഡേറ്റ് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
         ('applications_table.training_comment_deleted', 'Comment deleted', 'അഭിപ്രായം ഇല്ലാതാക്കി'),
         ('applications_table.training_comment_delete_failed', 'Could not delete comment', 'അഭിപ്രായം ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല'),
+
+        # ── Team tab (FPO primary / secondary users) ──
+        ('applications_table.section_team',              'Team',                                         'ടീം'),
+        ('applications_table.team_search_placeholder',   'Search name, email, phone…',                   'പേര്, ഇമെയിൽ, ഫോൺ തിരയുക…'),
+        ('applications_table.team_clear_search',         'Clear search',                                 'തിരയൽ മായ്ക്കുക'),
+        ('applications_table.team_filter_all',           'All statuses',                                 'എല്ലാ സ്ഥിതികളും'),
+        ('applications_table.team_count',                '{count} users',                                '{count} ഉപയോക്താക്കൾ'),
+        ('applications_table.team_count_one',            '1 user',                                       '1 ഉപയോക്താവ്'),
+        ('applications_table.team_count_filtered',       '{shown} of {total} users',                     '{total} ഉപയോക്താക്കളിൽ {shown}'),
+        ('applications_table.team_empty',                'No users found for this FPO.',                 'ഈ FPO-യ്ക്ക് ഉപയോക്താക്കളൊന്നും കണ്ടെത്തിയില്ല.'),
+        ('applications_table.team_no_match',             'No members match your filters.',               'ഫിൽട്ടറുകളുമായി പൊരുത്തപ്പെടുന്ന അംഗങ്ങളൊന്നുമില്ല.'),
+        ('applications_table.team_role_primary',         'Primary',                                      'പ്രാഥമികം'),
+        ('applications_table.team_role_secondary',       'Secondary',                                    'ദ്വിതീയം'),
+        ('applications_table.team_view_only',            'View only',                                    'കാണാൻ മാത്രം'),
+        ('applications_table.team_activate',             'Activate',                                     'സജീവമാക്കുക'),
+        ('applications_table.team_deactivate',           'Deactivate',                                   'നിഷ്ക്രിയമാക്കുക'),
+        ('applications_table.team_reset_password',       'Reset Password',                               'രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യുക'),
+        ('applications_table.team_reset_password_desc',  'A temporary password will be sent to "{name}" via email and SMS.', 'ഒരു താൽക്കാലിക രഹസ്യവാക്ക് "{name}"-ന് ഇമെയിലും SMS-ഉം വഴി അയക്കും.'),
+        ('applications_table.team_reset_sending',        'Sending…',                                     'അയക്കുന്നു…'),
+        ('applications_table.team_toast_activated',      'User activated',                               'ഉപയോക്താവ് സജീവമാക്കി'),
+        ('applications_table.team_toast_deactivated',    'User deactivated',                             'ഉപയോക്താവ് നിഷ്ക്രിയമാക്കി'),
+        ('applications_table.team_activate_failed',      'Failed to activate',                           'സജീവമാക്കൽ പരാജയപ്പെട്ടു'),
+        ('applications_table.team_deactivate_failed',    'Failed to deactivate',                         'നിഷ്ക്രിയമാക്കൽ പരാജയപ്പെട്ടു'),
+        ('applications_table.team_toast_password_sent',  'Temporary password sent',                      'താൽക്കാലിക രഹസ്യവാക്ക് അയച്ചു'),
+        ('applications_table.team_reset_failed',         'Failed to reset password',                     'രഹസ്യവാക്ക് റീസെറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
         # External APIs table
         ('external_apis_table.page_title',          'External API Settings',                                'എക്സ്റ്റേണൽ API ക്രമീകരണങ്ങൾ'),
         ('external_apis_table.page_description',    'Manage credentials for PAN / GSTIN / CIN verification', 'PAN / GSTIN / CIN പരിശോധനയ്ക്കുള്ള ക്രെഡൻഷ്യലുകൾ നിയന്ത്രിക്കുക'),
@@ -3558,8 +3583,10 @@ def seed_frontend_ui_translations(languages):
                 category=category, key=full_key, language=lang_en,
                 defaults={'value': en_value, 'context': 'Frontend UI label', 'is_verified': True}
             )
-            # Seed ML with English value as placeholder — admin to translate later
-            Translation.objects.update_or_create(
+            # Seed ML with English value as placeholder — admin to translate later.
+            # get_or_create, not update_or_create: re-running must not overwrite
+            # existing Malayalam with English.
+            Translation.objects.get_or_create(
                 category=category, key=full_key, language=lang_ml,
                 defaults={'value': en_value, 'context': 'Frontend UI label', 'is_verified': False}
             )
