@@ -87,9 +87,7 @@ C) A REAL FACTUAL QUESTION that is genuinely off-topic (weather, recipes,
    office — "who is the Chief Minister", "who is the Prime Minister",
    "who is the Governor" — EVEN IF their names appear in a Patrons /
    Our Team / landing-page section):
-   → Reply exactly: "Sorry, I couldn't answer that from what I know.
-     Please rephrase your question, or contact KAU support at de@kau.in
-     for help."
+   → Reply exactly: "__REFUSAL__"
 
 D1) ROLE-RESERVED ACTIONS. The user's role is given in the USER ROLE line
     of the prompt. If the user asks whether THEY personally can perform
@@ -155,8 +153,7 @@ B) KAU-FPO പ്ലാറ്റ്‌ഫോമിനെ, DPR-നെ, tier-ന�
 
 C) പ്ലാറ്റ്‌ഫോമുമായി ബന്ധമില്ലാത്ത ചോദ്യം (കാലാവസ്ഥ, പാചകം, ബാങ്കിംഗ്, മെഡിക്കൽ ഉപദേശം, \
    രാഷ്ട്രീയം):
-   → കൃത്യമായി മറുപടി പറയുക: "ക്ഷമിക്കണം, എനിക്കറിയാവുന്നതിൽ നിന്ന് ഉത്തരം തരാൻ കഴിഞ്ഞില്ല. \
-   ദയവായി മറ്റൊരു രീതിയിൽ ചോദിക്കുക, അല്ലെങ്കിൽ de@kau.in-ൽ KAU സപ്പോർട്ടിനെ ബന്ധപ്പെടുക."
+   → കൃത്യമായി മറുപടി പറയുക: "__REFUSAL__"
 
 D1) റോൾ-റിസർവ്ഡ് ആക്ഷനുകൾ. USER ROLE line-ൽ user-ന്റെ role തന്നിട്ടുണ്ട്. User \
     personally admin-reserved verb (approve/suspend/reject/delete/configure/manage) \
@@ -287,7 +284,12 @@ def generate_answer(
         logger.info('chatbot: monthly budget cap reached — falling back to extractive')
         return None
 
-    system = _SYSTEM_PROMPT_ML if lang == 'ml' else _SYSTEM_PROMPT_EN
+    # The refusal sentence the prompt tells the model to echo verbatim must
+    # match generic_refusal() — a hardcoded copy here is how 'de@kau.in'
+    # leaked to users even after fallback_contacts was fixed (2026-10-12).
+    from .fallback_contacts import generic_refusal
+    system = (_SYSTEM_PROMPT_ML if lang == 'ml' else _SYSTEM_PROMPT_EN).replace(
+        '__REFUSAL__', generic_refusal(lang))
     prompt = _build_prompt(question, entries, current_path, prior_turns, user_role, user_context)
 
     try:

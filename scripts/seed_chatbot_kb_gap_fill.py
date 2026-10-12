@@ -623,6 +623,49 @@ ENTRIES = [
             'Government option.'
         ),
     ),
+    # ── Chatbot meta questions (tester 2026-10-12) ──────────────────────
+    dict(
+        topic='How this assistant works and where its answers come from',
+        audiences=PUB + ADMIN,
+        keywords='how does this chatbot work where do you get your data from assistant information source AI trained knowledge',
+        body=(
+            'This assistant answers from a curated KAU-FPO knowledge base '
+            'maintained by the platform team — platform guides, scheme and '
+            'expert listings, and FPO-registration help — plus, for logged-in '
+            'users, your own account records such as your FPO status, tier '
+            'and bookings. It searches that knowledge for the entries that '
+            'match your question and uses an AI model to phrase the answer. '
+            'It only answers from this platform information; it does not '
+            'browse the internet, and questions outside the platform are '
+            'politely declined.'
+        ),
+    ),
+    dict(
+        topic='Chatbot is text-only — no file uploads in chat',
+        audiences=PUB + ADMIN,
+        keywords='can I upload files to the chatbot attach document image send photo pdf in chat',
+        body=(
+            'No — the chat assistant is text-only; you cannot upload files, '
+            'photos or documents in the chat window. Documents are uploaded '
+            'on the relevant page instead: FPO registration documents in the '
+            'registration wizard, DPR supporting documents inside the DPR '
+            'section, and tier-assessment proofs on the tier assessment page.'
+        ),
+    ),
+    dict(
+        topic='Finding KAU sub-admin and support contact details',
+        audiences=PUB + ADMIN,
+        keywords='sub admin contact details who is my district sub-admin get in touch KAU officer support contact',
+        body=(
+            'KAU sub-admins are district-level KAU staff who review FPO '
+            'information and documents. Their contact details are not listed '
+            'on a public page; when the assistant cannot help, it shows the '
+            'sub-admin names for your district, and you can reach KAU through '
+            'the Feedback form on the website (Contact Us) — messages are '
+            'routed to the KAU admin team, which responds within about 2 '
+            'business days.'
+        ),
+    ),
 ]
 
 

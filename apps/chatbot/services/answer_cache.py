@@ -76,6 +76,12 @@ def store(question: str, role: Optional[str], lang: str, entries,
     ttl = _ttl()
     if ttl <= 0 or not text:
         return
+    # Never cache refusals: they're cheap to regenerate, and a cached one
+    # outlives KB fixes — testers kept seeing the old 'de@kau.in' refusal
+    # for up to 24h after the wording was corrected (2026-10-12).
+    from .fallback_contacts import _looks_like_refusal
+    if _looks_like_refusal(text):
+        return
     try:
         cache.set(
             make_key(question, role, lang, entries),
