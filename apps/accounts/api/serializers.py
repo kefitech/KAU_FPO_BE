@@ -273,14 +273,14 @@ class LoginSerializer(serializers.Serializer):
         # Try to find user by username or email
         user = None
 
-        # Check if input is email format
+        # Check if input is email format. Email matching is case-insensitive
+        # (tester 2026-10-12: a case-variant email fell through to the
+        # generic 'Invalid email or password' even with a correct password,
+        # and inactive accounts never reached the account-disabled message).
         if '@' in username:
-            # Try to find by email
-            try:
-                user_obj = User.objects.get(email=username)
+            user_obj = User.objects.filter(email__iexact=username).order_by('id').first()
+            if user_obj:
                 username = user_obj.username
-            except User.DoesNotExist:
-                pass
 
         # Authenticate user
         user = authenticate(username=username, password=password)
@@ -288,7 +288,10 @@ class LoginSerializer(serializers.Serializer):
         if user is None:
             # authenticate() also returns None for an inactive user with the right password
             # (ModelBackend.user_can_authenticate), so look for that case to report it distinctly.
-            candidate = User.objects.filter(username=username).first()
+            candidate = (
+                User.objects.filter(username=username).first()
+                or User.objects.filter(email__iexact=attrs.get('username')).order_by('id').first()
+            )
             if candidate and not candidate.is_active and candidate.check_password(password):
                 raise serializers.ValidationError({
                     'non_field_errors': [ErrorDetail(t('auth.account_disabled'), code='account_disabled')]
