@@ -42,6 +42,60 @@ from apps.fpo.services.dpr.calculation import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# scrub_broken_numbers — mask vs repair (tester 2026-10-12, 15/15 blocker)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ScrubBrokenNumbersTests(unittest.TestCase):
+    """Malformed groupings whose digits match a prompt figure get silently
+    re-grouped; everything else keeps the mask-as-[?] behaviour."""
+
+    def test_repairs_malformed_grouping_when_digits_in_allowed(self):
+        """Tara's rice mill: `1,50,00,0` (digits 150000) → `1,50,000`."""
+        text = 'Rice Flour production of 1,50,00,0 kg per year.'
+        cleaned, hits = narrative.scrub_broken_numbers(text, allowed={150000})
+        self.assertIn('1,50,000 kg', cleaned)
+        self.assertNotIn('[?]', cleaned)
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]['bug'], narrative.REPAIRED_BUG_TAG)
+
+    def test_masks_when_digits_not_a_prompt_figure(self):
+        """`2,85,00,00` = 2850000 ≠ 2,85,000 — scale corruption, still masked."""
+        text = 'Rice Bran output of 2,85,00,00 kg per year.'
+        cleaned, hits = narrative.scrub_broken_numbers(text, allowed={285000})
+        self.assertIn('[?]', cleaned)
+        self.assertNotIn('2,85,00,00', cleaned)
+        self.assertEqual(hits[0]['bug'], 'BUG-26-broken-grouping')
+
+    def test_masks_everything_without_allowed_set(self):
+        """Backwards-compat: no allowed set → original mask-only behaviour."""
+        cleaned, hits = narrative.scrub_broken_numbers('Cost 4,38,00,0 litres.')
+        self.assertIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], 'BUG-26-broken-grouping')
+
+    def test_valid_groupings_untouched(self):
+        text = 'Figures: 1,50,000 and 12,34,567 and 1,234,567 and 950.'
+        cleaned, hits = narrative.scrub_broken_numbers(text, allowed={150000})
+        self.assertEqual(cleaned, text)
+        self.assertEqual(hits, [])
+
+    def test_mixed_repair_and_mask_in_one_text(self):
+        text = 'Flour 1,50,00,0 kg and bran 2,85,00,00 kg.'
+        cleaned, hits = narrative.scrub_broken_numbers(
+            text, allowed={150000, 285000})
+        self.assertIn('1,50,000 kg', cleaned)
+        self.assertIn('[?]', cleaned)
+        bugs = {h['bug'] for h in hits}
+        self.assertEqual(bugs, {narrative.REPAIRED_BUG_TAG,
+                                'BUG-26-broken-grouping'})
+
+    def test_indian_group_int_shapes(self):
+        for n, want in ((950, '950'), (1500, '1,500'), (150000, '1,50,000'),
+                        (2850000, '28,50,000'), (130000, '1,30,000'),
+                        (123456789, '12,34,56,789')):
+            self.assertEqual(narrative._indian_group_int(n), want)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # scrub_placeholders — pure function
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -199,7 +253,8 @@ def _make_calc_result(
         rows=[ProfitLossRow(
             year=1, revenue=y1_revenue, operating_cost=y1_opex,
             ebitda=y1_ebitda, depreciation=Decimal('0'), ebit=y1_ebitda,
-            interest=Decimal('0'), pbt=y1_ebitda, tax=Decimal('0'), pat=y1_pat,
+            interest=Decimal('0'), wc_interest=Decimal('0'),
+            pbt=y1_ebitda, tax=Decimal('0'), pat=y1_pat,
         )],
         total_pat=y1_pat,
         cumulative_pat_by_year={1: y1_pat},
@@ -232,7 +287,7 @@ class FormatCalcFactsTests(unittest.TestCase):
             'Project title:', 'FPO / promoter:', 'Primary commodity:',
             'Total project cost:', 'Total means of finance:',
             'Promoter contribution:', 'Bank / term loan:',
-            'Working capital loan:', 'Subsidy / grant:',
+            'Government subsidy/grant (aggregate):',
             'Debt : Equity ratio:',
             'Y1 revenue:', 'Y1 operating cost:', 'Y1 EBITDA:', 'Y1 PAT:',
             'IRR:', 'NPV', 'Average DSCR:',
@@ -279,11 +334,13 @@ class FormatCalcFactsTests(unittest.TestCase):
         self.assertEqual(a, b)
 
     def test_indian_comma_formatting_on_project_cost(self):
-        """95 lakh should render `₹ 95,00,000.00`, not `₹ 9,500,000.00`
-        (Indian numbering system, matching the PDF)."""
+        """95 lakh should render `₹ 95,00,000` (Indian numbering, and the
+        trailing `.00` dropped — BUG-26 root cause: Gemini shifted the two
+        zero-decimals into the comma grouping)."""
         result = _make_calc_result(cost_total=Decimal('9500000'))
         facts = narrative.format_calc_facts_for_prompt(_fake_project(), result)
-        self.assertIn('₹ 95,00,000.00', facts)
+        self.assertIn('₹ 95,00,000', facts)
+        self.assertNotIn('₹ 95,00,000.00', facts)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -309,7 +366,7 @@ class PromoterProfileFactsTests(unittest.TestCase):
         """Empty CEO fields → 'Not available' in prose. Never [Name of the CEO]."""
         project = _fake_project()  # all defaults blank/None
         facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
-        self.assertIn('CEO name:                   Not available', facts)
+        self.assertIn('CEO name:                   Not provided by the FPO', facts)
         self.assertNotIn('[Name of', facts)
         self.assertNotIn('[CEO', facts)
 
@@ -343,7 +400,7 @@ class PromoterProfileFactsTests(unittest.TestCase):
     def test_psc_empty_renders_not_constituted(self):
         project = _fake_project(psc_members=[])
         facts = narrative.format_calc_facts_for_prompt(project, _make_calc_result())
-        self.assertIn('Not constituted / Not available', facts)
+        self.assertIn('Not constituted / Not provided by the FPO', facts)
 
     def test_area_acreage_and_landholding_flow_through(self):
         project = _fake_project(
@@ -366,21 +423,26 @@ class ProvenanceFactsTests(unittest.TestCase):
     as [system_default] so the LLM can mention provenance in prose instead
     of asserting them as project-specific."""
 
-    def test_discount_rate_row_carries_system_default_tag(self):
+    def test_discount_rate_row_carries_provenance(self):
+        """DPR-10: provenance is explicit prose per row now — never a
+        `[system_default]` tag (rule 10 forbids bracketed metadata)."""
         facts = narrative.format_calc_facts_for_prompt(_fake_project(), _make_calc_result())
         self.assertIn('Discount rate used:', facts)
-        self.assertIn('[system_default]', facts)
+        self.assertNotIn('[system_default]', facts)
+        self.assertTrue('platform default' in facts or 'project-entered' in facts)
 
     def test_system_assumptions_block_is_appended(self):
-        """The 'System-default assumptions used by the calc engine' sub-block
-        must appear so both the LLM AND the KAU reviewer see every rate."""
+        """The rates-actually-used sub-block must appear so both the LLM
+        AND the KAU reviewer see every rate with its provenance."""
         facts = narrative.format_calc_facts_for_prompt(_fake_project(), _make_calc_result())
-        self.assertIn('--- System-default assumptions used by the calc engine ---', facts)
+        self.assertIn(
+            '--- Rates actually used by the calc engine (project overrides win) ---',
+            facts)
         # A handful of the expected DPRConfig rate labels
         for label in (
             'NPV discount rate:',
             'Corporate tax rate:',
-            'Loan interest rate (fallback):',
+            'Loan interest rate:',
             'Buildings — SLM depreciation:',
             'Plant & machinery — SLM depreciation:',
         ):

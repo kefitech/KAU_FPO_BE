@@ -1093,27 +1093,69 @@ _VALID_INDIAN_RE = re.compile(r'^\d{1,2}(?:,\d{2})*,\d{3}$')
 _VALID_WESTERN_RE = re.compile(r'^\d{1,3}(?:,\d{3})+$')
 _COMMA_GROUPED_RE = re.compile(r'\d+(?:,\d+)+')
 
+# Marks a hit that was silently REPAIRED (not masked) — excluded from the
+# retry trigger and from needs_review, kept in placeholder_hits for admin
+# visibility only.
+REPAIRED_BUG_TAG = 'BUG-26-regrouped-repaired'
 
-def scrub_broken_numbers(text: str) -> tuple[str, list[dict]]:
-    """Replace invalidly-grouped comma numbers with `[?]`, return hit list.
+
+def _indian_group_int(n: int) -> str:
+    """123456 → '1,23,456' (Indian grouping, integers only)."""
+    s = str(abs(n))
+    if len(s) <= 3:
+        body = s
+    else:
+        head, tail = s[:-3], s[-3:]
+        pieces = []
+        while len(head) > 2:
+            pieces.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            pieces.insert(0, head)
+        body = ','.join(pieces) + ',' + tail
+    return ('-' if n < 0 else '') + body
+
+
+def scrub_broken_numbers(
+    text: str,
+    allowed: Optional[set[int]] = None,
+) -> tuple[str, list[dict]]:
+    """Repair or mask invalidly-grouped comma numbers, return hit list.
 
     Only touches sequences that already contain at least one comma — bare
     decimal numbers are left alone. Returns `(cleaned_text, hits)` where
     hits is `[{'raw': '4,38,00,0', 'count': 1}, …]` so the caller can
     stamp DPRAIContent.placeholder_hits + needs_review.
+
+    Tester 2026-10-12 (Tara's rice mill, 15/15 generations): at
+    temperature 0.2 Gemini reproduces the SAME malformed grouping on every
+    attempt (`1,50,00,0` for 1,50,000), so mask-and-retry loops forever
+    and the final stays blocked. Commas are decoration — the digit run IS
+    the value — so when the digits of a malformed token exactly match a
+    figure the prompt showed the model (`allowed`), we re-group it
+    correctly instead of masking. Anything whose digits are NOT a prompt
+    figure (true scale corruptions such as `2,85,00,00` = 2850000 for
+    2,85,000) is still masked `[?]` exactly as before.
     """
-    hits_by_raw: dict[str, int] = {}
+    hits_by_raw: dict[str, dict] = {}
 
     def _replace(m):
         raw = m.group(0)
         if _VALID_INDIAN_RE.match(raw) or _VALID_WESTERN_RE.match(raw):
             return raw
-        hits_by_raw[raw] = hits_by_raw.get(raw, 0) + 1
+        v = int(raw.replace(',', ''))
+        if allowed is not None and v >= 1000 and v in allowed:
+            fixed = _indian_group_int(v)
+            h = hits_by_raw.setdefault(raw, {'count': 0, 'bug': REPAIRED_BUG_TAG,
+                                             'detail': f'regrouped to {fixed}'})
+            h['count'] += 1
+            return fixed
+        h = hits_by_raw.setdefault(raw, {'count': 0, 'bug': 'BUG-26-broken-grouping'})
+        h['count'] += 1
         return '[?]'
 
     cleaned = _COMMA_GROUPED_RE.sub(_replace, text)
-    hits = [{'raw': raw, 'count': n, 'bug': 'BUG-26-broken-grouping'}
-            for raw, n in hits_by_raw.items()]
+    hits = [{'raw': raw, **info} for raw, info in hits_by_raw.items()]
     return cleaned, hits
 
 
@@ -1724,16 +1766,21 @@ def generate_chapter(
         # so admin can see WHICH chapters were incomplete.
         text, scrubber_hits = scrub_placeholders(text, chapter=chapter)
 
-        # BUG-26: catch broken Indian comma groupings and mask as `[?]`.
-        text, broken_number_hits = scrub_broken_numbers(text)
+        # BUG-26: broken Indian comma groupings. Malformed tokens whose
+        # digits match a prompt figure are silently re-grouped (tester
+        # 2026-10-12: deterministic `1,50,00,0` at temp 0.2 made the
+        # mask-and-retry loop fail 15/15); the rest are masked `[?]`.
+        text, broken_number_hits = scrub_broken_numbers(text, allowed=prompt_figures)
         scrubber_hits.extend(broken_number_hits)
 
         # KAU review 2026-10-08 Pattern 1: catch WELL-FORMED figures that are
         # a ×10^k / ÷10^k corruption of a prompt figure (masked) or unknown
         # large figures (flagged). Both count as corruption for the retry.
+        # Repaired groupings do NOT count — they are already correct.
         text, figure_hits = verify_figures_against_prompt(text, prompt_figures)
         scrubber_hits.extend(figure_hits)
-        corruption_hits = broken_number_hits + figure_hits
+        corruption_hits = [h for h in broken_number_hits
+                           if h.get('bug') != REPAIRED_BUG_TAG] + figure_hits
 
         # Convert USD → INR using the configured rate, then record + apply
         # the spend against the monthly cap (auto-disables if breached).
@@ -1789,8 +1836,11 @@ def generate_chapter(
 
     # KAU 2026-09-19: record scrubber outcome. Zero hits → clear both fields
     # so re-generation of a previously-flagged chapter can un-flag itself.
+    # Repaired-grouping hits stay visible in placeholder_hits but a chapter
+    # whose only hits were repaired is clean — no review needed.
     row.placeholder_hits = scrubber_hits
-    row.needs_review = bool(scrubber_hits)
+    row.needs_review = bool([h for h in scrubber_hits
+                             if h.get('bug') != REPAIRED_BUG_TAG])
 
     # First-ever generation for this chapter: also seed original_ai +
     # user_edited so the user has an active version to compare against.

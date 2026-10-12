@@ -103,6 +103,9 @@ try:
     DEBUG_TOOLBAR_CONFIG = {
         'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
         'INTERCEPT_REDIRECTS': False,
+        # Django forces DEBUG=False under `manage.py test`, which trips the
+        # toolbar's E001 system check and blocks the whole test run.
+        'IS_RUNNING_TESTS': False,
     }
 
     INTERNAL_IPS = [
