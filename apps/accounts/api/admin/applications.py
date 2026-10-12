@@ -441,8 +441,9 @@ def _transition(fpo, to_status, changed_by, notes='', request=None):
 
     notification_map = {
         FPOStatus.APPROVED:      'fpo_approved',
-        FPOStatus.REJECTED:      'fpo_rejected',
+        FPOStatus.REJECTED:      'application_rejected',
         FPOStatus.INFO_REQUIRED: 'info_requested',
+        FPOStatus.SUSPENDED:     'application_suspended',
     }
 
     code = notification_map.get(to_status)
@@ -457,6 +458,7 @@ def _transition(fpo, to_status, changed_by, notes='', request=None):
                     'fpo_name':        fpo.name,
                     'application_id':  fpo.application_id,
                     'request_message': notes,
+                    'rejection_reason': notes,
                 },
                 lang=getattr(fpo.primary_user.profile, 'preferred_language', 'en'),
             )
@@ -804,7 +806,7 @@ class ApplicationApproveView(APIView):
             }
             from apps.notifications.services import send_notification
             try:
-                send_notification(user=fpo.primary_user, code='application_approved', channel='email',  context=ctx)
+                send_notification(user=fpo.primary_user, code='info_response_approved', channel='email', context=ctx)
                 send_notification(user=fpo.primary_user, code='application_approved', channel='sms',    context=ctx)
                 send_notification(user=fpo.primary_user, code='application_approved', channel='in_app', context=ctx)
             except Exception:
@@ -891,7 +893,7 @@ class ApplicationDeactivateView(APIView):
         tags=['Admin - FPO Applications'],
         summary='Deactivate (suspend) an approved FPO',
         description=(
-            'Transitions APPROVED → SUSPENDED.\n\n'
+            'Transitions APPROVED → SUSPENDED. FPO user receives a suspension email.\n\n'
             'Optional `notes` field is recorded in the status history.'
         ),
         request=_ActivateDeactivateSerializer,
