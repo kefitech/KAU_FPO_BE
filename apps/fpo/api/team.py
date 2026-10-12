@@ -284,11 +284,11 @@ class TeamListView(APIView):
         memberships = FPOUserMembership.objects.filter(
             fpo=fpo, is_deleted=False
         ).select_related('user', 'user__profile', 'role')
-        # The primary manages the team, so they don't list themselves;
-        # team members see their own row as well.
+        # The owner is never listed from memberships: an ownership-claim approval
+        # gives the owner a 'primary' membership row too, and the owner is
+        # prepended below for team members (the primary doesn't list themselves).
         is_primary = fpo.primary_user_id == request.user.id
-        if is_primary:
-            memberships = memberships.exclude(user=request.user)
+        memberships = memberships.exclude(user_id=fpo.primary_user_id)
         memberships = list(memberships)
         data = FPOTeamMemberSerializer(memberships, many=True).data
 
