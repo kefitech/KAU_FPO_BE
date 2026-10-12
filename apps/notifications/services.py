@@ -12,12 +12,12 @@ Usage anywhere in the codebase:
         code    = 'fpo_approved',
         channel = 'email',
         context = {'user_name': 'Rajan', 'fpo_name': 'Kerala FPO'},
-        lang    = 'ml',
     )
 
 The dispatcher:
     1. Looks up NotificationChannelSettings (is channel active?)
-    2. Looks up NotificationTemplateCode + NotificationTemplate (for lang)
+    2. Looks up NotificationTemplateCode + NotificationTemplate in the recipient's
+       profile.preferred_language (the `lang` argument is only a fallback for user=None)
     3. Renders the template with context variables
     4. Creates a NotificationLog entry (status=pending)
     5. Pushes to Celery for async delivery
@@ -38,6 +38,7 @@ from apps.database.models import (
     NotificationTemplate,
     NotificationLog,
     Language,
+    UserProfile,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ def send_notification(
     code: str,
     channel: str,
     context: dict = None,
-    lang: str = 'en',
+    lang: str = None,
     override_recipient: str = None,
 ) -> NotificationLog | None:
     """
@@ -60,7 +61,9 @@ def send_notification(
         code               : NotificationTemplateCode.code (e.g. 'fpo_approved')
         channel            : Channel string — 'email', 'sms', 'in_app', 'push', 'whatsapp'
         context            : Variable substitution dict — {'user_name': 'Rajan', ...}
-        lang               : Language code — 'en', 'ml', 'ta', etc.
+        lang               : Fallback language code — 'en', 'ml', 'ta', etc. Used only when
+                             there is no recipient profile (e.g. user=None registration OTPs);
+                             a user's profile.preferred_language always wins.
         override_recipient : Override the to-address derived from the user profile.
                              Use when sending to fpo.office_email or fpo.office_phone
                              instead of the user's personal contact.
@@ -74,6 +77,9 @@ def send_notification(
 
     # Resolve user ID
     user_id = user.pk if hasattr(user, 'pk') else user
+
+    # The recipient's saved preference decides the language, not the caller's request language
+    lang = _get_preferred_language(user_id) or lang or 'en'
 
     # Validate channel is active
     try:
@@ -171,6 +177,13 @@ def notify_district_sub_admins(district: str, code: str, context: dict = None, c
             send_notification(user=sub_admin, code=code, channel=channel, context=context or {})
         except Exception:
             logger.exception("notify_district_sub_admins: failed to send '%s' to sub-admin %s", code, sub_admin.pk)
+
+
+def _get_preferred_language(user_id) -> str | None:
+    """The recipient's profile.preferred_language, or None when there is no user or profile."""
+    if not user_id:
+        return None
+    return UserProfile.objects.filter(user_id=user_id).values_list('preferred_language', flat=True).first() or None
 
 
 def _get_recipient(user_id: int, channel: str) -> str:

@@ -34,7 +34,9 @@ TEMPLATE_CODES = [
     ('application_rejected',  'email',      'FPO application rejected notification',         ['user_name', 'fpo_name', 'rejection_reason']),
     ('application_rejected',  'whatsapp',   'FPO application rejected WhatsApp',             ['user_name', 'rejection_reason']),
     ('info_requested',        'email',      'Additional information requested from FPO',     ['user_name', 'request_message']),
-    ('password_reset',            'email', 'Password reset link email',                              ['user_name', 'reset_link']),
+    ('info_response_approved', 'email',     'FPO re-approved after re-submitting requested info', ['user_name', 'fpo_name', 'application_id']),
+    ('application_suspended', 'email',      'FPO suspended (deactivated) by admin',          ['user_name', 'fpo_name', 'application_id']),
+    ('password_reset',           'email', 'Password reset link email',                              ['user_name', 'reset_link']),
     ('password_reset_by_admin',   'email', 'Admin-initiated password reset with temp credentials', ['user_name', 'temp_password']),
     ('password_reset_by_admin',   'sms',   'Admin-initiated password reset SMS',                   ['user_name', 'temp_password']),
     ('password_changed',          'email', 'Password changed confirmation email',                  ['user_name']),
@@ -360,6 +362,16 @@ TEMPLATES = [
         ),
     ),
     (
+        'application_approved', 'email', 'ml',
+        'അഭിനന്ദനങ്ങൾ! നിങ്ങളുടെ FPO അപേക്ഷ അംഗീകരിച്ചു',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{fpo_name}}</strong> (ID: {{application_id}}) എന്ന FPO-യുടെ അപേക്ഷ '
+            '<strong style="color:#2e7d32;">അംഗീകരിച്ചതായി</strong> സന്തോഷപൂർവ്വം അറിയിക്കുന്നു.</p>'
+            '<p>ഇനി നിങ്ങൾക്ക് എല്ലാ പ്ലാറ്റ്‌ഫോം സേവനങ്ങളും ഉപയോഗിക്കാം. ആരംഭിക്കാൻ ലോഗിൻ ചെയ്യുക.</p>'
+        ),
+    ),
+    (
         'application_rejected', 'email', 'en',
         'FPO Application Update — Action Required',
         (
@@ -372,6 +384,17 @@ TEMPLATES = [
         ),
     ),
     (
+        'application_rejected', 'email', 'ml',
+        'FPO അപേക്ഷ — നടപടി ആവശ്യമാണ്',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p><strong>{{fpo_name}}</strong> എന്ന FPO-യുടെ അപേക്ഷ ഇപ്പോൾ അംഗീകരിക്കാൻ കഴിഞ്ഞിട്ടില്ലെന്ന് ഖേദപൂർവ്വം അറിയിക്കുന്നു.</p>'
+            '<p><strong>കാരണം:</strong></p>'
+            '<p style="background:#fff8f8;border-left:3px solid #e53935;padding:10px 14px;color:#555;font-size:14px;">{{rejection_reason}}</p>'
+            '<p>പ്രശ്നങ്ങൾ പരിഹരിച്ച ശേഷം അപേക്ഷ വീണ്ടും സമർപ്പിക്കാവുന്നതാണ്.</p>'
+        ),
+    ),
+    (
         'info_requested', 'email', 'en',
         'Additional Information Required for Your FPO Application',
         (
@@ -379,6 +402,58 @@ TEMPLATES = [
             '<p>Our team requires additional information to process your application.</p>'
             '<p style="background:#f5f5f5;border-left:3px solid #2e7d32;padding:10px 14px;color:#555;font-size:14px;">{{request_message}}</p>'
             '<p>Please log in and update your application at the earliest.</p>'
+        ),
+    ),
+    (
+        'info_requested', 'email', 'ml',
+        'നിങ്ങളുടെ FPO അപേക്ഷയ്ക്ക് കൂടുതൽ വിവരങ്ങൾ ആവശ്യമാണ്',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>നിങ്ങളുടെ അപേക്ഷ പ്രോസസ്സ് ചെയ്യുന്നതിന് ഞങ്ങളുടെ ടീമിന് കൂടുതൽ വിവരങ്ങൾ ആവശ്യമാണ്.</p>'
+            '<p style="background:#f5f5f5;border-left:3px solid #2e7d32;padding:10px 14px;color:#555;font-size:14px;">{{request_message}}</p>'
+            '<p>ദയവായി എത്രയും വേഗം ലോഗിൻ ചെയ്ത് നിങ്ങളുടെ അപേക്ഷ അപ്ഡേറ്റ് ചെയ്യുക.</p>'
+        ),
+    ),
+    (
+        'info_response_approved', 'email', 'en',
+        'Your Updated FPO Application is Approved',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Thank you for providing the additional information we requested. Our team has reviewed your updated application for '
+            '<strong>{{fpo_name}}</strong> (ID: {{application_id}}) and it has been <strong style="color:#2e7d32;">approved</strong>.</p>'
+            '<p>Your FPO is active again and you can continue using all platform features. Log in to get started.</p>'
+        ),
+    ),
+    (
+        'info_response_approved', 'email', 'ml',
+        'നിങ്ങളുടെ പുതുക്കിയ FPO അപേക്ഷ അംഗീകരിച്ചു',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>ആവശ്യപ്പെട്ട കൂടുതൽ വിവരങ്ങൾ നൽകിയതിന് നന്ദി. <strong>{{fpo_name}}</strong> (ID: {{application_id}}) '
+            'എന്ന FPO-യുടെ പുതുക്കിയ അപേക്ഷ ഞങ്ങളുടെ ടീം പരിശോധിച്ച് <strong style="color:#2e7d32;">അംഗീകരിച്ചു</strong>.</p>'
+            '<p>നിങ്ങളുടെ FPO വീണ്ടും സജീവമാണ്; എല്ലാ പ്ലാറ്റ്‌ഫോം സേവനങ്ങളും തുടർന്നും ഉപയോഗിക്കാം. ആരംഭിക്കാൻ ലോഗിൻ ചെയ്യുക.</p>'
+        ),
+    ),
+    (
+        'application_suspended', 'email', 'en',
+        'Your FPO Has Been Suspended',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Your FPO <strong>{{fpo_name}}</strong> (ID: {{application_id}}) has been '
+            '<strong style="color:#e53935;">suspended</strong> on the KAU-FPO Platform.</p>'
+            '<p>You will not be able to use the platform features until your FPO is reactivated.</p>'
+            '<p>If you believe this is an error or need more details, please contact KAU support.</p>'
+        ),
+    ),
+    (
+        'application_suspended', 'email', 'ml',
+        'നിങ്ങളുടെ FPO താൽക്കാലികമായി നിർത്തിവച്ചു',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ നിങ്ങളുടെ FPO <strong>{{fpo_name}}</strong> (ID: {{application_id}}) '
+            '<strong style="color:#e53935;">താൽക്കാലികമായി നിർത്തിവച്ചിരിക്കുന്നു</strong>.</p>'
+            '<p>FPO വീണ്ടും സജീവമാക്കുന്നതുവരെ പ്ലാറ്റ്‌ഫോം സേവനങ്ങൾ ഉപയോഗിക്കാൻ കഴിയില്ല.</p>'
+            '<p>ഇത് തെറ്റാണെന്ന് കരുതുന്നെങ്കിലോ കൂടുതൽ വിവരങ്ങൾ ആവശ്യമെങ്കിലോ KAU സഹായ കേന്ദ്രവുമായി ബന്ധപ്പെടുക.</p>'
         ),
     ),
     (
@@ -460,6 +535,40 @@ TEMPLATES = [
             '<td style="padding:4px 0;">{{district}}</td></tr>'
             '</table>'
             '<p>Please log in to the admin panel to review this application.</p>'
+        ),
+    ),
+    (
+        'admin_new_fpo_application', 'email', 'ml',
+        'പുതിയ FPO അപേക്ഷ സമർപ്പിച്ചു — {{application_id}}',
+        (
+            '<p>ഒരു പുതിയ FPO അപേക്ഷ സമർപ്പിച്ചിട്ടുണ്ട്, അവലോകനത്തിനായി കാത്തിരിക്കുന്നു.</p>'
+            '<table style="margin:12px 0;border-collapse:collapse;">'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">FPO പേര്</td>'
+            '<td style="padding:4px 0;font-weight:600;">{{fpo_name}}</td></tr>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">അപേക്ഷ ID</td>'
+            '<td style="padding:4px 0;font-weight:600;letter-spacing:0.5px;">{{application_id}}</td></tr>'
+            '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">ജില്ല</td>'
+            '<td style="padding:4px 0;">{{district}}</td></tr>'
+            '</table>'
+            '<p>ഈ അപേക്ഷ അവലോകനം ചെയ്യാൻ അഡ്മിൻ പാനലിൽ ലോഗിൻ ചെയ്യുക.</p>'
+        ),
+    ),
+    (
+        'verified_buyer_inquiry', 'email', 'en',
+        'New Buyer Inquiry — {{product_name}}',
+        (
+            '<p>Dear <strong>{{fpo_name}}</strong>,</p>'
+            '<p>A verified buyer has sent an inquiry about your product <strong>{{product_name}}</strong>.</p>'
+            '<p>Please log in to the KAU-FPO Platform and open Inquiries on your Products page to view the details and respond.</p>'
+        ),
+    ),
+    (
+        'verified_buyer_inquiry', 'email', 'ml',
+        'പുതിയ ക്രേതാവ് അന്വേഷണം — {{product_name}}',
+        (
+            '<p>പ്രിയ <strong>{{fpo_name}}</strong>,</p>'
+            '<p>നിങ്ങളുടെ ഉൽപ്പന്നമായ <strong>{{product_name}}</strong> സംബന്ധിച്ച് ഒരു പരിശോധിച്ച ക്രേതാവ് അന്വേഷണം അയച്ചിട്ടുണ്ട്.</p>'
+            '<p>വിശദാംശങ്ങൾ കാണാനും മറുപടി നൽകാനും KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ ലോഗിൻ ചെയ്ത് ഉൽപ്പന്നങ്ങൾ പേജിലെ അന്വേഷണങ്ങൾ തുറക്കുക.</p>'
         ),
     ),
     # ── WhatsApp templates ───────────────────────────────────────────────────────
@@ -947,12 +1056,28 @@ TEMPLATES = [
         '<p>Please log in to confirm or reject this request.</p>',
     ),
     (
+        'expert_booking_requested', 'email', 'ml',
+        '{{fpo_name}}-ൽ നിന്ന് പുതിയ ബുക്കിംഗ് അഭ്യർത്ഥന',
+        '<p>പ്രിയ <strong>{{expert_name}}</strong>,</p>'
+        '<p><strong>{{fpo_name}}</strong>-ൽ നിന്ന് നിങ്ങൾക്ക് ഒരു പുതിയ അപ്പോയിന്റ്മെന്റ് അഭ്യർത്ഥന ലഭിച്ചിട്ടുണ്ട്.</p>'
+        '<p>തീയതി: <strong>{{date}}</strong><br>സമയം: <strong>{{time}}</strong></p>'
+        '<p>ഈ അഭ്യർത്ഥന സ്ഥിരീകരിക്കാനോ നിരസിക്കാനോ ദയവായി ലോഗിൻ ചെയ്യുക.</p>',
+    ),
+    (
         'expert_booking_new', 'email', 'en',
         'New Appointment Booked — {{fpo_name}}',
         '<p>Dear <strong>{{expert_name}}</strong>,</p>'
         '<p><strong>{{user_name}}</strong> from <strong>{{fpo_name}}</strong> has booked an appointment with you.</p>'
         '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong><br>Topic: {{topic}}</p>'
         '<p>The slot is confirmed. If you cannot make it, please cancel it from your dashboard so the member is told.</p>',
+    ),
+    (
+        'expert_booking_new', 'email', 'ml',
+        'പുതിയ അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്തു — {{fpo_name}}',
+        '<p>പ്രിയ <strong>{{expert_name}}</strong>,</p>'
+        '<p><strong>{{fpo_name}}</strong>-ലെ <strong>{{user_name}}</strong> നിങ്ങളുമായി ഒരു അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്തിരിക്കുന്നു.</p>'
+        '<p>തീയതി: <strong>{{date}}</strong><br>സമയം: <strong>{{time}}</strong><br>വിഷയം: {{topic}}</p>'
+        '<p>ഈ സ്ലോട്ട് സ്ഥിരീകരിച്ചു. നിങ്ങൾക്ക് പങ്കെടുക്കാൻ കഴിയില്ലെങ്കിൽ, അംഗത്തെ അറിയിക്കുന്നതിനായി ഡാഷ്‌ബോർഡിൽ നിന്ന് ഇത് റദ്ദാക്കുക.</p>',
     ),
     (
         'expert_booking_new', 'in_app', 'en',
@@ -967,6 +1092,13 @@ TEMPLATES = [
         '<p>You can cancel it from the Expert Directory if your plans change.</p>',
     ),
     (
+        'expert_booking_receipt', 'email', 'ml',
+        '{{expert_name}}-മായുള്ള നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്തു',
+        '<p><strong>{{expert_name}}</strong>-മായുള്ള നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് ബുക്ക് ചെയ്തു.</p>'
+        '<p>തീയതി: <strong>{{date}}</strong><br>സമയം: <strong>{{time}}</strong></p>'
+        '<p>പദ്ധതികളിൽ മാറ്റമുണ്ടെങ്കിൽ വിദഗ്ധ ഡയറക്ടറിയിൽ നിന്ന് ഇത് റദ്ദാക്കാം.</p>',
+    ),
+    (
         'expert_booking_receipt', 'in_app', 'en',
         'Appointment booked',
         'Your appointment with {{expert_name}} on {{date}} at {{time}} is booked.',
@@ -977,6 +1109,13 @@ TEMPLATES = [
         '<p><strong>{{user_name}}</strong> ({{fpo_name}}) has cancelled their appointment scheduled for '
         '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
         '<p>Reason: {{reason}}</p>',
+    ),
+    (
+        'expert_booking_cancelled', 'email', 'ml',
+        'അപ്പോയിന്റ്മെന്റ് റദ്ദാക്കി — {{fpo_name}}',
+        '<p><strong>{{user_name}}</strong> ({{fpo_name}}) <strong>{{date}}</strong> <strong>{{time}}</strong>-ന് '
+        'നിശ്ചയിച്ചിരുന്ന അപ്പോയിന്റ്മെന്റ് റദ്ദാക്കി.</p>'
+        '<p>കാരണം: {{reason}}</p>',
     ),
     (
         'expert_booking_cancelled', 'in_app', 'en',
@@ -993,6 +1132,12 @@ TEMPLATES = [
         '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>',
     ),
     (
+        'expert_booking_confirmed', 'email', 'ml',
+        '{{expert_name}}-മായുള്ള നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് സ്ഥിരീകരിച്ചു',
+        '<p>സന്തോഷവാർത്ത! <strong>{{expert_name}}</strong> നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് അഭ്യർത്ഥന സ്ഥിരീകരിച്ചു.</p>'
+        '<p>തീയതി: <strong>{{date}}</strong><br>സമയം: <strong>{{time}}</strong></p>',
+    ),
+    (
         'expert_booking_confirmed', 'in_app', 'en',
         'Appointment confirmed',
         '{{expert_name}} confirmed your appointment on {{date}} at {{time}}.',
@@ -1002,6 +1147,12 @@ TEMPLATES = [
         'Your appointment request with {{expert_name}} was declined',
         '<p><strong>{{expert_name}}</strong> was unable to accept your appointment request for {{date}} at {{time}}.</p>'
         '<p>Reason: {{reason}}</p>',
+    ),
+    (
+        'expert_booking_rejected', 'email', 'ml',
+        '{{expert_name}}-മായുള്ള നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് അഭ്യർത്ഥന നിരസിച്ചു',
+        '<p>{{date}} {{time}}-നുള്ള നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് അഭ്യർത്ഥന സ്വീകരിക്കാൻ <strong>{{expert_name}}</strong>-ന് കഴിഞ്ഞില്ല.</p>'
+        '<p>കാരണം: {{reason}}</p>',
     ),
     (
         'expert_booking_rejected', 'in_app', 'en',
@@ -1014,6 +1165,13 @@ TEMPLATES = [
         '<p><strong>{{expert_name}}</strong> proposed rescheduling your appointment to '
         '<strong>{{date}}</strong> at <strong>{{time}}</strong>.</p>'
         '<p>Reason: {{reason}}</p><p>Please log in to confirm.</p>',
+    ),
+    (
+        'expert_booking_rescheduled', 'email', 'ml',
+        '{{expert_name}} നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റിന് പുതിയ സമയം നിർദ്ദേശിച്ചു',
+        '<p><strong>{{expert_name}}</strong> നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് '
+        '<strong>{{date}}</strong> <strong>{{time}}</strong>-ലേക്ക് മാറ്റാൻ നിർദ്ദേശിച്ചു.</p>'
+        '<p>കാരണം: {{reason}}</p><p>സ്ഥിരീകരിക്കാൻ ദയവായി ലോഗിൻ ചെയ്യുക.</p>',
     ),
     (
         'expert_booking_rescheduled', 'in_app', 'en',
@@ -1030,6 +1188,15 @@ TEMPLATES = [
         '<p>You may submit a new booking request for a different date or time.</p>',
     ),
     (
+        'expert_cancelled_confirmed_booking', 'email', 'ml',
+        'നിങ്ങളുടെ സ്ഥിരീകരിച്ച അപ്പോയിന്റ്മെന്റ് റദ്ദാക്കി',
+        '<p>പ്രിയ FPO,</p>'
+        '<p><strong>{{date}}</strong> <strong>{{time}}</strong>-ന് നിശ്ചയിച്ചിരുന്ന നിങ്ങളുടെ സ്ഥിരീകരിച്ച അപ്പോയിന്റ്മെന്റ് '
+        '<strong>{{expert_name}}</strong> റദ്ദാക്കി.</p>'
+        '<p>കാരണം: {{reason}}</p>'
+        '<p>മറ്റൊരു തീയതിയിലോ സമയത്തോ പുതിയ ബുക്കിംഗ് അഭ്യർത്ഥന സമർപ്പിക്കാവുന്നതാണ്.</p>',
+    ),
+    (
         'expert_cancelled_confirmed_booking', 'in_app', 'en',
         'Appointment Cancelled',
         '{{expert_name}} cancelled your confirmed appointment for {{date}} at {{time}}. Reason: {{reason}}',
@@ -1043,6 +1210,14 @@ TEMPLATES = [
         '<p>Please contact the expert or check your booking status, as this appointment may need to be rescheduled.</p>',
     ),
     (
+        'expert_marked_absent_conflict', 'email', 'ml',
+        'ഈ തീയതി ലഭ്യമല്ലെന്ന് വിദഗ്ധർ അടയാളപ്പെടുത്തി',
+        '<p>പ്രിയ FPO,</p>'
+        '<p><strong>{{expert_name}}</strong> <strong>{{date}}</strong> ലഭ്യമല്ലെന്ന് അടയാളപ്പെടുത്തിയിരിക്കുന്നു. '
+        'ഇത് <strong>{{time}}</strong>-നുള്ള നിങ്ങളുടെ സ്ഥിരീകരിച്ച അപ്പോയിന്റ്മെന്റുമായി ഒത്തുപോകുന്നില്ല.</p>'
+        '<p>ഈ അപ്പോയിന്റ്മെന്റ് പുനഃക്രമീകരിക്കേണ്ടി വന്നേക്കാം; ദയവായി വിദഗ്ധരുമായി ബന്ധപ്പെടുകയോ ബുക്കിംഗ് സ്റ്റാറ്റസ് പരിശോധിക്കുകയോ ചെയ്യുക.</p>',
+    ),
+    (
         'expert_marked_absent_conflict', 'in_app', 'en',
         'Possible Scheduling Conflict',
         '{{expert_name}} marked {{date}} as unavailable, which conflicts with your confirmed appointment at {{time}}.',
@@ -1054,6 +1229,14 @@ TEMPLATES = [
         '<p>FPO: <strong>{{fpo_name}}</strong></p>'
         '<p>Date: <strong>{{date}}</strong><br>Time: <strong>{{time}}</strong></p>'
         '<p>Please make sure you are available at the scheduled time.</p>',
+    ),
+    (
+        'expert_booking_reminder', 'email', 'ml',
+        'ഓർമ്മപ്പെടുത്തൽ: നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് ഉടൻ',
+        '<p><strong>{{expert_name}}</strong>-മായുള്ള നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് ഉടൻ നടക്കുമെന്ന ഓർമ്മപ്പെടുത്തലാണിത്.</p>'
+        '<p>FPO: <strong>{{fpo_name}}</strong></p>'
+        '<p>തീയതി: <strong>{{date}}</strong><br>സമയം: <strong>{{time}}</strong></p>'
+        '<p>നിശ്ചിത സമയത്ത് ലഭ്യമാണെന്ന് ദയവായി ഉറപ്പാക്കുക.</p>',
     ),
     (
         'expert_booking_reminder', 'in_app', 'en',
@@ -1077,6 +1260,24 @@ TEMPLATES = [
         '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Time</td>'
         '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
         '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">Venue</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
+        '</table>',
+    ),
+    (
+        'fpo_training_scheduled', 'email', 'ml',
+        'ഒരു പരിശീലന സെഷൻ ഷെഡ്യൂൾ ചെയ്തു — {{topic}}',
+        '<p>പ്രിയ FPO,</p>'
+        '<p><strong>{{fpo_name}}</strong>-നായി ഒരു പരിശീലന സെഷൻ ഷെഡ്യൂൾ ചെയ്തിരിക്കുന്നു.</p>'
+        '<table style="margin:12px 0;border-collapse:collapse;">'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">വിഷയം</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{topic}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">പരിശീലകൻ</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{trainer_name}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">തീയതി</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{date}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">സമയം</td>'
+        '<td style="padding:4px 0;font-weight:600;">{{time}}</td></tr>'
+        '<tr><td style="padding:4px 12px 4px 0;color:#666;font-size:13px;">വേദി</td>'
         '<td style="padding:4px 0;font-weight:600;">{{venue}}</td></tr>'
         '</table>',
     ),
