@@ -5838,6 +5838,25 @@ def seed_buyer_portal_translations(languages):
         ('buyer_products.commodities_selected',    '{count} commodities selected',
          '{count} ചരക്കുകൾ തിരഞ്ഞെടുത്തു'),
         ('buyer_products.no_image', 'No image', 'ചിത്രം ലഭ്യമല്ല'),
+        # ── price range filter (slider + Min/Max + Go) ──
+        ('buyer_products.filter_price',            'Price',
+         'വില'),
+        ('buyer_products.price_per_unit',          'Price per unit',
+         'യൂണിറ്റിന് വില'),
+        ('buyer_products.price_min_placeholder',   'Min',
+         'കുറഞ്ഞത്'),
+        ('buyer_products.price_max_placeholder',   'Max',
+         'കൂടിയത്'),
+        ('buyer_products.btn_price_go',            'Go',
+         'പോകുക'),
+        ('buyer_products.price_and_above',         '{amount} & above',
+         '{amount}-ഉം അതിനു മുകളിലും'),
+        ('buyer_products.price_up_to',             'Up to {amount}',
+         '{amount} വരെ'),
+        ('buyer_products.price_error',             'Enter a valid price range.',
+         'സാധുവായ വില പരിധി നൽകുക.'),
+        ('buyer_products.price_filter_clear',      'Clear',
+         'മായ്ക്കുക'),
     ]
 
     count = 0
