@@ -1265,13 +1265,38 @@ def verify_figures_against_prompt(
         if v < 1000 or v in allowed or (v - 1) in allowed or (v + 1) in allowed:
             return raw
         # Context guards (see _UNIT_AFTER_RE note): the scale heuristic is
-        # for money. Unit-suffixed quantities and sub-lakh non-rupee
-        # figures pass untouched.
+        # for money. Sub-lakh non-rupee figures pass untouched (BOD mg/L,
+        # wash-water litres, headcounts...). Unit-suffixed figures >= 1 lakh
+        # still get the scale check — dairy 2026-10-13: the model wrote
+        # '26,00,000 litres per year' for a 26,000-litre product, a real
+        # x100 quantity corruption — but with a UNIQUE FACTS counterpart
+        # they are REPAIRED to it instead of masked (mask + deterministic
+        # decode = permanently blocked DPR).
         after = m.string[m.end():m.end() + 24]
         before = m.string[max(0, m.start() - 10):m.start()]
         in_rupee_context = bool(_RUPEE_BEFORE_RE.search(before))
-        if not in_rupee_context and (_UNIT_AFTER_RE.match(after) or v < 100000):
+        unit_suffixed = bool(_UNIT_AFTER_RE.match(after))
+        if not in_rupee_context and v < 100000:
             return raw
+        if unit_suffixed and not in_rupee_context:
+            candidates = set()
+            for k in _SCALE_FACTORS:
+                if v % k == 0 and (v // k) in allowed and (v // k) >= 1000:
+                    candidates.add(v // k)
+                if (v * k) in allowed and (v * k) >= 1000:
+                    candidates.add(v * k)
+            if len(candidates) == 1:
+                target = candidates.pop()
+                fixed = _indian_group_int(target)
+                hits_by_raw.setdefault(raw, {
+                    'bug': REPAIRED_BUG_TAG,
+                    'detail': f'quantity scale-repaired to {fixed} '
+                              f'(unit context, unique prompt counterpart)',
+                    'count': 0})['count'] += 1
+                return fixed
+            if not candidates:
+                return raw  # unknown quantity — not a scale corruption
+            # 2+ counterparts: ambiguous — fall through to the mask below.
         for k in _SCALE_FACTORS:
             if v % k == 0 and (v // k) in allowed and (v // k) >= 1000:
                 hits_by_raw.setdefault(raw, {'bug': 'BUG-26-scale-corruption',
@@ -1843,8 +1868,8 @@ def generate_chapter(
         # Repaired groupings do NOT count — they are already correct.
         text, figure_hits = verify_figures_against_prompt(text, prompt_figures)
         scrubber_hits.extend(figure_hits)
-        corruption_hits = [h for h in broken_number_hits
-                           if h.get('bug') != REPAIRED_BUG_TAG] + figure_hits
+        corruption_hits = [h for h in broken_number_hits + figure_hits
+                           if h.get('bug') != REPAIRED_BUG_TAG]
 
         # Convert USD → INR using the configured rate, then record + apply
         # the spend against the monthly cap (auto-disables if breached).

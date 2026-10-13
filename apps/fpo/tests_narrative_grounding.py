@@ -165,6 +165,32 @@ class VerifyFiguresContextTests(unittest.TestCase):
         self.assertEqual(cleaned, text)
         self.assertEqual(hits, [])
 
+    def test_large_unit_quantity_corruption_repaired(self):
+        """Dairy 2026-10-13: '26,00,000 litres per year' for the 26,000-litre
+        product — a x100 corruption with a unique FACTS counterpart is
+        REPAIRED, not masked (masking re-blocked the DPR 6/6)."""
+        text = 'Surplus Chilled Raw Milk to Milma at 26,00,000 litres per year.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {26000})
+        self.assertIn('26,000 litres per year', cleaned)
+        self.assertNotIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], narrative.REPAIRED_BUG_TAG)
+
+    def test_large_unit_quantity_ambiguous_still_masked(self):
+        """Two scale counterparts in FACTS → no guessing, mask as before."""
+        text = 'Throughput of 2,60,000 kg per year is planned.'
+        cleaned, hits = narrative.verify_figures_against_prompt(
+            text, {26000, 2600000})
+        self.assertIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], 'BUG-26-scale-corruption')
+
+    def test_large_unit_quantity_unknown_passes(self):
+        """>=1 lakh with a unit but NO scale counterpart — a legitimate
+        engineering figure (e.g. wizard husk mass) passes untouched."""
+        text = 'About 8,50,000 kg of husk is generated annually.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {123456})
+        self.assertEqual(cleaned, text)
+        self.assertEqual(hits, [])
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # scrub_placeholders — pure function
