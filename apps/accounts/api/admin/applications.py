@@ -440,7 +440,8 @@ def _transition(fpo, to_status, changed_by, notes='', request=None):
     )
 
     notification_map = {
-        FPOStatus.APPROVED:      'fpo_approved',
+        # Only Activate (suspended/rejected → approved) reaches APPROVED here; the Approve view sends its own email
+        FPOStatus.APPROVED:      'application_activated',
         FPOStatus.REJECTED:      'application_rejected',
         FPOStatus.INFO_REQUIRED: 'info_requested',
         FPOStatus.SUSPENDED:     'application_suspended',
@@ -821,7 +822,7 @@ class ApplicationActivateView(APIView):
         tags=['Admin - FPO Applications'],
         summary='Activate a suspended or rejected FPO',
         description=(
-            'Transitions SUSPENDED or REJECTED → APPROVED.\n\n'
+            'Transitions SUSPENDED or REJECTED → APPROVED. FPO user receives an activation email.\n\n'
             'Before activating, checks for duplicate `pan_number`, `gst_number`, `cin_number`, '
             '`registration_number` against other APPROVED FPOs. If a conflict is found, returns 400.\n\n'
             'Optional `notes` field is recorded in the status history.'
