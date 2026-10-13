@@ -130,15 +130,18 @@ class PublicProductListView(APIView):
 
             # KAU #3 — include ACTIVE stock + EXPIRED stock still within the
             # 3-day grace window so buyers see "Validity is over" listings.
+            # PM-17 retest 2026-10-13: the nightly expire_products cron can
+            # run late/miss after stack restarts, leaving past-dated batches
+            # status=ACTIVE — so the DISPLAY decision is date-driven, never
+            # trusting status alone. Anything past the grace cutoff is
+            # hidden regardless of status.
             queryset = ProductStock.objects.filter(
                 is_public=True, is_deleted=False,
                 product__is_deleted=False,
+                status__in=[ProductStock.Status.ACTIVE, ProductStock.Status.EXPIRED],
             ).filter(
-                Q(status=ProductStock.Status.ACTIVE)
-                | Q(
-                    status=ProductStock.Status.EXPIRED,
-                    available_until__gte=grace_cutoff,
-                )
+                Q(available_until__isnull=True)
+                | Q(available_until__gte=grace_cutoff)
             ).select_related('product', 'product__commodity', 'product__fpo').order_by('-created_at')
 
             if search:
@@ -151,7 +154,11 @@ class PublicProductListView(APIView):
             cached = []
             for s in queryset:
                 p = s.product
-                in_grace = s.status == ProductStock.Status.EXPIRED
+                # Date-driven, not status-driven (see queryset note above).
+                in_grace = (
+                    s.status == ProductStock.Status.EXPIRED
+                    or (s.available_until is not None and s.available_until < today)
+                )
                 cached.append({
                     'id': s.id,
                     'product_id': p.id,

@@ -68,11 +68,13 @@ class BuyerProductListView(APIView):
             is_deleted=False,
             product__is_deleted=False,
         ).filter(
-            Q(status=ProductStock.Status.ACTIVE)
-            | Q(
-                status=ProductStock.Status.EXPIRED,
-                available_until__gte=grace_cutoff,
-            )
+            # PM-17 retest 2026-10-13: date-driven, never trusting status
+            # alone — a late/missed expire_products cron left past-dated
+            # batches status=ACTIVE and they rendered as normal cards.
+            status__in=[ProductStock.Status.ACTIVE, ProductStock.Status.EXPIRED],
+        ).filter(
+            Q(available_until__isnull=True)
+            | Q(available_until__gte=grace_cutoff)
         ).select_related('product', 'product__commodity', 'product__fpo').order_by('-created_at')
 
         # FPO-as-buyer shouldn't see its own products in this catalog —
@@ -177,11 +179,13 @@ class BuyerRecommendedProductsView(APIView):
             product__is_deleted=False,
             product__commodity__code__in=interested,
         ).filter(
-            Q(status=ProductStock.Status.ACTIVE)
-            | Q(
-                status=ProductStock.Status.EXPIRED,
-                available_until__gte=grace_cutoff,
-            )
+            # PM-17 retest 2026-10-13: date-driven, never trusting status
+            # alone — a late/missed expire_products cron left past-dated
+            # batches status=ACTIVE and they rendered as normal cards.
+            status__in=[ProductStock.Status.ACTIVE, ProductStock.Status.EXPIRED],
+        ).filter(
+            Q(available_until__isnull=True)
+            | Q(available_until__gte=grace_cutoff)
         ).select_related('product', 'product__commodity', 'product__fpo').order_by('-created_at')
 
         if buyer.fpo_id:
