@@ -562,6 +562,23 @@ Author: Athul Gopan (Kefi Tech Solutions)
   {# ── 8. Projected P&L ──────────────────────────────────────────────── #}
   <div class="wide-page"></div>
   <h2 id="sec-7">7. Projected Profit &amp; Loss (₹)</h2>
+
+  {% if opex_breakdown_rows %}
+  <h3 style="margin-top: 3mm;">Annual operating cost — Year 1 break-up</h3>
+  <table>
+    <thead>
+      <tr><th class="label">Component</th><th class="label">Amount (₹/year)</th></tr>
+    </thead>
+    <tbody>
+      {% for label, value in opex_breakdown_rows %}
+        <tr><td class="label">{{ label }}</td><td>{{ value|money }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="font-size: 9pt; margin-bottom: 3mm;">
+    Later years escalate each component by its configured escalation rate (see Key Assumptions).
+  </p>
+  {% endif %}
   <table class="dense-table">
     <thead>
       <tr>

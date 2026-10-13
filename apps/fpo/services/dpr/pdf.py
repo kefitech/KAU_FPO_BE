@@ -29,6 +29,9 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from apps.fpo.services.dpr.calculation import compute, CalculationResult
+# Indian-grouped money for user-facing note strings (tester 2026-10-13:
+# several notes rendered Western commas via f'{v:,.0f}').
+from apps.fpo.templatetags.dpr_filters import money as _money
 from apps.fpo.services.dpr.chart_helpers import (
     cost_breakdown_pie,
     pnl_trend_bar,
@@ -231,6 +234,18 @@ def _technologies_with_flow(project) -> list[dict]:
             'steps': steps,
         })
     return out
+
+
+def _opex_breakdown_rows(project) -> list[tuple[str, object]]:
+    """[(label, Y1 amount), ...] for every non-zero opex component, in the
+    canonical OPEX_LABELS order — gives lease/rent (and every other line)
+    a visible row of its own (tester 2026-10-13)."""
+    from apps.fpo.services.dpr.calculation import OPEX_FIELDS, OPEX_LABELS
+    fin = getattr(project, 'section_finance', None)
+    if fin is None:
+        return []
+    by_field = {f: (getattr(fin, f, None) or Decimal('0')) for f in OPEX_FIELDS}
+    return _breakdown_rows(by_field, OPEX_LABELS)
 
 
 def _breakdown_rows(by_field: dict, labels: dict) -> list[tuple[str, object]]:
@@ -513,7 +528,7 @@ def _pre_final_validation(project) -> list[dict]:
                 'reason': (
                     f'Balance Sheet invariant (Assets = Equity + Liabilities) '
                     f'fails on year(s) {unbalanced_years}. Maximum gap: '
-                    f'₹{max_delta:,.0f}. This is a calc engine error — do not '
+                    f'₹{_money(max_delta)}. This is a calc engine error — do not '
                     f'ship this DPR until the gap closes. If the gap equals '
                     f'the WC funding shortfall, the FPO must either raise a '
                     f'cash credit line (increase mof_working_capital_loan) '
@@ -534,7 +549,7 @@ def _pre_final_validation(project) -> list[dict]:
             errors.append({
                 'chapter': 'working_capital',
                 'reason': (
-                    f'Working capital funding gap of ₹{wc.funding_gap:,.0f} '
+                    f'Working capital funding gap of ₹{_money(wc.funding_gap)} '
                     f'({wc.funding_gap_pct_of_requirement}% of the requirement) '
                     f'is currently un-arranged — the Working Capital Statement '
                     f'shows the shortfall as a short-term borrowing but no '
@@ -645,7 +660,7 @@ def _pre_final_validation(project) -> list[dict]:
                     'check':   'building_permit_vs_buildings',
                     'reason': (
                         f'Building Permit is marked "Not Applicable" while '
-                        f'₹{_buildings_budget:,.0f} of buildings / civil works '
+                        f'₹{_money(_buildings_budget)} of buildings / civil works '
                         f'is budgeted in the project cost. Set the Building '
                         f'Permit status to Available / Applied / Proposed to '
                         f'Obtain in §2.3.19 Compliance before generating a '
@@ -693,6 +708,10 @@ def render_html_for_project(
         # Project-at-Glance breakdown rows — pre-computed so the template
         # renders human-readable labels without extra filter machinery.
         'cost_breakdown_rows': _breakdown_rows(result.cost.by_field, COST_LABELS),
+        # Tester 2026-10-13: lease rent needs a visible opex row — render a
+        # Year-1 operating-cost break-up next to the P&L instead of burying
+        # rent in the land-tenure footnote.
+        'opex_breakdown_rows': _opex_breakdown_rows(project),
         # BUG-37: the WC facility (cash credit) is not project funding — the
         # template shows it as a separate line against r.mof.wc_facility.
         'mof_breakdown_rows':  _breakdown_rows(

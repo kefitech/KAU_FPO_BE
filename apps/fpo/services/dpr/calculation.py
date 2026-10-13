@@ -1194,6 +1194,27 @@ OPEX_FIELDS = (
     'op_professional_charges', 'op_miscellaneous', 'op_lease_rent',  # BUG-28
 )
 
+# Display labels for the Year-1 operating-cost break-up table (tester
+# 2026-10-13: lease rent had no visible row of its own — it was only a
+# footnote under the land-tenure section).
+OPEX_LABELS: dict[str, str] = {
+    'op_raw_material':        'Raw material',
+    'op_salaries_wages':      'Salaries & wages',
+    'op_electricity':         'Electricity',
+    'op_water':               'Water',
+    'op_fuel':                'Fuel',
+    'op_transportation':      'Transportation',
+    'op_packaging':           'Packaging',
+    'op_repairs_maintenance': 'Repairs & maintenance',
+    'op_insurance':           'Insurance',
+    'op_admin_expenses':      'Administrative expenses',
+    'op_marketing_expenses':  'Marketing expenses',
+    'op_communication':       'Communication',
+    'op_professional_charges': 'Professional charges',
+    'op_miscellaneous':       'Miscellaneous',
+    'op_lease_rent':          'Lease / rent (land & buildings)',
+}
+
 # Split opex line items into buckets so each can be escalated by its own
 # Cat-I financial-assumption rate (raw material / salary / electricity /
 # fuel each get their own rate; everything else escalates by general
@@ -2752,6 +2773,26 @@ def build_risk_assessment(project) -> RiskAssessment:
     # Pull risks from Raw Material / Market / Technology / ESS. Kept as a
     # list ordered by source so the FE can group + display consistently.
     auto_pulled = _pull_risks_from_other_sections(project)
+
+    # Tester 2026-10-13: the "Additional Risks" table repeated rows the
+    # FPO had already copied into the main risk register — drop any
+    # auto-pulled row whose text substantially matches a register entry.
+    def _norm(s):
+        return ' '.join((s or '').lower().split())[:120]
+
+    register_texts = set()
+    for it in items:
+        for t in (it.risk_description, it.risk_code_other, it.mitigation_strategy):
+            n = _norm(t)
+            if len(n) >= 15:
+                register_texts.add(n)
+    def _is_duplicate(ap):
+        for t in (ap.risk_description, ap.risk_label, ap.mitigation_strategy):
+            n = _norm(t)
+            if len(n) >= 15 and any(n in r or r in n for r in register_texts):
+                return True
+        return False
+    auto_pulled = [ap for ap in auto_pulled if not _is_duplicate(ap)]
 
     # Bucket by category → list of (probability, impact)
     buckets: dict[str, list] = {code: [] for code, _ in _RISK_CATEGORIES}

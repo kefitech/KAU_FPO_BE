@@ -469,7 +469,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     )
 
     lines = [
-        '=== PROJECT FACTS (use these values verbatim; do not estimate) ===',
+        '=== PROJECT FACTS (use these values exactly as written; do not estimate) ===',
         f'Project title:              {project.title or "Not provided by the FPO"}',
         f'FPO / promoter:             {fpo_name}',
         f'FPO legal structure:        {legal_structure_display}  (this is the FPO\'s CONSTITUTION — not derived from the loan source. If this says "Co-operative Society", the FPO is NOT a Producer Company and vice versa.)',
@@ -633,7 +633,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         if products_section else []
     )
     lines.append('')
-    lines.append('--- Products planned (verbatim product list) ---')
+    lines.append('--- Products planned (exact product list) ---')
     if product_rows:
         for p in product_rows:
             ptype = str(p.product_type) if p.product_type_id else 'unspecified type'
@@ -664,7 +664,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         if raw_material_section else []
     )
     lines.append('')
-    lines.append('--- Raw materials (verbatim annual requirements — quote these, NEVER recompute) ---')
+    lines.append('--- Raw materials (exact annual requirements — quote these, NEVER recompute) ---')
     if raw_material_rows:
         for rm in raw_material_rows[:15]:
             variety = (rm.variety_grade or '').strip()
@@ -691,7 +691,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         if machinery_section else []
     )
     lines.append('')
-    lines.append('--- Key machinery (verbatim list — purpose = what the equipment does) ---')
+    lines.append('--- Key machinery (exact list — purpose = what the equipment does) ---')
     if machinery_rows:
         for m in machinery_rows[:15]:  # cap at 15 to keep prompt bounded
             purpose = (m.purpose or '').strip() or 'purpose not specified'
@@ -798,7 +798,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     risk_section = getattr(project, 'section_risk', None)
     risk_rows = list(risk_section.items.all()) if risk_section else []
     lines.append('')
-    lines.append('--- Risks + FPO-authored mitigations (verbatim) ---')
+    lines.append('--- Risk register entries with the FPO\'s own mitigation text ---')
     if risk_rows:
         for r in risk_rows[:20]:
             # KAU review 2026-10-08 Pattern 9: raw snake_case enum codes in
@@ -821,7 +821,10 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
                 m = mitig.replace('\n', ' ')
                 if len(m) > 220:
                     m = m[:217] + '...'
-                lines.append(f'    mitigation (verbatim): {m}')
+                # Label must not contain words like 'verbatim' — the model echoed
+                # them into prose ('verbatim mitigation strategies', tester
+                # 2026-10-13). Plain label, same quote-exactly behaviour.
+                lines.append(f'    FPO mitigation (quote exactly as written): {m}')
             existing = (r.existing_measures or '').strip()
             if existing:
                 e = existing.replace('\n', ' ')
@@ -852,7 +855,15 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
     if ra is not None:
         overall_display = _OVERALL_RISK_DISPLAY.get(ra.overall_class, ra.overall_class)
         lines.append(f'Overall project risk class:  {ra.overall_class.upper()}  —  {overall_display}')
-        lines.append(f'Risk register coverage:      {ra.total_risks_scored} of {ra.total_risks_added} risks scored')
+        # Tester 2026-10-13: prose kept saying "5 of 16 risk CATEGORIES" —
+        # these are individual register entries, and the category list
+        # follows separately. Say so explicitly.
+        lines.append(
+            f'Risk register coverage:      {ra.total_risks_scored} of '
+            f'{ra.total_risks_added} individual risk register entries scored '
+            f'(these are individual risks, NOT categories — the categories '
+            f'are the per-category classes listed below)'
+        )
         if ra.categories:
             lines.append('Per-category classes (worst-case per category):')
             for cat in ra.categories:
@@ -953,7 +964,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
         '':                   'Status not disclosed by the FPO',
     }
     lines.append('')
-    lines.append('--- Statutory compliance list (verbatim — quote the FACTS status, never upgrade it) ---')
+    lines.append('--- Statutory compliance list (exact — quote the FACTS status, never upgrade it) ---')
     if compliance_rows:
         for c in compliance_rows[:25]:
             if c.registration_id and c.registration:
@@ -964,7 +975,7 @@ def format_calc_facts_for_prompt(project: DPRProject, result: CalculationResult)
             authority = (c.issuing_authority or '').strip()
             auth_bit = f', issuing authority: {authority}' if authority else ''
             exp_bit = (
-                f', expected approval: {c.expected_date_of_approval}'
+                f', expected approval: {c.expected_date_of_approval:%d %B %Y}'
                 if c.expected_date_of_approval else ''
             )
             lines.append(f'  - {name}: {status_display}{auth_bit}{exp_bit}')

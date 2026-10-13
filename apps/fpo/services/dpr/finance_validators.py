@@ -16,6 +16,14 @@ from decimal import Decimal
 from apps.database.models import DPRConfig
 
 
+def _inr(v):
+    """Indian-grouped money for user-facing warnings (tester 2026-10-13:
+    the contingency note rendered Western commas)."""
+    from apps.fpo.templatetags.dpr_filters import money
+    return money(v)
+
+
+
 COST_FIELDS = [
     'cost_land_purchase', 'cost_land_development', 'cost_civil_works',
     'cost_buildings', 'cost_plant_machinery', 'cost_equipment',
@@ -391,8 +399,8 @@ def validate_section(section) -> dict[str, Any]:
             actual_pct = (contingency * Decimal('100') / hard_cost).quantize(Decimal('0.01'))
             warnings.append(_warn(
                 'contingency_below_tolerance', 'cost_contingencies',
-                f'Contingency (₹{contingency:,.0f} = {actual_pct}% of hard cost) is below '
-                f'the configured {threshold_pct}% contingency floor (expected ≥ ₹{expected_contingency:,.0f}). '
+                f'Contingency (₹{_inr(contingency)} = {actual_pct}% of hard cost) is below '
+                f'the configured {threshold_pct}% contingency floor (expected ≥ ₹{_inr(expected_contingency)}). '
                 f'Consider raising the contingency line or add a note in the Financial Analysis '
                 f'narrative explaining why a smaller buffer is adequate for this project.',
             ))
