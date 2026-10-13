@@ -36,6 +36,7 @@ TEMPLATE_CODES = [
     ('info_requested',        'email',      'Additional information requested from FPO',     ['user_name', 'request_message']),
     ('info_response_approved', 'email',     'FPO re-approved after re-submitting requested info', ['user_name', 'fpo_name', 'application_id']),
     ('application_suspended', 'email',      'FPO suspended (deactivated) by admin',          ['user_name', 'fpo_name', 'application_id']),
+    ('application_activated', 'email',      'Suspended or rejected FPO activated by admin',  ['user_name', 'fpo_name', 'application_id']),
     ('password_reset',           'email', 'Password reset link email',                              ['user_name', 'reset_link']),
     ('password_reset_by_admin',   'email', 'Admin-initiated password reset with temp credentials', ['user_name', 'temp_password']),
     ('password_reset_by_admin',   'sms',   'Admin-initiated password reset SMS',                   ['user_name', 'temp_password']),
@@ -454,6 +455,26 @@ TEMPLATES = [
             '<strong style="color:#e53935;">താൽക്കാലികമായി നിർത്തിവച്ചിരിക്കുന്നു</strong>.</p>'
             '<p>FPO വീണ്ടും സജീവമാക്കുന്നതുവരെ പ്ലാറ്റ്‌ഫോം സേവനങ്ങൾ ഉപയോഗിക്കാൻ കഴിയില്ല.</p>'
             '<p>ഇത് തെറ്റാണെന്ന് കരുതുന്നെങ്കിലോ കൂടുതൽ വിവരങ്ങൾ ആവശ്യമെങ്കിലോ KAU സഹായ കേന്ദ്രവുമായി ബന്ധപ്പെടുക.</p>'
+        ),
+    ),
+    (
+        'application_activated', 'email', 'en',
+        'Your FPO Has Been Activated',
+        (
+            '<p>Dear <strong>{{user_name}}</strong>,</p>'
+            '<p>Your FPO <strong>{{fpo_name}}</strong> (ID: {{application_id}}) has been '
+            '<strong style="color:#2e7d32;">activated</strong> on the KAU-FPO Platform.</p>'
+            '<p>You can now use all platform features again. Log in to get started.</p>'
+        ),
+    ),
+    (
+        'application_activated', 'email', 'ml',
+        'നിങ്ങളുടെ FPO സജീവമാക്കി',
+        (
+            '<p>പ്രിയ <strong>{{user_name}}</strong>,</p>'
+            '<p>KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ നിങ്ങളുടെ FPO <strong>{{fpo_name}}</strong> (ID: {{application_id}}) '
+            '<strong style="color:#2e7d32;">സജീവമാക്കിയിരിക്കുന്നു</strong>.</p>'
+            '<p>ഇനി നിങ്ങൾക്ക് എല്ലാ പ്ലാറ്റ്‌ഫോം സേവനങ്ങളും വീണ്ടും ഉപയോഗിക്കാം. ആരംഭിക്കാൻ ലോഗിൻ ചെയ്യുക.</p>'
         ),
     ),
     (
