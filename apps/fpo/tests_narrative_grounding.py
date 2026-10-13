@@ -119,6 +119,54 @@ class ScrubBrokenNumbersTests(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# verify_figures_against_prompt — scale check context guards (2026-10-13)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class VerifyFiguresContextTests(unittest.TestCase):
+    """The scale heuristic is for money: unit-suffixed engineering numbers
+    and sub-lakh non-rupee figures must never be masked (tester: '2,500
+    mg/L' masked as '25,000 ÷ 10' blocked rice + dairy DPRs 10/10)."""
+
+    def test_unit_suffixed_figure_never_masked(self):
+        text = 'Effluent BOD ranges from 1,200 to 2,500 mg/L before treatment.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {25000})
+        self.assertEqual(cleaned, text)
+        self.assertEqual(hits, [])
+
+    def test_wash_water_litres_never_masked(self):
+        text = 'Daily wash water of 1,800 to 3,000 litres per day is expected.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {18000, 30000})
+        self.assertEqual(cleaned, text)
+        self.assertEqual(hits, [])
+
+    def test_sub_lakh_non_rupee_figure_never_masked(self):
+        text = 'Around 2,500 beneficiaries attended the session.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {25000})
+        self.assertEqual(cleaned, text)
+        self.assertEqual(hits, [])
+
+    def test_rupee_scale_corruption_still_masked(self):
+        """₹-prefixed ÷10 corruption keeps getting caught."""
+        text = 'An installation charge of ₹ 2,500 is budgeted.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {25000})
+        self.assertIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], 'BUG-26-scale-corruption')
+
+    def test_large_unitless_scale_corruption_still_masked(self):
+        """≥₹1 lakh without a unit keeps the strict check even without ₹."""
+        text = 'The project cost totals 1,30,00,000 for the first phase.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {1300000})
+        self.assertIn('[?]', cleaned)
+        self.assertEqual(hits[0]['bug'], 'BUG-26-scale-corruption')
+
+    def test_prompt_figures_still_pass(self):
+        text = 'Revenue of ₹ 1,30,000 in year one.'
+        cleaned, hits = narrative.verify_figures_against_prompt(text, {130000})
+        self.assertEqual(cleaned, text)
+        self.assertEqual(hits, [])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # scrub_placeholders — pure function
 # ─────────────────────────────────────────────────────────────────────────────
 

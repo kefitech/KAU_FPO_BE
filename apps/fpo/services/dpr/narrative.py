@@ -1214,6 +1214,28 @@ def extract_prompt_figures(prompt: str) -> set[int]:
     return {_canon_figure(m.group(0)) for m in _PROMPT_FIGURE_RE.finditer(prompt)}
 
 
+# Tester 2026-10-13 (BUG-26 false positives — blocked rice + dairy DPRs):
+# the scale check masked ordinary ENGINEERING numbers because their ×10
+# counterpart happened to be a money figure in FACTS ('2,500 mg/L' masked
+# as '25,000 ÷ 10' — that 25,000 was a machinery installation charge;
+# dairy lost 1,800/2,500/3,000 L/day wash-water figures the same way,
+# 10/10 deterministic → final PDF permanently blocked). The scale
+# heuristic only makes sense for MONEY. A figure immediately followed by
+# a measurement unit, or a sub-₹1-lakh figure not in a rupee context, is
+# never treated as a scale corruption.
+_UNIT_AFTER_RE = re.compile(
+    r'^\s*(?:mg\s*/\s*l|mg/l|ppm|bod|cod|litres?|liters?|l/day|lpd|kl\b|'
+    r'kgs?\b|kg/h(?:r|our)?|tonnes?|tons?|mt\b|quintals?|grams?|'
+    r'kva\b|kv\b|kwh?\b|hp\b|units?\b|nos?\b\.?|'
+    r'days?\b|months?\b|years?\b|hours?\b|hrs?\b|weeks?\b|'
+    r'%|per\s*cent|°\s*c\b|celsius|sq\.?\s*(?:ft|m)|m2\b|m²|'
+    r'acres?\b|hectares?\b|cents?\b|members?\b|farmers?\b|'
+    r'pieces?\b|bags?\b|packets?\b)',
+    re.IGNORECASE,
+)
+_RUPEE_BEFORE_RE = re.compile(r'(?:₹|rs\.?|inr|rupees?)\s*$', re.IGNORECASE)
+
+
 def verify_figures_against_prompt(
     text: str,
     allowed: set[int],
@@ -1230,6 +1252,14 @@ def verify_figures_against_prompt(
         raw = m.group(0)
         v = _canon_figure(raw)
         if v < 1000 or v in allowed or (v - 1) in allowed or (v + 1) in allowed:
+            return raw
+        # Context guards (see _UNIT_AFTER_RE note): the scale heuristic is
+        # for money. Unit-suffixed quantities and sub-lakh non-rupee
+        # figures pass untouched.
+        after = m.string[m.end():m.end() + 24]
+        before = m.string[max(0, m.start() - 10):m.start()]
+        in_rupee_context = bool(_RUPEE_BEFORE_RE.search(before))
+        if not in_rupee_context and (_UNIT_AFTER_RE.match(after) or v < 100000):
             return raw
         for k in _SCALE_FACTORS:
             if v % k == 0 and (v // k) in allowed and (v // k) >= 1000:
