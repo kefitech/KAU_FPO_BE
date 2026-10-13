@@ -11,7 +11,9 @@ from apps.marketplace.api.market_prices import MarketOpportunitiesView, MarketPr
 from apps.marketplace.api.matches import BuyerSellerMatchViewSet
 from apps.marketplace.api.products import ProductViewSet
 from apps.marketplace.api.stocks import ProductStockViewSet
-from apps.marketplace.api.buyer_products import BuyerProductListView, BuyerRecommendedProductsView
+from apps.marketplace.api.buyer_products import (
+    BuyerProductListView, BuyerProductPriceRangeView, BuyerRecommendedProductsView,
+)
 
 # FPO-facing marketplace routes only.
 # Admin routes (buyers CRUD, admin matches, admin price seeding) are
@@ -42,6 +44,7 @@ urlpatterns = [
     path('buyer/dashboard/', BuyerDashboardView.as_view(), name='buyer-dashboard'),
     path('buyer/products/',  BuyerProductListView.as_view(), name='buyer-products'),
     path('buyer/products/recommended/', BuyerRecommendedProductsView.as_view(), name='buyer-products-recommended'),
+    path('buyer/products/price-range/', BuyerProductPriceRangeView.as_view(), name='buyer-products-price-range'),
     path('buyer/products/<int:pk>/inquire/', InquiryCreateView.as_view(), name='buyer-product-inquire'),
     path('buyer/profile/',   BuyerProfileView.as_view(),   name='buyer-profile'),
     path('buyer/me/profile/', BuyerAccountProfileView.as_view(), name='buyer-account-profile'),
