@@ -446,7 +446,16 @@ class BuyerProductSerializer(serializers.ModelSerializer):
         return commodity.get_name(lang) if commodity else ''
 
     def get_in_grace_period(self, obj):
-        return obj.status == ProductStock.Status.EXPIRED
+        # Date-driven, not status-driven (PM-17 retest 2026-10-13): a
+        # late/missed expire_products cron leaves past-dated batches
+        # status=ACTIVE — they must still show the grace banner.
+        if obj.status == ProductStock.Status.EXPIRED:
+            return True
+        from django.utils import timezone
+        return (
+            obj.available_until is not None
+            and obj.available_until < timezone.now().date()
+        )
 
     def get_grace_message(self, obj):
         if not self.get_in_grace_period(obj):
