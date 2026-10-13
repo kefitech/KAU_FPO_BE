@@ -130,6 +130,7 @@ from .experts import (
     ExpertDetailView,
     ExpertActivateView,
     ExpertDeactivateView,
+    ExpertResetPasswordView,
 )
 from .fpo_users import (
     FPOUserListView,
@@ -341,6 +342,7 @@ urlpatterns = [
     path('experts/<int:pk>/',              ExpertDetailView.as_view(),      name='admin-experts-detail'),
     path('experts/<int:pk>/activate/',     ExpertActivateView.as_view(),    name='admin-experts-activate'),
     path('experts/<int:pk>/deactivate/',   ExpertDeactivateView.as_view(),  name='admin-experts-deactivate'),
+    path('experts/<int:pk>/reset-password/', ExpertResetPasswordView.as_view(), name='admin-experts-reset-password'),
     path('experts/<int:pk>/bookings/',     ExpertBookingsView.as_view(),    name='admin-experts-bookings'),
     # ML Model Versions (P2-06)
     path('ml-models/',                     MLModelVersionAdminView.as_view(),    name='admin-ml-models-list-create'),
