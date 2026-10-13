@@ -18,6 +18,8 @@ Expert / admin side:
   POST     /api/experts/admin/bookings/{id}/cancel/ - expert cancels a confirmed booking
   confirm / reject / reschedule remain only for legacy pending rows.
 """
+from datetime import datetime
+
 from django.conf import settings as django_settings
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -60,6 +62,53 @@ class ExpertAvailabilitySerializer(serializers.ModelSerializer):
         return ExpertTimeSlotSerializer(qs, many=True).data
 
 
+WEEKDAY_NAMES = ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')
+
+
+def _slot_window_error(slot):
+    """
+    Normalises a slot's start/end to zero-padded HH:MM in place. Returns a
+    message when a time is malformed or the slot does not end after it starts,
+    else None.
+    """
+    times = []
+    for field in ('start', 'end'):
+        try:
+            times.append(datetime.strptime(str(slot[field]).strip(), '%H:%M').time())
+        except ValueError:
+            return f"'{slot[field]}' is not a valid time. Use HH:MM, e.g. 09:30."
+    start, end = times
+    if end == start:
+        return f"Start and end times are the same ({slot['start']}). Pick an end time after {slot['start']}."
+    if end < start:
+        return f"End time {slot['end']} is earlier than start time {slot['start']}. Pick an end time after {slot['start']}."
+    slot['start'], slot['end'] = start.strftime('%H:%M'), end.strftime('%H:%M')
+    return None
+
+
+def _slot_overlap_error(slots):
+    """
+    Message naming the first two slots that overlap (or duplicate each other),
+    else None. Slots that only touch (10:00–11:00 then 11:00–12:00) are fine.
+    Expects normalised HH:MM strings, which compare correctly as text.
+    """
+    ordered = sorted(slots, key=lambda s: (s['start'], s['end']))
+    if not ordered:
+        return None
+    reach = ordered[0]  # the slot whose end reaches furthest so far
+    for current in ordered[1:]:
+        if current['start'] < reach['end']:
+            if (current['start'], current['end']) == (reach['start'], reach['end']):
+                return f"The slot {reach['start']}–{reach['end']} is listed twice. Remove one of them."
+            return (
+                f"{current['start']}–{current['end']} clashes with {reach['start']}–{reach['end']}. "
+                'Slots on the same day cannot overlap.'
+            )
+        if current['end'] > reach['end']:
+            reach = current
+    return None
+
+
 class TimeSlotInputSerializer(serializers.Serializer):
     start = serializers.CharField(max_length=10)
     end = serializers.CharField(max_length=10)
@@ -73,6 +122,19 @@ class SetAvailabilitySerializer(serializers.Serializer):
 
 class BulkAvailabilitySerializer(serializers.Serializer):
     slots = SetAvailabilitySerializer(many=True)
+
+    def validate(self, attrs):
+        # Checked here rather than on the nested serializers so the API returns
+        # one plain message instead of a nested error tree.
+        for group in attrs['slots']:
+            for slot in group['time_slots']:
+                error = _slot_window_error(slot)
+                if error:
+                    raise serializers.ValidationError({'slots': [f"{group['date']}: {error}"]})
+            error = _slot_overlap_error(group['time_slots'])
+            if error:
+                raise serializers.ValidationError({'slots': [f"{group['date']}: {error}"]})
+        return attrs
 
 
 class ExpertBookingSerializer(serializers.ModelSerializer):
@@ -652,6 +714,19 @@ class WeeklyDefaultSlotSerializer(serializers.Serializer):
 
 class BulkWeeklyDefaultsSerializer(serializers.Serializer):
     slots = WeeklyDefaultSlotSerializer(many=True)
+
+    def validate(self, attrs):
+        by_weekday = {}
+        for slot in attrs['slots']:
+            error = _slot_window_error(slot)
+            if error:
+                raise serializers.ValidationError({'slots': [f"{WEEKDAY_NAMES[slot['weekday']]}: {error}"]})
+            by_weekday.setdefault(slot['weekday'], []).append(slot)
+        for weekday, slots in by_weekday.items():
+            error = _slot_overlap_error(slots)
+            if error:
+                raise serializers.ValidationError({'slots': [f'{WEEKDAY_NAMES[weekday]}: {error}']})
+        return attrs
 
 
 class ExpertWeeklyDefaultsView(APIView):
