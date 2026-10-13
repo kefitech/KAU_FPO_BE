@@ -1194,7 +1194,7 @@ def seed_ui_translations(languages):
         ('sub_admins_table.history_heading',    'Transfer History',                         'ജില്ലാ മാറ്റ ചരിത്രം'),
         ('sub_admins_table.cancel',             'Cancel',                                   'റദ്ദാക്കുക'),
         ('sub_admins_table.transfer_btn',       'Transfer',                                 'മാറ്റുക'),
-        ('sub_admins_table.transfer_success',   '{email} moved to {district}.',             '{email} {district} ജില്ലയിലേക്ക് മാറ്റി.'),
+        ('sub_admins_table.transfer_success',   '{name} moved to {district}.',              '{name} {district} ജില്ലയിലേക്ക് മാറ്റി.'),
         ('sub_admins_table.transfer_failed',    'Transfer failed.',                         'ജില്ല മാറ്റൽ പരാജയപ്പെട്ടു.'),
 
         # ── sub_admins_dialog — Add/Edit Sub-Admin dialog ─────────────────
