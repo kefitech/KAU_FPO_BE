@@ -51,6 +51,17 @@ def seed_menu():
     if dpr_sub_deleted:
         print(f"🗑️  Removed {dpr_sub_deleted} DPR sub-page menu item(s): {', '.join(dpr_sub_keys)}")
 
+    # ── Retire the old expert bookings path ───────────────────────────────────
+    # "My Bookings" (menu.expert_stats) moved from /expert/stats to
+    # /expert/booking. seed_item() matches on (label_key, path), so a DB seeded
+    # before the move kept the /expert/stats row and got a second one — two
+    # "My Bookings" links. The /expert/stats page no longer exists.
+    old_expert_stats = MenuItem.objects.filter(path='/expert/stats')
+    old_expert_stats_count = old_expert_stats.count()
+    if old_expert_stats_count:
+        old_expert_stats.delete()
+        print(f"🗑️  Removed {old_expert_stats_count} menu item(s) for the old /expert/stats path")
+
     # ── Groups ────────────────────────────────────────────────────────────────
     super_admin_group, _ = Group.objects.get_or_create(name='super_admin')
     sub_admin_group, _   = Group.objects.get_or_create(name='sub_admin')
