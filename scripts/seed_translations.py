@@ -6916,6 +6916,12 @@ def seed_cbbo_portal_translations(languages):
          'ആദ്യ നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
         ('fpo_settings.val_last_name_symbols',  'Last name must contain letters or numbers, not only symbols.',
          'അവസാന നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
+        # Expert availability — time-slot validation (reversed / overlapping slots)
+        ('expert_availability.error_slot_missing_time', 'Enter both a start and an end time.', 'ആരംഭ സമയവും അവസാന സമയവും നൽകുക.'),
+        ('expert_availability.error_slot_reversed', 'End time is earlier than the start time. Pick an end time after {start}.', 'അവസാന സമയം ആരംഭ സമയത്തേക്കാൾ മുമ്പാണ്. {start}-ന് ശേഷമുള്ള ഒരു അവസാന സമയം തിരഞ്ഞെടുക്കുക.'),
+        ('expert_availability.error_slot_zero', 'Start and end times are the same. Pick an end time after {start}.', 'ആരംഭ സമയവും അവസാന സമയവും ഒന്നുതന്നെയാണ്. {start}-ന് ശേഷമുള്ള ഒരു അവസാന സമയം തിരഞ്ഞെടുക്കുക.'),
+        ('expert_availability.error_slot_overlap', 'Clashes with the {other} slot. Times on the same day cannot overlap.', '{other} സ്ലോട്ടുമായി സമയം കൂട്ടിമുട്ടുന്നു. ഒരേ ദിവസത്തെ സ്ലോട്ടുകൾ ഓവർലാപ്പ് ചെയ്യരുത്.'),
+        ('expert_availability.error_slots_invalid', 'Fix the highlighted time slots before saving.', 'സംരക്ഷിക്കുന്നതിന് മുമ്പ് അടയാളപ്പെടുത്തിയ സമയ സ്ലോട്ടുകൾ ശരിയാക്കുക.'),
         # Admin → Sub-Admin Settings page (caps + auto-expiry windows, incl. validation messages)
         ('admin_sub_admin_settings.page_title', 'Sub-Admin Settings', 'സബ്-അഡ്മിൻ ക്രമീകരണങ്ങൾ'),
         ('admin_sub_admin_settings.page_description', 'Configure the sub-admin cap per district and how many days after deadline schemes/trainings auto-expire.', 'ജില്ല തിരിച്ചുള്ള സബ്-അഡ്മിൻ പരിധിയും, അവസാന തീയതിക്ക് ശേഷം എത്ര ദിവസം കഴിഞ്ഞ് സ്കീമുകളും പരിശീലനങ്ങളും സ്വയം കാലഹരണപ്പെടുമെന്നും ക്രമീകരിക്കുക.'),
