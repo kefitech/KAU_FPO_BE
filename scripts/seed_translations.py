@@ -1165,6 +1165,14 @@ def seed_ui_translations(languages):
         ('sub_admins_table.sending',            'Sending...',                               'അയക്കുന്നു...'),
         ('sub_admins_table.toast_password_reset', 'Temporary password sent successfully',   'താൽക്കാലിക പാസ്‌വേഡ് വിജയകരമായി അയച്ചു'),
         ('sub_admins_table.reset_password_failed', 'Failed to reset password',              'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
+        # ── admin_experts — Reset Password row action ──────────────────────
+        ('admin_experts.action_reset_password', 'Reset Password',                           'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക'),
+        ('admin_experts.reset_password_title', 'Reset Password',                            'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യുക'),
+        ('admin_experts.reset_password_description', 'A temporary password will be generated and sent to "{name}" via email. They will be required to change it on next login.', 'ഒരു താൽക്കാലിക പാസ്‌വേഡ് സൃഷ്ടിച്ച് "{name}" എന്നയാൾക്ക് ഇ-മെയിൽ വഴി അയയ്ക്കും. അടുത്ത ലോഗിനിൽ അത് മാറ്റേണ്ടതുണ്ട്.'),
+        ('admin_experts.reset_confirm',        'Reset',                                     'റീസെറ്റ് ചെയ്യുക'),
+        ('admin_experts.sending',              'Sending...',                                'അയക്കുന്നു...'),
+        ('admin_experts.toast_password_reset', 'Temporary password sent successfully',      'താൽക്കാലിക പാസ്‌വേഡ് വിജയകരമായി അയച്ചു'),
+        ('admin_experts.reset_password_failed', 'Failed to reset password',                 'പാസ്‌വേഡ് റീസെറ്റ് ചെയ്യൽ പരാജയപ്പെട്ടു'),
 
         # ── sub_admins_table — Bulk Invite dialog ──────────────────────────
         ('sub_admins_table.bulk_invite_button', 'Bulk Invite',                              'ബൾക്ക് ക്ഷണം'),
@@ -1501,6 +1509,7 @@ def seed_ui_translations(languages):
         ('applications_table.req_info_notes_hint',          'Describe what additional information or corrections are needed', 'എന്ത് അധിക വിവരമോ തിരുത്തലോ ആവശ്യമാണെന്ന് വിവരിക്കുക'),
         ('applications_table.req_info_btn_submit',          'Send Request',                             'അഭ്യർഥന അയക്കുക'),
         ('applications_table.req_info_btn_submitting',      'Sending…',                                 'അയക്കുന്നു…'),
+        ('applications_table.req_info_toast_success',       'Information request sent to the FPO.',     'വിവര അഭ്യർഥന FPO-യ്ക്ക് അയച്ചു.'),
         ('applications_table.user_limit_dialog_title',      'Set Secondary User Limit',                 'ദ്വിതീയ ഉപയോക്തൃ പരിധി നിശ്ചയിക്കുക'),
         ('applications_table.user_limit_field_label',       'Max Secondary Users',                      'പരമാവധി ദ്വിതീയ ഉപയോക്താക്കൾ'),
         ('applications_table.current_tier_label',           'Current Tier:',                            'നിലവിലെ ടയർ:'),

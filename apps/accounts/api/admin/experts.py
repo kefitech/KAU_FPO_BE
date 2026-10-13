@@ -5,6 +5,7 @@ GET/POST  /api/admin/experts/
 GET/PATCH/DELETE  /api/admin/experts/{id}/
 POST  /api/admin/experts/{id}/activate/
 POST  /api/admin/experts/{id}/deactivate/
+POST  /api/admin/experts/{id}/reset-password/
 GET   /api/admin/experts/{id}/bookings/
 
 Enquiries ("Contact Expert" messages) go straight to the expert by email and
@@ -28,6 +29,10 @@ from django.conf import settings as django_settings
 from apps.notifications.services import send_notification
 from apps.database.models.expert_booking import ExpertBooking
 from apps.experts.api.booking_views import ExpertBookingSerializer
+from apps.core.models.generic import AuditLog
+from apps.core.services.audit import AuditService
+from apps.core.services.translation import t
+from .fpo_users import _generate_temp_password
 
 
 
@@ -58,15 +63,21 @@ def _sub_admin_district_error(user, district, current=None):
 
 
 class ExpertSerializer(serializers.ModelSerializer):
+    # Experts added before logins were created on save have no account — nothing to reset.
+    has_login = serializers.SerializerMethodField()
+
     class Meta:
         model = Expert
         fields = [
             'id', 'name_en', 'name_ml', 'designation', 'organisation',
             'primary_expertise', 'secondary_expertise', 'district',
             'email', 'phone', 'category', 'is_active', 'order',
-            'created_at', 'updated_at',
+            'has_login', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_has_login(self, obj):
+        return obj.user_id is not None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -87,6 +98,27 @@ class ExpertWriteSerializer(serializers.ModelSerializer):
         valid = [c.value for c in ExpertCategory]
         if value not in valid:
             raise serializers.ValidationError(f'Must be one of: {", ".join(valid)}')
+        return value
+
+    def validate_email(self, value):
+        # Creating an expert also creates their login (username = email), so an email that
+        # already belongs to an account would leave the expert without one — reject it.
+        # Lowercased like the other admin-created accounts; on edit, the expert's own
+        # record and login don't count as a clash.
+        value = value.lower()
+        expert = self.instance
+        if expert and (expert.email or '').lower() == value:
+            return value
+        users = User.objects.filter(Q(email__iexact=value) | Q(username__iexact=value))
+        if expert and expert.user_id:
+            users = users.exclude(pk=expert.user_id)
+        if users.exists():
+            raise serializers.ValidationError('A user with this email already exists.')
+        experts = Expert.objects.filter(email__iexact=value, is_deleted=False)
+        if expert:
+            experts = experts.exclude(pk=expert.pk)
+        if experts.exists():
+            raise serializers.ValidationError('An expert with this email already exists.')
         return value
 
 
@@ -282,6 +314,65 @@ class ExpertDeactivateView(APIView):
         expert.save(update_fields=['is_active'])
         _sync_login_account(expert, False)
         return StandardResponse.success(message='Expert deactivated.')
+
+
+class ExpertResetPasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Admin - Experts'],
+        summary="Reset an expert's password",
+        description='Generates a temporary password, sets must_change_password=True, and emails it to the expert.',
+        request=None,
+    )
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return StandardResponse.error('Permission denied.', status_code=status.HTTP_403_FORBIDDEN)
+
+        try:
+            expert = Expert.objects.select_related('user__profile').get(pk=pk, is_deleted=False)
+        except Expert.DoesNotExist:
+            return StandardResponse.error('Expert not found.', status_code=status.HTTP_404_NOT_FOUND)
+
+        user = expert.user
+        if user is None:
+            return StandardResponse.error(
+                'This expert has no login account, so there is no password to reset.',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if not expert.is_active or not user.is_active:
+            return StandardResponse.error(
+                t('admin.reset_password_inactive_user', getattr(request, 'language', 'en')),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        temp_password = _generate_temp_password()
+        user.set_password(temp_password)
+        user.save(update_fields=['password'])
+        user.profile.must_change_password = True
+        user.profile.save(update_fields=['must_change_password'])
+
+        try:
+            send_notification(
+                user=user, code='password_reset_by_admin', channel='email',
+                context={
+                    'user_name': expert.name_en or user.get_full_name() or user.email,
+                    'temp_password': temp_password,
+                    'button_link': getattr(django_settings, 'FRONTEND_URL', ''),
+                    'button_text': 'Login Now',
+                },
+            )
+        except Exception:
+            pass
+
+        AuditService.log(
+            user=request.user,
+            action=AuditLog.Action.PASSWORD_RESET,
+            instance=expert,
+            request=request,
+            changes={'reset_password_for': user.email},
+        )
+        return StandardResponse.success(message='Password reset. The expert will be asked to change it on next login.')
 
 
 class ExpertBookingsView(APIView):
