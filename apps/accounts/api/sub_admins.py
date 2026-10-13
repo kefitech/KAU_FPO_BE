@@ -72,6 +72,24 @@ def _get_sub_admin_permissions():
         return Permission.objects.none()
 
 
+def _ensure_sub_admin_permissions():
+    """Create a Permission row for any SUB_ADMIN_PERMISSIONS codename that lacks one.
+
+    Codenames are validated against the constant, but assignment needs the DB row —
+    without this, a permission added to the constant whose data migration never ran
+    on that server is accepted and then silently dropped on save.
+    """
+    ct, _ = ContentType.objects.get_or_create(app_label='accounts', model='subadmin')
+    existing = set(Permission.objects.filter(content_type=ct).values_list('codename', flat=True))
+    missing = [
+        Permission(codename=codename, name=name, content_type=ct)
+        for codename, name in SUB_ADMIN_PERMISSIONS
+        if codename not in existing
+    ]
+    if missing:
+        Permission.objects.bulk_create(missing)
+
+
 # ─── Serializers ─────────────────────────────────────────────────────────────
 
 # RFC 5321 limits. Django's EmailValidator doesn't enforce the local-part one.
@@ -1133,6 +1151,7 @@ class SubAdminViewSet(TranslatedViewSet):
 
     def _assign_permissions(self, user, codenames, action='replace'):
         """Add, remove, or replace sub-admin permissions."""
+        _ensure_sub_admin_permissions()
         all_sub_admin_perms = _get_sub_admin_permissions()
 
         if action == 'replace':
