@@ -11,6 +11,8 @@ notification's event code. `?category=<key>` scopes list / unread_count /
 read_all; omit it (or pass `all`) for every notification.
 """
 
+from urllib.parse import urlsplit
+
 from django.db.models import Count, Q
 from rest_framework import serializers, mixins, status
 from rest_framework.decorators import action
@@ -25,13 +27,20 @@ from apps.core.services.translation import t
 
 from apps.database.models import InAppNotification, NotificationTemplate
 from apps.notifications.categories import CATEGORY_KEYS, category_for_code, category_q
+from apps.notifications.webmail import WEBMAIL_HOSTS
 
 
 def notification_link(notif):
-    """The optional in-app destination the sender put in the context as `link`
-    (e.g. '/fpo/products?view=inquiries'). Internal paths only — never a URL."""
+    """The optional destination the sender put in the context as `link`: an in-app
+    path (e.g. '/fpo/products?view=inquiries'), or the recipient's webmail home
+    (see apps/notifications/webmail.py). Never any other URL."""
     link = (notif.log.context or {}).get('link') if notif.log else None
-    if isinstance(link, str) and link.startswith('/') and not link.startswith('//'):
+    if not isinstance(link, str):
+        return None
+    if link.startswith('/') and not link.startswith('//'):
+        return link
+    parts = urlsplit(link)
+    if parts.scheme == 'https' and parts.hostname in WEBMAIL_HOSTS:
         return link
     return None
 
