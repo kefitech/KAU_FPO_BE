@@ -23,11 +23,28 @@ Created: 28-04-2026
 SRS Reference: Section 3.1.7 (Multilingual Support)
 """
 
+import re
+
 from django.db import models
 from django.core.cache import cache
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from apps.core.models.base import TimeStampedModel
+
+
+# An "&" that does not already start an entity such as &amp; &#39; &#x27;
+_BARE_AMPERSAND = re.compile(r'&(?!(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);)')
+
+
+def _escape_html_once(value) -> str:
+    """
+    HTML-escape a template value, leaving existing entities alone. Some callers
+    escape values themselves, and in-app rows already saved hold escaped values
+    that the inbox re-renders on every read; escaping those again would show
+    "&amp;#x27;" instead of an apostrophe. Output matches django.utils.html.escape.
+    """
+    text = _BARE_AMPERSAND.sub('&amp;', str(value))
+    return text.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#x27;')
 
 
 class Language(TimeStampedModel):
@@ -467,20 +484,32 @@ class NotificationTemplate(TimeStampedModel):
         Example:
             template.render({'user_name': 'Rajan', 'fpo_name': 'Kerala FPO'})
             -> {'subject': 'FPO Approved', 'body': 'Dear Rajan, Kerala FPO is approved...'}
+
+        Values are HTML-escaped wherever the result is shown as HTML — email bodies,
+        and in-app titles and bodies (the inbox renders both as HTML) — since many are
+        typed by users (topics, messages, reasons, names). Email subjects are plain
+        headers, and SMS / WhatsApp are plain text, so those are left as-is.
         """
+        channel = self.template_code.channel
+        Channel = NotificationTemplateCode.Channel
+        escape_body = channel in (Channel.EMAIL, Channel.IN_APP)
+        escape_subject = channel == Channel.IN_APP
+
         result = {'body': self.body}
 
         for key, value in context.items():
             placeholder = f"{{{{{key}}}}}"
-            result['body'] = result['body'].replace(placeholder, str(value))
+            text = _escape_html_once(value) if escape_body else str(value)
+            result['body'] = result['body'].replace(placeholder, text)
 
         if self.subject:
             result['subject'] = self.subject
             for key, value in context.items():
                 placeholder = f"{{{{{key}}}}}"
-                result['subject'] = result['subject'].replace(placeholder, str(value))
+                text = _escape_html_once(value) if escape_subject else str(value)
+                result['subject'] = result['subject'].replace(placeholder, text)
 
-        if self.template_code.channel == NotificationTemplateCode.Channel.WHATSAPP:
+        if channel == Channel.WHATSAPP:
             result['whatsapp_template_name']     = self.whatsapp_template_name
             result['whatsapp_template_language'] = self.whatsapp_template_language or 'en'
 

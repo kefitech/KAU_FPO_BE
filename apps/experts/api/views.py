@@ -3,7 +3,7 @@ Expert Directory — FPO-facing Browse & Contact Enquiry
 ========================================================
 GET   /api/experts/            — browse active experts (filter: category, district, search, booked=1; sort=booked)
 GET   /api/experts/{id}/       — expert detail
-POST  /api/experts/{id}/enquiry/ — submit contact enquiry (sends email to expert)
+POST  /api/experts/{id}/enquiry/ — submit contact enquiry (email + in-app notice to expert)
 """
 
 from drf_spectacular.utils import extend_schema
@@ -21,6 +21,7 @@ from django.db.models import Case, Exists, F, IntegerField, OuterRef, Q, Subquer
 from django.utils import timezone
 from apps.core.utils.constants import DISTRICT_ZONE
 from apps.notifications.services import send_notification
+from apps.notifications.webmail import webmail_url
 
 
 class ExpertPublicSerializer(serializers.ModelSerializer):
@@ -224,19 +225,21 @@ class ExpertEnquiryView(APIView):
             message=message,
         )
 
+        context = {
+            'expert_name':  expert.name_en,
+            'fpo_name':     fpo_name,
+            'user_name':    user_name,
+            'user_email':   request.user.email,
+            'message':      message,
+        }
+
         email_sent = False
         try:
             send_notification(
                 user=request.user,
                 code='expert_enquiry',
                 channel='email',
-                context={
-                    'expert_name':  expert.name_en,
-                    'fpo_name':     fpo_name,
-                    'user_name':    user_name,
-                    'user_email':   request.user.email,
-                    'message':      message,
-                },
+                context=context,
                 override_recipient=expert.email,
             )
             enquiry.email_sent = True
@@ -244,6 +247,19 @@ class ExpertEnquiryView(APIView):
             email_sent = True
         except Exception:
             pass
+
+        # In-app notice on the expert's own login, when they have one. Clicking it opens
+        # their webmail, where the enquiry email above lands.
+        if expert.user_id:
+            try:
+                send_notification(
+                    user=expert.user,
+                    code='expert_enquiry',
+                    channel='in_app',
+                    context={**context, 'link': webmail_url(expert.email)},
+                )
+            except Exception:
+                pass
 
         return StandardResponse.success(
             data={'enquiry_id': enquiry.id, 'email_sent': email_sent},
