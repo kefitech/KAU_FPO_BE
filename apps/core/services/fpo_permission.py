@@ -11,7 +11,8 @@ Check order:
   1. Get user's membership role in the given FPO
   2. Check system matrix — does this role allow this action? No -> DENY (hard ceiling)
   3. Check member override — explicit override present? Use it
-  4. Fall back to role default from system matrix
+  4. Fall back to the default: allowed, except DEFAULT_OFF_ACTIONS (off until
+     the primary user switches them on for the member)
 
 Usage:
     from apps.core.services.fpo_permission import has_fpo_permission
@@ -21,6 +22,21 @@ Usage:
 """
 
 from django.core.cache import cache
+
+# Grantable (the role ceiling allows them) but off for a team member until the
+# primary user switches them on — they change FPO data or run generation, so
+# they're opt-in rather than on for everyone the primary invites.
+DEFAULT_OFF_ACTIONS = {
+    'can_manage_products',
+    'can_edit_tier_assessment',
+    'can_generate_business_plan',
+    'can_generate_recommendations',
+}
+
+
+def default_allows(action_code):
+    """Whether a member with no override for `action_code` gets it (ceiling permitting)."""
+    return action_code not in DEFAULT_OFF_ACTIONS
 
 
 def get_user_membership(user, fpo):
@@ -122,8 +138,8 @@ def has_fpo_permission(user, fpo, action_code):
     if has_override:
         return override_value
 
-    # Step 3: fall back to role default (ceiling already True here)
-    return True
+    # Step 3: fall back to the default (ceiling already True here)
+    return default_allows(action_code)
 
 
 def invalidate_role_permission_cache(role_id, action_code):
@@ -166,7 +182,7 @@ def get_effective_permissions(membership):
         if not ceiling:
             result[code] = False
             continue
-        result[code] = override_map.get(code, True)
+        result[code] = override_map.get(code, default_allows(code))
 
     return result
 

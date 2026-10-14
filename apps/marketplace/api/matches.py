@@ -12,10 +12,12 @@ from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 
 from apps.core.permissions.rbac import IsAdmin, IsAuthenticated, IsFPOManager
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.core.services.translation import t
 from apps.core.utils.pagination import StandardPagination
 from apps.core.utils.responses import StandardResponse
 from apps.database.models import BuyerSellerMatch
+from apps.marketplace.permissions import CanManageProducts
 from apps.marketplace.serializers import BuyerSellerMatchSerializer
 
 
@@ -30,12 +32,13 @@ class BuyerSellerMatchViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
 
     serializer_class = BuyerSellerMatchSerializer
-    permission_classes = [IsAuthenticated, IsFPOManager]
+    # Any FPO member can see their FPO's matches; accept / reject need can_manage_products.
+    permission_classes = [IsAuthenticated, IsFPOManager, CanManageProducts]
     pagination_class = StandardPagination
 
     def get_queryset(self):
         return (
-            BuyerSellerMatch.objects.filter(product__fpo=self.request.user.fpo, is_deleted=False)
+            BuyerSellerMatch.objects.filter(product__fpo=get_member_fpo(self.request.user), is_deleted=False)
             .select_related('product', 'buyer')
             .order_by('-suggested_at')
         )

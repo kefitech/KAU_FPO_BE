@@ -133,14 +133,14 @@ class ProductStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductStock
         fields = [
-            'id', 'product', 'quantity', 'unit', 'price_per_unit',
+            'id', 'product', 'batch_number', 'quantity', 'unit', 'price_per_unit',
             'quality_certification', 'available_from', 'available_until',
             'is_ondc_listed', 'ondc_product_id', 'is_public', 'status',
             'contact_phone',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'product', 'is_ondc_listed', 'ondc_product_id',
+            'id', 'product', 'batch_number', 'is_ondc_listed', 'ondc_product_id',
             'created_at', 'updated_at',
         ]
         # min/max apply on create and on PATCH alike (DRF validates every
@@ -174,8 +174,12 @@ class ProductStockSerializer(serializers.ModelSerializer):
         # Sold/expired are set via dedicated actions (publish/mark-sold) or
         # the daily expiry task — not through raw PATCH. Restricting the
         # choices here keeps the lifecycle predictable even though the
-        # underlying field accepts all four values.
-        allowed = [ProductStock.Status.DRAFT.value, ProductStock.Status.ACTIVE.value]
+        # underlying field accepts all of them. `inactive` is allowed so an
+        # edit of a paused batch can keep it paused.
+        allowed = [
+            ProductStock.Status.DRAFT.value, ProductStock.Status.ACTIVE.value,
+            ProductStock.Status.INACTIVE.value,
+        ]
         if value not in allowed:
             raise serializers.ValidationError(
                 f"status must be one of {allowed} — use the mark-sold action "
@@ -255,14 +259,14 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'fpo', 'name', 'commodity', 'commodity_code', 'commodity_name',
-            'description', 'image',
+            'description', 'image', 'is_active',
             'stocks', 'latest_stock', 'has_stock',
             # Write-only shortcut fields for creating the first batch
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
             'available_from', 'available_until', 'is_public', 'status',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'fpo', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'fpo', 'is_active', 'created_at', 'updated_at']
 
     def get_commodity_name(self, obj):
         if not obj.commodity_id:
@@ -430,7 +434,7 @@ class BuyerProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductStock
         fields = [
-            'id', 'product_id', 'name', 'description',
+            'id', 'batch_number', 'product_id', 'name', 'description',
             'commodity_code', 'commodity_name',
             'quantity', 'unit', 'price_per_unit', 'quality_certification',
             'available_from', 'available_until',
@@ -463,7 +467,7 @@ class BuyerProductSerializer(serializers.ModelSerializer):
         lang = self.context.get('lang', 'en')
         if lang == 'ml':
             return 'സാധുത കഴിഞ്ഞു — പക്ഷേ വീണ്ടും സ്റ്റോക്ക് വന്നിട്ടുണ്ടോ എന്നറിയാൻ വിൽപ്പനക്കാരനെ ബന്ധപ്പെടുക.'
-        return "Validity is over — but please contact the buyer to know if it's restocked."
+        return "Validity is over — but please contact the seller to know if it's restocked."
 
 
 class InquiryCreateSerializer(serializers.ModelSerializer):
@@ -510,11 +514,13 @@ class InquirySerializer(serializers.ModelSerializer):
     contact_name = serializers.SerializerMethodField()
     contact_phone = serializers.SerializerMethodField()
     contact_email = serializers.SerializerMethodField()
+    # Null for inquiries made before batches were recorded, or a batch since deleted.
+    batch_number = serializers.CharField(source='stock.batch_number', read_only=True, default=None)
 
     class Meta:
         model = Inquiry
         fields = [
-            'id', 'product', 'product_name', 'buyer', 'buyer_name',
+            'id', 'product', 'product_name', 'batch_number', 'buyer', 'buyer_name',
             'quantity_requested', 'message', 'status',
             'contact_name', 'contact_phone', 'contact_email',
             'created_at',
@@ -567,10 +573,12 @@ class MarketHubInquirySerializer(serializers.ModelSerializer):
     email = serializers.CharField(source='buyer.contact_email', read_only=True)
     phone = serializers.CharField(source='buyer.contact_phone', read_only=True)
     created_at = serializers.DateTimeField(source='suggested_at', read_only=True)
+    # Null for inquiries made before batches were recorded, or a batch since deleted.
+    batch_number = serializers.CharField(source='stock.batch_number', read_only=True, default=None)
 
     class Meta:
         model = BuyerSellerMatch
-        fields = ['id', 'product', 'product_name', 'name', 'email', 'phone', 'message', 'status', 'created_at']
+        fields = ['id', 'product', 'product_name', 'batch_number', 'name', 'email', 'phone', 'message', 'status', 'created_at']
         read_only_fields = fields
 
     def get_product_name(self, obj):

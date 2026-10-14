@@ -18,11 +18,12 @@ from rest_framework.decorators import action
 
 from apps.core.exceptions import BusinessLogicError
 from apps.core.permissions.rbac import IsAuthenticated, IsFPOManager
+from apps.core.services.fpo_permission import get_member_fpo
 from apps.core.services.translation import t
 from apps.core.utils.responses import StandardResponse
 from apps.core.views import TranslatedViewSet
 from apps.database.models import Product, ProductStock
-from apps.marketplace.permissions import IsApprovedFPO
+from apps.marketplace.permissions import CanManageProducts, IsApprovedFPO
 from apps.marketplace.serializers import ProductStockSerializer
 from apps.marketplace.services import run_matching
 
@@ -56,7 +57,9 @@ class ProductStockViewSet(TranslatedViewSet):
     """
 
     serializer_class = ProductStockSerializer
-    permission_classes = [IsAuthenticated, IsFPOManager, IsApprovedFPO]
+    # Same as ProductViewSet: any FPO member can view batches; add / edit /
+    # publish / mark-sold / delete need can_manage_products.
+    permission_classes = [IsAuthenticated, IsFPOManager, IsApprovedFPO, CanManageProducts]
 
     list_message = 'marketplace.stocks_retrieved'
     create_message = 'marketplace.stock_created'
@@ -66,9 +69,10 @@ class ProductStockViewSet(TranslatedViewSet):
     def _get_product(self):
         """Resolve the parent product and enforce ownership. Raises 404 if
         the current FPO doesn't own the product — matches the pattern used
-        by ProductViewSet.get_queryset()."""
+        by ProductViewSet.get_queryset(). get_member_fpo() resolves the FPO
+        for the primary user and for team members alike."""
         from django.shortcuts import get_object_or_404
-        fpo = self.request.user.fpo
+        fpo = get_member_fpo(self.request.user)
         return get_object_or_404(
             Product.objects.select_related('fpo'),
             pk=self.kwargs['product_pk'],
@@ -95,7 +99,9 @@ class ProductStockViewSet(TranslatedViewSet):
 
     def perform_update(self, serializer):
         stock = serializer.instance
-        if stock.status not in (ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE):
+        if stock.status not in (
+            ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE, ProductStock.Status.INACTIVE,
+        ):
             raise BusinessLogicError(
                 message=t('marketplace.product_not_editable', self.get_language()),
                 code='product_not_editable',
@@ -158,4 +164,47 @@ class ProductStockViewSet(TranslatedViewSet):
         return StandardResponse.success(
             data=ProductStockSerializer(stock).data,
             message=t('marketplace.product_sold', self.get_language()),
+        )
+
+    @extend_schema(tags=['Marketplace - Product Stocks'])
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, product_pk=None, pk=None):
+        """ACTIVE → INACTIVE: pause the batch — hidden from buyers and the
+        Market Hub until reactivated."""
+        stock = self.get_object()
+        if stock.status != ProductStock.Status.ACTIVE:
+            raise BusinessLogicError(
+                message=t('marketplace.only_active_deactivatable', self.get_language()),
+                code='only_active_deactivatable',
+            )
+        stock.status = ProductStock.Status.INACTIVE
+        stock.save()
+        _clear_public_market_cache()
+        return StandardResponse.success(
+            data=ProductStockSerializer(stock).data,
+            message=t('marketplace.stock_deactivated', self.get_language()),
+        )
+
+    @extend_schema(tags=['Marketplace - Product Stocks'])
+    @action(detail=True, methods=['post'])
+    def activate(self, request, product_pk=None, pk=None):
+        """INACTIVE → ACTIVE: list a paused batch again (validity permitting)."""
+        stock = self.get_object()
+        if stock.status != ProductStock.Status.INACTIVE:
+            raise BusinessLogicError(
+                message=t('marketplace.only_inactive_activatable', self.get_language()),
+                code='only_inactive_activatable',
+            )
+        if stock.available_until and stock.available_until < timezone.localdate():
+            raise BusinessLogicError(
+                message=t('marketplace.batch_validity_ended', self.get_language()),
+                code='batch_validity_ended',
+            )
+        stock.status = ProductStock.Status.ACTIVE
+        stock.save()
+        run_matching(stock)
+        _clear_public_market_cache()
+        return StandardResponse.success(
+            data=ProductStockSerializer(stock).data,
+            message=t('marketplace.stock_activated', self.get_language()),
         )

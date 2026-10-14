@@ -52,7 +52,7 @@ from apps.core.models.generic import AuditLog
 from apps.core.permissions.rbac import IsFPOManager
 from apps.core.services.audit import AuditService as AuditLogService
 from apps.core.services.fpo_permission import (
-    get_effective_permissions, get_grantable_actions, set_member_permissions,
+    default_allows, get_effective_permissions, get_grantable_actions, set_member_permissions,
 )
 from apps.core.services.translation import t
 from apps.core.utils.constants import FPOStatus, UserRole
@@ -230,8 +230,8 @@ def _permission_rows(role, lang, effective=None):
             'label':       action.get_label(lang),
             'description': action.get_description(lang),
             'page':        action.menu_item.path if action.menu_item else None,
-            # Role default is "allowed" — the ceiling already allows every grantable action
-            'is_allowed':  True if effective is None else effective.get(action.code, False),
+            # No member yet (invite form) → the default, which the invite form pre-ticks
+            'is_allowed':  default_allows(action.code) if effective is None else effective.get(action.code, False),
         })
     return rows
 

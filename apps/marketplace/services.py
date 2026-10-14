@@ -133,9 +133,10 @@ def _get_buyer_row(user):
 def buyer_catalogue_queryset(buyer):
     """
     Stock batches this buyer can see in the catalogue — the same rules as
-    BuyerProductListView: public, not deleted, ACTIVE or EXPIRED but still
-    inside the PRODUCT_GRACE_DAYS window, and never the buyer's own FPO's
-    listings. Used for the buyer dashboard counts so they match the catalogue.
+    BuyerProductListView: not deleted, product active, ACTIVE or EXPIRED but
+    still inside the PRODUCT_GRACE_DAYS window, and never the buyer's own FPO's
+    listings. is_public isn't required — it only controls the anonymous public
+    Market Hub. Used for the buyer dashboard counts and buyer inquiries.
     """
     from datetime import timedelta
 
@@ -147,7 +148,7 @@ def buyer_catalogue_queryset(buyer):
 
     grace_cutoff = timezone.now().date() - timedelta(days=PRODUCT_GRACE_DAYS)
     qs = ProductStock.objects.filter(
-        is_public=True, is_deleted=False, product__is_deleted=False,
+        is_deleted=False, product__is_deleted=False, product__is_active=True,
     ).filter(
         Q(status=ProductStock.Status.ACTIVE)
         | Q(status=ProductStock.Status.EXPIRED, available_until__gte=grace_cutoff)

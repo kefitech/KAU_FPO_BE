@@ -46,7 +46,9 @@ TEMPLATE_CODES = [
     ('fpo_phone_otp',               'sms',   'OTP to verify FPO office phone before submission',   ['otp']),
     ('admin_new_fpo_application',   'email',  'Notify admin when a new FPO application is submitted', ['fpo_name', 'application_id', 'district']),
     #arunima 17 sep 2026
-    ('verified_buyer_inquiry',     'email', 'Notify FPO when a verified buyer sends an inquiry',     ['fpo_name', 'product_name']),
+    ('verified_buyer_inquiry',     'email', 'Notify FPO when a verified buyer sends an inquiry',     ['fpo_name', 'product_name', 'batch_number']),
+    ('buyer_inquiry',              'email', 'Notify FPO when a visitor sends an inquiry from the public Market Hub',
+     ['fpo_name', 'product_name', 'batch_number', 'buyer_name', 'buyer_email', 'buyer_phone', 'buyer_message']),
     #====================================
     ('application_approved',        'in_app', 'In-app notification when FPO is approved',             ['user_name', 'application_id']),
     ('application_rejected',        'in_app', 'In-app notification when FPO is rejected',             ['user_name', 'rejection_reason']),
@@ -127,8 +129,8 @@ TEMPLATE_CODES = [
     ('product_stock_expired',        'email',  'Notify FPO that a product stock batch expired and was removed', ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
     ('product_stock_expired',        'in_app', 'In-app: product stock batch expired and was removed',           ['fpo_name', 'product_name', 'quantity', 'unit', 'available_until']),
     # Marketplace inquiries → FPO inbox (link opens the matching tab on /fpo/products)
-    ('inquiry_received', 'in_app', "In-app: a verified buyer sent an inquiry on one of the FPO's products", ['buyer_name', 'product_name', 'quantity', 'unit', 'link']),
-    ('inquiry_received_public', 'in_app', 'In-app: a visitor sent an inquiry from the public Market Hub', ['buyer_name', 'product_name', 'link']),
+    ('inquiry_received', 'in_app', "In-app: a verified buyer sent an inquiry on one of the FPO's products", ['buyer_name', 'product_name', 'quantity', 'unit', 'batch_number', 'link']),
+    ('inquiry_received_public', 'in_app', 'In-app: a visitor sent an inquiry from the public Market Hub', ['buyer_name', 'product_name', 'batch_number', 'link']),
     # Inquiry status updates → the buyer's inbox (contact account + the member who submitted it)
     ('inquiry_contacted', 'in_app', "In-app: the selling FPO marked the buyer's inquiry as contacted", ['product_name', 'fpo_name']),
     ('inquiry_resolved',  'in_app', "In-app: the selling FPO marked the buyer's inquiry as resolved",  ['product_name', 'fpo_name']),
@@ -580,7 +582,7 @@ TEMPLATES = [
         'New Buyer Inquiry — {{product_name}}',
         (
             '<p>Dear <strong>{{fpo_name}}</strong>,</p>'
-            '<p>A verified buyer has sent an inquiry about your product <strong>{{product_name}}</strong>.</p>'
+            '<p>A verified buyer has sent an inquiry about your product <strong>{{product_name}}</strong> (batch <strong>{{batch_number}}</strong>).</p>'
             '<p>Please log in to the KAU-FPO Platform and open Inquiries on your Products page to view the details and respond.</p>'
         ),
     ),
@@ -589,8 +591,36 @@ TEMPLATES = [
         'പുതിയ ക്രേതാവ് അന്വേഷണം — {{product_name}}',
         (
             '<p>പ്രിയ <strong>{{fpo_name}}</strong>,</p>'
-            '<p>നിങ്ങളുടെ ഉൽപ്പന്നമായ <strong>{{product_name}}</strong> സംബന്ധിച്ച് ഒരു പരിശോധിച്ച ക്രേതാവ് അന്വേഷണം അയച്ചിട്ടുണ്ട്.</p>'
+            '<p>നിങ്ങളുടെ ഉൽപ്പന്നമായ <strong>{{product_name}}</strong> (ബാച്ച് <strong>{{batch_number}}</strong>) സംബന്ധിച്ച് ഒരു പരിശോധിച്ച ക്രേതാവ് അന്വേഷണം അയച്ചിട്ടുണ്ട്.</p>'
             '<p>വിശദാംശങ്ങൾ കാണാനും മറുപടി നൽകാനും KAU-FPO പ്ലാറ്റ്‌ഫോമിൽ ലോഗിൻ ചെയ്ത് ഉൽപ്പന്നങ്ങൾ പേജിലെ അന്വേഷണങ്ങൾ തുറക്കുക.</p>'
+        ),
+    ),
+    # Public Market Hub inquiry — the visitor has no account, so unlike the
+    # verified-buyer email above this one carries their contact details.
+    (
+        'buyer_inquiry', 'email', 'en',
+        'New Market Hub Inquiry — {{product_name}}',
+        (
+            '<p>Dear <strong>{{fpo_name}}</strong>,</p>'
+            '<p>A visitor on the public Market Hub has sent an inquiry about your product <strong>{{product_name}}</strong> (batch <strong>{{batch_number}}</strong>).</p>'
+            '<p><strong>Name:</strong> {{buyer_name}}<br>'
+            '<strong>Email:</strong> {{buyer_email}}<br>'
+            '<strong>Phone:</strong> {{buyer_phone}}</p>'
+            '<p><strong>Message:</strong><br>{{buyer_message}}</p>'
+            '<p>Please contact them directly, then update the inquiry under Market Hub Inquiries on your Products page.</p>'
+        ),
+    ),
+    (
+        'buyer_inquiry', 'email', 'ml',
+        'പുതിയ മാർക്കറ്റ് ഹബ് അന്വേഷണം — {{product_name}}',
+        (
+            '<p>പ്രിയ <strong>{{fpo_name}}</strong>,</p>'
+            '<p>പൊതു മാർക്കറ്റ് ഹബ്ബിലെ ഒരു സന്ദർശകൻ നിങ്ങളുടെ ഉൽപ്പന്നമായ <strong>{{product_name}}</strong> (ബാച്ച് <strong>{{batch_number}}</strong>) സംബന്ധിച്ച് അന്വേഷണം അയച്ചിട്ടുണ്ട്.</p>'
+            '<p><strong>പേര്:</strong> {{buyer_name}}<br>'
+            '<strong>ഇ-മെയിൽ:</strong> {{buyer_email}}<br>'
+            '<strong>ഫോൺ:</strong> {{buyer_phone}}</p>'
+            '<p><strong>സന്ദേശം:</strong><br>{{buyer_message}}</p>'
+            '<p>അവരെ നേരിട്ട് ബന്ധപ്പെട്ട ശേഷം, ഉൽപ്പന്നങ്ങൾ പേജിലെ മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങളിൽ അന്വേഷണത്തിന്റെ നില പുതുക്കുക.</p>'
         ),
     ),
     # ── WhatsApp templates ───────────────────────────────────────────────────────
@@ -1462,22 +1492,22 @@ TEMPLATES = [
     (
         'inquiry_received', 'in_app', 'en',
         'New inquiry — {{product_name}}',
-        '<strong>{{buyer_name}}</strong> has requested {{quantity}} {{unit}} of <strong>{{product_name}}</strong>. Open Inquiries to view their contact details and respond.',
+        '<strong>{{buyer_name}}</strong> has requested {{quantity}} {{unit}} of <strong>{{product_name}}</strong> (batch {{batch_number}}). Open Inquiries to view their contact details and respond.',
     ),
     (
         'inquiry_received', 'in_app', 'ml',
         'പുതിയ അന്വേഷണം — {{product_name}}',
-        '<strong>{{buyer_name}}</strong> <strong>{{product_name}}</strong> {{quantity}} {{unit}} ആവശ്യപ്പെട്ടിരിക്കുന്നു. ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ കാണാനും മറുപടി നൽകാനും അന്വേഷണങ്ങൾ തുറക്കുക.',
+        '<strong>{{buyer_name}}</strong> <strong>{{product_name}}</strong> (ബാച്ച് {{batch_number}}) {{quantity}} {{unit}} ആവശ്യപ്പെട്ടിരിക്കുന്നു. ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ കാണാനും മറുപടി നൽകാനും അന്വേഷണങ്ങൾ തുറക്കുക.',
     ),
     (
         'inquiry_received_public', 'in_app', 'en',
         'New Market Hub inquiry — {{product_name}}',
-        '<strong>{{buyer_name}}</strong> sent an inquiry about <strong>{{product_name}}</strong> from the public Market Hub. Open Market Hub Inquiries to view and respond.',
+        '<strong>{{buyer_name}}</strong> sent an inquiry about <strong>{{product_name}}</strong> (batch {{batch_number}}) from the public Market Hub. Open Market Hub Inquiries to view and respond.',
     ),
     (
         'inquiry_received_public', 'in_app', 'ml',
         'പുതിയ മാർക്കറ്റ് ഹബ് അന്വേഷണം — {{product_name}}',
-        '<strong>{{buyer_name}}</strong> പൊതു മാർക്കറ്റ് ഹബ്ബിൽ നിന്ന് <strong>{{product_name}}</strong> സംബന്ധിച്ച് അന്വേഷണം അയച്ചു. കാണാനും മറുപടി നൽകാനും മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ തുറക്കുക.',
+        '<strong>{{buyer_name}}</strong> പൊതു മാർക്കറ്റ് ഹബ്ബിൽ നിന്ന് <strong>{{product_name}}</strong> (ബാച്ച് {{batch_number}}) സംബന്ധിച്ച് അന്വേഷണം അയച്ചു. കാണാനും മറുപടി നൽകാനും മാർക്കറ്റ് ഹബ് അന്വേഷണങ്ങൾ തുറക്കുക.',
     ),
     # Marketplace inquiry status updates (in-app → buyer)
     (
