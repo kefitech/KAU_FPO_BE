@@ -31,7 +31,7 @@ from apps.core.services.fpo_permission import fpo_notification_recipients
 from apps.marketplace.api.buyers import _resolve_buyer_user
 from apps.marketplace.permissions import CanManageProducts
 from apps.marketplace.serializers import InquiryCreateSerializer, InquirySerializer, MarketHubInquirySerializer
-from apps.marketplace.services import _get_buyer_row
+from apps.marketplace.services import _get_buyer_row, buyer_catalogue_queryset
 
 
 class InquiryCreateView(APIView):
@@ -59,12 +59,10 @@ class InquiryCreateView(APIView):
         # `pk` is a ProductStock id — the buyer catalog surfaces one card
         # per batch, and that card's `id` is the stock id. The inquiry
         # therefore locks onto the specific batch the buyer saw, not the
-        # product master.
+        # product master. Any batch the catalog shows can be inquired on —
+        # including grace-window ("Validity is over") batches, for a restock.
         try:
-            stock = ProductStock.objects.select_related('product__fpo').get(
-                pk=pk, status=ProductStock.Status.ACTIVE,
-                is_public=True, is_deleted=False, product__is_deleted=False,
-            )
+            stock = buyer_catalogue_queryset(buyer).select_related('product__fpo').get(pk=pk)
         except ProductStock.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=http_status.HTTP_404_NOT_FOUND)
 
@@ -77,6 +75,7 @@ class InquiryCreateView(APIView):
 
         inquiry = Inquiry.objects.create(
             product=product,
+            stock=stock,  # the batch the buyer saw — shown to the FPO as its batch number
             buyer=buyer,
             contact_user=contact_user,
             submitted_by=request.user,
@@ -97,6 +96,7 @@ class InquiryCreateView(APIView):
                     context={
                         'product_name': product.name.get('en', '') if product.name else '',
                         'fpo_name': product.fpo.name,
+                        'batch_number': stock.batch_number,
                     },
                 )
             except Exception:
@@ -116,6 +116,7 @@ class InquiryCreateView(APIView):
                 'product_name': escape(product.name.get('en', '') if product.name else ''),
                 'quantity': f'{quantity.normalize():f}' if quantity is not None else '',
                 'unit': stock.unit,
+                'batch_number': stock.batch_number,
                 'link': '/fpo/products?view=inquiries',
             }
             for recipient in fpo_notification_recipients(product.fpo, 'can_manage_products'):
@@ -153,7 +154,7 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         queryset = Inquiry.objects.filter(
             product__fpo=get_member_fpo(self.request.user),
             is_deleted=False,
-        ).select_related('product', 'buyer', 'buyer__fpo', 'contact_user').order_by('-created_at')
+        ).select_related('product', 'stock', 'buyer', 'buyer__fpo', 'contact_user').order_by('-created_at')
 
         search = self.request.query_params.get('search', '').strip()
         if search:
@@ -162,6 +163,7 @@ class InquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 | Q(product__name__ml__icontains=search)
                 | Q(buyer__name__icontains=search)
                 | Q(buyer__fpo__name__icontains=search)
+                | Q(stock__batch_number__icontains=search)
             )
 
         status = self.request.query_params.get('status')
@@ -255,7 +257,7 @@ class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             buyer__fpo__isnull=True,
             buyer__user__isnull=True,
             is_deleted=False,
-        ).select_related('product', 'buyer').order_by('-suggested_at')
+        ).select_related('product', 'stock', 'buyer').order_by('-suggested_at')
 
         search = self.request.query_params.get('search', '').strip()
         if search:
@@ -263,6 +265,7 @@ class MarketHubInquiryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 Q(product__name__en__icontains=search)
                 | Q(product__name__ml__icontains=search)
                 | Q(buyer__name__icontains=search)
+                | Q(stock__batch_number__icontains=search)
             )
 
         status = self.request.query_params.get('status')

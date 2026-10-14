@@ -43,6 +43,17 @@ class Product(BaseModel):
         upload_to=_product_image_path, null=True, blank=True,
         help_text='Product photo shown on FPO products page and public Market Hub'
     )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Product-level switch. When off, none of its batches are shown to '
+                  'buyers or on the public Market Hub — the batches keep their own '
+                  'status, so switching the product back on restores them as they were.'
+    )
+    batch_counter = models.PositiveIntegerField(
+        default=0, editable=False,
+        help_text='Last batch sequence issued for this product (see ProductStock.batch_number). '
+                  'Only ever increases, so a number is never reused after a batch is deleted.'
+    )
 
     class Meta:
         verbose_name = 'Product'
@@ -107,11 +118,19 @@ class ProductStock(BaseModel):
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Draft'
         ACTIVE = 'active', 'Active'
+        # Paused by the FPO: hidden from buyers / the Market Hub, can be reactivated.
+        INACTIVE = 'inactive', 'Inactive'
         SOLD = 'sold', 'Sold'
         EXPIRED = 'expired', 'Expired'
 
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='stocks'
+    )
+    batch_number = models.CharField(
+        max_length=30, unique=True, editable=False,
+        help_text='Auto-generated on create — "P<product id>-B<n>", n counting up per '
+                  'product (e.g. P34-B2). Shown on cards and inquiries so the FPO '
+                  'knows which batch a buyer asked about.'
     )
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     unit = models.CharField(max_length=20, choices=Unit.choices)
@@ -149,7 +168,24 @@ class ProductStock(BaseModel):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.product} — {self.quantity}{self.unit} ({self.status})"
+        return f"{self.batch_number} {self.product} — {self.quantity}{self.unit} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        if not self.batch_number:
+            self.batch_number = self._next_batch_number()
+        super().save(*args, **kwargs)
+
+    def _next_batch_number(self):
+        """Bump the product's counter and format the next number. The UPDATE
+        locks the product row until the transaction ends, so two batches
+        created at once for the same product can't read the same counter."""
+        from django.db import transaction
+        from django.db.models import F
+
+        with transaction.atomic():
+            Product.objects.filter(pk=self.product_id).update(batch_counter=F('batch_counter') + 1)
+            counter = Product.objects.values_list('batch_counter', flat=True).get(pk=self.product_id)
+        return f'P{self.product_id}-B{counter}'
 
 
 class BuyerDirectory(BaseModel):
@@ -217,6 +253,12 @@ class BuyerSellerMatch(BaseModel):
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='matches'
     )
+    stock = models.ForeignKey(
+        ProductStock, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='matches',
+        help_text='The batch the public Market Hub inquiry was made on. Null for '
+                  'algorithmic matches, rows older than this field, or a batch since deleted.'
+    )
     buyer = models.ForeignKey(
         BuyerDirectory, on_delete=models.CASCADE, related_name='matches'
     )
@@ -273,6 +315,12 @@ class Inquiry(BaseModel):
 
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='inquiries'
+    )
+    stock = models.ForeignKey(
+        ProductStock, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='inquiries',
+        help_text='The batch the buyer inquired on. Null for rows older than this '
+                  'field or a batch since deleted.'
     )
     buyer = models.ForeignKey(
         BuyerDirectory, on_delete=models.CASCADE, related_name='inquiries'

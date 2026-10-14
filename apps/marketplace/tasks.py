@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # KAU suggestion #3 — product keeps showing in the buyer directory for N
 # days after its `available_until` passes, with a "Validity is over —
-# contact the buyer to know if it's restocked" banner. Only after this
+# contact the seller to know if it's restocked" banner. Only after this
 # grace is the stock row genuinely deleted.
 PRODUCT_GRACE_DAYS = 3
 
@@ -156,7 +156,9 @@ def run_buyer_seller_matching():
     """Daily — run matching for every ACTIVE stock batch."""
     from apps.marketplace.services import run_matching
 
-    for stock in ProductStock.objects.filter(status=ProductStock.Status.ACTIVE).select_related('product'):
+    for stock in ProductStock.objects.filter(
+        status=ProductStock.Status.ACTIVE, product__is_active=True,
+    ).select_related('product'):
         run_matching(stock)
 
 

@@ -3,8 +3,10 @@ Buyer Product Catalog API
 ===========================
 GET /api/marketplace/buyer/products/
 
-Read-only list of all active, publicly-listed products across every FPO.
-Verified-buyer-only (external or FPO-as-buyer).
+Read-only list of all active products across every FPO.
+Verified-buyer-only (external or FPO-as-buyer). `is_public` is NOT required
+here — it only controls the anonymous public Market Hub (P2-11 business rule 3);
+verified buyers see every live batch.
 
 Query params:
     search      — matches against product name (English or Malayalam)
@@ -67,9 +69,10 @@ def _catalog_queryset(request, buyer, with_price=True):
     # One card per stock batch — a Product with two live batches
     # surfaces as two cards, each with its own quantity/price/validity.
     queryset = ProductStock.objects.filter(
-        is_public=True,
+        # No is_public filter — that flag is only for the public Market Hub.
         is_deleted=False,
         product__is_deleted=False,
+        product__is_active=True,
     ).filter(
         # PM-17 retest 2026-10-13: date-driven, never trusting status
         # alone — a late/missed expire_products cron left past-dated
@@ -226,9 +229,10 @@ class BuyerRecommendedProductsView(APIView):
 
         # One card per stock batch (same pattern as BuyerProductListView).
         queryset = ProductStock.objects.filter(
-            is_public=True,
+            # No is_public filter — that flag is only for the public Market Hub.
             is_deleted=False,
             product__is_deleted=False,
+            product__is_active=True,
             product__commodity__code__in=interested,
         ).filter(
             # PM-17 retest 2026-10-13: date-driven, never trusting status

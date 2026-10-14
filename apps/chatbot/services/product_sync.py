@@ -81,7 +81,7 @@ def build_product_entry(stock) -> dict | None:
         return None
 
     product = stock.product
-    if not product or product.is_deleted:
+    if not product or product.is_deleted or not product.is_active:
         return None
 
     fpo = product.fpo
@@ -114,7 +114,7 @@ def build_product_entry(stock) -> dict | None:
     parts.append(f'Available from {avail_from} to {avail_until}.')
     if in_grace:
         parts.append(
-            "Note: Validity is over — but please contact the buyer to know if it's restocked."
+            "Note: Validity is over — but please contact the seller to know if it's restocked."
         )
 
     # Malayalam product name in the body so a Malayalam chatbot user can also
@@ -233,7 +233,7 @@ def sync_all_active_products() -> dict:
     from apps.database.models.marketplace import ProductStock
 
     stocks = ProductStock.objects.select_related('product__fpo').filter(
-        is_deleted=False, is_public=True, status='active',
+        is_deleted=False, is_public=True, status='active', product__is_active=True,
     )
     created = updated = skipped = 0
     for stock in stocks:

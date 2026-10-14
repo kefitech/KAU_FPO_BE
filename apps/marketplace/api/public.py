@@ -33,12 +33,38 @@ CACHE_TTL = 60 * 60  # 1h — spec says shorter than CMS's 24h, since prices/sto
 
 # KAU suggestion #3 — "Validity is over" banner shown during the 3-day
 # grace window after a listing's available_until passes.
-_GRACE_MESSAGE_EN = 'Validity is over — but please contact the buyer to know if it\'s restocked.'
+_GRACE_MESSAGE_EN = 'Validity is over — but please contact the seller to know if it\'s restocked.'
 _GRACE_MESSAGE_ML = 'സാധുത കഴിഞ്ഞു — പക്ഷേ വീണ്ടും സ്റ്റോക്ക് വന്നിട്ടുണ്ടോ എന്നറിയാൻ വിൽപ്പനക്കാരനെ ബന്ധപ്പെടുക.'
 
 
 def _grace_message(lang: str) -> str:
     return _GRACE_MESSAGE_ML if lang == 'ml' else _GRACE_MESSAGE_EN
+
+
+def _listed_stocks():
+    """
+    Batches the public Market Hub lists — and so accepts inquiries on:
+    ACTIVE or EXPIRED stock up to the end of the 3-day grace window after
+    available_until (KAU #3). Grace cards keep their Inquire button so the
+    "Validity is over — contact the seller" banner has a way to act on it.
+
+    PM-17 retest 2026-10-13: the nightly expire_products cron can run
+    late/miss after stack restarts, leaving past-dated batches status=ACTIVE —
+    so visibility is date-driven, never trusting status alone. Anything past
+    the grace cutoff is hidden regardless of status.
+    """
+    from datetime import timedelta
+    from django.db.models import Q
+    from django.utils import timezone
+
+    grace_cutoff = timezone.now().date() - timedelta(days=PRODUCT_GRACE_DAYS)
+    return ProductStock.objects.filter(
+        is_public=True, is_deleted=False, product__is_deleted=False, product__is_active=True,
+        status__in=[ProductStock.Status.ACTIVE, ProductStock.Status.EXPIRED],
+    ).filter(
+        Q(available_until__isnull=True)
+        | Q(available_until__gte=grace_cutoff)
+    )
 
 
 def _lang(request):
@@ -62,7 +88,7 @@ class PublicCommodityListView(APIView):
         # ProductStock FK means a product with multiple batches is joined once
         # per batch — set() dedupes the commodity codes.
         commodity_codes = set(Product.objects.filter(
-            stocks__is_public=True, stocks__status=ProductStock.Status.ACTIVE, is_deleted=False,
+            stocks__is_public=True, stocks__status=ProductStock.Status.ACTIVE, is_deleted=False, is_active=True,
         ).values_list('commodity__code', flat=True))
 
         data = []
@@ -121,28 +147,16 @@ class PublicProductListView(APIView):
         cache_key = f'public:market:products:{lang}:{search or "-"}:{commodity or "-"}'
         cached = cache.get(cache_key)
         if cached is None:
-            from datetime import timedelta
             from django.db.models import Q
             from django.utils import timezone
 
             today = timezone.now().date()
-            grace_cutoff = today - timedelta(days=PRODUCT_GRACE_DAYS)
 
-            # KAU #3 — include ACTIVE stock + EXPIRED stock still within the
-            # 3-day grace window so buyers see "Validity is over" listings.
-            # PM-17 retest 2026-10-13: the nightly expire_products cron can
-            # run late/miss after stack restarts, leaving past-dated batches
-            # status=ACTIVE — so the DISPLAY decision is date-driven, never
-            # trusting status alone. Anything past the grace cutoff is
-            # hidden regardless of status.
-            queryset = ProductStock.objects.filter(
-                is_public=True, is_deleted=False,
-                product__is_deleted=False,
-                status__in=[ProductStock.Status.ACTIVE, ProductStock.Status.EXPIRED],
-            ).filter(
-                Q(available_until__isnull=True)
-                | Q(available_until__gte=grace_cutoff)
-            ).select_related('product', 'product__commodity', 'product__fpo').order_by('-created_at')
+            # KAU #3 — ACTIVE stock + EXPIRED stock still within the 3-day
+            # grace window, so buyers see "Validity is over" listings.
+            queryset = _listed_stocks().select_related(
+                'product', 'product__commodity', 'product__fpo',
+            ).order_by('-created_at')
 
             if search:
                 queryset = queryset.filter(
@@ -161,6 +175,7 @@ class PublicProductListView(APIView):
                 )
                 cached.append({
                     'id': s.id,
+                    'batch_number': s.batch_number,
                     'product_id': p.id,
                     'name': p.name,
                     'description': p.description,
@@ -207,7 +222,7 @@ class PublicProductDetailView(APIView):
         try:
             # KAU #3 — fetch ACTIVE or EXPIRED-in-grace stock.
             s = ProductStock.objects.select_related('product__commodity', 'product__fpo').filter(
-                pk=pk, is_public=True, is_deleted=False, product__is_deleted=False,
+                pk=pk, is_public=True, is_deleted=False, product__is_deleted=False, product__is_active=True,
             ).filter(
                 Q(status=ProductStock.Status.ACTIVE)
                 | Q(
@@ -222,6 +237,7 @@ class PublicProductDetailView(APIView):
         in_grace = s.status == ProductStock.Status.EXPIRED
         data = {
             'id': s.id,
+            'batch_number': s.batch_number,
             'product_id': p.id,
             'name': p.name,
             'description': p.description,
@@ -242,7 +258,12 @@ class PublicProductDetailView(APIView):
 
 import re
 
-NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z\s'-]*$")
+# English or Malayalam letters (incl. Malayalam vowel signs/chillu and the
+# ZWJ/ZWNJ used to render them), plus spaces, dots for initials ("K. Ravi"),
+# apostrophes and hyphens. Same rule as the Market Hub form (market-hub/page.tsx).
+NAME_PATTERN = re.compile(r"^[A-Za-zഀ-ൿ][A-Za-zഀ-ൿ‌‍ .'-]*$")
+NAME_MIN_LENGTH = 2
+MESSAGE_MAX_LENGTH = 1000
 PHONE_PATTERN = re.compile(r"^\d{10}$")
 
 
@@ -250,13 +271,16 @@ class PublicInquirySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     email = serializers.EmailField()
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
-    message = serializers.CharField(required=False, allow_blank=True)
+    # CharField trims surrounding whitespace by default.
+    message = serializers.CharField(required=False, allow_blank=True, max_length=MESSAGE_MAX_LENGTH)
 
     def validate_name(self, value):
-        value = value.strip()
+        value = ' '.join(value.split())  # trim + collapse inner whitespace
+        if len(value) < NAME_MIN_LENGTH:
+            raise serializers.ValidationError(f'Name must be at least {NAME_MIN_LENGTH} characters.')
         if not NAME_PATTERN.match(value):
             raise serializers.ValidationError(
-                'Name must contain only letters, spaces, apostrophes, or hyphens.'
+                'Name can only contain letters, spaces, dots, apostrophes and hyphens.'
             )
         return value
 
@@ -282,11 +306,10 @@ class PublicProductInquireView(APIView):
         # `pk` here is a ProductStock id — the public list surfaces one
         # card per batch, so the inquiry locks onto the specific batch
         # the visitor saw.
+        # Any card the list shows can be inquired on — including grace-window
+        # ("Validity is over") batches, where the visitor is asking about a restock.
         try:
-            stock = ProductStock.objects.select_related('product__fpo', 'product__commodity').get(
-                pk=pk, status=ProductStock.Status.ACTIVE, is_public=True,
-                is_deleted=False, product__is_deleted=False,
-            )
+            stock = _listed_stocks().select_related('product__fpo', 'product__commodity').get(pk=pk)
         except ProductStock.DoesNotExist:
             return StandardResponse.error(message='Product not found', status_code=status.HTTP_404_NOT_FOUND)
         product = stock.product
@@ -305,6 +328,7 @@ class PublicProductInquireView(APIView):
 
         match = BuyerSellerMatch.objects.create(
             product=product,
+            stock=stock,  # the batch the visitor saw — shown to the FPO as its batch number
             buyer=buyer,
             match_score=1,
             status=BuyerSellerMatch.Status.SUGGESTED,
@@ -316,6 +340,9 @@ class PublicProductInquireView(APIView):
         if primary_user:
             from apps.notifications.services import send_notification
             try:
+                # Carries the visitor's contact details — they have no account,
+                # so the email is how the FPO reaches them. render() escapes
+                # the values for the HTML body.
                 send_notification(
                     user=primary_user,
                     code='buyer_inquiry',
@@ -325,9 +352,11 @@ class PublicProductInquireView(APIView):
                         'product_name': product.name.get('en', ''),
                         'buyer_name': data['name'],
                         'buyer_email': data['email'],
-                        'buyer_phone': data.get('phone', ''),
-                        'buyer_message': data.get('message', ''),
+                        'buyer_phone': data.get('phone') or '—',
+                        'buyer_message': data.get('message') or '—',
+                        'batch_number': stock.batch_number,
                     },
+                    lang=getattr(getattr(primary_user, 'profile', None), 'preferred_language', None) or 'en',
                 )
             except Exception:
                 pass  # Inquiry already saved — don't fail the request if notification dispatch fails
@@ -342,6 +371,7 @@ class PublicProductInquireView(APIView):
             in_app_context = {
                 'buyer_name': escape(data['name']),
                 'product_name': escape(product.name.get('en', '')),
+                'batch_number': stock.batch_number,
                 'link': '/fpo/products?view=market-hub-inquiries',
             }
             for recipient in fpo_notification_recipients(product.fpo, 'can_manage_products'):

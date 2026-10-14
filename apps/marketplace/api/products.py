@@ -230,19 +230,26 @@ class ProductViewSet(TranslatedViewSet):
 
         search = self.request.query_params.get('search', '').strip()
         if search:
+            # Batch numbers are searchable too (e.g. "P34-B2" from an inquiry).
             queryset = queryset.filter(
                 Q(name__en__icontains=search) | Q(name__ml__icontains=search)
-            )
+                | Q(stocks__batch_number__icontains=search)
+            ).distinct()
 
         status = self.request.query_params.get('status')
         if status in (
-            ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE,
+            ProductStock.Status.DRAFT, ProductStock.Status.ACTIVE, ProductStock.Status.INACTIVE,
             ProductStock.Status.SOLD, ProductStock.Status.EXPIRED,
         ):
             # Any batch in the requested status qualifies the product. distinct()
             # because the inner JOIN duplicates products with multiple matching
             # batches.
             queryset = queryset.filter(stocks__status=status).distinct()
+
+        # Product-level switch (the products table's Status column / filter).
+        product_status = self.request.query_params.get('product_status')
+        if product_status in ('active', 'inactive'):
+            queryset = queryset.filter(is_active=product_status == 'active')
         return queryset
 
     # update()/destroy() are NOT overridden — per house convention, business
@@ -343,6 +350,37 @@ class ProductViewSet(TranslatedViewSet):
             data=ProductSerializer(product).data,
             message=t('marketplace.product_sold', self.get_language())
         )
+
+    def _set_active(self, is_active, message_key):
+        """Product-level switch. Batches keep their own status, so switching
+        the product back on restores exactly the batches that were live."""
+        product = self.get_object()
+        if product.is_active != is_active:
+            product.is_active = is_active
+            product.save(update_fields=['is_active', 'updated_at'])
+            # Chatbot product entries are synced per batch on batch save —
+            # refresh them so they drop out (or come back) with the product.
+            from apps.chatbot.services.product_sync import upsert_product_entry
+            for stock in product.stocks.filter(is_deleted=False):
+                try:
+                    upsert_product_entry(stock)
+                except Exception:
+                    pass  # KB sync is best-effort; never block the switch on it
+            _clear_public_market_cache()
+        return StandardResponse.success(
+            data=ProductSerializer(product, context=self.get_serializer_context()).data,
+            message=t(message_key, self.get_language()),
+        )
+
+    @extend_schema(tags=['Marketplace - Products'], summary='Hide the product and all its batches from buyers')
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        return self._set_active(False, 'marketplace.product_deactivated')
+
+    @extend_schema(tags=['Marketplace - Products'], summary='Show the product to buyers again')
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        return self._set_active(True, 'marketplace.product_activated')
 
     @extend_schema(tags=['Marketplace - Products'], summary='Download bulk-import Excel template')
     @action(detail=False, methods=['get'], url_path='bulk-template')
