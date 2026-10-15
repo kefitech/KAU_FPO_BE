@@ -21,7 +21,6 @@ from django.db.models import Case, Exists, F, IntegerField, OuterRef, Q, Subquer
 from django.utils import timezone
 from apps.core.utils.constants import DISTRICT_ZONE
 from apps.notifications.services import send_notification
-from apps.notifications.webmail import webmail_url
 
 
 class ExpertPublicSerializer(serializers.ModelSerializer):
@@ -249,14 +248,14 @@ class ExpertEnquiryView(APIView):
             pass
 
         # In-app notice on the expert's own login, when they have one. Clicking it opens
-        # their webmail, where the enquiry email above lands.
+        # the full message in the inbox, with a Reply button addressed to the sender.
         if expert.user_id:
             try:
                 send_notification(
                     user=expert.user,
                     code='expert_enquiry',
                     channel='in_app',
-                    context={**context, 'link': webmail_url(expert.email)},
+                    context={**context, 'reply_to': request.user.email},
                 )
             except Exception:
                 pass

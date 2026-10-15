@@ -22,6 +22,9 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.utils import timezone
 
 from apps.core.utils.responses import StandardResponse
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
+
 from apps.core.utils.pagination import StandardPagination
 from apps.core.services.translation import t
 
@@ -41,8 +44,26 @@ def notification_link(notif):
         return link
     parts = urlsplit(link)
     if parts.scheme == 'https' and parts.hostname in WEBMAIL_HOSTS:
-        return link
+        # A notice that can be answered in-app (reply_to) stays in the inbox;
+        # enquiry notices sent before the Reply button carried a webmail link.
+        return None if notification_reply_to(notif) else link
     return None
+
+
+def notification_reply_to(notif):
+    """The sender's email address when the notice can be answered by email
+    (an expert's enquiry notice puts the FPO member's address in `reply_to`)."""
+    context = (notif.log.context or {}) if notif.log else {}
+    value = context.get('reply_to')
+    if value is None and notif.log and notif.log.template_code and notif.log.template_code.code == 'expert_enquiry':
+        value = context.get('user_email')  # notices sent before reply_to existed
+    if not isinstance(value, str):
+        return None
+    try:
+        validate_email(value)
+    except DjangoValidationError:
+        return None
+    return value
 
 
 class InAppNotificationSerializer(serializers.ModelSerializer):
@@ -50,10 +71,11 @@ class InAppNotificationSerializer(serializers.ModelSerializer):
     body = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
+    reply_to = serializers.SerializerMethodField()
 
     class Meta:
         model  = InAppNotification
-        fields = ['id', 'title', 'body', 'category', 'link', 'is_read', 'read_at', 'created_at']
+        fields = ['id', 'title', 'body', 'category', 'link', 'reply_to', 'is_read', 'read_at', 'created_at']
         read_only_fields = ['id', 'is_read', 'read_at', 'created_at']
 
     def _get_language(self):
@@ -94,6 +116,9 @@ class InAppNotificationSerializer(serializers.ModelSerializer):
 
     def get_link(self, obj):
         return notification_link(obj)
+
+    def get_reply_to(self, obj):
+        return notification_reply_to(obj)
 
 
 @extend_schema_view(

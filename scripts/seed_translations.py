@@ -7007,6 +7007,9 @@ def seed_cbbo_portal_translations(languages):
          'ആദ്യ നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
         ('fpo_settings.val_last_name_symbols',  'Last name must contain letters or numbers, not only symbols.',
          'അവസാന നാമത്തിൽ അക്ഷരങ്ങളോ അക്കങ്ങളോ ഉണ്ടായിരിക്കണം, ചിഹ്നങ്ങൾ മാത്രം പോരാ.'),
+        # Inbox + bell — reply to an enquiry by email (mailto to the sender)
+        ('inbox_page.btn_reply_email', 'Reply by email', 'ഇമെയിൽ വഴി മറുപടി നൽകുക'),
+        ('notification_bell.btn_reply_email', 'Reply by email', 'ഇമെയിൽ വഴി മറുപടി നൽകുക'),
         # Expert availability — time-slot validation (reversed / overlapping slots)
         ('expert_availability.error_slot_missing_time', 'Enter both a start and an end time.', 'ആരംഭ സമയവും അവസാന സമയവും നൽകുക.'),
         ('expert_availability.error_slot_reversed', 'End time is earlier than the start time. Pick an end time after {start}.', 'അവസാന സമയം ആരംഭ സമയത്തേക്കാൾ മുമ്പാണ്. {start}-ന് ശേഷമുള്ള ഒരു അവസാന സമയം തിരഞ്ഞെടുക്കുക.'),

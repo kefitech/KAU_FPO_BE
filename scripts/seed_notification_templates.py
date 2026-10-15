@@ -71,7 +71,7 @@ TEMPLATE_CODES = [
     ('claim_docs_submitted',        'in_app', 'In-app: claimant submitted the claim document requested by the admin',  ['claimant_name', 'fpo_name']),
     # Expert enquiry
     ('expert_enquiry',              'email',  'Email sent to expert when an FPO submits a contact enquiry',            ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
-    ('expert_enquiry',              'in_app', 'In-app: an FPO sent the expert an enquiry (opens their webmail)',      ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
+    ('expert_enquiry',              'in_app', 'In-app: an FPO sent the expert an enquiry (read + reply by email in the inbox)', ['expert_name', 'fpo_name', 'user_name', 'user_email', 'message']),
     # DPR Generation (P2-07)
     ('dpr_generated',               'email',  'Email to FPO when DPR PDF is ready to download',                       ['user_name', 'project_title', 'financial_year', 'button_link', 'button_text']),
     ('dpr_generated',               'in_app', 'In-app notification when DPR PDF is ready',                            ['user_name', 'project_title', 'financial_year']),
@@ -922,16 +922,17 @@ TEMPLATES = [
 <p style="background:#f9f9f9;border-left:4px solid #2e7d32;padding:12px 16px;border-radius:4px;">{{message}}</p>
 <p>ഈ അന്വേഷണത്തിന് മറുപടി നൽകാൻ <a href="mailto:{{user_email}}">{{user_email}}</a>-ലേക്ക് നേരിട്ട് മറുപടി അയക്കുക.</p>''',
     ),
-    # Expert enquiry — in-app notice to the expert; clicking it opens their webmail
+    # Expert enquiry — in-app notice to the expert; the inbox shows the message
+    # with a "Reply by email" button addressed to the member (context reply_to)
     (
         'expert_enquiry', 'in_app', 'en',
         'New enquiry from {{fpo_name}}',
-        '<strong>{{user_name}}</strong> sent you an enquiry. Open your email to read it and reply: {{message}}',
+        '<strong>{{user_name}}</strong> from {{fpo_name}} wrote:<br><br>{{message}}',
     ),
     (
         'expert_enquiry', 'in_app', 'ml',
         '{{fpo_name}}-ൽ നിന്ന് പുതിയ അന്വേഷണം',
-        '<strong>{{user_name}}</strong> നിങ്ങൾക്ക് ഒരു അന്വേഷണം അയച്ചിരിക്കുന്നു. വായിക്കാനും മറുപടി നൽകാനും നിങ്ങളുടെ ഇമെയിൽ തുറക്കുക: {{message}}',
+        '{{fpo_name}}-ൽ നിന്നുള്ള <strong>{{user_name}}</strong> എഴുതി:<br><br>{{message}}',
     ),
 
     # ── DPR Generated (P2-07) ─────────────────────────────────────────────
