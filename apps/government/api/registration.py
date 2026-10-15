@@ -29,7 +29,7 @@ from apps.government.api.validators import validate_id_number
 logger = logging.getLogger(__name__)
 
 _OTP_TTL      = 600  # 10 minutes
-_VERIFIED_TTL = 900  # 15 minutes — enough time to finish filling the form
+_VERIFIED_TTL = 3600  # 1 hour — enough time to finish filling the form
 _MAX_SENDS    = 3
 _MAX_ATTEMPTS = 3
 
