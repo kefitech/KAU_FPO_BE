@@ -157,6 +157,12 @@ class ProductStock(BaseModel):
         help_text='Visible on public Market Hub (P2-12)'
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    paused_with_product = models.BooleanField(
+        default=False,
+        help_text='Set when switching the product off moved this batch ACTIVE → INACTIVE, '
+                  'so switching the product back on restores it. Batches the FPO paused '
+                  'individually stay unset and stay paused.'
+    )
     # 3-day-before-expiry reminder should fire exactly once per stock batch —
     # this flag prevents the daily Celery task from re-sending it every day
     # between the 3-day mark and actual expiry.

@@ -159,8 +159,10 @@ class PublicProductListView(APIView):
             ).order_by('-created_at')
 
             if search:
+                # Product name (EN/ML) or batch number, e.g. "P34-B2" quoted by a buyer.
                 queryset = queryset.filter(
                     Q(product__name__en__icontains=search) | Q(product__name__ml__icontains=search)
+                    | Q(batch_number__icontains=search)
                 )
             if commodity:
                 queryset = queryset.filter(product__commodity__code=commodity)

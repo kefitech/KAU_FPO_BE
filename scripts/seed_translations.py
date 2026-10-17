@@ -1656,6 +1656,7 @@ def seed_ui_translations(languages):
         ('ml_models.deployment_date_required', 'Deployment date is required',                                'വിന്യാസ തീയതി ആവശ്യമാണ്'),
         ('ml_models.model_file_label',         'Model File',                                                 'മോഡൽ ഫയൽ'),
         ('ml_models.model_file_required',      'A model file is required.',                                  'ഒരു മോഡൽ ഫയൽ ആവശ്യമാണ്.'),
+        ('ml_models.remove_file',              'Remove file',                                                'ഫയൽ നീക്കം ചെയ്യുക'),
         ('ml_models.model_file_helper',        "The file is checked by the ML service before it's registered: it must be a joblib classifier trained on this service's exact feature columns. Files that don't fit are rejected with the specific mismatch. This is a structural check only — it doesn't judge whether the model is any good.", 'ഫയൽ രജിസ്റ്റർ ചെയ്യുന്നതിന് മുമ്പ് ML സേവനം അത് പരിശോധിക്കുന്നു: ഇത് ഈ സേവനത്തിന്റെ കൃത്യമായ ഫീച്ചർ കോളങ്ങളിൽ പരിശീലിപ്പിച്ച ഒരു joblib ക്ലാസിഫയർ ആയിരിക്കണം. യോജിക്കാത്ത ഫയലുകൾ നിർദ്ദിഷ്ട പൊരുത്തക്കേടോടെ നിരസിക്കപ്പെടും. ഇത് ഒരു ഘടനാപരമായ പരിശോധന മാത്രമാണ് — മോഡൽ നല്ലതാണോ എന്ന് ഇത് വിലയിരുത്തുന്നില്ല.'),
         ('ml_models.cancel',                   'Cancel',                                                     'റദ്ദാക്കുക'),
         ('ml_models.register',                 'Register',                                                   'രജിസ്റ്റർ ചെയ്യുക'),
@@ -5277,6 +5278,8 @@ def seed_marketplace_translations(languages):
         ('product_sold',              'Product marked as sold successfully',               'ഉൽപ്പന്നം വിറ്റതായി വിജയകരമായി അടയാളപ്പെടുത്തി'),
         ('product_activated',         'Product activated',                                 'ഉൽപ്പന്നം സജീവമാക്കി'),
         ('product_deactivated',       'Product deactivated',                               'ഉൽപ്പന്നം നിഷ്ക്രിയമാക്കി'),
+        ('product_all_batches_inactive', 'All batches of this product are inactive. Activate a batch to make the product active.',
+         'ഈ ഉൽപ്പന്നത്തിന്റെ എല്ലാ ബാച്ചുകളും നിഷ്ക്രിയമാണ്. ഉൽപ്പന്നം സജീവമാക്കാൻ ഒരു ബാച്ച് സജീവമാക്കുക.'),
         # Stock batches
         ('stocks_retrieved',          'Batches retrieved successfully',                    'ബാച്ചുകൾ വിജയകരമായി ലഭിച്ചു'),
         ('stock_created',             'Batch created successfully',                        'ബാച്ച് വിജയകരമായി സൃഷ്ടിച്ചു'),
@@ -5588,8 +5591,8 @@ def seed_market_hub_translations(languages):
          'മാർക്കറ്റ് ഹബ്'),
         ('market_hub.breadcrumb',         'Market Hub',
          'മാർക്കറ്റ് ഹബ്'),
-        ('market_hub.search_placeholder', 'Search products...',
-         'ഉൽപ്പന്നങ്ങൾ തിരയുക...'),
+        ('market_hub.search_placeholder', 'Search products or batch number...',
+         'ഉൽപ്പന്നങ്ങളോ ബാച്ച് നമ്പറോ തിരയുക...'),
         ('market_hub.empty_state',        'No products found',
          'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല'),
         ('market_hub.label_quantity',     'Quantity',
@@ -5972,6 +5975,26 @@ def seed_fpo_buyer_directory_translations(languages):
         ('fpo_buyer_directory.empty_state', 'No products found.',
          'ഉൽപ്പന്നങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
 
+        # ── price range filter (slider + Min/Max + Go) — same wording as buyer_products ──
+        ('fpo_buyer_directory.filter_price', 'Price',
+         'വില'),
+        ('fpo_buyer_directory.price_per_unit', 'Price per unit',
+         'യൂണിറ്റിന് വില'),
+        ('fpo_buyer_directory.price_min_placeholder', 'Min',
+         'കുറഞ്ഞത്'),
+        ('fpo_buyer_directory.price_max_placeholder', 'Max',
+         'കൂടിയത്'),
+        ('fpo_buyer_directory.btn_price_go', 'Go',
+         'പോകുക'),
+        ('fpo_buyer_directory.price_and_above', '{amount} & above',
+         '{amount}-ഉം അതിനു മുകളിലും'),
+        ('fpo_buyer_directory.price_up_to', 'Up to {amount}',
+         '{amount} വരെ'),
+        ('fpo_buyer_directory.price_error', 'Enter a valid price range.',
+         'സാധുവായ വില പരിധി നൽകുക.'),
+        ('fpo_buyer_directory.price_filter_clear', 'Clear',
+         'മായ്ക്കുക'),
+
         # ── ProductCard ──
         ('fpo_buyer_directory.label_quantity', 'Quantity',
          'അളവ്'),
@@ -6150,8 +6173,8 @@ def seed_fpo_products_bulk_import_translations(languages):
         ('fpo_products.bulk_import_title', 'Bulk Import Products',
          'ഉൽപ്പന്നങ്ങൾ ബൾക്കായി ഇംപോർട്ട് ചെയ്യുക'),
         ('fpo_products.bulk_import_description',
-         'Upload a filled Excel/CSV to create many products at once. Each row becomes a live product with one active batch.',
-         'ഒരേസമയം നിരവധി ഉൽപ്പന്നങ്ങൾ സൃഷ്ടിക്കാൻ പൂരിപ്പിച്ച Excel/CSV ഫയൽ അപ്‌ലോഡ് ചെയ്യുക. ഓരോ വരിയും ഒരു സജീവ ബാച്ചുള്ള ലൈവ് ഉൽപ്പന്നമായി മാറും.'),
+         'Upload a filled Excel/CSV to create many products at once. Each row becomes a live batch — rows with the same product name and commodity code are batches of one product.',
+         'ഒരേസമയം നിരവധി ഉൽപ്പന്നങ്ങൾ സൃഷ്ടിക്കാൻ പൂരിപ്പിച്ച Excel/CSV ഫയൽ അപ്‌ലോഡ് ചെയ്യുക. ഓരോ വരിയും ഒരു ലൈവ് ബാച്ചായി മാറും — ഒരേ ഉൽപ്പന്ന നാമവും കമ്മോഡിറ്റി കോഡുമുള്ള വരികൾ ഒരു ഉൽപ്പന്നത്തിന്റെ ബാച്ചുകളാണ്.'),
 
         # Step 1 — template
         ('fpo_products.step1_title', '1. Download the template',
@@ -6193,10 +6216,19 @@ def seed_fpo_products_bulk_import_translations(languages):
          'വരി'),
         ('fpo_products.col_reason', 'Reason',
          'കാരണം'),
+        ('fpo_products.saved_as_draft', 'saved as draft',
+         'ഡ്രാഫ്റ്റായി സേവ് ചെയ്തു'),
+        ('fpo_products.draft_rows_label',
+         'Saved as draft — these products were created switched off with no batch. Add a batch from Manage Batches; the product switches on once that batch is live.',
+         'ഡ്രാഫ്റ്റായി സേവ് ചെയ്തു — ഈ ഉൽപ്പന്നങ്ങൾ ബാച്ചില്ലാതെ നിഷ്‌ക്രിയമായി സൃഷ്ടിച്ചു. Manage Batches-ൽ നിന്ന് ഒരു ബാച്ച് ചേർക്കുക; ആ ബാച്ച് ലൈവ് ആകുമ്പോൾ ഉൽപ്പന്നം സജീവമാകും.'),
+        ('fpo_products.col_batch_not_added', 'Why the batch was not added',
+         'ബാച്ച് ചേർക്കാത്തതിന്റെ കാരണം'),
 
         # Toasts
-        ('fpo_products.toast_bulk_import_success', '{count} product(s) imported',
-         '{count} ഉൽപ്പന്നം(ങ്ങൾ) ഇംപോർട്ട് ചെയ്തു'),
+        ('fpo_products.toast_bulk_import_success', '{count} batch(es) imported into {products} product(s)',
+         '{products} ഉൽപ്പന്നങ്ങളിലായി {count} ബാച്ച്(കൾ) ഇംപോർട്ട് ചെയ്തു'),
+        ('fpo_products.toast_bulk_import_drafts', '{count} product(s) saved as draft without a batch',
+         '{count} ഉൽപ്പന്നം(ങ്ങൾ) ബാച്ചില്ലാതെ ഡ്രാഫ്റ്റായി സേവ് ചെയ്തു'),
         ('fpo_products.err_bulk_import_all_failed', 'No products could be imported',
          'ഒരു ഉൽപ്പന്നവും ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല'),
         ('fpo_products.err_bulk_import_upload', 'Upload failed',
@@ -6308,8 +6340,8 @@ def seed_product_batches_translations(languages):
         ('err_batch_toggle_failed', 'Could not change the batch status',
          'ബാച്ചിന്റെ നില മാറ്റാൻ കഴിഞ്ഞില്ല'),
         ('product_inactive_hint',
-         'This product is inactive — none of its batches are shown to buyers until the product is activated.',
-         'ഈ ഉൽപ്പന്നം നിഷ്ക്രിയമാണ് — ഉൽപ്പന്നം സജീവമാക്കുന്നതുവരെ ഇതിന്റെ ബാച്ചുകളൊന്നും വാങ്ങുന്നവർക്ക് കാണിക്കില്ല.'),
+         'This product is inactive — the batches that were live were set to Inactive and come back when the product is activated.',
+         'ഈ ഉൽപ്പന്നം നിഷ്ക്രിയമാണ് — ലൈവ് ആയിരുന്ന ബാച്ചുകൾ നിഷ്ക്രിയമാക്കി; ഉൽപ്പന്നം സജീവമാക്കുമ്പോൾ അവ തിരികെ വരും.'),
         ('toast_batch_published', 'Batch published',
          'ബാച്ച് പ്രസിദ്ധീകരിച്ചു'),
         ('err_batch_publish_failed', 'Only draft batches can be published',
@@ -6427,8 +6459,8 @@ def seed_product_batches_translations(languages):
         ('product_table.confirm_deactivate_product_title', 'Deactivate Product',
          'ഉൽപ്പന്നം നിഷ്ക്രിയമാക്കുക'),
         ('product_table.confirm_deactivate_product_description',
-         'All batches of this product will be hidden from buyers and the Market Hub until you activate it again.',
-         'നിങ്ങൾ വീണ്ടും സജീവമാക്കുന്നതുവരെ ഈ ഉൽപ്പന്നത്തിന്റെ എല്ലാ ബാച്ചുകളും വാങ്ങുന്നവരിൽ നിന്നും മാർക്കറ്റ് ഹബ്ബിൽ നിന്നും മറയ്ക്കും.'),
+         'Its active batches will be set to Inactive and hidden from buyers and the Market Hub. Activating the product again restores them.',
+         'ഇതിന്റെ സജീവ ബാച്ചുകൾ നിഷ്ക്രിയമാക്കി വാങ്ങുന്നവരിൽ നിന്നും മാർക്കറ്റ് ഹബ്ബിൽ നിന്നും മറയ്ക്കും. ഉൽപ്പന്നം വീണ്ടും സജീവമാക്കുമ്പോൾ അവ തിരികെ വരും.'),
         ('product_table.product_inactive_badge', 'Inactive',
          'നിഷ്ക്രിയം'),
         ('product_table.product_status_active', 'Active',
@@ -7273,6 +7305,271 @@ def seed_fpo_team_translations(languages):
     return count
 
 
+def seed_fpo_trainings_translations(languages):
+    """
+    FPO portal → Training Sessions page (fpo_trainings.*) — /fpo/trainings.
+
+    The one source for this page's labels in both languages. Wording follows
+    government_training.* (വേദി, പരിശീലകൻ, പങ്കാളികൾ) so both sides of a
+    session read the same.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    fpo_trainings_keys = [
+        # ── Header + search ──
+        ('page_title',        'Training Sessions', 'പരിശീലന സെഷനുകൾ'),
+        ('page_description',  'Training sessions scheduled for your FPO',
+         'നിങ്ങളുടെ FPO-യ്ക്കായി ഷെഡ്യൂൾ ചെയ്ത പരിശീലന സെഷനുകൾ'),
+        ('search_placeholder', 'Search by topic, trainer or venue...',
+         'വിഷയം, പരിശീലകൻ അല്ലെങ്കിൽ വേദി പ്രകാരം തിരയുക...'),
+
+        # ── Status filter chips ──
+        ('filter_all',        'All',       'എല്ലാം'),
+        ('filter_upcoming',   'Upcoming',  'വരാനിരിക്കുന്നവ'),
+        ('filter_completed',  'Completed', 'പൂർത്തിയായവ'),
+        ('filter_cancelled',  'Cancelled', 'റദ്ദാക്കിയവ'),
+
+        # ── Card status chip ──
+        ('status_today',      'Today',     'ഇന്ന്'),
+        ('status_upcoming',   'Upcoming',  'വരാനിരിക്കുന്നത്'),
+        ('status_completed',  'Completed', 'പൂർത്തിയായി'),
+        ('status_cancelled',  'Cancelled', 'റദ്ദാക്കി'),
+
+        # ── Card body ──
+        ('read_more',         'Read more', 'കൂടുതൽ വായിക്കുക'),
+        ('show_less',         'Show less', 'കുറച്ച് കാണിക്കുക'),
+        ('cancelled_on',      'Cancelled on {date}', '{date}-ന് റദ്ദാക്കി'),
+        ('label_date_time',   'Date, time and duration', 'തീയതി, സമയം, ദൈർഘ്യം'),
+        ('duration_hours',    '{hours} hours', '{hours} മണിക്കൂർ'),
+        ('label_venue',       'Venue',     'വേദി'),
+        ('venue_tbd',         'Venue TBD', 'വേദി തീരുമാനിച്ചിട്ടില്ല'),
+        ('label_trainer_participants', 'Trainer and participants', 'പരിശീലകനും പങ്കാളികളും'),
+        ('trainer_tbd',       'Trainer TBD', 'പരിശീലകനെ തീരുമാനിച്ചിട്ടില്ല'),
+        ('participants_one',  '{count} participant',  '{count} പങ്കാളി'),
+        ('participants_many', '{count} participants', '{count} പങ്കാളികൾ'),
+        ('scheduled_by',      'Scheduled by', 'ഷെഡ്യൂൾ ചെയ്തത്'),
+        ('label_organisation', 'Organisation', 'സ്ഥാപനം'),
+
+        # ── Scheduled-by role badge (keyed by conducted_by_role) ──
+        ('role_government',   'Government official', 'സർക്കാർ ഉദ്യോഗസ്ഥൻ'),
+        ('role_cbbo',         'CBBO / NGO officer',  'CBBO / NGO ഉദ്യോഗസ്ഥൻ'),
+        ('role_admin',        'KAU admin',           'KAU അഡ്മിൻ'),
+        ('role_other',        'Official',            'ഉദ്യോഗസ്ഥൻ'),
+
+        # ── Loading / error / empty states ──
+        ('loading',           'Loading...', 'ലോഡ് ചെയ്യുന്നു...'),
+        ('error_load',        "Couldn't load training sessions.",
+         'പരിശീലന സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.'),
+        ('empty_all',         'No training sessions scheduled yet.',
+         'ഇതുവരെ പരിശീലന സെഷനുകളൊന്നും ഷെഡ്യൂൾ ചെയ്തിട്ടില്ല.'),
+        ('empty_upcoming',    'No upcoming training sessions.',
+         'വരാനിരിക്കുന്ന പരിശീലന സെഷനുകളൊന്നുമില്ല.'),
+        ('empty_completed',   'No completed training sessions.',
+         'പൂർത്തിയായ പരിശീലന സെഷനുകളൊന്നുമില്ല.'),
+        ('empty_cancelled',   'No cancelled training sessions.',
+         'റദ്ദാക്കിയ പരിശീലന സെഷനുകളൊന്നുമില്ല.'),
+
+        # ── Pagination ──
+        ('pagination_summary', 'Page {page} of {total_pages} · {count} total',
+         'പേജ് {page} / {total_pages} · ആകെ {count}'),
+        ('btn_previous',      'Previous', 'മുമ്പത്തേത്'),
+        ('btn_next',          'Next',     'അടുത്തത്'),
+    ]
+
+    count = 0
+    for key, en_value, ml_value in fpo_trainings_keys:
+        full_key = f'fpo_trainings.{key}'
+        Translation.objects.update_or_create(
+            category=category, key=full_key, language=lang_en,
+            defaults={'value': en_value, 'context': 'FPO Training Sessions page (/fpo/trainings)', 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=full_key, language=lang_ml,
+            defaults={'value': ml_value, 'context': 'FPO Training Sessions page (/fpo/trainings)', 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
+def seed_fpo_directory_translations(languages):
+    """
+    FPO directory pages for officials:
+      government_fpos.*       — /government/fpos (list)
+      government_fpo_detail.* — /government/fpos/[id]
+      cbbo_verifications.*    — /cbbo/verifications (list: View button + status badges)
+      common.pagination_* / common.table_no_results / common.col_sl_no — the shared DataTable's
+        SL No header, footer and empty row, for pages that merge `common` into their labels.
+
+    Also adds government_dashboard.status_info_required / status_claimed: the
+    directory pages look statuses up by code, while the dashboard's keys are
+    built from display names (status_additional_info_required, ...).
+
+    Runs after seed_frontend_ui_translations, which writes English into the
+    Malayalam rows, so the Malayalam here is what ends up in the database.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    keys = [
+        # ── Government FPO Directory — list ──
+        ('government_fpos.page_title',          'FPO Directory', 'FPO ഡയറക്ടറി'),
+        ('government_fpos.page_description',    'Read-only view of FPOs in your jurisdiction',
+         'നിങ്ങളുടെ അധികാരപരിധിയിലെ FPO-കൾ (കാണാൻ മാത്രം)'),
+        ('government_fpos.btn_export_excel',    'Export Excel', 'Excel എക്സ്പോർട്ട് ചെയ്യുക'),
+        ('government_fpos.btn_export_pdf',      'Export PDF', 'PDF എക്സ്പോർട്ട് ചെയ്യുക'),
+        ('government_fpos.placeholder_search',  'Search name or application ID...',
+         'പേര് അല്ലെങ്കിൽ അപേക്ഷാ ഐഡി തിരയുക...'),
+        ('government_fpos.option_all_statuses', 'All statuses', 'എല്ലാ സ്ഥിതികളും'),
+        ('government_fpos.loading',             'Loading FPOs...', 'FPO-കൾ ലോഡ് ചെയ്യുന്നു...'),
+        ('government_fpos.error_load',          "Couldn't load FPOs. Please try again.",
+         'FPO-കൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.'),
+        ('government_fpos.empty_no_fpos',       'No FPOs found.', 'FPO-കളൊന്നും കണ്ടെത്തിയില്ല.'),
+        ('government_fpos.summary_count',       '{count} total FPO(s) in your jurisdiction',
+         'നിങ്ങളുടെ അധികാരപരിധിയിൽ ആകെ {count} FPO-കൾ'),
+        ('government_fpos.toast_export_excel_success', 'Excel exported successfully',
+         'Excel വിജയകരമായി എക്സ്പോർട്ട് ചെയ്തു'),
+        ('government_fpos.toast_export_pdf_success',   'PDF exported successfully',
+         'PDF വിജയകരമായി എക്സ്പോർട്ട് ചെയ്തു'),
+        ('government_fpos.toast_export_error',  'Export failed. Please try again.',
+         'എക്സ്പോർട്ട് പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.'),
+
+        # ── Government FPO Directory — detail (the field labels come from fpo_my_application.*) ──
+        ('government_fpo_detail.btn_back',             'Back to Directory', 'ഡയറക്ടറിയിലേക്ക് മടങ്ങുക'),
+        ('government_fpo_detail.loading',              'Loading...', 'ലോഡ് ചെയ്യുന്നു...'),
+        ('government_fpo_detail.error_not_found',      'FPO not found, or outside your jurisdiction.',
+         'FPO കണ്ടെത്തിയില്ല, അല്ലെങ്കിൽ ഇത് നിങ്ങളുടെ അധികാരപരിധിക്ക് പുറത്താണ്.'),
+        ('government_fpo_detail.field_application_id', 'Application ID', 'അപേക്ഷാ ഐഡി'),
+        ('government_fpo_detail.field_tier',           'Tier', 'ടയർ'),
+        ('government_fpo_detail.field_last_updated',   'Last Updated', 'അവസാനം അപ്ഡേറ്റ് ചെയ്തത്'),
+        ('government_fpo_detail.section_registration', 'Registration Details', 'രജിസ്ട്രേഷൻ വിവരങ്ങൾ'),
+        ('government_fpo_detail.section_address',      'Address & Contact', 'വിലാസവും ബന്ധപ്പെടാനുള്ള വിവരങ്ങളും'),
+        ('government_fpo_detail.section_membership',   'Membership Breakdown', 'അംഗത്വ വിശദാംശങ്ങൾ'),
+        ('government_fpo_detail.section_commodities',  'Commodities', 'ചരക്കുകൾ'),
+        ('government_fpo_detail.label_primary',        'Primary', 'പ്രാഥമികം'),
+        ('government_fpo_detail.label_secondary',      'Secondary', 'ദ്വിതീയം'),
+
+        # ── Status labels looked up by FPO status code ──
+        ('government_dashboard.status_info_required',  'Additional Info Required', 'വിവരം ആവശ്യമാണ്'),
+        ('government_dashboard.status_claimed',        'Claimed (Ownership Transferred)',
+         'ക്ലെയിം ചെയ്തു (ഉടമസ്ഥാവകാശം കൈമാറി)'),
+
+        # ── CBBO FPO Verifications — list ──
+        ('cbbo_verifications.action_view',          'View', 'കാണുക'),
+        ('cbbo_verifications.status_draft',         'Draft', 'ഡ്രാഫ്റ്റ്'),
+        ('cbbo_verifications.status_submitted',     'Submitted', 'സമർപ്പിച്ചു'),
+        ('cbbo_verifications.status_under_review',  'Under Review', 'അവലോകനത്തിൽ'),
+        ('cbbo_verifications.status_info_required', 'Additional Info Required', 'അധിക വിവരങ്ങൾ ആവശ്യമാണ്'),
+        ('cbbo_verifications.status_approved',      'Approved', 'അംഗീകരിച്ചു'),
+        ('cbbo_verifications.status_rejected',      'Rejected', 'നിരസിച്ചു'),
+        ('cbbo_verifications.status_suspended',     'Suspended', 'സസ്പെൻഡ് ചെയ്തു'),
+        ('cbbo_verifications.status_claimed',       'Claimed', 'ക്ലെയിം ചെയ്തു'),
+
+        # ── Shared DataTable footer + empty row (same wording as fpo_team.pagination_*) ──
+        ('common.pagination_showing',       'Showing {from}–{to} of {total}', '{total}-ൽ {from}–{to} കാണിക്കുന്നു'),
+        ('common.pagination_rows_per_page', 'Rows per page', 'ഓരോ പേജിലും വരികൾ'),
+        ('common.pagination_page_of',       'Page {page} of {totalPages}', 'പേജ് {page} / {totalPages}'),
+        ('common.pagination_no_results',    'No results', 'ഫലങ്ങളൊന്നുമില്ല'),
+        ('common.table_no_results',         'No results found.', 'ഫലങ്ങളൊന്നും കണ്ടെത്തിയില്ല.'),
+        ('common.col_sl_no',                'SL No', 'ക്രമ നമ്പർ'),
+    ]
+
+    context = 'FPO directory pages (/government/fpos, /cbbo/verifications)'
+    count = 0
+    for key, en_value, ml_value in keys:
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_en,
+            defaults={'value': en_value, 'context': context, 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=key, language=lang_ml,
+            defaults={'value': ml_value, 'context': context, 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
+def seed_government_dashboard_translations(languages):
+    """
+    Government portal dashboard (/government/dashboard) — government_dashboard.*
+    Status labels: the stats API returns FPO status *display names*; the page
+    looks them up as status_<display name lowercased, spaces → _>.
+    """
+    category = TranslationCategory.objects.get(code='ui')
+    lang_en = languages['en']
+    lang_ml = languages['ml']
+
+    keys = [
+        # Header
+        ('page_title', 'Government Portal', 'സർക്കാർ പോർട്ടൽ'),
+        ('subtitle_state', 'Monitor FPO activities across Kerala', 'കേരളത്തിലുടനീളമുള്ള FPO പ്രവർത്തനങ്ങൾ നിരീക്ഷിക്കുക'),
+        ('subtitle_district', 'Monitor FPO activities in your district', 'നിങ്ങളുടെ ജില്ലയിലെ FPO പ്രവർത്തനങ്ങൾ നിരീക്ഷിക്കുക'),
+        # Stat cards
+        ('stat_registered_fpos', 'Registered FPOs', 'രജിസ്റ്റർ ചെയ്ത FPO-കൾ'),
+        ('stat_registered_desc_state', 'Across {{count}} districts', '{{count}} ജില്ലകളിലായി'),
+        ('stat_registered_desc_district', 'In your district', 'നിങ്ങളുടെ ജില്ലയിൽ'),
+        ('stat_status_categories', 'Status Categories', 'സ്ഥിതി വിഭാഗങ്ങൾ'),
+        ('stat_status_categories_desc', 'Distinct FPO statuses', 'വ്യത്യസ്ത FPO സ്ഥിതികൾ'),
+        ('stat_top_status', 'Top Status', 'ഏറ്റവും കൂടുതലുള്ള സ്ഥിതി'),
+        ('no_data', 'No data', 'ഡാറ്റയില്ല'),
+        ('stat_jurisdiction', 'Jurisdiction', 'അധികാരപരിധി'),
+        ('jurisdiction_state', 'State', 'സംസ്ഥാനം'),
+        ('jurisdiction_district', 'District', 'ജില്ല'),
+        ('stat_jurisdiction_desc_state', 'All Kerala districts', 'കേരളത്തിലെ എല്ലാ ജില്ലകളും'),
+        ('stat_jurisdiction_desc_district', 'Single district view', 'ഒരു ജില്ലയുടെ കാഴ്ച'),
+        # Training chart + notifications card (already in some DBs — same wording)
+        ('chart_training_trend', 'Training Sessions', 'പരിശീലന സെഷനുകൾ'),
+        ('chart_training_trend_subtitle', 'Sessions held for FPOs in your jurisdiction per month — last 12 months',
+         'നിങ്ങളുടെ അധികാരപരിധിയിലെ എഫ്പിഒകൾക്കായി നടത്തിയ പ്രതിമാസ സെഷനുകൾ — കഴിഞ്ഞ 12 മാസം'),
+        ('chart_training_value', 'Sessions', 'സെഷനുകൾ'),
+        ('card_notifications_title', 'Recent Notifications', 'സമീപകാല അറിയിപ്പുകൾ'),
+        ('no_notifications', 'No notifications yet', 'അറിയിപ്പുകൾ ഒന്നും ഇല്ല'),
+        ('notifications_empty_hint', 'KAU comments on your training sessions will appear here',
+         'നിങ്ങളുടെ പരിശീലന സെഷനുകളിലെ KAU അഭിപ്രായങ്ങൾ ഇവിടെ കാണാം'),
+        # Cards
+        ('card_district_dist_title', 'District-wise FPO Distribution', 'ജില്ല തിരിച്ചുള്ള FPO വിതരണം'),
+        ('card_district_dist_desc', 'FPO count by district', 'ജില്ല തിരിച്ചുള്ള FPO എണ്ണം'),
+        ('empty_no_fpos_view', 'No FPOs in view yet.', 'ഇതുവരെ FPO-കളൊന്നും കാണാനില്ല.'),
+        ('card_status_breakdown_title', 'Status Breakdown', 'സ്ഥിതി വിശകലനം'),
+        ('card_status_breakdown_desc', 'FPOs by verification status', 'പരിശോധനാ സ്ഥിതി അനുസരിച്ച് FPO-കൾ'),
+        ('empty_no_data', 'No data yet.', 'ഇതുവരെ ഡാറ്റയില്ല.'),
+        ('card_fpos_in_view_title', 'FPOs in View', 'കാണിക്കുന്ന FPO-കൾ'),
+        ('card_fpos_in_view_desc_state', 'Sample across all districts', 'എല്ലാ ജില്ലകളിൽ നിന്നുമുള്ള സാമ്പിൾ'),
+        ('card_fpos_in_view_desc_district', 'In your assigned district', 'നിങ്ങൾക്ക് നിയോഗിച്ച ജില്ലയിൽ'),
+        ('empty_no_fpos_found', 'No FPOs found.', 'FPO-കളൊന്നും കണ്ടെത്തിയില്ല.'),
+        # FPO status labels (keys built from FPOStatus display names)
+        ('status_draft', 'Draft', 'ഡ്രാഫ്റ്റ്'),
+        ('status_submitted', 'Submitted', 'സമർപ്പിച്ചു'),
+        ('status_under_review', 'Under Review', 'അവലോകനത്തിൽ'),
+        ('status_additional_info_required', 'Additional Info Required', 'വിവരം ആവശ്യമാണ്'),
+        ('status_approved', 'Approved', 'അംഗീകരിച്ചു'),
+        ('status_rejected', 'Rejected', 'നിരസിച്ചു'),
+        ('status_suspended', 'Suspended', 'സസ്പെൻഡ് ചെയ്തു'),
+        ('status_claimed_(ownership_transferred)', 'Claimed (Ownership Transferred)',
+         'ക്ലെയിം ചെയ്തു (ഉടമസ്ഥാവകാശം കൈമാറി)'),
+    ]
+
+    context = 'Government portal dashboard (/government/dashboard)'
+    count = 0
+    for key, en_value, ml_value in keys:
+        full_key = f'government_dashboard.{key}'
+        Translation.objects.update_or_create(
+            category=category, key=full_key, language=lang_en,
+            defaults={'value': en_value, 'context': context, 'is_verified': True}
+        )
+        Translation.objects.update_or_create(
+            category=category, key=full_key, language=lang_ml,
+            defaults={'value': ml_value, 'context': context, 'is_verified': True}
+        )
+        count += 1
+
+    return count
+
+
 def seed_translations():
     """Main seed function"""
     print("=" * 60)
@@ -7397,6 +7694,11 @@ def seed_translations():
     print(f"✅ Seeded {buyer_portal_count} buyer-portal translations")
     total_count += buyer_portal_count
 
+    print("\nSeeding FPO buyer directory translations...")
+    fpo_buyer_directory_count = seed_fpo_buyer_directory_translations(languages)
+    print(f"✅ Seeded {fpo_buyer_directory_count} FPO buyer-directory translations")
+    total_count += fpo_buyer_directory_count
+
     # Step 9f: GIS + Recommendations translations (Aravind — P2-05/P2-06)
     print("\nSeeding GIS translations...")
     gis_count = seed_gis_translations(languages)
@@ -7413,12 +7715,27 @@ def seed_translations():
     print(f"✅ Seeded {cbbo_portal_count} CBBO portal translations")
     total_count += cbbo_portal_count
 
+    print("\nSeeding government dashboard translations...")
+    gov_dashboard_count = seed_government_dashboard_translations(languages)
+    print(f"✅ Seeded {gov_dashboard_count} government dashboard translations")
+    total_count += gov_dashboard_count
+
     # Step 10: Apply known fixes (broken placeholders, wrong values)
     # After seed_frontend_ui_translations (which puts English in the ML rows)
     print("\nSeeding FPO My Team page translations...")
     team_count = seed_fpo_team_translations(languages)
     print(f"✅ Seeded {team_count} My Team translations")
     total_count += team_count
+
+    print("\nSeeding FPO Training Sessions page translations...")
+    fpo_trainings_count = seed_fpo_trainings_translations(languages)
+    print(f"✅ Seeded {fpo_trainings_count} Training Sessions translations")
+    total_count += fpo_trainings_count
+
+    print("\nSeeding FPO directory (government + CBBO) translations...")
+    fpo_directory_count = seed_fpo_directory_translations(languages)
+    print(f"✅ Seeded {fpo_directory_count} FPO directory translations")
+    total_count += fpo_directory_count
 
     print("\nApplying translation fixes...")
     seed_fixes(languages)

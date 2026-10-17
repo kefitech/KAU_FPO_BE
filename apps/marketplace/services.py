@@ -59,6 +59,102 @@ def run_matching(stock):
     return created
 
 
+def _restorable_batches(product):
+    """Batches the product switch-off paused whose validity hasn't ended —
+    what the FPO's product Activate puts back on sale."""
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from apps.database.models import ProductStock
+
+    return product.stocks.filter(
+        is_deleted=False, status=ProductStock.Status.INACTIVE, paused_with_product=True,
+    ).filter(Q(available_until__isnull=True) | Q(available_until__gte=timezone.localdate()))
+
+
+def batches_all_inactive(product):
+    """True when the product has batches and every one of them is paused."""
+    from apps.database.models import ProductStock
+
+    statuses = set(product.stocks.filter(is_deleted=False).values_list('status', flat=True))
+    return statuses == {ProductStock.Status.INACTIVE}
+
+
+def activate_would_leave_all_inactive(product):
+    """For the FPO's product Activate: every batch is paused and none would be
+    restored, so the product would be on with nothing for sale. It is kept
+    inactive instead — the FPO activates a batch, which switches it on."""
+    return batches_all_inactive(product) and not _restorable_batches(product).exists()
+
+
+def set_product_active(product, is_active, restore_batches=False):
+    """
+    Flip the product-level switch. Switching off pauses the product's live
+    batches (ACTIVE → INACTIVE), flagged `paused_with_product`. Switching on
+    clears those flags; with `restore_batches` (the FPO's own Activate) the
+    flagged batches go live again, except ones whose validity has ended.
+    Batches the FPO paused individually are never touched.
+
+    The chatbot entries are synced per batch on batch save, so they're
+    refreshed here to drop out (or come back) with the product. Returns True
+    if the switch changed; the caller clears the public market cache.
+    """
+    from django.utils import timezone
+
+    from apps.database.models import ProductStock
+
+    if product.is_active == is_active:
+        return False
+    now = timezone.now()
+    stocks = product.stocks.filter(is_deleted=False)
+    restored_ids = []
+    if not is_active:
+        stocks.filter(status=ProductStock.Status.ACTIVE).update(
+            status=ProductStock.Status.INACTIVE, paused_with_product=True, updated_at=now,
+        )
+    else:
+        if restore_batches:
+            restored_ids = list(_restorable_batches(product).values_list('id', flat=True))
+            stocks.filter(id__in=restored_ids).update(status=ProductStock.Status.ACTIVE, updated_at=now)
+        stocks.filter(paused_with_product=True).update(paused_with_product=False)
+    product.is_active = is_active
+    product.save(update_fields=['is_active', 'updated_at'])
+    from apps.chatbot.services.product_sync import upsert_product_entry
+    for stock in product.stocks.filter(is_deleted=False):
+        try:
+            upsert_product_entry(stock)
+        except Exception:
+            pass  # KB sync is best-effort; never block the switch on it
+        if stock.id in restored_ids:
+            run_matching(stock)
+    return True
+
+
+def switch_product_on_for_live_batch(product):
+    """A batch of this product just went live (published, activated or added
+    as active) — make sure buyers can see it by switching the product on.
+    Only that batch goes live; others the switch-off paused stay paused."""
+    return set_product_active(product, True)
+
+
+def switch_product_off_if_no_live_batch(product):
+    """A batch of this product was just deactivated — if no batch is live any
+    more, switch the product off too."""
+    from apps.database.models import ProductStock
+
+    if product.stocks.filter(is_deleted=False, status=ProductStock.Status.ACTIVE).exists():
+        return False
+    return set_product_active(product, False)
+
+
+def switch_product_off_if_all_inactive(product):
+    """A batch of this product was just removed — if every batch left is
+    paused, switch the product off too."""
+    if not batches_all_inactive(product):
+        return False
+    return set_product_active(product, False)
+
+
 def compute_opportunities():
     """
     Market demand signals by commodity — for GET /api/marketplace/opportunities/.

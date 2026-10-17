@@ -33,7 +33,9 @@ from apps.core.services.fpo_permission import get_member_fpo
 from apps.database.models import Product, ProductStock
 from apps.marketplace.permissions import CanManageProducts, IsApprovedFPO
 from apps.marketplace.serializers import ProductSerializer
-from apps.marketplace.services import run_matching
+from apps.marketplace.services import (
+    activate_would_leave_all_inactive, run_matching, set_product_active, switch_product_on_for_live_batch,
+)
 
 
 def _clear_public_market_cache():
@@ -108,11 +110,33 @@ def _parse_date(value, field_name, required=False):
         raise ValueError(f"{field_name} must be a valid date (YYYY-MM-DD), got '{value}'")
 
 
-def _create_bulk_product(fpo, row, commodity_cache=None):
+def _normalize_product_name(name):
     """
-    Validate one row from the bulk-import sheet and create a Product +
-    ProductStock (status=ACTIVE) from it — per the confirmed decision that
-    bulk-imported products go live immediately, no draft review step.
+    Grouping key for a product name — trimmed, inner whitespace collapsed and
+    case-insensitive, so 'Organic Rice' and ' organic  rice' are one product.
+    """
+    return ' '.join(str(name or '').split()).casefold()
+
+
+# The batch values a sheet row carries. Two batches of the same product with
+# equal values here are duplicates (the bulk import skips the second one).
+_BATCH_SIGNATURE_FIELDS = (
+    'quantity', 'unit', 'price_per_unit', 'quality_certification',
+    'available_from', 'available_until', 'is_public',
+)
+
+
+def _batch_signature(values):
+    """Hashable signature of a batch, from a parsed row's batch dict or a ProductStock."""
+    if isinstance(values, dict):
+        return tuple(values[f] for f in _BATCH_SIGNATURE_FIELDS)
+    return tuple(getattr(values, f) for f in _BATCH_SIGNATURE_FIELDS)
+
+
+def _parse_bulk_product(row, commodity_cache=None):
+    """
+    Validate the product columns of one bulk-import row (name, commodity,
+    description) and return them cleaned. Nothing is written here.
 
     Raises ValueError with a human-readable message on any validation
     failure; the caller catches this and skips just this row, so one bad
@@ -143,6 +167,23 @@ def _create_bulk_product(fpo, row, commodity_cache=None):
         raise ValueError('description_en is required')
     description_ml = str(row.get('description_ml') or '').strip()
 
+    return {
+        'name_en': name_en,
+        'name_ml': name_ml,
+        'commodity': commodity,
+        'description_en': description_en,
+        'description_ml': description_ml,
+    }
+
+
+def _parse_bulk_batch(row):
+    """
+    Validate the batch columns of one bulk-import row and return them as
+    ProductStock fields. Kept apart from _parse_bulk_product so a row with
+    good product details but a bad batch can still create the product.
+
+    Raises ValueError with a human-readable message on the first problem.
+    """
     quantity = _parse_decimal(row.get('quantity'), 'quantity')
     price_per_unit = _parse_decimal(row.get('price_per_unit'), 'price_per_unit')
 
@@ -165,26 +206,20 @@ def _create_bulk_product(fpo, row, commodity_cache=None):
     # discoverable on the public Market Hub right away (matches the default
     # the Add Product form picks). The FPO can set FALSE / NO / 0 in the
     # cell to opt a specific row out.
-    is_public = _parse_bool(row.get('is_public'), default=True)
+    try:
+        is_public = _parse_bool(row.get('is_public'), default=True)
+    except ValueError as e:
+        raise ValueError(f'is_public {e}')
 
-    product = Product.objects.create(
-        fpo=fpo,
-        name={'en': name_en, 'ml': name_ml},
-        commodity=commodity,
-        description={'en': description_en, 'ml': description_ml},
-    )
-    ProductStock.objects.create(
-        product=product,
-        quantity=quantity,
-        unit=unit,
-        price_per_unit=price_per_unit,
-        quality_certification=quality_certification,
-        available_from=available_from,
-        available_until=available_until,
-        status=ProductStock.Status.ACTIVE,
-        is_public=is_public,
-    )
-    return product
+    return {
+        'quantity': quantity,
+        'unit': unit,
+        'price_per_unit': price_per_unit,
+        'quality_certification': quality_certification,
+        'available_from': available_from,
+        'available_until': available_until,
+        'is_public': is_public,
+    }
 
 
 @extend_schema_view(
@@ -317,6 +352,7 @@ class ProductViewSet(TranslatedViewSet):
             )
         stock.status = ProductStock.Status.ACTIVE
         stock.save()
+        switch_product_on_for_live_batch(product)
 
         run_matching(stock)
         _clear_public_market_cache()
@@ -352,32 +388,31 @@ class ProductViewSet(TranslatedViewSet):
         )
 
     def _set_active(self, is_active, message_key):
-        """Product-level switch. Batches keep their own status, so switching
-        the product back on restores exactly the batches that were live."""
+        """Product-level switch. Switching off pauses the live batches;
+        switching back on restores exactly those (see set_product_active).
+        A product whose batches are all paused, none by the switch-off, stays
+        inactive — the FPO activates a batch, which switches it on."""
         product = self.get_object()
-        if product.is_active != is_active:
-            product.is_active = is_active
-            product.save(update_fields=['is_active', 'updated_at'])
-            # Chatbot product entries are synced per batch on batch save —
-            # refresh them so they drop out (or come back) with the product.
-            from apps.chatbot.services.product_sync import upsert_product_entry
-            for stock in product.stocks.filter(is_deleted=False):
-                try:
-                    upsert_product_entry(stock)
-                except Exception:
-                    pass  # KB sync is best-effort; never block the switch on it
+        if is_active and not product.is_active and activate_would_leave_all_inactive(product):
+            raise BusinessLogicError(
+                message=t('marketplace.product_all_batches_inactive', self.get_language()),
+                code='product_all_batches_inactive',
+            )
+        if set_product_active(product, is_active, restore_batches=True):
             _clear_public_market_cache()
+            # Re-read: the batch statuses changed under the prefetched `stocks`.
+            product = self.get_object()
         return StandardResponse.success(
             data=ProductSerializer(product, context=self.get_serializer_context()).data,
             message=t(message_key, self.get_language()),
         )
 
-    @extend_schema(tags=['Marketplace - Products'], summary='Hide the product and all its batches from buyers')
+    @extend_schema(tags=['Marketplace - Products'], summary='Hide the product from buyers and pause its live batches')
     @action(detail=True, methods=['post'])
     def deactivate(self, request, pk=None):
         return self._set_active(False, 'marketplace.product_deactivated')
 
-    @extend_schema(tags=['Marketplace - Products'], summary='Show the product to buyers again')
+    @extend_schema(tags=['Marketplace - Products'], summary='Show the product to buyers again and restore the batches it paused')
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
         return self._set_active(True, 'marketplace.product_activated')
@@ -420,7 +455,7 @@ class ProductViewSet(TranslatedViewSet):
         instructions = [
             ('HOW TO FILL THIS FILE', True),
             ('', False),
-            ('1. Fill one row per product, starting from row 2 of the "Products" sheet.', False),
+            ('1. Fill one row per batch, starting from row 2 of the "Products" sheet.', False),
             ('2. Do NOT change the column headers in row 1.', False),
             ('3. Required: name_en, commodity_code, description_en, quantity, unit, price_per_unit, available_from.', False),
             ('4. All other columns are optional and can be left blank.', False),
@@ -441,7 +476,21 @@ class ProductViewSet(TranslatedViewSet):
             ('available_until        -> Date in YYYY-MM-DD format, leave blank if open-ended', False),
             ('is_public              -> Yes/No — show on the public Market Hub (default Yes if blank)', False),
             ('', False),
-            ('All products created from this sheet go live (Active) immediately.', True),
+            ('ONE PRODUCT, SEVERAL BATCHES', True),
+            ('', False),
+            ('Rows with the same name_en and commodity_code are ONE product — each row becomes a separate batch', False),
+            ('of it, with its own quantity, unit, price, certification and dates.', False),
+            ('The product name and description are taken from the first of those rows.', False),
+            ('If you already have a product with that name and commodity code, the rows are added to it as new batches.', False),
+            ('A row that exactly repeats another batch of the same product is skipped and reported as a duplicate.', False),
+            ('', False),
+            ('PRODUCTS SAVED AS DRAFT', True),
+            ('', False),
+            ('If a new product\'s name, commodity_code and description are fine but its batch columns are not', False),
+            ('(e.g. quantity missing, dates wrong), the product is still created — switched off (Inactive) and with', False),
+            ('no batch — and listed as a draft. Add the batch from Manage Batches; the product switches on once it is live.', False),
+            ('', False),
+            ('All batches imported from this sheet go live (Active) immediately.', True),
             ('Product photos cannot be added here — add them by editing each product afterward.', True),
         ]
         for row_idx, (text, is_heading) in enumerate(instructions, start=1):
@@ -481,11 +530,19 @@ class ProductViewSet(TranslatedViewSet):
         POST /api/marketplace/products/bulk-import/
 
         Upload a filled bulk-template .xlsx (or .csv) as multipart form
-        field "file". Valid rows are created as brand-new, Active products
-        (never restocks an existing product — v1 scope, per confirmed
-        decision). Invalid rows are skipped and reported back so the FPO
-        can fix just those and re-upload. Mirrors the pattern used by the
-        team bulk-invite-file endpoint (apps/fpo/api/team.py).
+        field "file". Each valid row becomes an Active batch. Rows sharing
+        name_en (case/spacing ignored) + commodity_code are one product:
+        the first such row creates it (its name and description win) and
+        the rest are added as batches. A product the FPO already has with
+        that name + commodity gets the batches instead, so re-importing
+        never creates a duplicate product. A row whose batch values repeat
+        an earlier row or an existing batch of the same product is skipped
+        as a duplicate. A row with valid product details but invalid batch
+        details still creates its product — switched off, with no batch —
+        and is reported under `drafts`. Invalid rows are skipped and
+        reported back so the FPO can fix just those and re-upload. Mirrors
+        the pattern used by the team bulk-invite-file endpoint
+        (apps/fpo/api/team.py).
         """
         fpo = get_member_fpo(request.user)
 
@@ -546,9 +603,26 @@ class ProductViewSet(TranslatedViewSet):
                 code='too_many_rows',
             )
 
-        success, failed, created_products = [], [], []
+        success, failed, created_batches = [], [], []
         # One commodity lookup per distinct code instead of one per row.
         commodity_cache: dict = {}
+        # Products are keyed by (normalized name_en, commodity id). Seeded
+        # with the FPO's existing products (oldest wins if it already has
+        # duplicates) so their rows become batches instead of new products.
+        products_by_key: dict = {}
+        for existing in Product.objects.filter(fpo=fpo, is_deleted=False).order_by('created_at'):
+            name = existing.name.get('en', '') if isinstance(existing.name, dict) else existing.name
+            products_by_key.setdefault((_normalize_product_name(name), existing.commodity_id), existing)
+        # Per product key: batch signature -> duplicate reason. Loaded
+        # lazily from an existing product's batches on its first row.
+        seen_batches: dict = {}
+        new_product_ids, updated_product_ids = set(), set()
+        # Products this file created without a batch (switched off because
+        # their row's batch details failed): product id -> draft entry. If a
+        # later row adds a batch, the product is switched on (as is any
+        # switched-off product that gets a batch) and the entry moves to
+        # `failed`, since only that row's batch is still missing.
+        drafts_by_product: dict = {}
         # Single transaction: one commit instead of per-row fsyncs (the
         # dominant cost on the small test-server Postgres), and an
         # unexpected crash mid-file leaves nothing half-imported. Per-row
@@ -556,16 +630,82 @@ class ProductViewSet(TranslatedViewSet):
         with transaction.atomic():
             for i, row in enumerate(rows, start=2):  # row 1 is the header
                 try:
+                    data = _parse_bulk_product(row, commodity_cache)
+                    key = (_normalize_product_name(data['name_en']), data['commodity'].id)
+                    product = products_by_key.get(key)
+
+                    try:
+                        batch_fields, batch_error = _parse_bulk_batch(row), None
+                    except ValueError as e:
+                        batch_fields, batch_error = None, str(e)
+                    if batch_fields is None and product is not None:
+                        # The product already exists, so this row has
+                        # nothing left to create.
+                        raise ValueError(batch_error)
+
+                    if batch_fields is not None:
+                        seen = seen_batches.get(key)
+                        if seen is None:
+                            seen = {}
+                            if product is not None:
+                                for stock in product.stocks.filter(is_deleted=False):
+                                    seen.setdefault(
+                                        _batch_signature(stock),
+                                        f'Duplicate — this batch already exists ({stock.batch_number})',
+                                    )
+                            seen_batches[key] = seen
+                        signature = _batch_signature(batch_fields)
+                        if signature in seen:
+                            raise ValueError(seen[signature])
+
                     # Per-row savepoint so a DB-level failure on one row
                     # (e.g. IntegrityError) is skipped without poisoning
                     # the outer transaction.
+                    is_new_product = product is None
+                    batch = None
                     with transaction.atomic():
-                        product = _create_bulk_product(fpo, row, commodity_cache)
-                    created_products.append(product)
+                        if is_new_product:
+                            # A bad batch still creates the product, switched
+                            # off and without a batch, for the FPO to finish.
+                            product = Product.objects.create(
+                                fpo=fpo,
+                                name={'en': data['name_en'], 'ml': data['name_ml']},
+                                commodity=data['commodity'],
+                                description={'en': data['description_en'], 'ml': data['description_ml']},
+                                is_active=batch_fields is not None,
+                            )
+                        if batch_fields is not None:
+                            batch = ProductStock.objects.create(
+                                product=product,
+                                status=ProductStock.Status.ACTIVE,
+                                **batch_fields,
+                            )
+                            # Covers drafts from this file or an earlier
+                            # upload, and products the FPO switched off.
+                            switch_product_on_for_live_batch(product)
+                    # Only remembered once the savepoint has committed, so a
+                    # rolled-back product is never reused by a later row.
+                    products_by_key[key] = product
+                    (new_product_ids if is_new_product else updated_product_ids).add(product.id)
+                    if batch is None:
+                        drafts_by_product[product.id] = {
+                            'row': i,
+                            'product_id': product.id,
+                            'name': product.name.get('en', ''),
+                            'reason': batch_error,
+                        }
+                        continue
+                    draft = drafts_by_product.pop(product.id, None)
+                    if draft:
+                        failed.append({'row': draft['row'], 'name_en': draft['name'], 'reason': draft['reason']})
+                    seen[signature] = f'Duplicate of row {i} — same product and batch details'
+                    created_batches.append(batch)
                     success.append({
                         'row': i,
                         'product_id': product.id,
                         'name': product.name.get('en', ''),
+                        'batch_number': batch.batch_number,
+                        'new_product': is_new_product,
                     })
                 except Exception as e:
                     failed.append({
@@ -574,16 +714,29 @@ class ProductViewSet(TranslatedViewSet):
                         'reason': str(e),
                     })
 
-        if created_products:
-            # Bulk-import creates exactly one ACTIVE stock per product
-            # (see _create_bulk_product), so matching happens on that batch.
-            for product in created_products:
-                batch = product.stocks.filter(status=ProductStock.Status.ACTIVE).first()
-                if batch:
-                    run_matching(batch)
+        if created_batches:
+            for batch in created_batches:
+                run_matching(batch)
             _clear_public_market_cache()
 
+        # A product created by this file and given more batches by later
+        # rows counts as new only; one still without a batch is a draft.
+        updated_product_ids -= new_product_ids
+        products_created = len(new_product_ids - drafts_by_product.keys())
+        drafts = sorted(drafts_by_product.values(), key=lambda d: d['row'])
+        failed.sort(key=lambda e: e['row'])
         return StandardResponse.success(
-            data={'success': len(success), 'failed': len(failed), 'results': success, 'errors': failed},
-            message=f'{len(success)} product(s) created successfully, {len(failed)} failed.',
+            data={
+                'success': len(success),
+                'drafted': len(drafts),
+                'failed': len(failed),
+                'products_created': products_created,
+                'products_updated': len(updated_product_ids),
+                'results': success,
+                'drafts': drafts,
+                'errors': failed,
+            },
+            message=f'{len(success)} batch(es) imported into {products_created} new and '
+                    f'{len(updated_product_ids)} existing product(s), {len(drafts)} product(s) '
+                    f'saved as draft without a batch, {len(failed)} failed.',
         )

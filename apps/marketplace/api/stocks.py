@@ -25,7 +25,10 @@ from apps.core.views import TranslatedViewSet
 from apps.database.models import Product, ProductStock
 from apps.marketplace.permissions import CanManageProducts, IsApprovedFPO
 from apps.marketplace.serializers import ProductStockSerializer
-from apps.marketplace.services import run_matching
+from apps.marketplace.services import (
+    run_matching, switch_product_off_if_all_inactive, switch_product_off_if_no_live_batch,
+    switch_product_on_for_live_batch,
+)
 
 
 def _clear_public_market_cache():
@@ -94,6 +97,7 @@ class ProductStockViewSet(TranslatedViewSet):
         # choice to {draft, active}.
         stock = serializer.save(product=product)
         if stock.status == ProductStock.Status.ACTIVE:
+            switch_product_on_for_live_batch(product)
             run_matching(stock)
         _clear_public_market_cache()
 
@@ -106,12 +110,18 @@ class ProductStockViewSet(TranslatedViewSet):
                 message=t('marketplace.product_not_editable', self.get_language()),
                 code='product_not_editable',
             )
-        was_draft = stock.status == ProductStock.Status.DRAFT
+        old_status = stock.status
         updated = serializer.save()
         # Draft → active transition triggered via raw PATCH (status=active)
         # should still fire matching, same as the explicit publish action.
-        if was_draft and updated.status == ProductStock.Status.ACTIVE:
+        if old_status == ProductStock.Status.DRAFT and updated.status == ProductStock.Status.ACTIVE:
             run_matching(updated)
+        # A PATCH can go live or pause a batch too — same product switch
+        # rules as the publish / activate / deactivate actions.
+        if old_status != ProductStock.Status.ACTIVE and updated.status == ProductStock.Status.ACTIVE:
+            switch_product_on_for_live_batch(updated.product)
+        elif old_status == ProductStock.Status.ACTIVE and updated.status == ProductStock.Status.INACTIVE:
+            switch_product_off_if_no_live_batch(updated.product)
         _clear_public_market_cache()
 
     def perform_destroy(self, instance):
@@ -121,6 +131,8 @@ class ProductStockViewSet(TranslatedViewSet):
                 code='only_draft_deletable',
             )
         instance.soft_delete(user=self.request.user)
+        # Removing the last non-paused batch leaves only paused ones.
+        switch_product_off_if_all_inactive(instance.product)
         _clear_public_market_cache()
 
     @extend_schema(tags=['Marketplace - Product Stocks'])
@@ -141,6 +153,7 @@ class ProductStockViewSet(TranslatedViewSet):
             )
         stock.status = ProductStock.Status.ACTIVE
         stock.save()
+        switch_product_on_for_live_batch(stock.product)
         run_matching(stock)
         _clear_public_market_cache()
         return StandardResponse.success(
@@ -170,7 +183,8 @@ class ProductStockViewSet(TranslatedViewSet):
     @action(detail=True, methods=['post'])
     def deactivate(self, request, product_pk=None, pk=None):
         """ACTIVE → INACTIVE: pause the batch — hidden from buyers and the
-        Market Hub until reactivated."""
+        Market Hub until reactivated. Pausing the last live batch switches
+        the product off too."""
         stock = self.get_object()
         if stock.status != ProductStock.Status.ACTIVE:
             raise BusinessLogicError(
@@ -179,6 +193,7 @@ class ProductStockViewSet(TranslatedViewSet):
             )
         stock.status = ProductStock.Status.INACTIVE
         stock.save()
+        switch_product_off_if_no_live_batch(stock.product)
         _clear_public_market_cache()
         return StandardResponse.success(
             data=ProductStockSerializer(stock).data,
@@ -188,7 +203,8 @@ class ProductStockViewSet(TranslatedViewSet):
     @extend_schema(tags=['Marketplace - Product Stocks'])
     @action(detail=True, methods=['post'])
     def activate(self, request, product_pk=None, pk=None):
-        """INACTIVE → ACTIVE: list a paused batch again (validity permitting)."""
+        """INACTIVE → ACTIVE: list a paused batch again (validity permitting),
+        switching the product back on if it was off."""
         stock = self.get_object()
         if stock.status != ProductStock.Status.INACTIVE:
             raise BusinessLogicError(
@@ -202,6 +218,7 @@ class ProductStockViewSet(TranslatedViewSet):
             )
         stock.status = ProductStock.Status.ACTIVE
         stock.save()
+        switch_product_on_for_live_batch(stock.product)
         run_matching(stock)
         _clear_public_market_cache()
         return StandardResponse.success(
